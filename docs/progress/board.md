@@ -44,7 +44,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
-| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Ready** | First task |
+| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **In progress** | Builder session started 2026-10-02 |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | Planned | |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
