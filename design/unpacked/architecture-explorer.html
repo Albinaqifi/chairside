@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="9dcc0646-1c7c-4206-b5c1-021aa099470a"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style></style>
+<style>*{box-sizing:border-box}body{margin:0;background:oklch(0.985 0.003 250);color:oklch(0.24 0.012 250);font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}a{color:oklch(0.45 0.1 190)}a:hover{color:oklch(0.35 0.1 190)}button{font-family:inherit}</style>
+</helmet>
+<div style="display:flex;min-height:100vh;">
+  <nav style="width:248px;flex:0 0 248px;border-right:1px solid oklch(0.9 0.005 250);padding:28px 14px;position:sticky;top:0;height:100vh;overflow:auto;background:oklch(0.97 0.004 250);display:flex;flex-direction:column;gap:4px;">
+    <div style="padding:0 10px 20px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;color:oklch(0.46 0.012 250);">ARCHITECTURE EXPLORER</div>
+      <div style="font-weight:600;font-size:17px;line-height:1.3;margin-top:6px;">Dental scheduling &amp; patient messaging</div>
+    </div>
+    <sc-for list="{{ navStart }}" as="it" hint-placeholder-count="1">
+      <button sc-camel-on-click="{{ it.onClick }}" style="text-align:left;border:0;border-radius:6px;padding:8px 10px;font-size:14px;cursor:pointer;background:{{ it.bg }};color:{{ it.color }};font-weight:{{ it.weight }};">{{ it.label }}</button>
+    </sc-for>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;color:oklch(0.46 0.012 250);padding:18px 10px 6px;">DIAGRAMS</div>
+    <sc-for list="{{ navDiagrams }}" as="it" hint-placeholder-count="6">
+      <button sc-camel-on-click="{{ it.onClick }}" style="text-align:left;border:0;border-radius:6px;padding:8px 10px;font-size:14px;cursor:pointer;background:{{ it.bg }};color:{{ it.color }};font-weight:{{ it.weight }};">{{ it.label }}</button>
+    </sc-for>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;color:oklch(0.46 0.012 250);padding:18px 10px 6px;">GUIDES</div>
+    <sc-for list="{{ navGuides }}" as="it" hint-placeholder-count="6">
+      <button sc-camel-on-click="{{ it.onClick }}" style="text-align:left;border:0;border-radius:6px;padding:8px 10px;font-size:14px;cursor:pointer;background:{{ it.bg }};color:{{ it.color }};font-weight:{{ it.weight }};">{{ it.label }}</button>
+    </sc-for>
+  </nav>
+  <main style="flex:1 1 auto;min-width:0;padding:36px 44px 96px;">
+    <div style="max-width:1440px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;color:oklch(0.46 0.012 250);">{{ view.groupLabel }}</div>
+      <h1 style="font-size:30px;font-weight:600;margin:6px 0 10px;letter-spacing:-0.01em;">{{ view.title }}</h1>
+      <p style="max-width:780px;font-size:15.5px;line-height:1.6;color:oklch(0.4 0.012 250);margin:0 0 28px;text-wrap:pretty;">{{ view.intro }}</p>
+
+      <sc-if value="{{ isDiagram }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;">
+          <div style="flex:1 1 620px;min-width:0;display:flex;flex-direction:column;gap:24px;">
+            <div style="background:#ffffff;border:1px solid oklch(0.9 0.005 250);border-radius:10px;padding:18px 18px 22px;">
+              <div style="display:flex;flex-wrap:wrap;gap:8px 18px;margin-bottom:16px;">
+                <sc-for list="{{ legend }}" as="lg" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:oklch(0.46 0.012 250);">
+                    <span style="width:14px;height:10px;border-radius:3px;background:{{ lg.bg }};border:{{ lg.bd }};"></span>{{ lg.name }}
+                  </div>
+                </sc-for>
+                <div style="font-size:12px;color:oklch(0.46 0.012 250);margin-left:auto;">{{ view.canvasHint }}</div>
+              </div>
+              <div ref="{{ wrapRef }}" style="width:100%;">
+                <div style="position:relative;width:{{ canvasW }}px;height:{{ canvasH }}px;">
+                  <div style="position:absolute;left:0;top:0;width:{{ view.W }}px;height:{{ view.H }}px;transform:scale({{ scale }});transform-origin:0 0;">
+                    {{ edges }}
+                    <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="0">
+                      <button sc-camel-on-click="{{ n.onClick }}" style="position:absolute;left:{{ n.x }}px;top:{{ n.y }}px;width:{{ n.w }}px;height:{{ n.h }}px;background:{{ n.bg }};border:{{ n.bd }};border-radius:{{ n.r }};box-shadow:{{ n.shadow }};padding:{{ n.pad }};display:flex;flex-direction:column;justify-content:{{ n.justify }};align-items:{{ n.align }};text-align:{{ n.ta }};gap:3px;cursor:pointer;color:oklch(0.24 0.012 250);overflow:hidden;">
+                        <span style="flex-shrink:0;width:100%;font-size:13px;font-weight:600;line-height:1.25;font-family:{{ n.font }};">{{ n.t }}</span>
+                        <sc-if value="{{ n.hasSub }}" hint-placeholder-val="{{ false }}">
+                          <span style="flex-shrink:0;width:100%;font-size:11.5px;line-height:1.3;color:oklch(0.44 0.012 250);">{{ n.s }}</span>
+                        </sc-if>
+                        <sc-if value="{{ n.hasFields }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:flex;flex-direction:column;width:100%;border-top:1px solid oklch(0.88 0.006 250);margin-top:5px;padding-top:4px;">
+                            <sc-for list="{{ n.fields }}" as="f" hint-placeholder-count="3">
+                              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:17px;color:oklch(0.38 0.012 250);white-space:nowrap;">{{ f }}</span>
+                            </sc-for>
+                          </span>
+                        </sc-if>
+                      </button>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <sc-if value="{{ hasKp }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#ffffff;border:1px solid oklch(0.9 0.005 250);border-radius:10px;padding:22px 26px;">
+                <h3 style="margin:0 0 14px;font-size:16px;font-weight:600;">{{ kpTitle }}</h3>
+                <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:9px;font-size:14.5px;line-height:1.55;">
+                  <sc-for list="{{ kpItems }}" as="it" hint-placeholder-count="3">
+                    <li style="text-wrap:pretty;"><strong style="font-weight:600;">{{ it.head }}</strong>{{ it.sep }}{{ it.body }}</li>
+                  </sc-for>
+                </ul>
+              </div>
+            </sc-if>
+          </div>
+          <aside style="flex:1 1 300px;max-width:420px;position:sticky;top:24px;background:#ffffff;border:1px solid oklch(0.9 0.005 250);border-radius:10px;padding:24px 24px 26px;">
+            <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:oklch(0.46 0.012 250);">
+                  <span style="width:14px;height:10px;border-radius:3px;background:{{ sel.bg }};border:{{ sel.bd }};"></span>{{ sel.kind }}
+                </div>
+                <h2 style="margin:0;font-size:21px;font-weight:600;line-height:1.25;">{{ sel.t }}</h2>
+                <sc-if value="{{ sel.hasSub }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:oklch(0.44 0.012 250);line-height:1.5;">{{ sel.s }}</div>
+                </sc-if>
+                <p style="margin:0;font-size:14.5px;line-height:1.6;text-wrap:pretty;">{{ sel.what }}</p>
+                <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:9px;font-size:14px;line-height:1.55;color:oklch(0.3 0.012 250);">
+                  <sc-for list="{{ sel.pts }}" as="p" hint-placeholder-count="3">
+                    <li style="text-wrap:pretty;">{{ p }}</li>
+                  </sc-for>
+                </ul>
+                <sc-if value="{{ sel.hasLinks }}" hint-placeholder-val="{{ false }}">
+                  <div style="border-top:1px solid oklch(0.92 0.005 250);padding-top:12px;display:flex;flex-direction:column;gap:6px;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;color:oklch(0.46 0.012 250);">CONNECTIONS</div>
+                    <sc-for list="{{ sel.links }}" as="l" hint-placeholder-count="2">
+                      <button sc-camel-on-click="{{ l.onClick }}" style="text-align:left;border:0;background:transparent;padding:2px 0;font-size:13.5px;color:oklch(0.42 0.1 190);cursor:pointer;">{{ l.text }}</button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <button sc-camel-on-click="{{ clearSel }}" style="align-self:flex-start;margin-top:4px;border:1px solid oklch(0.85 0.006 250);background:#ffffff;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer;color:oklch(0.3 0.012 250);">Clear selection</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{ noSel }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;color:oklch(0.46 0.012 250);">DETAILS</div>
+                <p style="margin:0;font-size:14.5px;line-height:1.6;color:oklch(0.36 0.012 250);">Click any box in the diagram to see what it does, why it is there, and what it connects to.</p>
+              </div>
+            </sc-if>
+          </aside>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isText }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:20px;align-items:start;">
+          <sc-for list="{{ blocks }}" as="b" hint-placeholder-count="4">
+            <section style="background:#ffffff;border:1px solid oklch(0.9 0.005 250);border-radius:10px;padding:22px 26px 24px;display:flex;flex-direction:column;gap:12px;">
+              <h3 style="margin:0;font-size:17px;font-weight:600;">{{ b.h }}</h3>
+              <sc-if value="{{ b.hasP }}" hint-placeholder-val="{{ false }}">
+                <p style="margin:0;font-size:14.5px;line-height:1.6;color:oklch(0.34 0.012 250);text-wrap:pretty;">{{ b.p }}</p>
+              </sc-if>
+              <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:9px;font-size:14px;line-height:1.55;">
+                <sc-for list="{{ b.items }}" as="it" hint-placeholder-count="3">
+                  <li style="text-wrap:pretty;"><strong style="font-weight:600;">{{ it.head }}</strong>{{ it.sep }}{{ it.body }}</li>
+                </sc-for>
+              </ul>
+            </section>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;showEdgeLabels&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;startView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;overview&quot;,&quot;options&quot;:[&quot;overview&quot;,&quot;arch&quot;,&quot;erd&quot;,&quot;msg&quot;,&quot;ai&quot;,&quot;links&quot;,&quot;import&quot;,&quot;security&quot;,&quot;stack&quot;,&quot;mvp&quot;,&quot;risks&quot;,&quot;testing&quot;,&quot;glossary&quot;],&quot;tsType&quot;:&quot;string&quot;}}">
+const C = { ink:'oklch(0.24 0.012 250)', mut:'oklch(0.46 0.012 250)', line:'oklch(0.74 0.01 250)', acc:'oklch(0.52 0.11 190)', accSoft:'oklch(0.52 0.11 190 / 0.3)' };
+const KIND = {
+  actor:{bg:'oklch(0.985 0.003 250)',bd:'1.5px solid oklch(0.4 0.012 250)',r:'999px',name:'People'},
+  app:{bg:'#ffffff',bd:'1.5px solid oklch(0.3 0.012 250)',r:'8px',name:'Our app'},
+  worker:{bg:'oklch(0.96 0.03 190)',bd:'1.5px solid oklch(0.52 0.09 190)',r:'8px',name:'Background work'},
+  data:{bg:'oklch(0.95 0.025 255)',bd:'1.5px solid oklch(0.5 0.09 255)',r:'8px',name:'Data'},
+  ext:{bg:'oklch(0.965 0.035 75)',bd:'1.5px dashed oklch(0.55 0.11 75)',r:'8px',name:'External service'},
+  note:{bg:'oklch(0.97 0.003 250)',bd:'1.5px dashed oklch(0.6 0.01 250)',r:'8px',name:'Rule / note'},
+  warn:{bg:'oklch(0.965 0.03 25)',bd:'1.5px solid oklch(0.55 0.13 25)',r:'8px',name:'Failure path'},
+  eT:{bg:'oklch(0.965 0.004 250)',bd:'1.5px solid oklch(0.45 0.012 250)',r:'6px',name:'Tenancy & staff'},
+  eS:{bg:'#ffffff',bd:'1.5px solid oklch(0.3 0.012 250)',r:'6px',name:'Scheduling & patients'},
+  eC:{bg:'oklch(0.96 0.03 190)',bd:'1.5px solid oklch(0.52 0.09 190)',r:'6px',name:'Care plans & aftercare'},
+  eM:{bg:'oklch(0.95 0.025 255)',bd:'1.5px solid oklch(0.5 0.09 255)',r:'6px',name:'Messaging'}
+};
+const N = (id,x,y,w,h,k,t,s,what,pts) => ({id,x,y,w,h,k,t,s,what,pts});
+
+const ARCH = {
+  id:'arch', group:'Diagrams', nav:'System architecture', title:'System architecture',
+  intro:'One app, one database, one background worker. The staff app, patient pages and API are a single codebase. Slow or time-based work runs in a separate worker process. Email, SMS, WhatsApp and AI are external services you pay per use, each behind a small adapter.',
+  W:1000, H:590,
+  nodes:[
+    N('staff',60,20,180,52,'actor','Clinic staff','Browser, with roles','Front desk, dentists and clinic owners using a normal web browser.',['They log in with email and password, plus two-factor authentication (2FA). Make 2FA mandatory for owners and anyone who can export data.','Their role decides what they can see and do. For example, front desk cannot export patient lists, and only owners manage users and billing.','One person can work at several clinics. Each clinic gets its own Membership record.']),
+    N('patient',480,20,180,52,'actor','Patients','Phone, no login','Patients never log in. They get messages that contain a unique link.',['Each link opens a mobile page for one purpose: confirm, cancel, request a new time, or view their treatment plan.','See the Patient links diagram for how this stays secure without passwords.']),
+    N('webapp',40,130,220,64,'app','Staff web app','Calendar, patients, rules, dashboard','The screens staff use, rendered by the same Next.js app that holds the API.',['Calendar per dentist or chair, patient records, rule and template editor, aftercare approval inbox, import wizard, dashboard.','The browser never talks to the database directly. It calls server-side code, which checks the user\'s role and clinic first.','Add an “Needs attention” inbox: drafts to approve, failed messages, patient cancellations. It keeps staff from missing anything.']),
+    N('ppages',460,130,220,64,'app','Patient pages','Public, mobile-first','A small set of public pages under /p/<token>, separate from the staff app.',['Rendered on the server and kept very light, so they load fast on weak mobile connections.','Actions use buttons that send a POST request. Opening the page never changes anything, because email scanners and chat apps open links automatically.','Rate-limited per IP address and per token. No staff cookies, no staff data, no third-party analytics.']),
+    N('webhooks',780,130,200,64,'app','Webhook endpoint','Delivery status, replies','A webhook is a URL that an external service calls to tell you something happened. Providers use it to report delivered, bounced or failed messages, and SMS/WhatsApp replies like “STOP”.',['Check the provider\'s signature on every request, so nobody can fake a status.','Save the raw event first and process it afterwards. That keeps responses fast and nothing is lost if processing fails.','Providers sometimes send the same event twice. Processing it twice must give the same result (this is called idempotency).','Every provider (email, SMS, WhatsApp) posts to this endpoint. Only one of those lines is drawn to keep the diagram readable.']),
+    N('core',200,250,480,72,'app','Application core — modular monolith','Modules: auth · scheduling · patients · messaging · aftercare · import · reporting','A modular monolith is one deployable app with its code split into modules that have clear boundaries. Other modules call a module\'s functions, not its tables.',['Why not microservices: separate services mean separate deployments, network failures between them, and data to keep in sync. For one developer that is a lot of cost and no benefit at this size.','Every request knows the current clinic (the tenant) and user. Every query is scoped to that clinic.','When a change needs follow-up work (for example, plan reminders for a new appointment), the job is written in the same database transaction as the change. Either both are saved or neither is.','The reporting module reads message and appointment history for the dashboard: no-show rate, confirmation rate, recalls that turned into bookings.','Clean module boundaries keep a later split possible, if you ever need one.']),
+    N('files',40,400,200,64,'data','File storage','S3-compatible, EU region','Stores uploaded import files and any exports.',['Private bucket. Files are only reachable through short-lived signed URLs.','Delete import files automatically after about 30 days, because they contain full patient lists.','Leave X-rays and documents out of the MVP. If you add them later, the same rules apply.']),
+    N('db',300,400,220,64,'data','PostgreSQL','Data + job queue (pg-boss)','One database shared by all clinics, with a clinic_id on every row. It also holds the job queue.',['Row-Level Security (RLS) is a safety net: Postgres itself refuses to return another clinic\'s rows, even if app code forgets a filter.','Job queue: a table of “work to do later” that the worker reads. Libraries like pg-boss or Graphile Worker provide scheduled jobs, retries and repeating (cron) jobs, so you don\'t need Redis.','Store all times as timestamptz (UTC). Convert to the clinic\'s time zone only for display and scheduling.','Daily automated backups with point-in-time recovery. Test a restore before your first real clinic.','Host it in an EU region.']),
+    N('worker',580,400,180,64,'worker','Background worker','Planner · dispatcher · import · AI','A second process that runs the same codebase and handles anything slow or time-based.',['Planner: every 5 minutes, works out which messages should exist and creates them.','Dispatcher: sends messages that are due.','Import processor: parses uploaded spreadsheets. AI drafting: calls the AI API.','Because it is a separate process, a slow provider never slows down the calendar.','You can run several copies safely. Each job is locked when it is picked up, so two workers never take the same one.']),
+    N('email',800,290,180,64,'ext','Email provider','Postmark, Brevo, Amazon SES (EU)','Sends email and reports delivery back through the webhook.',['Set up SPF, DKIM and DMARC for the sending domain. Without them, reminders land in spam.','Use one stream for reminders and a separate one for promotions. Complaints about promos then can\'t hurt reminder delivery.','Sign the provider\'s Data Processing Agreement (DPA).']),
+    N('sms',800,400,180,64,'ext','SMS / WhatsApp provider','Twilio, Vonage, Infobip','Delivers SMS and WhatsApp messages.',['SMS is charged per message, and prices vary a lot by country (roughly €0.03–0.10). Check your target countries early.','Business-initiated WhatsApp messages must use templates approved by Meta. Each rule\'s template needs approval before it can be used.','Some countries require a registered sender name (Sender ID).','Choosing one provider for both SMS and WhatsApp means less integration work.']),
+    N('ai',800,510,180,64,'ext','AI API','Anthropic or OpenAI','Drafts aftercare text. It is only called from the worker, never from the browser.',['It never receives patient identity. See the AI aftercare diagram.','Check the provider\'s data-retention and no-training terms, and sign their DPA.'])
+  ],
+  edges:[['staff','webapp','HTTPS'],['patient','ppages','link in message'],['webapp','core',''],['ppages','core',''],['webhooks','core','status updates'],['core','db','read / write + enqueue'],['core','files','uploads'],['db','worker','jobs'],['worker','email','send'],['worker','sms','send'],['worker','ai','draft request'],['email','webhooks','delivery events']],
+  kp:{title:'How the pieces talk', items:['Browser → app — Normal HTTPS requests. Staff use a session cookie. Patients use the token in their link.','App → worker — Never called directly. The app writes a job row into Postgres and the worker picks it up. If the worker is down, jobs wait and nothing is lost.','Worker → providers — Outgoing API calls through adapters, one per channel.','Providers → app — Webhooks bring back delivery status and replies.']}
+};
+
+const MSG = {
+  id:'msg', group:'Diagrams', nav:'Message scheduling', title:'Message scheduling flow',
+  intro:'Messaging has two stages. Planning decides which messages should exist and stores each one as a row. Sending delivers the rows that are due. Keeping these apart is what makes duplicates, gaps, retries and time zones manageable.',
+  W:1000, H:520,
+  nodes:[
+    N('event',20,30,210,72,'app','Something changed','Appointment booked, moved, cancelled, completed, no-show','Business changes add a “plan messages for this patient” job in the same transaction as the change.',['This lets the system react quickly, so a booking made today for tomorrow still gets its reminder.','Moving an appointment cancels its pending messages and plans new ones.']),
+    N('tick',20,150,210,64,'worker','Clock tick','Repeating job, every 5 minutes','A repeating job that runs the planner for every clinic.',['It is the safety net: it catches anything events missed because of a bug, a crash or a deploy mid-change.','Triggers with no event behind them come only from here: recall due, aligner switch, unfinished plan.','The planner is idempotent (running it again changes nothing), so running it often is harmless.']),
+    N('planner',280,90,190,64,'worker','Planner','Decides what should be sent','For each enabled rule, the planner finds matching patients or appointments and works out when the message should go out, in the clinic\'s local time.',['Example: rule “day before at 18:00”, appointment Tuesday 10:00 in Europe/Belgrade. The send time is Monday 18:00 local time, stored as UTC.','Use a time zone library such as Luxon or date-fns-tz. Never add 24 hours by hand: on daylight-saving days a day is 23 or 25 hours long.','Quiet hours: if the computed time falls at night, move it to the next morning.','If the send time is already past (booked at 20:00 for tomorrow), the rule setting decides whether to send now or skip.']),
+    N('scheduled',520,90,200,64,'data','Message row','status = pending · unique key','Every message that should go out becomes a row in the messages table before anything is sent. That row is the single source of truth.',['Idempotency key: a value that identifies “this message for this reason”, e.g. reminder:appt_123:2026-10-06T08:00Z.','A UNIQUE constraint on that key makes the database reject a second copy. Duplicates are impossible, even if two planners run at once.','The key includes the appointment time, so a rescheduled appointment gets a new, correct reminder.','Staff can see a patient\'s upcoming messages before they go out.']),
+    N('dispatcher',770,90,210,64,'worker','Dispatcher','Runs every minute, sends what is due','Claims pending rows with scheduled_for ≤ now and marks them “sending”.',['It claims rows with SELECT … FOR UPDATE SKIP LOCKED. Rows another worker is already handling are skipped, so no message is taken twice.','It sends in small batches and respects provider rate limits.','If a worker crashes mid-send, rows stuck in “sending” for over 10 minutes are checked with the provider before anything is resent.']),
+    N('checks',770,230,210,64,'note','Send-time checks','Is this still valid?','Conditions are checked again right before sending, because things change between planning and sending.',['Is the appointment still booked and at the same time?','Does the patient still have consent for this purpose and channel? Are they deleted or opted out?','Are we outside quiet hours?','If any check fails, the status becomes “skipped” with a reason. Skipped messages are visible, never silently dropped.']),
+    N('router',520,230,200,64,'app','Channel router','Picks the channel + template','Chooses a channel from the rule\'s priority list and the patient\'s contact details, for example WhatsApp → SMS → email.',['Renders the template for that channel and the patient\'s language.','Fallback: if WhatsApp fails permanently (the number isn\'t on WhatsApp), SMS is tried as a new attempt.','Clinic settings decide which channels are switched on.']),
+    N('ademail',280,200,150,48,'app','Email adapter','',"An adapter is a small class that translates our standard message into one provider's API.",['Every adapter implements the same interface: send(message) returns a provider message id or an error marked temporary or permanent. parseWebhook(request) returns status events.','Adding Viber later means writing one new adapter plus templates. Nothing else changes.','Keep a fake adapter that only logs messages. Use it for tests and demos.']),
+    N('adsms',280,262,150,48,'app','SMS adapter','',"Same interface as the other adapters.",['Long SMS are split into 160-character segments (70 with special characters), and each segment is charged. Show staff a character counter in the template editor.','Add an opt-out line (“Reply STOP to unsubscribe”) wherever local rules require one.']),
+    N('adwa',280,324,150,48,'app','WhatsApp adapter','',"Same interface as the other adapters.",['Messages you start must use a Meta-approved template name plus variables. Store that name on the message template.','Free-form replies are only allowed within 24 hours of the patient messaging you.']),
+    N('provider',20,262,210,64,'ext','Provider','Postmark, Twilio, …','The external service that actually delivers the message. When a provider accepts a message, it has not been delivered yet.',['Save the provider\'s message id on our row and set status to “sent”.','Delivered or failed comes later, through the webhook.']),
+    N('webhook',20,420,210,64,'app','Delivery webhook','delivered · bounced · failed · reply','Turns provider statuses into ours.',['A hard bounce or invalid number marks that contact as invalid and shows a warning on the patient record.','Incoming replies: “STOP” removes consent for that channel. “YES” to a reminder can confirm the appointment.','Replayed events are ignored, because the event id is stored with a unique constraint.']),
+    N('events',280,420,190,64,'data','Status + history','message_events','Each status change is added to message_events. The message row keeps the latest status.',['This is the per-patient message history staff asked for.','It also feeds the dashboard: delivery rate, confirmation rate, and recalls that turned into bookings.']),
+    N('failed',520,420,200,64,'warn','Failed → staff alert','Nothing fails silently','After the final attempt, the status becomes “failed” with a reason, shown in the attention inbox.',['Front desk can phone the patient instead.','You, the developer, get an alert if the failure rate spikes. That usually means a provider outage or an expired API key.']),
+    N('retry',770,420,210,64,'warn','Retry with backoff','Temporary errors only','Exponential backoff means waiting longer after each failure: 1 min, 5 min, 30 min, 2 h.',['Retry timeouts, server errors and rate limits. Never retry permanent errors such as an invalid number or an unsubscribed patient.','Allow about 5 attempts. Never retry a reminder after the appointment has started.','A retry puts the same row back to “pending” with a later scheduled_for time. It is not a new message, so it cannot create duplicates.'])
+  ],
+  edges:[['event','planner','enqueue'],['tick','planner',''],['planner','scheduled','insert, ignore if exists'],['scheduled','dispatcher','when due'],['dispatcher','checks',''],['checks','router','still valid'],['checks','events','skipped + reason'],['router','ademail',''],['router','adsms',''],['router','adwa',''],['ademail','provider',''],['adsms','provider',''],['adwa','provider',''],['provider','webhook','status callback'],['webhook','events',''],['router','retry','temporary error'],['retry','failed','max attempts']],
+  kp:{title:'How each rule computes its send time', items:['Appointment reminder — appointment start minus the offset, at the rule\'s local send time. Rescheduling replaces it.','Recall — patient_care_plan.next_due_on minus lead days. next_due_on is recalculated when a visit for that plan is completed. It stops if the patient already has a future appointment.','Missed visit — the appointment is marked no-show, then the message goes out after X hours. Ortho rules can add a second follow-up if the patient hasn\'t rebooked within N days.','Aligner switch — aligner_series.next_switch_on. It moves forward by switch_every_days until the last aligner.','Unfinished plan — plan items remain, the patient has no future appointment, and the last visit was more than X days ago.','Promotion — sent only to patients with current marketing consent for that channel, always with an unsubscribe option.','Time zones — each clinic stores an IANA time zone (e.g. Europe/Belgrade). Rules are written in local time and stored in UTC. The server\'s own time zone never matters.']}
+};
+
+const AI = {
+  id:'ai', group:'Diagrams', nav:'AI aftercare', title:'AI aftercare flow',
+  intro:'Suggested change: use AI mainly to build each clinic\'s library of approved aftercare templates, and only occasionally for one-off drafts. Once a treatment type has an approved template, drafts come from the library. That is faster, costs nothing, is already signed off by the dentist, and no data goes to the AI provider.',
+  W:1000, H:460,
+  nodes:[
+    N('done',20,40,200,64,'app','Treatment marked done','Plan item → done','Staff complete a treatment item, for example “extraction, tooth 36”. This adds an aftercare job.',['Nothing is sent automatically. This only prepares a draft.']),
+    N('lookup',260,40,200,64,'note','Approved template exists?','For this treatment + language','The worker looks in the clinic\'s aftercare library.',['After the first few weeks the answer is usually yes. That means no AI call, no cost and no wait.']),
+    N('fill',500,40,200,64,'app','Fill template locally','Our code inserts name, clinic phone','Placeholders such as {{first_name}} and {{clinic_phone}} are filled in by our code.',['The patient\'s name never goes to the AI.','The draft still goes to the approval inbox. Later, clinics could turn off approval for library templates, per rule.']),
+    N('library',740,40,220,64,'data','Save to library','Versioned template','One click saves the text as the clinic\'s template for this treatment.',['Library templates are versioned. Editing one creates a new version, and each sent message records which version it used.','Status: draft, approved or archived. Source: AI or manual.']),
+    N('boundary',20,190,200,110,'note','Data boundary','The AI gets facts about the treatment, never about the person.','This is the rule for what leaves our system.',['Under GDPR the AI provider is a sub-processor. List it in your DPA with each clinic.','Prefer providers that offer EU processing or zero data retention.','Ask for structured output (JSON with dos, donts, call_clinic_if) so the result fits your layout.']),
+    N('build',260,200,200,64,'worker','Build de-identified prompt','Treatment facts only','The request is built from facts that don\'t identify the patient.',['Sent: treatment type, tooth area (e.g. “lower left molar”), anaesthesia used, language, the clinic\'s tone and style notes, and optional staff notes.','Not sent: name, phone, email, date of birth, patient id, appointment dates, other treatment history.','Free-text staff notes are the main leak risk. Label them clearly as “sent to AI” and automatically strip phone numbers, emails and names.']),
+    N('ai',500,200,200,64,'ext','AI API','Anthropic / OpenAI','Returns a short do\'s and don\'ts draft.',['Set a timeout and retry. If the AI is down, staff can write the text themselves, so the workflow never blocks.','Log token usage per clinic to watch costs (a few cents per draft).']),
+    N('review',740,200,220,64,'app','Staff review & approve','Dentist or authorised role','A dentist or authorised staff member reads the draft, edits it, then approves or discards it.',['Only roles with the “approve clinical content” permission can approve.','The audit log records who approved which text, and when.','Until approved, the text is clearly labelled as AI-drafted.']),
+    N('draft',500,360,200,64,'data','Draft saved','status = awaiting_approval','The draft is stored with the prompt version and model name.',['Later you can tell which drafts came from which prompt, which helps when you improve it.','It appears in the staff approval inbox.']),
+    N('send',740,360,220,64,'worker','Queued as a message','Same pipeline as reminders','Once approved, the text becomes a normal message row. The same dispatcher, checks and retries apply.',['Aftercare is care communication, so it doesn\'t need marketing consent. It does need a valid contact channel.'])
+  ],
+  edges:[['done','lookup',''],['lookup','fill','yes'],['lookup','build','no'],['build','ai','de-identified'],['ai','draft',''],['fill','review',''],['draft','review',''],['review','library','optional'],['review','send','approve']]
+};
+
+const LINKS = {
+  id:'links', group:'Diagrams', nav:'Patient links', title:'Patient link flow',
+  intro:'Patients never log in. Each link carries a long random token that acts like a one-purpose key. The link alone is enough for low-risk actions like confirming. Viewing health information needs one extra check, because links get forwarded and phones get shared.',
+  W:1000, H:420,
+  nodes:[
+    N('msg',20,40,200,64,'app','Message with link','app.example/p/k7Qx9…','Every message gets its own link token: 32 random bytes, URL-safe, about 43 characters.',['Only a hash (SHA-256) of the token is stored, the same way passwords are stored. A leaked database doesn\'t expose working links.','Each token is tied to one patient and one purpose, such as appointment actions or plan view.','Expiry: appointment links expire after the appointment. Plan links expire after about 30 days.']),
+    N('open',260,40,200,64,'app','Patient opens link','GET request: read-only','Opening the page never changes anything.',['Email security scanners and chat previews (WhatsApp, Viber) open links automatically. If opening the link confirmed the appointment, scanners would confirm on patients\' behalf.','Send noindex headers and load no third-party scripts, so the URL doesn\'t leak to trackers.']),
+    N('lookup',500,40,200,64,'app','Look up token','Hash → find row → check','The token from the URL is hashed and looked up. Then expiry, revocation and patient status are checked.',['Rate-limit by IP address. Guessing a 256-bit token is practically impossible anyway.','Give the same response for “not found” and “expired”, so the page reveals nothing.']),
+    N('invalid',760,40,220,64,'warn','Expired or invalid','Friendly fallback page','Shows the clinic\'s name and phone number.',['Optional: a “send me a new link” button that sends only to the contact details already on file, never to a newly typed number.']),
+    N('update',20,180,200,64,'app','Update appointment','+ audit log','The status changes, and pending reminders are cancelled or re-planned.',['The audit log records “patient via link” as the actor.','An SMS or WhatsApp reply of “YES” goes through the same update, via the webhook.']),
+    N('action',260,180,200,64,'app','Confirm / Cancel','POST with the token','The patient presses a button.',['Idempotent: pressing Confirm twice gives the same result.','Cancel asks “are you sure?” and optionally a reason.','The clinic sets a cancel cut-off, e.g. 24 hours. After it, the page says “please call us”.']),
+    N('page',500,180,200,64,'app','Appointment summary','Minimal data only','Shows only what is needed: first name, date and time, clinic, dentist.',['No treatment details on this page, so a forwarded reminder doesn\'t reveal health information.','Buttons: Confirm, Cancel, Request another time.']),
+    N('notify',20,320,200,64,'app','Staff notified','Calendar + attention inbox','Cancellations and requests appear in the calendar and the attention inbox straight away.',['A freed slot can be offered to someone else. A waitlist is a good later feature.']),
+    N('resched',260,320,200,64,'app','Request another time','MVP: staff call back','MVP: the patient picks rough preferences (mornings, next week) and staff call back.',['Much simpler than showing live availability, and many clinics prefer to control their calendar.','Later: show real free slots for that dentist and appointment type. A database constraint prevents double booking.']),
+    N('verify',500,320,200,64,'note','Extra check','Birth date or SMS code','Viewing the treatment plan needs one more factor, because the link could be forwarded or seen on a shared phone.',['Options: enter date of birth, or a 6-digit code sent to the phone number on file.','After 5 wrong attempts, the link is locked.','Success creates a short session (about 30 minutes) for that one patient.']),
+    N('plan',760,320,220,64,'app','Treatment plan & progress','Read-only','Shows done and remaining items, next steps and aftercare notes.',['Every view is recorded in the access log.'])
+  ],
+  edges:[['msg','open',''],['open','lookup',''],['lookup','invalid','not valid'],['lookup','page','valid'],['page','action',''],['action','update',''],['update','notify',''],['page','resched',''],['resched','notify',''],['page','verify','view plan'],['verify','plan','passed']]
+};
+
+const IMPORT = {
+  id:'import', group:'Diagrams', nav:'Import wizard', title:'Import wizard flow',
+  intro:'Imported data goes into a staging area first. Nothing touches real patient records until staff have reviewed the problems and confirmed. Every import can be undone for a few days, which makes clinics less nervous and saves you support time.',
+  W:1000, H:440,
+  nodes:[
+    N('upload',20,60,200,64,'app','Upload file','.csv or .xlsx','The file is stored privately and linked to an import job.',['Size limit around 10 MB.','The file is deleted automatically after about 30 days.']),
+    N('parse',260,60,200,64,'worker','Parse','In the worker','The file is read with a library: SheetJS for Excel, Papa Parse for CSV.',['Handle the encodings that old systems export (Windows-1250/1252) and both delimiters (; and ,).','Show the first 20 rows as a preview.']),
+    N('map',500,60,200,64,'app','Map columns','Saved per clinic','Staff match each column in their file to one of our fields.',['Auto-suggest from header names, so “Tel”, “Mobile” and “Telefon” all map to phone.','Allow splitting and joining, e.g. one “Full name” column into first and last name.','Save the mapping so a second import is quick.']),
+    N('normalize',760,60,220,64,'worker','Normalize','Phones, dates, names','Values are cleaned into one consistent format.',['Phone numbers become E.164 (e.g. +381641234567) using libphonenumber and the clinic\'s default country.','Dates arrive in many formats. When one is ambiguous (03/04/1990), ask staff which format the file uses.','Trim spaces and fix capitalisation.']),
+    N('commit',20,200,200,64,'data','Commit','Tagged with import_id','The worker inserts rows in batches, each batch in a transaction.',['Each created patient records which import created it.','The whole import gets one audit log entry.']),
+    N('confirm',260,200,200,64,'app','Confirm import','“Import 1,240 patients”','Staff confirm with a clear summary of what will happen.',[]),
+    N('review',500,200,200,64,'app','Review screen','Ready · Needs attention · Duplicates','Staff see clear counts: “1,240 ready, 36 missing phone, 12 possible duplicates”.',['Fix values inline, skip rows, or merge duplicates.','A link back to column mapping if something was mapped wrong.']),
+    N('validate',760,200,220,64,'worker','Validate & find duplicates','Into import_rows staging','Rows are checked. Nothing is written to real tables yet.',['Errors: missing name, or no valid phone and no email (the patient can\'t be messaged).','Duplicates within the file and against existing patients: same phone, or same name and birth date.']),
+    N('undo',20,340,200,64,'warn','Undo import','Within 7 days','“Delete everything created by import #12.”',['Only allowed while those patients have no appointments or messages yet. Otherwise it offers to archive them.']),
+    N('manual',260,340,200,64,'app','Manual entry','For paper records','A fast, keyboard-friendly form for typing in paper records.',['Uses the same cleaning and duplicate checks as imports.','Tab through fields, save and start the next record with one key.']),
+    N('consent',500,340,220,64,'note','Consent on import','Never assume marketing consent','How consent is set for imported patients.',['Reminders about booked care usually rely on the care relationship or the clinic\'s legitimate interest. That is the clinic\'s legal decision, so make it an explicit checkbox in the wizard.','Import marketing consent only if the clinic has proof. Otherwise it is “unknown”, and unknown means no promotions.','Record the source, e.g. “import #12, column Newsletter”.'])
+  ],
+  edges:[['upload','parse',''],['parse','map',''],['map','normalize',''],['normalize','validate',''],['validate','review',''],['review','map','fix mapping'],['review','confirm',''],['confirm','commit',''],['commit','undo','']]
+};
+
+const E = (id,t,k,fields,what,pts) => ({id,t,k,fields,what,pts});
+const ERD_COLS = [
+  [E('clinic','Clinic','eT',['id','name','timezone','settings'],'The tenant. Every other table (except User) has a clinic_id pointing here.',['timezone is an IANA name such as Europe/Belgrade. All scheduling uses it.','settings: quiet hours, cancel cut-off, enabled channels, sender names, default country for phone numbers.']),
+   E('membership','Membership','eT',['clinic_id','user_id','role','resource_id'],'Connects a user to a clinic, with a role.',['role: owner, dentist, front_desk, assistant. Code checks permissions from the role, e.g. can_export, can_approve_aftercare, can_manage_rules.','resource_id links a dentist to their own calendar column.']),
+   E('user','User','eT',['id','email','mfa_enabled'],'A login identity. It isn\'t tied to one clinic, because Membership handles that.',['Use an auth library for password hashing, sessions and 2FA. Don\'t write this yourself.']),
+   E('audit','AuditLog','eT',['clinic_id','actor','action','entity','at'],'A record of who did what, and when.',['Append-only: the app database user may insert but never update or delete. Enforce this with database permissions.','Log logins, patient record views, edits, exports, imports, approvals and link access.','Kept longer than normal data. Agree the retention period with clinics.']),
+   E('importjob','ImportJob','eT',['clinic_id','file_key','mapping','status'],'One upload through the import wizard.',['status: uploaded, mapped, validated, committed, undone.','A child table, import_rows, holds the staging data: raw values, cleaned values, errors, duplicate_of.'])],
+  [E('resource','Resource','eS',['clinic_id','type','name','hours'],'A dentist, chair or room that can be booked.',['type = dentist | chair | room.','hours: working hours, used for availability.']),
+   E('appt','Appointment','eS',['clinic_id','patient_id','dentist_id','chair_id','starts_at','ends_at','status'],'One booked visit.',['status: booked → confirmed → completed, or cancelled / no_show. Write the allowed transitions down and test them.','Postgres can prevent double booking with an exclusion constraint on (resource, time range).','starts_at and ends_at are timestamptz. An optional care_plan_id records which recall this visit fulfils.']),
+   E('link','PatientLink','eS',['token_hash','purpose','patient_id','appointment_id','expires_at'],'Tokens for the no-login patient pages.',['Only the hash is stored. The link itself exists only in the sent message.','Also stores used_at and failed_attempts, for step-up verification lockout.']),
+   E('consent','Consent','eS',['patient_id','purpose','channel','granted_at','revoked_at'],'One row per decision, per purpose (reminders, marketing) and channel.',['Never overwrite a row. The history of consent is itself evidence under GDPR.','Current consent is the latest row for each purpose and channel.','source records where it came from: form, import, link, or a STOP reply.'])],
+  [E('patient','Patient','eS',['clinic_id','first_name','last_name','phone_e164','email','language','deleted_at'],'A clinic\'s patient. Patients have no login.',['Phone numbers are stored in E.164 format, so matching and sending are reliable.','preferred_channel and language drive message routing.','deleted_at marks a soft delete. The record is anonymised later, subject to medical record retention law.']),
+   E('tplan','TreatmentPlan','eS',['patient_id','status','created_by'],'A group of planned treatments.',['status: proposed, accepted, in_progress, completed.','Progress is done items divided by all items.']),
+   E('item','PlanItem','eS',['plan_id','treatment_type_id','tooth','status','done_at'],'One treatment within a plan.',['status: planned, scheduled, done. appointment_id is set once it is booked.','Setting done_at triggers the aftercare flow.']),
+   E('ttype','TreatmentType','eS',['clinic_id','name','duration'],'The clinic\'s catalogue: filling, extraction, aligner check, and so on.',['Linked to aftercare templates and a default appointment duration.'])],
+  [E('careplan','CarePlan','eC',['clinic_id','name','interval_days'],'A recall plan template.',['Examples: standard check-up (6 months), ortho check (14 days), perio maintenance (90 days).','Store months and days separately, because “6 months” isn\'t a fixed number of days.']),
+   E('pcp','PatientCarePlan','eC',['patient_id','care_plan_id','next_due_on','active'],'Puts a patient on a recall plan.',['A patient can have several active plans at once.','next_due_on is a date, not a timestamp. It is recalculated when a matching visit is completed: completion date + interval.']),
+   E('aligner','AlignerSeries','eC',['patient_id','total','current_no','every_days','next_switch_on'],'Tracks clear-aligner switching between visits.',['next_switch_on = start + current_no × every_days.','Staff can adjust it when a patient pauses or restarts. It ends when current_no = total.']),
+   E('aftercare','AftercareTemplate','eC',['clinic_id','treatment_type_id','language','body','status','version'],'The clinic\'s approved aftercare library.',['status: draft, approved, archived. source: ai or manual.','Editing creates a new version.'])],
+  [E('rule','AutomationRule','eM',['clinic_id','trigger','offset','send_time_local','channels','enabled'],'One automation, editable by staff.',['trigger: appointment_reminder, recall_due, no_show, aligner_switch, plan_unfinished, promo.','offset (e.g. −1 day) plus send_time_local (18:00). channels is an ordered fallback list.','conditions (JSON) holds filters, e.g. only patients on an ortho plan.']),
+   E('mtpl','MessageTemplate','eM',['rule_id','channel','language','body','version'],'The text for each rule, channel and language.',['Variables: {{first_name}}, {{appt_time}}, {{link}}.','whatsapp_template_name references the template Meta approved.','Versioned. Each message records the version it used.']),
+   E('message','Message','eM',['clinic_id','patient_id','rule_id','idempotency_key','channel','status','scheduled_for','attempts'],'The key table. Every outgoing message, past and future, lives here.',['idempotency_key is UNIQUE, so the same message can never be created twice.','status: pending → sending → sent → delivered, or failed / skipped / cancelled / awaiting_approval.','Also stores provider_message_id, last_error, and a snapshot of the rendered text.']),
+   E('mevent','MessageEvent','eM',['message_id','status','occurred_at'],'Append-only history of each message.',['Written by the dispatcher and by webhooks.','Raw provider payloads are kept for about 30 days, then removed.'])]
+];
+const ERD_EDGES = [['clinic','membership'],['user','membership'],['resource','appt'],['patient','appt'],['appt','link'],['patient','consent'],['patient','tplan'],['tplan','item'],['ttype','item'],['ttype','aftercare'],['careplan','pcp'],['patient','pcp'],['patient','aligner'],['rule','mtpl'],['rule','message'],['patient','message'],['message','mevent']];
+function buildErd(){
+  const nodes=[]; const xs=[15,215,415,615,815];
+  ERD_COLS.forEach((col,ci)=>{ let y=20; col.forEach(e=>{ const h=40+17*e.fields.length; nodes.push({id:e.id,x:xs[ci],y,w:170,h,k:e.k,t:e.t,s:'',fields:e.fields,what:e.what,pts:e.pts,ent:true}); y+=h+34; }); });
+  return {
+    id:'erd', group:'Diagrams', nav:'Data model', title:'Data model',
+    intro:'All clinics share one database and one set of tables. Every table except User has a clinic_id column, and Postgres Row-Level Security makes sure one clinic can never read another\'s rows. The clinic_id lines are left out to keep the diagram readable. Arrows point from the “one” side to the “many” side, e.g. one patient has many appointments.',
+    W:1000, H:700, nodes, edges:ERD_EDGES.map(e=>[e[0],e[1],'']), noLabels:true, canvasHint:'Arrow: one → many',
+    kp:{title:'Keeping clinics separate (multi-tenancy)', items:['Shared database, shared tables — The simplest model for a solo developer: one set of migrations and one backup. Each clinic is a “tenant”, identified by clinic_id.','Filter in the app — Every query goes through helpers that add “where clinic_id = current clinic”. Never write a query without them.','Enforce in the database — Row-Level Security policies read the current clinic from a setting that is set at the start of every request. A forgotten filter returns nothing instead of another clinic\'s data.','Composite keys — Foreign keys include clinic_id, e.g. (clinic_id, patient_id). That makes it impossible to link an appointment to another clinic\'s patient.','Alternatives — A separate schema or database per clinic gives stronger isolation, but every migration then runs N times. Keep it in mind for a large clinic chain that asks for it.']}
+  };
+}
+
+const T = (id,nav,title,intro,blocks)=>({id,group:'Guides',nav,title,intro,blocks});
+const OVERVIEW = {id:'overview', group:'Start', nav:'Overview & key changes', title:'Overview & suggested changes', intro:'A realistic architecture for one developer: a single TypeScript app and a background worker, sharing one PostgreSQL database in the EU. Email, SMS, WhatsApp and AI are external services behind small adapters. Below are the places where I\'d change or tighten your plan.', blocks:[
+  {h:'The system in one paragraph', p:'Staff use a Next.js web app. Patients open public pages from links in their messages. Both talk to one application core, split into modules. Anything slow or time-based is handed to a background worker through a job queue stored in Postgres. The worker plans messages, sends them through channel adapters, runs imports and asks the AI for drafts. Providers report delivery back through webhooks.', items:[]},
+  {h:'Where I\'d change your plan', items:['Use AI to build the template library — Don\'t draft every aftercare message from scratch. Once a treatment has an approved template, reuse it. That is cheaper, faster, already reviewed, and no data goes to the AI.','Separate planning from sending — Store every future message as a row with a unique key before sending anything. Duplicates, missed messages and retries all become simple database questions.','Protect health data behind a second check — Links get forwarded. Confirm and cancel can work from the link alone, but the treatment plan page asks for date of birth or an SMS code.','Start rescheduling as a request — “Request another time” plus a staff call-back is far simpler than live self-booking, and most clinics are happy with it.','Treat WhatsApp as phase 2 — It needs a verified Meta business account per clinic and pre-approved templates. Design the adapter now, launch with email and SMS.']},
+  {h:'Rethink the positioning', items:['“Replaces their old system” brings a lot of scope — Full practice management software also means billing, insurance, dental charting and legally required clinical records.','A narrower pitch is easier to deliver — Scheduling plus patient communication, with a clear list of what it does not do. You can add more once clinics pay.','Medical record law — Many EU countries require dental records to be kept for 10 years or more. Check your first country before you design deletion.']},
+  {h:'How to use this explorer', items:['Diagrams — Click any box to read what it does, why it\'s there, and what it connects to. Connected lines are highlighted.','Colours — Teal: background work. Blue: stored data. Dashed amber: external services you pay for. Red: failure paths.','Guides — Security, stack and hosting, MVP scope, risks, testing, and a glossary of every term used.']}
+]};
+const GUIDES = [
+  T('security','Security & privacy','Security & privacy','Dental records are health data, a “special category” under GDPR with stricter rules. The clinic is the data controller (it decides why data is processed). You are the data processor (you process it on the clinic\'s behalf). Most of your duties come from that relationship.',[
+    {h:'Paperwork you need', items:['Data Processing Agreement (DPA) — A contract with each clinic describing what you process, how, and your security measures.','Sub-processor list — Hosting, email, SMS, WhatsApp, AI and error tracking, each with its location and DPA.','Record of processing — A simple document: which data, why, where, and for how long.','DPIA template — A Data Protection Impact Assessment. Clinics may need one for health data, so offer a pre-filled version.']},
+    {h:'Access control', items:['Roles and permissions — Owner, dentist, front desk and assistant, checked on the server for every action, never only hidden in the UI.','2FA — Required for owners and admins, strongly encouraged for everyone.','Sessions — Log users out after inactivity (e.g. 30 minutes). A “log out everywhere” button for owners.','Tenant isolation — Row-Level Security plus app-level filters. Write the “clinic A can\'t see clinic B” test first.','Support access — If you need to see a clinic\'s data to help them, make it explicit, time-limited and audit-logged.']},
+    {h:'Consent', items:['Separate purposes — Care reminders and marketing are separate consents, per channel.','History, not a flag — Store every grant and withdrawal with date and source.','Easy withdrawal — An unsubscribe link in every promotion. A “STOP” reply is handled automatically.','Checked at send time — The dispatcher re-checks consent right before sending, not only when planning.']},
+    {h:'Audit logs', items:['What to log — Logins, patient record views, edits, exports, imports, approvals, patient link access.','Append-only — The app can add entries but never change or delete them.','Visible to owners — A simple filterable audit screen answers “who looked at this patient?”']},
+    {h:'Encryption & logging', items:['In transit — HTTPS everywhere (TLS), including webhooks.','At rest — Managed databases and storage encrypt disks by default. Confirm this with your host.','No patient data in logs — Don\'t log message bodies, names or phones. Configure the error tracker to strip them.','Secrets — API keys live in environment variables or the host\'s secret store, never in the code repository.']},
+    {h:'Retention & deletion', items:['Clinical data — The clinic decides, within the law. Many countries require long retention, so deletion requests may be refused or limited.','Message bodies — Keep the full text for e.g. 24 months, then keep only metadata (date, channel, status).','Import files and raw webhook data — Delete after about 30 days.','Erasure — Anonymise the patient (remove name and contact details) rather than breaking history.','Backups — Deleted data survives in backups until they expire (e.g. 30 days). Write this down in your DPA.']},
+    {h:'Patient rights & breaches', items:['Access requests — One button exports everything about a patient (JSON or PDF).','Correction — Staff can edit, and the audit log keeps the old value.','Breach readiness — The clinic must notify the authority within 72 hours. You must tell the clinic without delay, and the audit log must show what was accessed.']}
+  ]),
+  T('stack','Stack & hosting','Recommended stack & hosting','Chosen for one developer: one language everywhere, few moving parts, managed services where mistakes are expensive (database, backups), and EU hosting. You didn\'t name a preferred language, so this is a TypeScript stack.',[
+    {h:'Core stack', items:['TypeScript — One language for front end, back end and worker. Types catch many mistakes before tests do.','Next.js — Staff UI, patient pages and API in one project, with one deployment.','PostgreSQL — Relational data with constraints (unique, exclusion, foreign keys) that do real safety work. Also provides Row-Level Security.','Drizzle ORM — Typed queries and migrations, close to plain SQL, which makes RLS and constraints easier. Prisma is a friendlier alternative.','pg-boss — A job queue inside Postgres, with scheduled jobs, retries and cron. No Redis needed.','Better Auth (or similar) — Login, sessions and 2FA. Don\'t build password handling yourself.']},
+    {h:'Helper libraries', items:['Luxon or date-fns-tz — Time zones and daylight saving.','libphonenumber-js — Validating and formatting phone numbers.','Zod — Validates every input: forms, webhooks, AI responses.','Tailwind + shadcn/ui — Quick, consistent UI.','Calendar — FullCalendar\'s per-dentist resource views are a paid add-on. A simple custom day grid may be enough for the MVP.','Sentry (EU region) — Error tracking, with patient data stripped.','Vitest + Playwright — Unit and end-to-end tests.']},
+    {h:'Hosting options (EU)', items:['A. Managed platform — Recommended to start. Render (Frankfurt), Railway or Fly.io: web service + worker + managed Postgres with backups. Roughly $25–45/month. Least operations work.','B. Single VPS — Hetzner (Germany or Finland) at roughly €5–15/month, with Docker and Coolify. Cheapest option, but you handle updates, backups, security patches and restore tests yourself.','C. Serverless (Vercel + Neon) — Cheap at first, but the long-running worker needs another host, so there are more moving parts. Not a good fit here.','Storage — Any S3-compatible EU bucket (Hetzner, Scaleway, Cloudflare R2 EU). A few euros a month.']},
+    {h:'Running costs to plan for', items:['SMS is the biggest cost — Example: 5 clinics × 800 SMS/month × €0.06 ≈ €240/month. Build message bundles or pass-through pricing into your plans from day one.','Email — Free to about $15/month at this size.','AI — Cents per draft. With the template-library approach, a few euros a month.','Prices are rough — Check current pricing for your target countries before quoting clinics.']}
+  ]),
+  T('mvp','MVP vs later','MVP vs later','The MVP is for demos and the first one or two pilot clinics. It needs to show the core promise — fewer no-shows with less front-desk work — end to end, reliably. Anything that doesn\'t serve that can wait.',[
+    {h:'Demo MVP', items:['Clinic setup and staff login with 3 roles.','Calendar per dentist, create and move appointments.','Patients: create, edit, and CSV import with mapping, phone check and duplicate check.','Treatment plans with done and remaining items.','Automations: day-before reminder with confirm and cancel link, one recall plan, missed-visit follow-up.','Channels: email and SMS through real providers, plus a fake adapter for demos. Delivery status through webhooks.','Message history per patient and a failed-messages inbox.','AI aftercare: draft, approve, send, save to library.','Simple dashboard: messages sent, confirmation rate, no-shows.']},
+    {h:'Before real patient data (non-negotiable)', items:['EU hosting, daily backups, one tested restore.','2FA, Row-Level Security, audit log.','No patient data in logs or error tracking.','DPA with the clinic and a sub-processor list.','Consent records and unsubscribe handling.']},
+    {h:'Soon after (first paying clinics)', items:['Full template, timing and channel editor for every rule.','Aligner switch reminders and unfinished-plan follow-ups.','Extra check (birth date or SMS code) and the patient treatment plan page.','“Request another time” flow.','Patient data export and anonymisation tools.','Recall → booking conversion on the dashboard.']},
+    {h:'Later', items:['WhatsApp, then Viber, once Meta approval is sorted per clinic.','Promotional campaigns with audience selection.','Live self-service rescheduling with real availability.','Two-way inbox for patient replies.','Waitlist to fill cancelled slots.','Clinic subscriptions and billing (e.g. Stripe), multi-location clinics.']}
+  ]),
+  T('risks','Risks & trade-offs','Risks, trade-offs & gaps','The things most likely to hurt a solo-built product in this space, the trade-offs this design makes on purpose, and gaps in the brief worth deciding early.',[
+    {h:'Main risks', items:['Scope creep — Clinics will ask for billing, charting and insurance. Each is a product of its own. Keep a written “not doing” list.','Reliability is the product — A missed reminder is a no-show the clinic blames on you. Monitor it (see Testing → production canary).','SMS cost and country rules — Prices, Sender ID registration and opt-out rules vary by country. Check them before your first sale.','WhatsApp onboarding — Business verification and template approval can take days to weeks per clinic.','Compliance — Health data raises the stakes. A few hours with a GDPR lawyer in your first country is cheap insurance.','Messy imports — Old exports are inconsistent. Budget real time for the import wizard, because it is the clinic\'s first impression.','Bus factor of one — If something breaks at 3 a.m., only you can fix it. Managed hosting, alerts and a short runbook reduce the damage.','AI content — A dentist always approves, and the audit log shows who. The clinic stays responsible for clinical advice.','Front-desk speed — If booking takes more clicks than their old system, they won\'t switch. Test with real receptionists early.']},
+    {h:'Trade-offs made on purpose', items:['Monolith over microservices — Simpler to build, deploy and debug. Clean module boundaries keep a later split possible.','Postgres queue over Redis — One less system to run. It\'s enough for tens of thousands of jobs a day.','Shared database over one database per clinic — One migration path and cheap hosting, with isolation from RLS.','5-minute planner over exact timers — A reminder at 18:03 instead of 18:00 is fine. In exchange you get a self-healing system that catches up after any outage.']},
+    {h:'Things the brief doesn\'t cover yet', items:['Your own billing — How clinics pay you, and how SMS usage is charged.','Two-way messages — Patients will reply “can I come at 3?” to SMS. Where do those replies go?','Closed days and holidays — These affect reminders, recalls and availability.','Patient language — Per-patient language for templates, especially in multilingual regions.','Appointment types and durations — These drive the calendar and recall matching.','Clinic onboarding — Sender domain setup (SPF/DKIM), SMS Sender ID, WhatsApp verification.','Terms of service, uptime expectations and a support channel.']}
+  ]),
+  T('testing','Testing','Testing the critical parts','Scheduling and messaging bugs are silent: nothing crashes, a patient simply doesn\'t get a reminder. Design the code so this logic is easy to test, then test it heavily. Your QA background is a real advantage here.',[
+    {h:'Make the logic testable', items:['Pure functions — Write computeSendTime(rule, appointment, clinicTimeZone, now) and nextRecallDate(plan, lastVisit) as functions with no database access. Test them with tables of inputs and expected outputs.','Inject the clock — Never call Date.now() deep in the code. Pass “now” in, so tests can simulate a whole week in milliseconds.','Fake channel adapter — Can be set to succeed, fail temporarily, fail permanently or time out. Tests then check the resulting states.']},
+    {h:'Time zone cases to cover', items:['Daylight-saving changes — Last Sunday of March and October in the EU: reminders around 02:00–03:00, and “day before” across the switch.','Edge times — Appointments at 00:30, quiet hours, a booking made after its reminder time.','Hidden local time — Run the suite with TZ=UTC and again with TZ=Pacific/Auckland. Failures show code using the server\'s time zone by accident.','Month maths — Recall 6 months after 31 August: which day? Pick a rule and test it.']},
+    {h:'Duplicates, retries & states', items:['Idempotency — Run the planner twice, and twice in parallel. The number of message rows must stay the same.','Webhook replay — Send the same event twice. Status changes once.','State machines — List the allowed status changes for messages and appointments. Test that invalid ones are rejected.','Retries — A temporary failure retries with growing delays. A permanent failure stops immediately. Max attempts ends in “failed”.','Property-based tests — With fast-check, generate thousands of random dates and intervals and check rules like “next recall is always after the last visit”.']},
+    {h:'Integration & end-to-end', items:['Real Postgres in tests — Use Testcontainers or a Docker database, not mocks, so constraints and RLS are really tested.','Tenant isolation — A user from clinic A tries to read, update and link clinic B\'s data. All attempts must fail.','One full journey in Playwright — Book an appointment, advance the fake clock, run the planner and dispatcher, open the patient link, confirm, and check the calendar shows “confirmed”.','Link security — Expired, reused, tampered and brute-forced tokens. A GET request never changes state.']},
+    {h:'Testing in production', items:['Nightly canary — A job checks that every appointment tomorrow has a pending reminder or a recorded skip reason, and alerts you otherwise. It catches the worst kind of bug: messages that silently never happen.','Dashboards for you — Messages planned, sent, failed and skipped per clinic per day. A sudden drop is a bug or an outage.']}
+  ]),
+  T('glossary','Glossary','Glossary','Plain definitions of the terms used across this explorer.',[
+    {h:'Architecture', items:['Tenant / multi-tenancy — Each clinic is a tenant. Multi-tenancy means many clinics share one system while their data stays separate.','Modular monolith — One deployable app with code split into modules that have clear boundaries.','Background worker — A separate process that runs jobs outside web requests.','Job queue — A list of work to do later, which workers take from. Here it is stored in Postgres.','Transactional outbox — Writing the “do this later” job in the same transaction as the data change, so both happen or neither does.','Adapter — A small class that makes one provider fit a common interface, so providers can be swapped.','Webhook — A URL on your server that an external service calls to report events.']},
+    {h:'Reliability', items:['Idempotent — Doing something twice has the same effect as doing it once.','Idempotency key — A unique value naming one specific action, so the database can reject repeats.','Exponential backoff — Waiting longer after each failed attempt before retrying.','SKIP LOCKED — A Postgres option that lets several workers take different rows from the same queue without clashing.','Exclusion constraint — A Postgres rule that can forbid overlapping time ranges, e.g. two bookings for one chair.','Canary check — An automated check in production that alerts you when something expected hasn\'t happened.']},
+    {h:'Time & data', items:['UTC / timestamptz — UTC is the universal reference time. timestamptz is Postgres\'s type for an exact moment.','IANA time zone — A named zone like Europe/Belgrade that includes its daylight-saving rules.','DST — Daylight saving time. Clocks move twice a year, so some days are 23 or 25 hours long.','E.164 — The international phone number format, e.g. +381641234567.','Soft delete / anonymisation — Marking a record deleted without removing it, then removing the identifying fields.']},
+    {h:'Security & privacy', items:['Row-Level Security (RLS) — Postgres policies that filter rows automatically, e.g. by clinic.','Hash — A one-way fingerprint of a value. Useful for checking a token without storing it.','Rate limiting — Capping how many requests a client can make in a time window.','Step-up verification — Asking for an extra check only before a more sensitive action.','Controller / processor — GDPR roles. The clinic decides why data is processed. You process it for them.','Sub-processor — A service you use that also handles the data (host, SMS provider, AI).','DPA — Data Processing Agreement: the contract that covers the processor role.','DPIA — Data Protection Impact Assessment: a documented risk review for sensitive processing.']}
+  ])
+];
+
+function splitItem(s){ const i=s.indexOf(' — '); return i>0?{head:s.slice(0,i),sep:' — ',body:s.slice(i+3)}:{head:'',sep:'',body:s}; }
+
+class Component extends DCLogic {
+  state = { view: null, sel: null, cw: 0 };
+  wrapRef = (el) => {
+    if (this.ro) { this.ro.disconnect(); this.ro = null; }
+    if (el) { this.ro = new ResizeObserver(en => { const w = Math.floor(en[0].contentRect.width); if (w !== this.state.cw) this.setState({ cw: w }); }); this.ro.observe(el); }
+  };
+  componentWillUnmount(){ if (this.ro) this.ro.disconnect(); }
+  views(){ if (!this._views){ const erd=buildErd(); this._views=[OVERVIEW,ARCH,erd,MSG,AI,LINKS,IMPORT,...GUIDES]; } return this._views; }
+  go = (id) => { this.setState({ view:id, sel:null }); window.scrollTo(0,0); };
+  edgesSvg(v, sel, showLabels){
+    const h = React.createElement, by = {}; v.nodes.forEach(n => by[n.id] = n);
+    const clip = (n, tx, ty) => { const cx=n.x+n.w/2, cy=n.y+n.h/2, dx=tx-cx, dy=ty-cy; const t=Math.min(dx?(n.w/2+2)/Math.abs(dx):1e9, dy?(n.h/2+2)/Math.abs(dy):1e9); return [cx+dx*t, cy+dy*t]; };
+    const mk = (id,fill) => h('marker',{key:id,id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:7,markerHeight:7,orient:'auto-start-reverse'},h('path',{d:'M0,0 L10,5 L0,10 z',fill}));
+    const lines=[], labels=[];
+    v.edges.forEach(([a,b,l],i) => {
+      const A=by[a], B=by[b]; if(!A||!B) return;
+      const on = sel && (a===sel || b===sel);
+      const [x1,y1]=clip(A,B.x+B.w/2,B.y+B.h/2), [x2,y2]=clip(B,A.x+A.w/2,A.y+A.h/2);
+      lines.push(h('line',{key:'l'+i,x1,y1,x2,y2,stroke:on?C.acc:C.line,strokeWidth:on?2.4:1.5,markerEnd:on?'url(#ahOn)':'url(#ah)'}));
+      if (showLabels && l && !v.noLabels) labels.push(h('text',{key:'t'+i,x:(x1+x2)/2,y:(y1+y2)/2-5,textAnchor:'middle',fontSize:11.5,fontFamily:"'IBM Plex Sans', sans-serif",fill:on?C.acc:C.mut,stroke:'#ffffff',strokeWidth:5,paintOrder:'stroke',strokeLinejoin:'round',fontWeight:on?600:400},l));
+    });
+    return h('svg',{width:v.W,height:v.H,style:{position:'absolute',left:0,top:0,overflow:'visible',pointerEvents:'none'}},[h('defs',{key:'d'},[mk('ah',C.line),mk('ahOn',C.acc)]),...lines,...labels]);
+  }
+  renderVals(){
+    const views = this.views();
+    const vid = this.state.view || this.props.startView || 'overview';
+    const v = views.find(x => x.id === vid) || views[0];
+    const isDiagram = !!v.nodes;
+    const sel = isDiagram ? this.state.sel : null;
+    const navFor = g => views.filter(x => x.group === g).map(x => ({ label:x.nav, onClick:()=>this.go(x.id), bg:x.id===v.id?'oklch(0.9 0.03 190)':'transparent', color:x.id===v.id?'oklch(0.28 0.06 200)':C.ink, weight:x.id===v.id?600:400 }));
+    const out = { view:{ ...v, groupLabel:(v.group||'').toUpperCase(), canvasHint:v.canvasHint||'' }, navStart:navFor('Start'), navDiagrams:navFor('Diagrams'), navGuides:navFor('Guides'), isDiagram, isText:!isDiagram, wrapRef:this.wrapRef, clearSel:()=>this.setState({sel:null}) };
+    if (isDiagram){
+      const avail = this.state.cw || v.W; const scale = Math.min(1, avail / v.W);
+      const related = new Set(); if (sel) v.edges.forEach(([a,b]) => { if(a===sel) related.add(b); if(b===sel) related.add(a); });
+      const kinds = [];
+      out.nodes = v.nodes.map(n => { const K = KIND[n.k]; if (!kinds.includes(n.k)) kinds.push(n.k);
+        return { ...n, bg:K.bg, bd:K.bd, r:K.r, hasSub:!!n.s, hasFields:!!n.fields,
+          shadow: n.id===sel ? `0 0 0 3px ${C.acc}` : related.has(n.id) ? `0 0 0 2px ${C.accSoft}` : 'none',
+          pad: n.ent ? '8px 10px' : '8px 12px', justify: n.ent ? 'flex-start' : 'center', align: n.ent ? 'flex-start' : (n.k==='actor'?'center':'flex-start'), ta: n.k==='actor'?'center':'left',
+          font: n.ent ? "'IBM Plex Mono', monospace" : 'inherit',
+          onClick: () => this.setState({ sel: this.state.sel===n.id ? null : n.id }) }; });
+      out.legend = kinds.map(k => ({ name:KIND[k].name, bg:KIND[k].bg, bd:KIND[k].bd }));
+      out.edges = this.edgesSvg(v, sel, this.props.showEdgeLabels ?? true);
+      out.scale = scale; out.canvasW = Math.round(v.W*scale); out.canvasH = Math.round(v.H*scale);
+      const sn = sel && v.nodes.find(n => n.id===sel);
+      out.hasSel = !!sn; out.noSel = !sn;
+      if (sn){ const K=KIND[sn.k]; const by={}; v.nodes.forEach(n=>by[n.id]=n);
+        const links = v.edges.filter(([a,b])=>a===sel||b===sel).map(([a,b,l]) => { const other = a===sel?b:a; const dir = a===sel?'→ ':'← '; return { text: dir + by[other].t + (l && !v.noLabels ? ` (${l})` : ''), onClick:()=>this.setState({sel:other}) }; });
+        out.sel = { t:sn.t, s:sn.ent ? sn.fields.join(' · ') : sn.s, hasSub:!!(sn.ent||sn.s), what:sn.what, pts:sn.pts||[], kind:K.name, bg:K.bg, bd:K.bd, links, hasLinks:links.length>0 };
+      } else out.sel = { pts:[], links:[] };
+      out.hasKp = !!v.kp; out.kpTitle = v.kp ? v.kp.title : ''; out.kpItems = v.kp ? v.kp.items.map(splitItem) : [];
+    } else {
+      out.nodes=[]; out.legend=[]; out.hasSel=false; out.noSel=true; out.sel={pts:[],links:[]}; out.hasKp=false; out.kpItems=[];
+      out.blocks = v.blocks.map(b => ({ h:b.h, p:b.p||'', hasP:!!b.p, items:(b.items||[]).map(splitItem) }));
+    }
+    return out;
+  }
+}
+</script>
+
+
+</body></html>

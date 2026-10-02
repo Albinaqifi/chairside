@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Environment files: real values never go into git. `.env.example` is the template.
+.env
+.env.*
+!.env.example
+
+# Test and tool output
+coverage/
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+
+# Personal Claude Code settings (shared settings live in .claude/settings.json)
+.claude/settings.local.json
