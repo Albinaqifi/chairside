@@ -35,6 +35,9 @@ turns lines into tasks or strikes them out.
 
 - 2026-10-02 · planning · Since Chairside replaces the old tool (D-050), a clinic's already booked **future appointments** must be brought in at switch-over. No task covers it yet. E04-T00 must add one (file import of upcoming appointments, or a fast keying screen).
 - 2026-10-02 · planning · `docs/intent.md` still says "GDPR" and "data stays in the EU". With North Macedonia (D-049) the wording could mention the national law. Owner-only file: waiting for the owner.
+- 2026-10-03 · E00-T01 · Next.js collects anonymous usage telemetry by default (`next dev`, `next build`). Owner to decide whether to turn it off (`NEXT_TELEMETRY_DISABLED=1`) locally, in CI and on staging.
+- 2026-10-03 · E00-T01 · The app role may UPDATE every column of `clinics`, including `status`. E01-T08 (clinic settings) should decide whether staff may change all of them (column grants).
+- 2026-10-03 · E00-T01 · Newer major versions exist than the stack uses: TypeScript 7, ESLint 10, drizzle-orm 1.0 (release candidate). Kept on the versions in D-059; an upgrade would be its own task.
 
 ---
 
@@ -44,7 +47,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
-| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **In progress** | Builder session started 2026-10-02 |
+| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Built** | Ready for the tester; handoff in `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | Planned | |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
