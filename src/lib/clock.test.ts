@@ -47,6 +47,20 @@ describe('fakeClock', () => {
     expect(() => fakeClock(new Date(Number.NaN))).toThrow(RangeError);
     expect(() => fakeClock('2026-03-10T09:00:00Z').advance(Number.NaN)).toThrow(RangeError);
   });
+
+  it('rejects a day its month does not have, instead of moving into the next month', () => {
+    // JavaScript reads 2026-02-30 as 2 March. A timing test must not run on a date it did not ask for.
+    expect(() => fakeClock('2026-02-30T09:00:00Z')).toThrow(RangeError);
+    expect(() => fakeClock('2026-02-29T09:00:00Z')).toThrow(RangeError); // 2026 is not a leap year
+    expect(() => fakeClock('2026-04-31T09:00:00Z')).toThrow(RangeError);
+    expect(() => fakeClock('2026-03-10T09:00:00Z').set('2026-06-31T09:00:00Z')).toThrow(RangeError);
+
+    // Real days stay accepted, also when the offset moves the moment into another UTC day.
+    expect(fakeClock('2028-02-29T09:00:00Z').now().toISOString()).toBe('2028-02-29T09:00:00.000Z');
+    expect(fakeClock('2026-03-01T00:30:00+01:00').now().toISOString()).toBe(
+      '2026-02-28T23:30:00.000Z',
+    );
+  });
 });
 
 describe('systemClock', () => {

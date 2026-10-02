@@ -47,7 +47,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
-| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Built** | Ready for the tester; handoff in `handoffs/E00-T01.md` |
+| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **In progress** | Back from testing: fix findings 1–3 (failing tests added); owner decides 2's approach and 4–12. See `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | Planned | |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |

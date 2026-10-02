@@ -15,3 +15,11 @@ export const GLOBAL_TABLES: Readonly<Record<string, string>> = {
 export const TENANT_ROOT_TABLES: Readonly<Record<string, string>> = {
   'public.clinics': 'The tenant.',
 };
+
+/**
+ * SECURITY DEFINER functions, by `schema.name`: the few named database functions that may look
+ * across clinics (security-privacy.md, section 1). They run with their owner's rights, so
+ * Row-Level Security does not limit them. Views must be `security_invoker`, and materialized
+ * views are not allowed: neither has an allow-list (tenant-tables.test.ts).
+ */
+export const CROSS_CLINIC_FUNCTIONS: Readonly<Record<string, string>> = {};
