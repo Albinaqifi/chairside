@@ -3,8 +3,8 @@
 Scheduling app for dental clinics with automated patient communication. Multi-clinic,
 holds health data, built by one developer with AI agents.
 
-**Status: planning is done, no application code exists yet.** The first build task is
-`E00-T01` in `docs/backlog/E00-foundation.md`.
+**Status:** the project skeleton and database foundation exist (E00-T01). What is done and
+what comes next is on the board, `docs/progress/board.md`.
 
 ## Start of every session (in this order)
 
@@ -28,12 +28,100 @@ Do not read the whole `docs/` tree. `docs/README.md` is the map if you need to f
 
 ## Design reference
 
-The two HTML files in the repo root are the original plan and UI design. They are compressed
+The two HTML files in `design/originals/` are the original plan and UI design. They are compressed
 bundles; readable copies are in `design/unpacked/`. They are a **visual and behavioural
 reference, not code to copy**. Where the demo and the docs disagree, the docs win
 (`docs/product/design-reference.md` lists every deliberate difference).
 
 ## Technical conventions
 
-_To be written by task E00-T01 (commands, folder structure, coding conventions, testing
-commands). Until then, the intended stack and structure are in `docs/architecture/overview.md`._
+Stack and reasons: `docs/architecture/overview.md`. First-time setup: `README.md`.
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `pnpm check` | **Everything a task must pass:** format, lint, types, unit and integration tests. Needs the database: `docker compose up -d --wait`. |
+| `pnpm dev` | The app at http://localhost:3000. |
+| `pnpm test` | Unit tests (`src/**/*.test.ts`, `eslint-rules/`). No database. |
+| `pnpm test:integration` | Tests against real PostgreSQL (`tests/integration/`). First rebuilds the separate `<db>_test` database from the migrations. |
+| `pnpm exec vitest run <file>` | One test file. |
+| `pnpm lint` · `pnpm typecheck` | ESLint (a warning fails too) · `next typegen` + `tsc`. |
+| `pnpm format` · `pnpm format:check` | Prettier: fix · check only. Markdown and `docs/` are not formatted. |
+| `pnpm db:reset` | Rebuild the local database from nothing: roles, database, every migration. Refuses any non-local host. |
+| `pnpm db:migrate` | Apply pending migrations as the migration role. |
+| `pnpm db:generate --name <what>` | Generate a migration from changed `schema.ts` files. |
+| `pnpm build` · `pnpm start` | Production build · run it. |
+
+Every script must work on Windows (the owner's OS): no bash-only syntax in `package.json`.
+
+### Folder structure
+
+```
+src/app/              Next.js routes. Thin: parse input, call a module, render.
+src/modules/<name>/   All business logic. index.ts = public API, schema.ts = its tables.
+src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts.
+src/lib/              Small shared pieces: clock, ids, logger, personal-fields.
+tests/integration/    Tests against real PostgreSQL, including the tenant meta-test.
+eslint-rules/         The module-boundary lint rule and the tests of all architecture rules.
+```
+
+Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tests/e2e` (E00-T06), `src/worker` (E00-T07).
+
+### Module rules (lint enforces them; `eslint-rules/architecture.test.ts` proves it)
+
+1. A module's tables are private. Other modules call its functions, never query its tables.
+2. Import another module only through its `index.ts`: `@/modules/patients`. One exception: a
+   `schema.ts` may import another module's `schema.ts` to declare foreign keys (D-058).
+3. No Next.js or React in `src/modules`, so the worker and tests can use every module.
+4. No reading the clock in `src/modules` (`Date.now()`, `new Date()`, `DateTime.now()`…).
+   Take `now: Date` as a parameter, or a `Clock` from `src/lib/clock.ts`; tests use `fakeClock`.
+
+### Code conventions
+
+- TypeScript strict, plus `noUncheckedIndexedAccess`. `@/…` imports for `src/`; `import type` for types.
+- Files `kebab-case.ts`. Tables and columns `snake_case`, tables plural. TypeScript `camelCase`.
+- Ids: `newId()` from `src/lib/ids.ts` (UUID v7). Moments `timestamptz`, calendar dates `date`.
+  `updated_at` is set from the passed-in `now` when a row changes.
+- Database: only inside `withTenant(clinicId, async (tx) => …)` from `src/db/tenant.ts`. Never
+  import `src/db/client.ts` elsewhere, never set `app.clinic_id` yourself.
+- Logs: `logger` from `src/lib/logger.ts`, ids and codes only. It drops the fields listed in
+  `src/lib/personal-fields.ts` as a safety net, not as permission to log personal data.
+- Files Node runs directly (`src/db/migrate.ts`, `src/db/reset.ts`): import only packages and
+  relative `.ts` files, never `@/`.
+- Next.js 16 differs from older versions: read `node_modules/next/dist/docs/` before writing
+  Next.js code. `AGENTS.md` holds the block `next dev` checks for; leave it.
+
+### Database roles and settings
+
+- `chairside_migrator` runs migrations and owns the schema. `chairside_app` is the app's role:
+  owns nothing, cannot bypass Row-Level Security, cannot change the schema.
+- Settings are listed in `.env.example`. Agents cannot read `.env` files (`.claude/settings.json`);
+  never print environment values. If `.env` is missing, ask the owner.
+
+### How to add a table
+
+1. Check it against `docs/architecture/data-model.md`. A table or column that is not there
+   needs the owner (agent rule 4) and a decision-log entry.
+2. Define it in `src/modules/<module>/schema.ts`: `id uuid` primary key with `$defaultFn(newId)`;
+   `clinic_id uuid not null` referencing `clinics.id`; unique `(clinic_id, id)`; foreign keys to
+   other tenant tables include `clinic_id`; `created_at` (and `updated_at` if rows change);
+   allowed values as text with a check constraint.
+3. `pnpm db:generate --name <what>`, read the SQL, then append (statements separated by
+   `--> statement-breakpoint`):
+   ```sql
+   ALTER TABLE "x" ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY "x_tenant_isolation" ON "x"
+     USING ("clinic_id" = current_clinic_id()) WITH CHECK ("clinic_id" = current_clinic_id());
+   GRANT SELECT, INSERT, UPDATE, DELETE ON "x" TO chairside_app; -- only what the app needs
+   ```
+4. `pnpm db:reset`, then `pnpm test:integration`. The meta-test
+   (`tests/integration/tenant-tables.test.ts`) fails if `clinic_id`, RLS or the policy is missing.
+5. A table without a clinic is rare and critical: add it to `tests/integration/tenant-allow-list.ts`
+   with the reason, and flag it in the handoff note.
+
+### How to write a migration
+
+- Change a `schema.ts`, run `pnpm db:generate --name <what>`, read the SQL, and add what
+  drizzle-kit does not generate: RLS, policies, grants, extensions, functions.
+- Commit the SQL file and the `meta/` files together. Never edit a merged migration: write a new one.

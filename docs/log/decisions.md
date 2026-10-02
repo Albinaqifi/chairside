@@ -426,3 +426,40 @@ architecture), `changed` (differs from the original files), `process`.
   added later for clinics that want their own name as sender.
 - **Risk accepted:** a restriction on the shared number affects every clinic (R-27); the
   email fallback and, later, SMS limit the damage.
+
+---
+
+## Part 5 — Decisions made while building
+
+### D-057 · PostgreSQL driver: `pg` (node-postgres)
+- **Origin:** stack, E00-T01. Approved by the owner on 2026-10-02 (agent rule 4: new library).
+- **Why:** Drizzle (D-004) needs a driver and no task named one. pg-boss (D-005) is built on
+  `pg`, so choosing it keeps the project on one driver for queries and jobs.
+- **Note:** `pg` is a CommonJS package: import it as `import pg from 'pg'` and use `pg.Pool`.
+  Named imports fail when Node runs a file directly.
+- **Revisit if:** a hosting or performance need calls for a different driver.
+
+### D-058 · A module's `schema.ts` may import another module's `schema.ts`, for foreign keys only
+- **Origin:** process, E00-T01. Refines module rule 2 in `overview.md`.
+- **Why:** every tenant table has a foreign key to `clinics`, and composite foreign keys cross
+  modules (an appointment points at a patient). Drizzle declares a foreign key by referencing
+  the other table's definition, so a schema file must import it. Exporting tables from a
+  module's `index.ts` instead would let any code query them, which rule 1 forbids.
+- **How it is enforced:** the lint rule `chairside/module-boundaries` allows exactly this import
+  (`schema.ts` → another module's `schema.ts`) and reports every other deep import.
+- **Revisit if:** a module needs to reach another module's tables for anything but a foreign key.
+
+### D-059 · Local tooling details chosen in E00-T01
+- **Origin:** stack, E00-T01.
+- **What:** ESLint 9 (Next.js config) and Prettier 3, as the task named them. TypeScript 5.9 and
+  ESLint 9 are the versions create-next-app 16.3 ships with, not the newer TypeScript 7 and
+  ESLint 10. pnpm's protection against freshly published packages stays on. Local PostgreSQL 18
+  in Docker on port 5433, matching Render's default version for new databases. The two database
+  scripts (`db:migrate`, `db:reset`) run with Node's built-in TypeScript support instead of a
+  runner such as tsx. UUID v7 ids come from a 25-line tested function (`src/lib/ids.ts`): Node
+  has no built-in one, and the `uuid` package would be one more dependency.
+- **Why:** the fewest new dependencies; versions known to work together; staging and local
+  databases on the same major version; no build step for scripts.
+- **Revisit if:** a script needs to import application modules (Node cannot resolve the `@/`
+  paths; a runner such as tsx then needs a decision); Render changes its PostgreSQL version;
+  Next.js supports TypeScript 7 and ESLint 10.
