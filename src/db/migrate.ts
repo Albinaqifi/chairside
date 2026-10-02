@@ -21,5 +21,5 @@ export async function runMigrations(migratorUrl: string): Promise<void> {
 
 if (import.meta.main) {
   await runMigrations(requiredEnv('MIGRATION_DATABASE_URL'));
-  console.log('Migrations applied.');
+  console.log('All migrations are applied.');
 }

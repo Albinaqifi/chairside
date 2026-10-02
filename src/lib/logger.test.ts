@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createLogger } from './logger';
-import { PERSONAL_FIELDS } from './personal-fields';
+import { PERSONAL_FIELD_ENDINGS, PERSONAL_FIELD_WORDS, PERSONAL_FIELDS } from './personal-fields';
 
 // Every personal value in these tests is a marker. A marker in the output means a leak.
 const MARKER = 'MARKER-7f3a';
@@ -15,11 +15,48 @@ function capture() {
 describe('logger', () => {
   it('drops every listed personal field', () => {
     const { logger, output } = capture();
-    const entry = Object.fromEntries(PERSONAL_FIELDS.map((field) => [field, `${MARKER}-${field}`]));
+    const fields = [...PERSONAL_FIELDS, ...PERSONAL_FIELD_ENDINGS, ...PERSONAL_FIELD_WORDS];
+    const entry = Object.fromEntries(fields.map((field) => [field, `${MARKER}-${field}`]));
     logger.info({ ...entry, clinicId: 'clinic-1' }, 'appointment booked');
 
     expect(output()).not.toContain(MARKER);
     expect(JSON.parse(output())).toMatchObject({ clinicId: 'clinic-1', msg: 'appointment booked' });
+  });
+
+  it('drops compound names that end with, or contain, a personal word', () => {
+    const { logger, output } = capture();
+    logger.info({
+      patientEmail: MARKER,
+      guardian_phone: MARKER,
+      recipientName: MARKER,
+      patientFirstName: MARKER,
+      emailAddress: MARKER,
+      accessToken: MARKER,
+      requestBody: MARKER,
+      smsText: MARKER,
+      staffNotes: MARKER,
+      passwordConfirmation: MARKER,
+      clientSecretValue: MARKER,
+      pathname: `/p/${MARKER}`,
+    });
+
+    expect(output()).not.toContain(MARKER);
+  });
+
+  it('keeps ids, codes and names that only look similar', () => {
+    const { logger, output } = capture();
+    const kept = {
+      clinicId: 'clinic-1',
+      context: { requestId: 'request-1' },
+      emailCount: 3,
+      phoneCountry: 'MK',
+      inputTokens: 120,
+      tokenHash: 'hash-1',
+      status: 'sent',
+    };
+    logger.info(kept);
+
+    expect(JSON.parse(output())).toMatchObject({ ...kept, hostname: expect.any(String) });
   });
 
   it('drops personal fields at any depth and inside arrays', () => {
