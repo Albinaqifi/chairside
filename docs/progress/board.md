@@ -6,12 +6,12 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Tested` → `Reviewed` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.)
 
-_Last updated: 2026-10-03 — E00-T02 fix round 2: the reviewer's required change 1 is fixed (the request proxy renews the session cookie whenever the session is moved forward, D-067). Reviewed: the tester checks the fix next, then the delta review. A new pull request from the branch is still needed (PR #3 was merged before the fixes). Owner: add the two `BETTER_AUTH_` lines from `.env.example` to `.env`._
+_Last updated: 2026-10-03 — E00-T02 fix round 2 tested: the session cookie is renewed with the session (D-067), checked in a real browser; no findings. Tested: the delta review is next. A new pull request from the branch is still needed (PR #3 was merged before the fixes). Owner: add the two `BETTER_AUTH_` lines from `.env.example` to `.env`._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T02` to the tester (fix round 2), then the delta review. Then `E00-T03` (builder, critical), once E00-T02 is merged; the owner decides E00-T02 finding 6 and finding 2's page side before it starts
+- **Next task to start:** `E00-T02` to the delta review (commits after `d5724b2`). Then `E00-T03` (builder, critical), once E00-T02 is merged; the owner decides E00-T02 finding 6 and finding 2's page side before it starts
 - **Owner decisions from the E00-T02 test:** findings 5–7 in `handoffs/E00-T02.md` (rate-limit address, the clinic an action runs in, self-rename)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
   business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
@@ -66,6 +66,7 @@ turns lines into tasks or strikes them out.
 - 2026-10-03 · E00-T02 review · `PERMISSION_TABLE` leaves out scope-v1.md's row "Read aftercare drafts and the library" (every role ✔) though its comment says it mirrors the table row by row. Add it (E06) or say why it is left out.
 - 2026-10-03 · E00-T02 review · `chooseClinic` (`(auth)/choose-clinic/actions.ts`) is a server action outside `(staff)`: E00-T03's wrapper check will not see it, and it reads input without Zod. E00-T03: decide how actions before a clinic is chosen are checked.
 - 2026-10-03 · E00-T02 review · The builder's "For the tester" recipe in `handoffs/E00-T02.md` holds synthetic names, emails and a dev password; rule 6 and the template ask for ids. Point to the seed once E00-T05 exists.
+- 2026-10-03 · E00-T02 test · The proxy matcher (`src/proxy.ts`) skips every path that contains a dot or starts with `login`: a future staff route such as `/logins` or `/export.csv` would not renew the session. Keep staff routes clear of both, or narrow the pattern (E00-T04 navigation).
 
 ---
 
@@ -76,7 +77,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
 | E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
-| E00-T02 | Login, sessions and clinic membership | builder | critical | **Reviewed** | Fix round 2: the reviewer's required change (cookie never renewed) fixed in the proxy (D-067); tester next, then delta review. 5 suggestions (Discovered). Tester findings 5–7 for the owner. No open PR (#3 merged before the fixes): a new one is needed. Owner: add `BETTER_AUTH_*` to `.env`. See `handoffs/E00-T02.md` |
+| E00-T02 | Login, sessions and clinic membership | builder | critical | **Tested** | Fix round 2 tested: the reviewer's required change (cookie never renewed) is fixed in the proxy (D-067), no new findings; delta review next. 5 suggestions (Discovered). Tester findings 5–7 for the owner. No open PR (#3 merged before the fixes): a new one is needed. Owner: add `BETTER_AUTH_*` to `.env`. See `handoffs/E00-T02.md` |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | |

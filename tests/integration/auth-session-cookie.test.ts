@@ -1,6 +1,6 @@
 import { NextRequest, type NextResponse } from 'next/server';
 import { getRedirectUrl } from 'next/experimental/testing/server';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { currentUser } from '@/app/_lib/auth';
 import { closeDb } from '@/db/client';
 import { createStaffUser, getAuth, SESSION_IDLE_SECONDS } from '@/modules/auth';
@@ -201,5 +201,127 @@ describe('a staff page reading the session', () => {
     page.headers = new Headers({ cookie });
 
     expect(await currentUser()).toBeNull();
+  });
+});
+
+// Tester, E00-T02 fix round 2. The tests above look at one response at a time. A browser keeps a
+// cookie only until its Max-Age runs out, and curl ignores Max-Age, so neither shows what the
+// reviewer found. This is a browser's cookie jar over a working morning, on a fake clock (only
+// Date is faked: the library reads the time through Date).
+
+/** A browser's cookies for this origin: each kept until its Max-Age or Expires runs out. */
+class CookieJar {
+  private readonly cookies = new Map<string, { value: string; until: number }>();
+
+  /** Takes every Set-Cookie of a response, as a browser does (Max-Age wins over Expires). */
+  take(response: Response): void {
+    for (const header of response.headers.getSetCookie()) {
+      const [pair = '', ...attributes] = header.split(';').map((part) => part.trim());
+      const name = pair.slice(0, pair.indexOf('='));
+      const value = pair.slice(pair.indexOf('=') + 1);
+      const maxAge = attributes.find((a) => /^max-age=/i.test(a));
+      const expires = attributes.find((a) => /^expires=/i.test(a));
+      let until = Number.POSITIVE_INFINITY;
+      if (maxAge) until = Date.now() + Number(maxAge.slice('max-age='.length)) * 1000;
+      else if (expires) until = new Date(expires.slice('expires='.length)).getTime();
+      if (until <= Date.now()) this.cookies.delete(name);
+      else this.cookies.set(name, { value, until });
+    }
+  }
+
+  /** The Cookie header the browser sends now; cookies past their end are gone. */
+  header(): string {
+    for (const [name, cookie] of this.cookies) {
+      if (cookie.until <= Date.now()) this.cookies.delete(name);
+    }
+    return [...this.cookies].map(([name, cookie]) => `${name}=${cookie.value}`).join('; ');
+  }
+
+  /** When the browser drops the cookie, in milliseconds. */
+  until(name: string): number | undefined {
+    return this.cookies.get(name)?.until;
+  }
+}
+
+describe('a browser over a working morning', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function signInInto(jar: CookieJar): Promise<string> {
+    const response = await getAuth().handler(
+      new Request(`${ORIGIN}/api/auth/sign-in/email`, {
+        method: 'POST',
+        headers: {
+          origin: ORIGIN,
+          'content-type': 'application/json',
+          'x-forwarded-for': freshAddress(),
+        },
+        body: JSON.stringify({ email, password: PASSWORD }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    jar.take(response);
+    const cookie = response.headers.getSetCookie().find((c) => c.startsWith(`${SESSION_COOKIE}=`));
+    return decodeURIComponent(cookie!.split('=')[1]!.split(';')[0]!).split('.')[0]!;
+  }
+
+  it('stays signed in while requests keep coming, and is signed out 30 minutes after the last', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // Europe/Skopje leaves summer time at 03:00 on 25 October 2026 (01:00 UTC); the morning
+    // crosses it. Nothing here may depend on local time.
+    const start = new Date('2026-10-25T00:20:00Z').getTime();
+    vi.setSystemTime(start);
+    const jar = new CookieJar();
+    const token = await signInInto(jar);
+
+    // A request every 4 minutes for two hours: page loads, client-side navigations, actions.
+    for (let minute = 4; minute <= 120; minute += 4) {
+      vi.setSystemTime(start + minute * 60_000);
+      const sent = jar.header();
+      expect(sent, `the browser still has the cookie after ${minute} minutes`).toContain(
+        `${SESSION_COOKIE}=`,
+      );
+
+      const response = await staffRequest(sent);
+      expect(getRedirectUrl(response), `served after ${minute} minutes`).toBeNull();
+      jar.take(response);
+      page.headers = new Headers({ cookie: jar.header() });
+      expect((await currentUser())?.id, `the page knows the user after ${minute} minutes`).toBe(
+        userId,
+      );
+
+      // The cookie and the session end together: the browser never drops a live session's cookie.
+      const end = await sessionEnd(token);
+      expect(end, 'the session row').not.toBeNull();
+      expect(jar.until(SESSION_COOKIE)).toBe(end!.getTime());
+      expect(end!.getTime()).toBe(Date.now() + SESSION_IDLE_SECONDS * 1000);
+    }
+
+    // Then nobody touches the computer. 30 minutes and a second later the browser has dropped
+    // the cookie, and a client that kept it anyway gets nowhere either.
+    const kept = jar.header();
+    vi.setSystemTime(start + (120 + 30) * 60_000 + 1000);
+    expect(jar.header()).not.toContain(`${SESSION_COOKIE}=`);
+    page.headers = new Headers({ cookie: kept });
+    expect(await currentUser()).toBeNull();
+    expect(getRedirectUrl(await staffRequest(kept))).toBe(`${ORIGIN}/login`);
+  });
+
+  it('serves several requests at once on a session due for its move, keeping one session', async () => {
+    const jar = new CookieJar();
+    const token = await signInInto(jar);
+    await lastRequestAgo(token, 10);
+    const sent = jar.header();
+
+    const responses = await Promise.all(Array.from({ length: 6 }, () => staffRequest(sent)));
+
+    for (const response of responses) {
+      expect(getRedirectUrl(response)).toBeNull();
+      expect(sessionCookieOf(response) ?? '', 'never a removal').not.toMatch(/Max-Age=0(;|$)/);
+    }
+    const { rows } = await admin.query('select 1 from sessions where token = $1', [token]);
+    expect(rows, 'still one session').toHaveLength(1);
+    expect(await secondsLeft(token)).toBeGreaterThan(SESSION_IDLE_SECONDS - 60);
   });
 });
