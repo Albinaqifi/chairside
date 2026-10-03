@@ -29,6 +29,9 @@ This document has two parts: rules that code must follow, and the gate before re
 - 2FA is mandatory for owners and for anyone with the `export` or `import` permission.
 - Every server action declares the permission it needs; the wrapper checks it. Hiding a
   button in the UI is never the check.
+- An action runs only in the clinic its page was shown for. The page sends that clinic's id,
+  and the wrapper refuses when the request now resolves to another clinic (another tab switched,
+  a membership was disabled). The id grants nothing; memberships decide (D-069).
 - Sessions end after 30 minutes of inactivity (clinic computers are shared).
 - Login and 2FA attempts are rate-limited.
 
@@ -73,6 +76,10 @@ This document has two parts: rules that code must follow, and the gate before re
   message bodies, tokens. Log ids and codes.
 - The logger and the error tracker strip known personal fields before anything leaves the
   process. A test proves it with canary values.
+- A failed query's error carries no values: they are removed where the error is made (the auth
+  library's adapter, `withTenant`, `clinicsForUser()`), because a framework can print an error our
+  logger never sees (D-066, D-070). Keep a caught error as `cause`; never copy its message into a
+  new error or a string.
 - Error messages shown to users never include internals; errors shown to patients never say
   whether a record exists.
 

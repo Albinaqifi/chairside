@@ -51,7 +51,7 @@ One codebase, two running processes, one database.
 | Login, sessions, 2FA | Better Auth | D-006 |
 | Hosting | Render, Frankfurt: web + worker + Postgres, one Docker image | D-007 |
 | UI | Tailwind CSS, shadcn/ui, demo tokens | D-009 |
-| Validation | Zod, on every input: forms, webhooks, AI responses | — |
+| Validation | Zod, on every input: forms, webhooks, AI responses | D-068 |
 | Dates and time zones | Luxon | — |
 | Phone numbers | libphonenumber-js | — |
 | Translations | next-intl | D-015 |
@@ -121,18 +121,23 @@ docs/  design/
 
 ## How a staff action flows
 
-Every server-side action from the staff app goes through one wrapper (built in E00-T03).
-No route talks to the database without it.
+Every server-side action from the staff app goes through a wrapper (built in E00-T03, D-071):
+`staffAction` for changes, a read helper for pages and read-only actions, and `userAction` for
+the few actions before a clinic is chosen (the clinic picker). Lint fails a server action that
+no wrapper made (E00-T08). No route talks to the database without them.
 
 ```
 1. Who is this?            session → user
-2. Which clinic, what role? membership → role + permissions
-3. Allowed?                check the permission the action declares, else 403
-4. Valid?                  Zod-parse the input
+2. Which clinic, what role? membership → role + permissions; the clinic the page was shown
+                           for must be the clinic the request resolves to, else
+                           "clinic changed" and nothing runs (D-069)
+3. Allowed?                check the permission the action declares, else "forbidden"
+4. Valid?                  Zod-parse the input (D-068)
 5. Do it                   open a transaction, set the clinic for Row-Level Security,
                            call the module function,
                            write the audit entry and any jobs in the SAME transaction
-6. Answer                  typed result or typed error; nothing personal in logs
+6. Answer                  typed result or typed error; nothing personal in logs, and no
+                           query values in any error (D-070)
 ```
 
 ## How tenant isolation works

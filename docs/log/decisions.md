@@ -666,3 +666,107 @@ architecture), `changed` (differs from the original files), `process`.
   happen when a link enters the viewport or is hovered, not on a timer.
 - **Revisit if:** the second read shows up in measurements, a route outside the proxy's matcher
   needs a signed-in user, or a later Next.js lets pages set cookies.
+
+### D-068 · Zod 4 validates every input at the edge
+- **Origin:** stack, refinement of E00-T03. Approved by the owner on 2026-10-03 (agent rule 4: new
+  library).
+- **What:** `zod` 4 becomes a direct dependency, at the version the lockfile already holds through
+  Better Auth (4.6.5 on 2026-10-03), so adding it brings no new code into the tree. The action
+  wrappers (E00-T03) parse every input with it; webhooks (E03) and AI responses (E06) follow, as
+  the stack table in `overview.md` says. A failed parse is reported as field paths and Zod issue
+  codes, never with the values that were sent.
+- **Why:** the stack table named Zod but no decision approved it, and the wrappers need a schema
+  library. Sharing the auth library's version avoids a second copy.
+- **Revisit if:** Better Auth moves to another major version of Zod, or Zod's messages start
+  quoting the input.
+
+### D-069 · A staff action runs only in the clinic its page was shown for (E00-T02, tester finding 6)
+- **Origin:** E00-T02 test, finding 6 (`handoffs/E00-T02.md`). Decided by the owner on 2026-10-03,
+  in the refinement of E00-T03.
+- **What:**
+  - Every action made by the action wrappers carries the id of the clinic its page was shown for.
+    The wrapper resolves the clinic for the request as before (D-062: the cookie, checked against
+    active memberships, in `currentStaff()`). When the two differ, or the id is missing, it
+    refuses with `clinic_changed` before anything else: no permission check, no transaction,
+    nothing written. The person is told the clinic changed in another tab and to reload (how a
+    form shows it: E00-T04).
+  - The id the browser sends grants nothing. It can only stop an action, never let one into a
+    clinic: memberships still decide.
+  - A page rendering on the server needs no id: it renders in the clinic resolved for that request
+    and shows that clinic's name.
+  - One clinic per browser stays. The clinic is not put in the URL.
+- **Why:** there is one clinic cookie per browser. A form shown for clinic A and sent after another
+  tab switched to B, or after A's membership was disabled (D-062 then falls back to the person's
+  other clinic), would otherwise run in B. A patient created or changed in the wrong clinic is a
+  data-protection incident, not a slip. A clinic in the URL would allow two clinics side by side,
+  but it changes every route and link, and each action still has to be told its clinic.
+- **Revisit if:** people who work in several clinics need them open side by side. Then the clinic
+  goes into the URL, and this check stays.
+
+### D-070 · Query errors lose their values where they are made, for our own queries too (E00-T02, tester finding 2, page side)
+- **Origin:** E00-T02 test, finding 2 (`handoffs/E00-T02.md`). Decided by the owner on 2026-10-03,
+  in the refinement of E00-T03. Extends D-066, which did this for the auth library's adapter.
+- **What:** every error that leaves `withTenant` (from the work inside it, the commit or the
+  rollback) and every error from `clinicsForUser()` is replaced by the copy `withoutQueryValues()`
+  (`src/lib/query-errors.ts`) makes: the message without the values, the SQL with `$1`
+  placeholders, the PostgreSQL code and the names of the table, column and constraint. This also
+  holds when the query error sits in the `cause` chain of another error. It holds in every
+  environment, development included. E00-T03 builds it.
+- **Why:** Next.js prints an error thrown while a page renders, outside our logger, with the values
+  the failed query was sent (`params`). Today that is a user id; from E01 it is patient names and
+  phone numbers. Cleaning where the errors are made covers every printer at once: Next.js, our
+  logger, the error tracker (E00-T07). Keeping the values in development would make the code
+  behave differently on the owner's machine than on staging, and agent rule 6 holds for synthetic
+  data too.
+- **Consequences:** nobody sees the values of a failed query, locally either: debugging works from
+  the SQL, the code and the constraint name. Code that needs the PostgreSQL code still finds it on
+  the error's `cause`, where Drizzle puts it.
+- **Revisit if:** a failure cannot be diagnosed without the values. Then reproduce it with
+  synthetic data in a test; do not print them.
+
+### D-071 · E00-T03 refined: three action wrappers, the Discovered lines settled, the task split in two
+- **Origin:** process, refinement of E00-T03 on 2026-10-03. The split was approved by the owner.
+  The other points are architect choices inside D-062, D-064 and the owner's decision to solve
+  R-32 in E00-T03; the owner reviews them with the two tasks.
+- **What:**
+  - **Three wrappers, in `src/app/_lib/`.** `staffAction` for every server action that changes
+    data: session → clinic check (D-069) → permission → input (D-068) → one `withTenant` → handler
+    → one audit row in the same transaction → typed answer. A read helper for pages and read-only
+    actions: the same steps without the audit row, unless the read declares a patient-record view.
+    `userAction` for a signed-in person before a clinic is chosen: session → input → handler, with
+    no transaction and no audit row. The clinic picker's `chooseClinic` moves onto it. Every
+    wrapper call names its permission, or says that every active member may; there is no default.
+  - **Typed answers.** `forbidden`, `invalid_input` (field paths and issue codes), `clinic_changed`,
+    a handler's own refusal (such as `not_found`), and `internal` for anything unexpected: rolled
+    back, logged once with ids, no detail in the answer. A caught error is kept as `cause`; its
+    message is never copied into a new error or a string. The wrapper does not depend on seeing the
+    handler's first error: when a rollback fails, Drizzle throws the rollback's error instead.
+  - **Only the wrappers open a transaction.** A value import of `withTenant` is allowed only in the
+    wrappers, in `src/db/`, and in `src/modules/auth/` for the login audit; `@/db/client` only in
+    `src/db/` and `src/modules/auth/` (D-062). Lint enforces both. Another lint rule fails any
+    server action in `src/app` that a wrapper did not make, in every route group, not only
+    `(staff)`. Route handlers under `src/app/api/` other than the auth library's are on a short
+    list, each with a reason. The worker's job handler joins these lists in E00-T07, E02's
+    patient-link wrapper and E03's webhooks in theirs.
+  - **Un-awaited promises (R-32).** Type-aware linting with `no-floating-promises` and
+    `no-misused-promises`. No new dependency: typescript-eslint is already installed.
+  - **Login audit (D-064, point 4).** Written from `databaseHooks.session.create.after`. Better Auth
+    1.7.7 runs that hook after the session row is stored and before the cookie is set, and an error
+    in it fails the sign-in. So when a login row cannot be written, the sign-in fails and no cookie
+    reaches the browser: the same rule as an action, whose change and audit row stand or fall
+    together. The session row already stored is never used and ends after 30 minutes.
+  - **An action sent after the session ended** lands the person on the login page with nothing
+    run, instead of the error the proxy's redirect probably causes today (E00-T02 delta review).
+    The proxy stays the place the session is moved forward (D-067), and is still not the
+    permission check.
+  - **Split.** E00-T03 builds the wrappers, the audit module and the cleaned query errors. A new
+    task, E00-T08, right after it, adds the lint rules, the login audit and the ended-session
+    action. Together they are about 500 changed lines of product code, over the one-session rule
+    of thumb (`workflow.md`), and the owner reads every critical diff.
+- **Why:** these points settle the board's Discovered lines that named E00-T03, and risk R-32. Each
+  is the smallest choice that keeps an existing decision: a check in every route group, because a
+  bare action anywhere is a way in; one failure rule for audit rows everywhere; a lint rule
+  wherever a reviewer could miss the mistake.
+- **Revisit if:** a server action fits none of the three wrappers; type-aware linting makes
+  `pnpm check` too slow to run on every task; a later Better Auth runs `create.after` hooks after
+  the cookie is set (then the login rule needs another place).

@@ -6,20 +6,20 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Tested` → `Reviewed` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.)
 
-_Last updated: 2026-10-03 — E00-T02 delta review of fix round 2 (`79fb209`): approved, no required changes, 3 suggestions (Discovered). Stays Tested. Next: a new pull request from the branch (PR #3 was merged before the fixes), then the owner merges. Owner: add the two `BETTER_AUTH_` lines from `.env.example` to `.env`._
+_Last updated: 2026-10-03 — architect: E00-T02 is Done (PR #5). E00-T03 refined and Ready; owner decided tester findings 6 and 2 (page side) and approved Zod and the split (D-068–D-071). New E00-T08 takes the second half. The planning branch `plan/E00-T03-ready` must be merged before E00-T03 starts._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T02` needs a new pull request from its branch (delta review approved), then the owner merges it (Done). Then `E00-T03` (builder, critical); the owner decides E00-T02 finding 6 and finding 2's page side before it starts
-- **Owner decisions from the E00-T02 test:** findings 5–7 in `handoffs/E00-T02.md` (rate-limit address, the clinic an action runs in, self-rename)
+- **Next task to start:** `E00-T03` (builder, critical), once the owner has merged the planning branch `plan/E00-T03-ready`. Then `E00-T08`
+- **Owner decisions from the E00-T02 test, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list. Finding 6 is decided (D-069)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
   business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
 - **Waiting on the owner:** copy the two `BETTER_AUTH_` lines from `.env.example` into `.env` (E00-T02). Q-07 and Q-09 are open with working assumptions.
 
 ## Next (in order)
 
-1. E00-T01 → E00-T02 → E00-T03
+1. E00-T01 → E00-T02 → E00-T03 → E00-T08
 2. E00-T04, E00-T05, E00-T06 (any order) → E00-T07
 3. E01 from T01
 
@@ -45,31 +45,33 @@ turns lines into tasks or strikes them out.
 - ~~2026-10-03 · E00-T01 · `eslint-rules/architecture.test.ts` can hit its 60 s `beforeAll` limit when the file cache is cold (first run of a session on Windows: 56 s, once over 60 s); warm runs take about 2 s.~~ Fixed in E00-T01 on the owner's decision: limit raised to 3 minutes.
 - 2026-10-03 · E00-T01 · Luxon also reads the clock when a date has no day: its docs show `DateTime.fromObject({ hour: 10 })` as "today at 10:00". Lint rule (a) does not catch it; check before E02 uses Luxon.
 - 2026-10-03 · E00-T01 · The logger still keeps field names that matter for messaging and links: `toNumber`, `fromNumber`, `waNumber`, `whatsappId`, `sender`, `referer`, `redirectUri`, `querystring`, `values`, and free text such as `cancelReason` (tester round 2). Look at them with the `URL`/`Buffer` line above, before E02.
-- 2026-10-03 · E00-T01 · E00-T03's action wrapper: keep a caught error as `cause`; never copy `err.message` into a new error or a template string. The logger cannot clean text, and a failed query's values are in that message (tester round 2).
-- 2026-10-03 · E00-T01 · When a rollback fails (for example because the connection died), Drizzle's `transaction()` throws the rollback's error instead of the error that caused it. `withTenant` logs the connection failure; E00-T03 should not count on seeing the first error.
+- ~~2026-10-03 · E00-T01 · E00-T03's action wrapper: keep a caught error as `cause`; never copy `err.message` into a new error or a template string. The logger cannot clean text, and a failed query's values are in that message (tester round 2).~~ In E00-T03, "Unexpected errors" (D-071).
+- ~~2026-10-03 · E00-T01 · When a rollback fails (for example because the connection died), Drizzle's `transaction()` throws the rollback's error instead of the error that caused it. `withTenant` logs the connection failure; E00-T03 should not count on seeing the first error.~~ In E00-T03, "Unexpected errors" (D-071).
 - 2026-10-03 · E00-T01 · Nothing limits how long a statement waits for the database to answer (no `statement_timeout`, no pg `query_timeout`). The 5 s limits cover locks and connections only: a database that stops answering mid-statement, or during `withTenant`'s reset, keeps the call waiting.
 - 2026-10-03 · E00-T01 review · Outside local `db:reset`, nothing checks the app's database role. A hosted `DATABASE_URL` that names the table owner (or a superuser or BYPASSRLS role) switches off every policy without an error. Suggest a start-up check that refuses to serve, before E00-T07 (handoff, reviewer suggestion 1).
-- 2026-10-03 · E00-T01 review · "Never import `src/db/client.ts` elsewhere" is not a lint rule, and `getDb()` (tests only) gives a handle outside `withTenant`. E00-T02 or E00-T03: decide which file may use it (the auth library needs one for the global tables) and lint the rest.
+- ~~2026-10-03 · E00-T01 review · "Never import `src/db/client.ts` elsewhere" is not a lint rule, and `getDb()` (tests only) gives a handle outside `withTenant`. E00-T02 or E00-T03: decide which file may use it (the auth library needs one for the global tables) and lint the rest.~~ Decided in D-062; the lint rule is in E00-T08 (D-071).
 - 2026-10-03 · E00-T01 review · The `db:reset` guard accepts a `MIGRATION_DATABASE_URL` whose user is `chairside_app` or the admin user; the app role then owns the tables and skips the policies. Local only: `pnpm check` catches it, `pnpm dev` does not.
 - 2026-10-03 · E00-T02 · `memberships` exists without `provider_id`: the column and its foreign key (`clinic_id`, `provider_id`) → providers must come with E01-T01, when providers exist (D-062).
-- 2026-10-03 · E00-T02 · `data-model.md` says the audit log records logins, but a login has no clinic yet (sessions are global). Decided 2026-10-03 (D-064, owner delegated): a login is audited as `user.logged_in` in every clinic the person has an active membership in, from the session-creation hook; E00-T03 builds it.
+- ~~2026-10-03 · E00-T02 · `data-model.md` says the audit log records logins, but a login has no clinic yet (sessions are global). Decided 2026-10-03 (D-064, owner delegated): a login is audited as `user.logged_in` in every clinic the person has an active membership in, from the session-creation hook; E00-T03 builds it.~~ E00-T08 builds it, after E00-T03's `audit.record()` (D-071).
 - 2026-10-03 · E00-T02 · The auth library reads the client address from `x-forwarded-for` only when it holds exactly one address; otherwise all such requests share one login rate-limit bucket. E00-T07: set `advanced.ipAddress.trustedProxies` (or the host's own header) once the host is known (R-33).
 - 2026-10-03 · E00-T02 · The app role has SELECT only on `memberships` and no INSERT on `clinics`. E00-T05: the seed and `clinic:create` must run as the migrator or get their own grants; `createStaffUser()` from `@/modules/auth` creates the user.
 - 2026-10-03 · E00-T02 · Sessions store the staff member's `ip_address` and `user_agent` (library default), and an expired session is deleted only when its cookie is seen again. E07-T04 (retention): a job that deletes expired `sessions`, `verifications` and stale `rate_limits` rows.
-- 2026-10-03 · E00-T02 · Decided: only `src/modules/auth/` imports `@/db/client` (D-062). The lint rule that enforces it is still to write (E00-T03, see the E00-T01 review line above).
+- ~~2026-10-03 · E00-T02 · Decided: only `src/modules/auth/` imports `@/db/client` (D-062). The lint rule that enforces it is still to write (E00-T03, see the E00-T01 review line above).~~ In E00-T08 (D-071).
 - 2026-10-03 · E00-T02 · Removing a route leaves old generated types in `.next/dev/types`, so `pnpm typecheck` fails locally until `.next` is deleted (README says so). A fresh checkout (CI, E00-T06) is not affected.
-- 2026-10-03 · E00-T02 test · Next.js prints an error thrown while rendering a page, values of a failed query included (`params`); our logger never sees it. Today only ids; from E01 patient values. Take the values out where query errors are created, before E01 (handoff, tester finding 2).
+- ~~2026-10-03 · E00-T02 test · Next.js prints an error thrown while rendering a page, values of a failed query included (`params`); our logger never sees it. Today only ids; from E01 patient values. Take the values out where query errors are created, before E01 (handoff, tester finding 2).~~ Owner decided: cleaned where the errors are made, in every environment (D-070); E00-T03 builds it.
 - 2026-10-03 · E00-T02 test · The auth library's queries (`getDb()`) have no lock timeout: "waiting for a lock fails after 5 s" (CLAUDE.md) holds inside `withTenant` only.
 - 2026-10-03 · E00-T01 review · `security-privacy.md` section 7 says `.env.example` lists names without values; the task allowed local values that are not secrets, which the file has. Owner: adjust the sentence.
 - 2026-10-03 · E00-T02 review · Pin `better-auth` to exactly 1.7.7 (`package.json` has `^1.7.7`): the adapter error wrapper and `PASSWORD_CHECK_PATHS` depend on its internals and route list, and a minor upgrade could change them with no failing test (handoff, reviewer suggestion 1).
 - 2026-10-03 · E00-T02 review · `.env.example` holds a working `BETTER_AUTH_SECRET`; copied to staging, cookies would be signed with a value in git. E00-T07: refuse to start with that value when `BETTER_AUTH_URL` is https.
 - 2026-10-03 · E00-T02 review · `PERMISSION_TABLE` leaves out scope-v1.md's row "Read aftercare drafts and the library" (every role ✔) though its comment says it mirrors the table row by row. Add it (E06) or say why it is left out.
-- 2026-10-03 · E00-T02 review · `chooseClinic` (`(auth)/choose-clinic/actions.ts`) is a server action outside `(staff)`: E00-T03's wrapper check will not see it, and it reads input without Zod. E00-T03: decide how actions before a clinic is chosen are checked.
+- ~~2026-10-03 · E00-T02 review · `chooseClinic` (`(auth)/choose-clinic/actions.ts`) is a server action outside `(staff)`: E00-T03's wrapper check will not see it, and it reads input without Zod. E00-T03: decide how actions before a clinic is chosen are checked.~~ Decided (D-071): E00-T03 moves it onto `userAction` with Zod; E00-T08's lint check covers every route group.
 - 2026-10-03 · E00-T02 review · The builder's "For the tester" recipe in `handoffs/E00-T02.md` holds synthetic names, emails and a dev password; rule 6 and the template ask for ids. Point to the seed once E00-T05 exists.
 - 2026-10-03 · E00-T02 test · The proxy matcher (`src/proxy.ts`) skips every path that contains a dot or starts with `login`: a future staff route such as `/logins` or `/export.csv` would not renew the session. Keep staff routes clear of both, or narrow the pattern (E00-T04 navigation).
 - 2026-10-03 · E00-T02 delta review · The request proxy now reads and writes the database (D-067), using the pool and auth instance on `globalThis`. Next.js warns a proxy may run apart from the app (CDN). E00-T07: choose a host that runs it inside the app's Node.js process, or revisit D-067.
 - 2026-10-03 · E00-T02 delta review · The proxy's matcher covers every path but `/login…`, `/api/auth` and files. Patient link pages (E02-T08, T09) and webhooks (E03-T04) would go to `/login`, and on a staff computer a patient page would renew the staff session and set its cookie (security-privacy.md section 3). Narrow the matcher to staff routes when the first other route arrives.
-- 2026-10-03 · E00-T02 delta review · A server action sent after the session ended gets the proxy's 307, which `fetch` follows as a POST to `/login`, so `currentStaff()`'s redirect is never reached; what the person sees is unchecked (probably an error). Fails safe. E00-T03 or E00-T06: check it in a browser.
+- ~~2026-10-03 · E00-T02 delta review · A server action sent after the session ended gets the proxy's 307, which `fetch` follows as a POST to `/login`, so `currentStaff()`'s redirect is never reached; what the person sees is unchecked (probably an error). Fails safe. E00-T03 or E00-T06: check it in a browser.~~ In E00-T08: the person must end on the login page; the tester checks it in a browser (D-071).
+- 2026-10-03 · E00-T02 test · Any client picks its own sign-in rate-limit counter by sending a new `X-Forwarded-For` each time (tester finding 5). E00-T07: add "rotating `X-Forwarded-For` against staging still gets a 429" to its acceptance. Owner: also whether D-064 point 5 (no per-account limit) stands.
+- 2026-10-03 · E00-T02 test · A signed-in person can rename themselves and store any picture address through the auth library's `/update-user` (tester finding 7). Owner: decide in E04, or switch the route off before then.
 
 ---
 
@@ -80,8 +82,9 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
 | E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
-| E00-T02 | Login, sessions and clinic membership | builder | critical | **Tested** | Delta review of fix round 2 approved: the session cookie is renewed with the session (D-067), no required changes. 8 reviewer suggestions in all (Discovered). Tester findings 5–7 for the owner. No open PR (#3 merged before the fixes): a new one is needed. Owner: add `BETTER_AUTH_*` to `.env`. See `handoffs/E00-T02.md` |
-| E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
+| E00-T02 | Login, sessions and clinic membership | builder | critical | **Done** | Merged by the owner (PR #5). Tester finding 6 → D-069, finding 2's page side → D-070; findings 5 and 7 on the Discovered list. See `handoffs/E00-T02.md` |
+| E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Ready** | Refined 2026-10-03 (D-068–D-071): clinic check, query errors cleaned at the source, `userAction` for the picker, adds `zod`. Start after `plan/E00-T03-ready` is merged. See `handoffs/E00-T03.md` |
+| E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | Planned | Split from E00-T03 (D-071): lint rules (wrappers only, database imports, R-32), login audit rows, action after session end. Fully specified; Ready when E00-T03 is Done |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | |
 | E00-T06 | CI and the first end-to-end test | builder | normal | Planned | Owner: create GitHub repo |
@@ -219,4 +222,4 @@ Outline. Needs E07-T00.
 
 ## Done
 
-_Nothing yet._
+- E00-T02 · Login, sessions and clinic membership · merged 2026-10-03 (PR #5)
