@@ -1,10 +1,12 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { getDb } from '@/db/client';
 import { requiredEnv } from '@/db/required-env';
 import { AUTH_COOKIE_PREFIX } from '@/lib/cookies';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
+import { withoutQueryValues } from '@/lib/query-errors';
 import { accounts, rateLimits, sessions, users, verifications } from './schema';
 
 /**
@@ -29,6 +31,65 @@ export const SESSION_REFRESH_SECONDS = 60;
  */
 export const SIGN_IN_RATE_LIMIT = { window: 60, max: 10 } as const;
 
+/**
+ * The library's routes that check a password. Each is limited like sign-in, so no route lets
+ * anyone guess a password faster (the library's defaults are 100 per 10 seconds for
+ * `/verify-password` and 3 per 10 seconds for `/change-password`). Counters are per address and
+ * path.
+ */
+const PASSWORD_CHECK_PATHS = ['/sign-in/email', '/verify-password', '/change-password'] as const;
+
+type AdapterFactory = ReturnType<typeof drizzleAdapter>;
+
+/**
+ * The library's database adapter, with every error it throws made safe to print. The library's
+ * router writes an unexpected error to the console itself (better-call), outside our logger, and
+ * Next.js prints an error that escapes. A failed query's error carries the values the query was
+ * sent: an email typed into the form, or a new session's token, address and user agent
+ * (security-privacy.md, section 6).
+ */
+function withSafeQueryErrors(createAdapter: AdapterFactory): AdapterFactory {
+  return (options) => {
+    const adapter = createAdapter(options);
+    // Changed in place, not wrapped: the library finds its schema check by this very object.
+    for (const [name, method] of Object.entries(adapter)) {
+      if (typeof method !== 'function') continue;
+      const original = method as (...args: unknown[]) => Promise<unknown>;
+      Object.assign(adapter, {
+        [name]: async (...args: unknown[]) => {
+          try {
+            return await original.apply(adapter, args);
+          } catch (error) {
+            throw withoutQueryValues(error);
+          }
+        },
+      });
+    }
+    return adapter;
+  };
+}
+
+/**
+ * Refuses a sign-in that asks not to be remembered. The library gives such a session a fixed 24
+ * hours that are never moved forward, so it would outlive the 30 minutes without a request that
+ * every session must end after (security-privacy.md, section 2). Our login form never asks.
+ */
+const refuseDontRememberMe = createAuthMiddleware(async (ctx) => {
+  const body: unknown = ctx.body;
+  if (
+    ctx.path === '/sign-in/email' &&
+    typeof body === 'object' &&
+    body !== null &&
+    'rememberMe' in body &&
+    body.rememberMe === false
+  ) {
+    throw new APIError('BAD_REQUEST', {
+      message:
+        'Every session ends after 30 minutes without a request; rememberMe is not supported.',
+    });
+  }
+});
+
 function createAuth() {
   return betterAuth({
     appName: 'Chairside',
@@ -36,11 +97,13 @@ function createAuth() {
     // (https). Required, so nothing is ever inferred from request headers.
     baseURL: requiredEnv('BETTER_AUTH_URL'),
     secret: requiredEnv('BETTER_AUTH_SECRET'),
-    database: drizzleAdapter(getDb(), {
-      provider: 'pg',
-      usePlural: true,
-      schema: { users, sessions, accounts, verifications, rateLimits },
-    }),
+    database: withSafeQueryErrors(
+      drizzleAdapter(getDb(), {
+        provider: 'pg',
+        usePlural: true,
+        schema: { users, sessions, accounts, verifications, rateLimits },
+      }),
+    ),
     emailAndPassword: {
       enabled: true,
       // No self sign-up: clinics are set up by hand (intent.md). Users come from the seed, the
@@ -52,12 +115,15 @@ function createAuth() {
       expiresIn: SESSION_IDLE_SECONDS,
       updateAge: SESSION_REFRESH_SECONDS,
     },
+    hooks: { before: refuseDontRememberMe },
     rateLimit: {
       // On in every environment, not only in production, so tests and local runs see it.
       enabled: true,
       // Counters in the database: shared by every web instance, kept across restarts.
       storage: 'database',
-      customRules: { '/sign-in/email': SIGN_IN_RATE_LIMIT },
+      customRules: Object.fromEntries(
+        PASSWORD_CHECK_PATHS.map((path) => [path, SIGN_IN_RATE_LIMIT]),
+      ),
     },
     advanced: {
       cookiePrefix: AUTH_COOKIE_PREFIX,

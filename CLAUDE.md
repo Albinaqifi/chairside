@@ -64,7 +64,8 @@ src/app/              Next.js routes. Thin: parse input, call a module, render.
   (staff)/            The staff app. Its layout and every page start from currentStaff().
   _lib/               Request-edge helpers: who is signed in, for which clinic; the browser auth client.
   api/auth/           The auth library's routes (sign-in, sign-out, get-session). No code of ours.
-src/proxy.ts          Sends requests without a session cookie to /login. Not a security check.
+src/proxy.ts          Moves the session forward and renews its cookie (D-067); no valid session → /login.
+                      Not the permission check: pages and actions still call currentStaff().
 src/modules/<name>/   All business logic. index.ts = public API, schema.ts = its tables.
 src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts.
 src/lib/              Small shared pieces: clock, ids, logger, personal-fields.

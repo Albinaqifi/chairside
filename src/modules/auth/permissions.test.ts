@@ -116,4 +116,18 @@ describe('can(): kinds and values the table leaves out', () => {
     const unlinked = { extraPermissions: [] } as unknown as MembershipExtras; // providerKind missing
     expect(can('owner', unlinked, 'visit.record')).toBe(false);
   });
+
+  it('answers false for names every object inherits, as role, permission or provider kind', () => {
+    // Tester, fix round 1: a lookup by name must not find Object.prototype's members.
+    for (const name of ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf']) {
+      for (const permission of PERMISSIONS) {
+        expect(can(name as Role, nothing, permission), `role ${name}`).toBe(false);
+      }
+      for (const role of ROLES) {
+        expect(can(role, nothing, name as Permission), `permission ${name}`).toBe(false);
+      }
+      const linked = { extraPermissions: [], providerKind: name } as unknown as MembershipExtras;
+      expect(can('owner', linked, 'visit.record'), `provider kind ${name}`).toBe(false);
+    }
+  });
 });

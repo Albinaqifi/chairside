@@ -164,6 +164,24 @@ describe('a session without requests', () => {
     expect(await session.json()).not.toBeNull();
     expect(await sessionSeconds(token)).toBeGreaterThan(SESSION_IDLE_SECONDS - 60);
   });
+
+  it('cannot be asked to last longer: sign-in with rememberMe: false is refused', async () => {
+    // The library would give it a fixed 24 hours that requests never move.
+    const refused = await authRequest('/sign-in/email', {
+      body: { email, password: PASSWORD, rememberMe: false },
+    });
+    expect(refused.status).toBe(400);
+    expect(refused.headers.getSetCookie()).toEqual([]);
+
+    // rememberMe: true is the library's default and changes nothing.
+    const remembered = await authRequest('/sign-in/email', {
+      body: { email, password: PASSWORD, rememberMe: true },
+    });
+    expect(remembered.status).toBe(200);
+    expect(await sessionSeconds(sessionTokenOf(remembered))).toBeLessThanOrEqual(
+      SESSION_IDLE_SECONDS,
+    );
+  });
 });
 
 describe('repeated failed logins', () => {
@@ -189,6 +207,45 @@ describe('repeated failed logins', () => {
     );
     expect(rows[0]?.count).toBe(SIGN_IN_RATE_LIMIT.max);
   });
+});
+
+describe('guessing the password of a signed-in session', () => {
+  // Wrong guesses only: a right one would change the password.
+  const guesses: Record<string, (attempt: number) => object> = {
+    '/verify-password': (attempt) => ({ password: `${WRONG_PASSWORD}-${attempt}` }),
+    '/change-password': (attempt) => ({
+      currentPassword: `${WRONG_PASSWORD}-${attempt}`,
+      newPassword: 'MARKER-pw-9c2e-new',
+    }),
+  };
+
+  it.each(Object.keys(guesses))(
+    '%s answers no more guesses in a minute than sign-in',
+    { timeout: 60_000 },
+    async (path) => {
+      const cookie = cookiesOf(await signIn(email, PASSWORD));
+      const address = freshAddress();
+      const guess = guesses[path]!;
+
+      let answered = 0;
+      let attempt = 0;
+      // Six rounds, each followed by moving the counter 10 seconds back: one minute, as the rate
+      // limit sees it. The library's own limits allow 3 (change) or 100 (verify) per 10 seconds.
+      for (let round = 0; round < 6; round++) {
+        for (let tries = 0; tries <= SIGN_IN_RATE_LIMIT.max; tries++) {
+          const response = await authRequest(path, { body: guess(attempt++), cookie, address });
+          if (response.status === 429) break;
+          expect(response.status, 'a wrong password').toBe(400);
+          answered++;
+        }
+        await admin.query(
+          'update rate_limits set last_request = last_request - 10000 where key = $1',
+          [`${address}|${path}`],
+        );
+      }
+      expect(answered).toBe(SIGN_IN_RATE_LIMIT.max);
+    },
+  );
 });
 
 describe('log lines around login', () => {

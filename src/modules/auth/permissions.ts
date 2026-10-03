@@ -97,22 +97,35 @@ export const PERMISSION_TABLE: Readonly<Record<Permission, Row>> = {
   'results.view': ownerOnly,
 };
 
-/** True if a member with this role and these extras has the permission. Pure. */
+/**
+ * True if a member with this role and these extras has the permission. Pure. Values from outside
+ * the type system (a database row, a JavaScript caller) fail closed: a role, permission or
+ * provider kind it does not know gives false.
+ */
 export function can(role: Role, extras: MembershipExtras, permission: Permission): boolean {
-  switch (PERMISSION_TABLE[permission][role]) {
+  const row: Row | undefined = Object.hasOwn(PERMISSION_TABLE, permission)
+    ? PERMISSION_TABLE[permission]
+    : undefined;
+  const grant: Grant | undefined = row && Object.hasOwn(row, role) ? row[role] : undefined;
+  switch (grant) {
     case 'always':
       return true;
-    case 'never':
-      return false;
     case 'linked_to_provider':
-      return extras.providerKind !== null;
+      return isProviderKind(extras.providerKind);
     case 'linked_to_dentist':
       return extras.providerKind === 'dentist';
     case 'extra_import':
       return extras.extraPermissions.includes('import');
     case 'extra_export':
       return extras.extraPermissions.includes('export');
+    default:
+      // 'never', and anything the table does not hold.
+      return false;
   }
+}
+
+function isProviderKind(value: unknown): value is ProviderKind {
+  return typeof value === 'string' && (PROVIDER_KINDS as readonly string[]).includes(value);
 }
 
 export function isRole(value: unknown): value is Role {

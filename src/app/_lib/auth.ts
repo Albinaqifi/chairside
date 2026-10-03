@@ -16,9 +16,16 @@ export interface SignedInUser {
   email: string;
 }
 
-/** The signed-in user, from the session cookie, or null. */
+/**
+ * The signed-in user, from the session cookie, or null. Reads the session without moving its end
+ * forward: a page cannot renew the browser's cookie, so only the request proxy (src/proxy.ts) moves
+ * the session, together with the cookie (D-067).
+ */
 export const currentUser = cache(async (): Promise<SignedInUser | null> => {
-  const result = await getAuth().api.getSession({ headers: await headers() });
+  const result = await getAuth().api.getSession({
+    headers: await headers(),
+    query: { disableRefresh: true },
+  });
   if (!result) return null;
   return { id: result.user.id, name: result.user.name, email: result.user.email };
 });

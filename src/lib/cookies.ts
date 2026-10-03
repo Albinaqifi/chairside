@@ -1,7 +1,4 @@
-/**
- * Cookie names, in one place so the request proxy (src/proxy.ts) can read them without loading
- * the auth module.
- */
+/** Cookie names, in one place for the auth module, the request proxy (src/proxy.ts) and pages. */
 
 /** The auth library's cookies are `chairside.session_token` and so on. */
 export const AUTH_COOKIE_PREFIX = 'chairside';
