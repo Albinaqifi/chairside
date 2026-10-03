@@ -56,7 +56,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
-| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Built** | Round 3: findings 13–17 and the minor notes fixed as the owner decided (connection reset: D-061). See `handoffs/E00-T01.md` |
+| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Tested** | Round 3 re-test (owner's short scope): findings 13–17 and the minor notes fixed as decided. See `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | Planned | |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
