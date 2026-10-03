@@ -632,3 +632,37 @@ architecture), `changed` (differs from the original files), `process`.
   with; the tester showed three ways around them through the library's own routes.
 - **Revisit if:** a "Remember me" or "confirm your password" screen is wanted (E04), or the
   library offers a setting for any of these.
+
+### D-067 · The request proxy moves the session forward and renews the browser's cookie; pages only read the session (E00-T02, reviewer's required change 1)
+- **Origin:** E00-T02, fix round 2 for the reviewer's required change 1 (`handoffs/E00-T02.md`).
+- **What:**
+  - `src/proxy.ts` runs before every staff page and server action. It asks the auth library for
+    the session (`getSession` as a Response). When the session is due for its move (D-063: at most
+    once a minute), the library moves `sessions.expires_at` forward and sends a renewed
+    `chairside.session_token` cookie with `Max-Age` 1800; the proxy puts that cookie on its
+    response. So the browser's cookie ends when the session row does: 30 minutes after the last
+    request, up to a minute early, never late.
+  - When the library finds no valid session (ended, deleted, or a cookie that is not signed by
+    us), the proxy redirects to `/login`, with the cookie removal the library sends for an ended
+    or deleted session. A failure to
+    read the session (status other than 200 or 401) ends the request with an error; it is never
+    treated as signed in.
+  - Pages read the session without moving it: `currentUser()` passes `disableRefresh`. A Server
+    Component cannot set cookies, so a move made while a page renders would leave the cookie
+    behind the session row.
+  - Nothing renews the session in the background: no polling, no `useSession()`. Only requests
+    that pass the proxy count.
+  - This replaces "`src/proxy.ts` only sends requests without a session cookie to the login page"
+    in D-063. The proxy is still not the permission check: `currentStaff()` decides the user and
+    the clinic for every page and action.
+- **Why:** before, the move happened inside `api.getSession()` called from a page, which returns
+  only the JSON; the renewed cookie was dropped, so the browser deleted the cookie 30 minutes after
+  sign-in however busy the person was (the library calls it a DB/cookie mismatch). The proxy is the
+  one place on a page request that can both write the database and set a cookie (Next.js 16 runs it
+  on Node.js). The library's `nextCookies()` plugin does not help: it cannot set cookies while a
+  page renders either, it only skips the move.
+- **Consequences:** each staff request reads the session twice (proxy and page); the move itself
+  stays once a minute. A link prefetch also passes the proxy, so it counts as a request; prefetches
+  happen when a link enters the viewport or is hovered, not on a timer.
+- **Revisit if:** the second read shows up in measurements, a route outside the proxy's matcher
+  needs a signed-in user, or a later Next.js lets pages set cookies.
