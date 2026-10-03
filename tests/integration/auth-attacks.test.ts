@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { inspect } from 'node:util';
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -106,6 +107,21 @@ async function captureOutput(fn: () => Promise<unknown>): Promise<string> {
       return (write as (...a: unknown[]) => boolean)(chunk, ...rest);
     }) as typeof stream.write);
   }
+  // Our logger (pino) writes to the file descriptors directly, not through process.stdout.
+  const writeSync = fs.writeSync;
+  vi.spyOn(fs, 'writeSync').mockImplementation(((
+    fd: unknown,
+    data: unknown,
+    ...rest: unknown[]
+  ) => {
+    if (fd === 1 || fd === 2) written.push(String(data));
+    return (writeSync as (...a: unknown[]) => number)(fd, data, ...rest);
+  }) as typeof fs.writeSync);
+  const writeAsync = fs.write;
+  vi.spyOn(fs, 'write').mockImplementation(((fd: unknown, data: unknown, ...rest: unknown[]) => {
+    if (fd === 1 || fd === 2) written.push(String(data));
+    return (writeAsync as (...a: unknown[]) => void)(fd, data, ...rest);
+  }) as typeof fs.write);
   try {
     await fn();
   } catch (error) {
@@ -129,6 +145,60 @@ describe('a session without requests, whatever the client asks for', () => {
       expect(response.status).toBeGreaterThanOrEqual(400);
     }
   });
+
+  it('ends after 30 minutes for every other way of sending rememberMe', async () => {
+    // Tester, fix round 1. Only a JSON false is refused; no other body may get the library's
+    // 24-hour "do not remember me" session either (sign-in also takes a form).
+    const json = 'application/json';
+    const credentials = `"email":${JSON.stringify(email)},"password":${JSON.stringify(PASSWORD)}`;
+    const bodies: [label: string, body: string, contentType: string][] = [
+      ...['"false"', '0', 'null', '""', '[]', '{}', 'true'].map(
+        (value): [string, string, string] => [
+          `rememberMe: ${value}`,
+          `{${credentials},"rememberMe":${value}}`,
+          json,
+        ],
+      ),
+      ['false, then true', `{${credentials},"rememberMe":false,"rememberMe":true}`, json],
+      ['true, then false', `{${credentials},"rememberMe":true,"rememberMe":false}`, json],
+      ['false, inherited', `{${credentials},"__proto__":{"rememberMe":false}}`, json],
+      [
+        'a form',
+        new URLSearchParams({ email, password: PASSWORD, rememberMe: 'false' }).toString(),
+        'application/x-www-form-urlencoded',
+      ],
+    ];
+
+    for (const [label, body, contentType] of bodies) {
+      const response = await getAuth().handler(
+        new Request(`${ORIGIN}/api/auth/sign-in/email`, {
+          method: 'POST',
+          headers: {
+            origin: ORIGIN,
+            'x-forwarded-for': freshAddress(),
+            'content-type': contentType,
+          },
+          body,
+        }),
+      );
+      const cookies = response.headers.getSetCookie();
+      expect(
+        cookies.filter((c) => c.includes('dont_remember')),
+        label,
+      ).toEqual([]);
+      if (response.status === 200) {
+        expect(await sessionSeconds(sessionTokenOf(response)), label).toBeLessThanOrEqual(
+          SESSION_IDLE_SECONDS,
+        );
+        // A "do not remember me" session cookie has no Max-Age; ours always has one.
+        const sessionCookie = cookies.find((c) => c.startsWith('chairside.session_token='));
+        expect(sessionCookie, label).toMatch(/Max-Age=/i);
+      } else {
+        expect(response.status, label).toBeGreaterThanOrEqual(400);
+        expect(cookies, label).toEqual([]);
+      }
+    }
+  });
 });
 
 describe('guessing a password from a signed-in session', () => {
@@ -149,19 +219,83 @@ describe('guessing a password from a signed-in session', () => {
     }
     expect(answered).toBeLessThanOrEqual(SIGN_IN_RATE_LIMIT.max);
   });
+
+  // Tester, fix round 1: the limit on the two routes that check a password after sign-in.
+  const wrongGuess: Record<string, object> = {
+    '/verify-password': { password: 'MARKER-guess-wrong' },
+    '/change-password': {
+      currentPassword: 'MARKER-guess-wrong',
+      newPassword: 'MARKER-pw-new-7e3b',
+    },
+  };
+  const sessionCookie = async () => {
+    const response = await authRequest('/sign-in/email', { body: { email, password: PASSWORD } });
+    expect(response.status).toBe(200);
+    return cookiesOf(response);
+  };
+
+  it.each(Object.keys(wrongGuess))(
+    '%s: no other spelling of the path and no other session starts a fresh count',
+    { timeout: 60_000 },
+    async (path) => {
+      const body = wrongGuess[path]!;
+      const cookie = await sessionCookie();
+      const address = freshAddress();
+      for (let attempt = 0; attempt < SIGN_IN_RATE_LIMIT.max; attempt++) {
+        const response = await authRequest(path, { body, cookie, address });
+        expect(response.status, 'a wrong password').toBe(400);
+      }
+
+      const spellings = [
+        `${path}/`,
+        `/${path}`,
+        `${path}?again=1`,
+        `${path}#again`,
+        `/.${path}`,
+        `/x/..${path}`,
+        `/%2e${path}`,
+        path.toUpperCase(),
+        path.replace('d', '%64'),
+        `${path}%20`,
+        `${path};x`,
+      ];
+      for (const spelling of spellings) {
+        const response = await authRequest(spelling, { body, cookie, address });
+        expect([404, 429], `${spelling} must not check a password`).toContain(response.status);
+      }
+      const otherSession = await sessionCookie();
+      const response = await authRequest(path, { body, cookie: otherSession, address });
+      expect(response.status, 'another session, same address').toBe(429);
+    },
+  );
+
+  it.each(Object.keys(wrongGuess))(
+    '%s: thirty guesses at once still get at most the limit answered',
+    async (path) => {
+      const cookie = await sessionCookie();
+      const address = freshAddress();
+      const statuses = await Promise.all(
+        Array.from({ length: SIGN_IN_RATE_LIMIT.max * 3 }, () =>
+          authRequest(path, { body: wrongGuess[path], cookie, address }).then((r) => r.status),
+        ),
+      );
+      expect(statuses.filter((status) => status === 400)).toHaveLength(SIGN_IN_RATE_LIMIT.max);
+      expect(statuses.filter((status) => status !== 400 && status !== 429)).toEqual([]);
+    },
+  );
 });
 
-describe('a failed query during sign-in', () => {
-  // The migrator owns the tables, so it can take a grant away from the app role for one request.
-  async function withoutGrant(grant: string, table: string, fn: () => Promise<unknown>) {
-    await admin.query(`revoke ${grant} on ${table} from chairside_app`);
-    try {
-      await fn();
-    } finally {
-      await admin.query(`grant ${grant} on ${table} to chairside_app`);
-    }
+// The migrator owns the tables, so it can take a grant away from the app role for one request.
+async function withoutGrant(grant: string, table: string, fn: () => Promise<unknown>) {
+  await admin.query(`revoke ${grant} on ${table} from chairside_app`);
+  try {
+    await fn();
+  } finally {
+    await admin.query(`grant ${grant} on ${table} to chairside_app`);
   }
+}
 
+describe('a failed query during sign-in', () => {
   it('writes neither the email nor the new session to any output', async () => {
     const userAgent = 'MARKER-ua-5c0e';
     const address = '192.0.2.250';
@@ -191,6 +325,128 @@ describe('a failed query during sign-in', () => {
     );
     expect(output).not.toContain(typed);
     expect(output).not.toContain('MARKER-pw-typed');
+  });
+});
+
+describe('a failed query on the other auth routes', () => {
+  // Tester, fix round 1: every query the library makes must fail without printing its values,
+  // not only those of sign-in. "Failed query" in the output shows the query really failed.
+  let lastOctet = 100;
+  /** A client address for one test only; three digits, so no other address is part of it. */
+  const markerAddress = () => `198.51.100.${lastOctet++}`;
+
+  async function signedIn(userEmail = email) {
+    const address = markerAddress();
+    const userAgent = `MARKER-ua-${address}`;
+    const response = await authRequest('/sign-in/email', {
+      body: { email: userEmail, password: PASSWORD },
+      address,
+      userAgent,
+    });
+    expect(response.status).toBe(200);
+    return { cookie: cookiesOf(response), token: sessionTokenOf(response), address, userAgent };
+  }
+
+  it('reading the session prints no session token', async () => {
+    const { cookie, token, address, userAgent } = await signedIn();
+    const output = await captureOutput(() =>
+      withoutGrant('select', 'sessions', () =>
+        authRequest('/get-session', { cookie, address, userAgent }),
+      ),
+    );
+    expect(output).toContain('Failed query');
+    expect(output).not.toContain(token);
+  });
+
+  it('moving the session forward prints no session token', async () => {
+    const { cookie, token, address, userAgent } = await signedIn();
+    // Due for its refresh: the expiry is moved forward once a minute has passed since the last move.
+    await admin.query(
+      `update sessions set expires_at = expires_at - interval '2 minutes' where token = $1`,
+      [token],
+    );
+    const output = await captureOutput(() =>
+      withoutGrant('update', 'sessions', () =>
+        authRequest('/get-session', { cookie, address, userAgent }),
+      ),
+    );
+    expect(output).toContain('Failed query');
+    expect(output).not.toContain(token);
+  });
+
+  it('signing out prints no session token', async () => {
+    const { cookie, token, address, userAgent } = await signedIn();
+    const output = await captureOutput(() =>
+      withoutGrant('delete', 'sessions', () =>
+        authRequest('/sign-out', { body: {}, cookie, address, userAgent }),
+      ),
+    );
+    expect(output).toContain('Failed query');
+    expect(output).not.toContain(token);
+  });
+
+  it('counting requests for the rate limit prints no client address', async () => {
+    for (const grant of ['select', 'insert', 'update']) {
+      const address = markerAddress();
+      const signIn = () =>
+        authRequest('/sign-in/email', { body: { email, password: PASSWORD }, address });
+      // A counter must exist before an update can fail.
+      if (grant === 'update') expect((await signIn()).status).toBe(200);
+      const output = await captureOutput(() => withoutGrant(grant, 'rate_limits', signIn));
+      expect(output, grant).toContain('Failed query');
+      expect(output, grant).not.toContain(address);
+    }
+  });
+
+  it('changing the password prints no password hash', async () => {
+    const userEmail = testEmail();
+    await createStaffUser({ email: userEmail, name: 'Test Staff', password: PASSWORD });
+    const { cookie, address, userAgent } = await signedIn(userEmail);
+    const { password } = await getAuth().$context;
+    const hash = password.hash;
+    const hashes: string[] = [];
+    vi.spyOn(password, 'hash').mockImplementation(async (plain) => {
+      const hashed = await hash(plain);
+      hashes.push(hashed);
+      return hashed;
+    });
+
+    const output = await captureOutput(() =>
+      withoutGrant('update', 'accounts', () =>
+        authRequest('/change-password', {
+          body: { currentPassword: PASSWORD, newPassword: 'MARKER-pw-new-5d2a' },
+          cookie,
+          address,
+          userAgent,
+        }),
+      ),
+    );
+    expect(hashes, 'the new password was hashed').toHaveLength(1);
+    expect(output).toContain('Failed query');
+    expect(output).not.toContain(hashes[0]);
+  });
+
+  it('changing the password and the session prints nothing of the new session', async () => {
+    const userEmail = testEmail();
+    await createStaffUser({ email: userEmail, name: 'Test Staff', password: PASSWORD });
+    const { cookie, address, userAgent } = await signedIn(userEmail);
+    const output = await captureOutput(() =>
+      withoutGrant('insert', 'sessions', () =>
+        authRequest('/change-password', {
+          body: {
+            currentPassword: PASSWORD,
+            newPassword: 'MARKER-pw-new-8b1f',
+            revokeOtherSessions: true,
+          },
+          cookie,
+          address,
+          userAgent,
+        }),
+      ),
+    );
+    expect(output).toContain('Failed query');
+    expect(output).not.toContain(userAgent);
+    expect(output).not.toContain(address);
   });
 });
 
