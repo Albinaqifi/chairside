@@ -6,12 +6,12 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Tested` → `Reviewed` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.)
 
-_Last updated: 2026-10-03 — E00-T02 fix round 1 tested: findings 1–4 fixed, no new findings (Tested). A new pull request from the branch is needed (PR #3 was merged before the fixes). Owner: add the two `BETTER_AUTH_` lines from `.env.example` to `.env`._
+_Last updated: 2026-10-03 — E00-T02 full review: changes required (1: the session cookie is never renewed, so someone still working is signed out 30 minutes after sign-in). Back to the builder (In progress). A new pull request from the branch is needed (PR #3 was merged before the fixes). Owner: add the two `BETTER_AUTH_` lines from `.env.example` to `.env`._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T03` (builder, critical), once the E00-T02 fixes are merged; the owner decides E00-T02 finding 6 and finding 2's page side before it starts
+- **Next task to start:** `E00-T02` back to the builder (reviewer's required change 1), then the tester. Then `E00-T03` (builder, critical), once E00-T02 is merged; the owner decides E00-T02 finding 6 and finding 2's page side before it starts
 - **Owner decisions from the E00-T02 test:** findings 5–7 in `handoffs/E00-T02.md` (rate-limit address, the clinic an action runs in, self-rename)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
   business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
@@ -61,6 +61,11 @@ turns lines into tasks or strikes them out.
 - 2026-10-03 · E00-T02 test · Next.js prints an error thrown while rendering a page, values of a failed query included (`params`); our logger never sees it. Today only ids; from E01 patient values. Take the values out where query errors are created, before E01 (handoff, tester finding 2).
 - 2026-10-03 · E00-T02 test · The auth library's queries (`getDb()`) have no lock timeout: "waiting for a lock fails after 5 s" (CLAUDE.md) holds inside `withTenant` only.
 - 2026-10-03 · E00-T01 review · `security-privacy.md` section 7 says `.env.example` lists names without values; the task allowed local values that are not secrets, which the file has. Owner: adjust the sentence.
+- 2026-10-03 · E00-T02 review · Pin `better-auth` to exactly 1.7.7 (`package.json` has `^1.7.7`): the adapter error wrapper and `PASSWORD_CHECK_PATHS` depend on its internals and route list, and a minor upgrade could change them with no failing test (handoff, reviewer suggestion 1).
+- 2026-10-03 · E00-T02 review · `.env.example` holds a working `BETTER_AUTH_SECRET`; copied to staging, cookies would be signed with a value in git. E00-T07: refuse to start with that value when `BETTER_AUTH_URL` is https.
+- 2026-10-03 · E00-T02 review · `PERMISSION_TABLE` leaves out scope-v1.md's row "Read aftercare drafts and the library" (every role ✔) though its comment says it mirrors the table row by row. Add it (E06) or say why it is left out.
+- 2026-10-03 · E00-T02 review · `chooseClinic` (`(auth)/choose-clinic/actions.ts`) is a server action outside `(staff)`: E00-T03's wrapper check will not see it, and it reads input without Zod. E00-T03: decide how actions before a clinic is chosen are checked.
+- 2026-10-03 · E00-T02 review · The builder's "For the tester" recipe in `handoffs/E00-T02.md` holds synthetic names, emails and a dev password; rule 6 and the template ask for ids. Point to the seed once E00-T05 exists.
 
 ---
 
@@ -71,7 +76,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
 | E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
-| E00-T02 | Login, sessions and clinic membership | builder | critical | **Tested** | Fix round 1 tested: findings 1–4 fixed, no new findings; 5–7 for the owner. No open PR (#3 merged before the fixes): a new one is needed. Owner: add `BETTER_AUTH_*` to `.env`. See `handoffs/E00-T02.md` |
+| E00-T02 | Login, sessions and clinic membership | builder | critical | **In progress** | Full review: 1 required change (session cookie never renewed: an active user is signed out 30 min after sign-in); 5 suggestions (Discovered). Tester findings 5–7 for the owner. No open PR (#3 merged before the fixes): a new one is needed. Owner: add `BETTER_AUTH_*` to `.env`. See `handoffs/E00-T02.md` |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | |
