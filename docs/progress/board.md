@@ -6,12 +6,12 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Tested` → `Reviewed` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.)
 
-_Last updated: 2026-10-03 — architect: E00-T02 is Done (PR #5). E00-T03 refined and Ready; owner decided tester findings 6 and 2 (page side) and approved Zod and the split (D-068–D-071). New E00-T08 takes the second half. The planning branch `plan/E00-T03-ready` must be merged before E00-T03 starts._
+_Last updated: 2026-10-04 — builder: E00-T03 is Built (the three action wrappers, `audit.record()`, query errors cleaned at the source; D-072). Reviewer next._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T03` (builder, critical), once the owner has merged the planning branch `plan/E00-T03-ready`. Then `E00-T08`
+- **Next task to start:** `E00-T03` is Built and goes to the reviewer, then the tester. Then `E00-T08`
 - **Owner decisions from the E00-T02 test, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list. Finding 6 is decided (D-069)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
   business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
@@ -72,6 +72,8 @@ turns lines into tasks or strikes them out.
 - ~~2026-10-03 · E00-T02 delta review · A server action sent after the session ended gets the proxy's 307, which `fetch` follows as a POST to `/login`, so `currentStaff()`'s redirect is never reached; what the person sees is unchecked (probably an error). Fails safe. E00-T03 or E00-T06: check it in a browser.~~ In E00-T08: the person must end on the login page; the tester checks it in a browser (D-071).
 - 2026-10-03 · E00-T02 test · Any client picks its own sign-in rate-limit counter by sending a new `X-Forwarded-For` each time (tester finding 5). E00-T07: add "rotating `X-Forwarded-For` against staging still gets a 429" to its acceptance. Owner: also whether D-064 point 5 (no per-account limit) stands.
 - 2026-10-03 · E00-T02 test · A signed-in person can rename themselves and store any picture address through the auth library's `/update-user` (tester finding 7). Owner: decide in E04, or switch the route off before then.
+- 2026-10-04 · E00-T03 · Nothing stops a `staffRead` handler from writing: a read that changes data would write no audit row. A `READ ONLY` transaction for reads that declare no audit row would make it impossible (E00-T08 or later).
+- 2026-10-04 · E00-T03 · `captureOutput` and `withoutGrant` are now shared in `tests/integration/fixtures.ts`; `auth-attacks.test.ts` still has its own copies (left unchanged). A test cleanup can switch it over.
 
 ---
 
@@ -83,7 +85,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 |---|---|---|---|---|---|
 | E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | **Done** | Merged by the owner (PR #5). Tester finding 6 → D-069, finding 2's page side → D-070; findings 5 and 7 on the Discovered list. See `handoffs/E00-T02.md` |
-| E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Ready** | Refined 2026-10-03 (D-068–D-071): clinic check, query errors cleaned at the source, `userAction` for the picker, adds `zod`. Start after `plan/E00-T03-ready` is merged. See `handoffs/E00-T03.md` |
+| E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Built** | `staffAction`, `staffRead`, `userAction` in `src/app/_lib/actions.ts`; `audit.record()`; D-070 at the source; D-072. Three logger tests take their raw error outside `withTenant` now (handoff). See `handoffs/E00-T03.md` |
 | E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | Planned | Split from E00-T03 (D-071): lint rules (wrappers only, database imports, R-32), login audit rows, action after session end. Fully specified; Ready when E00-T03 is Done |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | |

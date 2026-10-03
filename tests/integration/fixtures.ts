@@ -1,6 +1,11 @@
+import fs from 'node:fs';
+import { inspect } from 'node:util';
+import type { SQL } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
-import { expect } from 'vitest';
+import { expect, vi } from 'vitest';
 import { newId } from '@/lib/ids';
+import { getAuth } from '@/modules/auth';
 import { testDatabase } from './test-database';
 
 /**
@@ -38,6 +43,20 @@ export async function insertAuditEntry(db: pg.Pool, clinicId: string): Promise<s
   return id;
 }
 
+/**
+ * The error a failed query throws, exactly as Drizzle and pg make it, values included: for tests
+ * of what prints errors, such as the logger. Run outside withTenant, which since E00-T03 lets no
+ * error out with the values a query was sent (D-070).
+ */
+export async function rawQueryError(db: pg.Pool, query: SQL): Promise<unknown> {
+  return drizzle(db)
+    .execute(query)
+    .then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+}
+
 /** The Postgres error code of an error, also when a library wrapped it (`cause`). */
 export function pgErrorCode(error: unknown): string | undefined {
   let current = error;
@@ -71,6 +90,120 @@ export async function expectPgError(promise: Promise<unknown>, code: string): Pr
 /** A synthetic staff email that no real person can have. */
 export function testEmail(): string {
   return `staff-${newId().slice(-12)}@example.test`;
+}
+
+/** The app's origin in tests: BETTER_AUTH_URL in vitest.config.ts. */
+export const ORIGIN = 'http://localhost:3000';
+
+/**
+ * Signs a user in through the auth library's own handler, as the browser does, and returns the
+ * Cookie header the browser would send back. `address` is the client address the sign-in rate
+ * limit counts: give each sign-in one no other test uses.
+ */
+export async function signInCookie(
+  email: string,
+  password: string,
+  address: string,
+): Promise<string> {
+  const response = await getAuth().handler(
+    new Request(`${ORIGIN}/api/auth/sign-in/email`, {
+      method: 'POST',
+      headers: { origin: ORIGIN, 'content-type': 'application/json', 'x-forwarded-for': address },
+      body: JSON.stringify({ email, password }),
+    }),
+  );
+  expect(response.status, 'signed in').toBe(200);
+  return response.headers
+    .getSetCookie()
+    .map((cookie) => cookie.split(';')[0]!)
+    .join('; ');
+}
+
+/**
+ * Where a call sent the browser with Next.js's redirect(), or undefined when it returned. Any
+ * other error is thrown again.
+ */
+export async function redirectOf(call: Promise<unknown>): Promise<string | undefined> {
+  try {
+    await call;
+    return undefined;
+  } catch (error) {
+    const digest = (error as { digest?: unknown } | null)?.digest;
+    if (typeof digest !== 'string' || !digest.startsWith('NEXT_REDIRECT;')) throw error;
+    return digest.split(';').slice(2, -2).join(';'); // NEXT_REDIRECT;<type>;<url>;<status>;
+  }
+}
+
+/**
+ * Everything written to the console, stdout and stderr while `fn` runs, as text, and what `fn`
+ * returned. Our logger (pino) writes to the file descriptors directly, so those writes are read
+ * too. An error that escapes counts as output: whatever catches it prints it. Mocks are restored
+ * at the end.
+ */
+export async function captureOutput<T>(
+  fn: () => Promise<T>,
+): Promise<{ output: string; result: T | undefined }> {
+  const written: string[] = [];
+  const keep = (...args: unknown[]) => void written.push(args.map((a) => inspect(a)).join(' '));
+  const spies: { mockRestore(): void }[] = [];
+  for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
+    spies.push(vi.spyOn(console, method).mockImplementation(keep));
+  }
+  for (const stream of [process.stdout, process.stderr]) {
+    const write = stream.write.bind(stream);
+    spies.push(
+      vi.spyOn(stream, 'write').mockImplementation(((chunk: unknown, ...rest: unknown[]) => {
+        written.push(String(chunk));
+        return (write as (...a: unknown[]) => boolean)(chunk, ...rest);
+      }) as typeof stream.write),
+    );
+  }
+  const writeSync = fs.writeSync;
+  spies.push(
+    vi.spyOn(fs, 'writeSync').mockImplementation(((
+      fd: unknown,
+      data: unknown,
+      ...rest: unknown[]
+    ) => {
+      if (fd === 1 || fd === 2) written.push(String(data));
+      return (writeSync as (...a: unknown[]) => number)(fd, data, ...rest);
+    }) as typeof fs.writeSync),
+  );
+  const writeAsync = fs.write;
+  spies.push(
+    vi.spyOn(fs, 'write').mockImplementation(((fd: unknown, data: unknown, ...rest: unknown[]) => {
+      if (fd === 1 || fd === 2) written.push(String(data));
+      return (writeAsync as (...a: unknown[]) => void)(fd, data, ...rest);
+    }) as typeof fs.write),
+  );
+  let result: T | undefined;
+  try {
+    result = await fn();
+  } catch (error) {
+    written.push(inspect(error));
+  } finally {
+    for (const spy of spies) spy.mockRestore();
+  }
+  return { output: written.join('\n'), result };
+}
+
+/**
+ * Runs `fn` while the app role lacks one grant. The migrator owns the tables and functions, so
+ * it can take a grant away and give it back. Test files run one after another, so no other test
+ * sees the gap.
+ */
+export async function withoutGrant<T>(
+  db: pg.Pool,
+  grant: string,
+  on: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  await db.query(`revoke ${grant} on ${on} from chairside_app`);
+  try {
+    return await fn();
+  } finally {
+    await db.query(`grant ${grant} on ${on} to chairside_app`);
+  }
 }
 
 /** Inserts a membership. The app role only reads memberships in E00-T02, so this uses the migrator. */

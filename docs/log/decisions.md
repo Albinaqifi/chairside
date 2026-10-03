@@ -770,3 +770,47 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a server action fits none of the three wrappers; type-aware linting makes
   `pnpm check` too slow to run on every task; a later Better Auth runs `create.after` hooks after
   the cookie is set (then the login rule needs another place).
+
+### D-072 · The action wrappers as built: how they are called, how they answer, what they audit (E00-T03)
+- **Origin:** process, E00-T03. Builder choices inside the task's scope (D-068–D-071); the owner
+  reviews them with the task.
+- **What:**
+  - **Calls.** The browser calls a staff action as `action(clinicId, input)`: the clinic id first,
+    so a form binds it (`action.bind(null, clinicId)`, which Next.js supports without JavaScript),
+    then the input as a plain value or a form's FormData (one value per field as it is, several as
+    a list). `staffRead` adds `.forPage(input)` for a page while it renders: no clinic check
+    (D-069); it is not an action and is never exported from a `'use server'` file. `userAction` is
+    called with the input only. All three live in `src/app/_lib/actions.ts`.
+  - **Answers.** `{ ok: true, value }` or `{ ok: false, error: { code } }` with `clinic_changed`,
+    `forbidden`, `invalid_input` (plus `issues: { path, code }[]`), `internal`, or the handler's own
+    code. A handler refuses by returning `refuse('code')`, a lower-case word that is none of those
+    four; the wrapper then rolls its transaction back. Anything a staff handler throws, Next.js's
+    `redirect()` and `notFound()` included, is rolled back, logged once and answered `internal`.
+    A `userAction` handler may redirect (there is no transaction to lose), as the picker does.
+  - **The audit declaration** is `{ action, entityType, entityId, metadata? }`: required on
+    `staffAction`, optional on `staffRead` (a patient-record view). `entityId` and `metadata` come
+    from a function of the parsed input and the staff member, or from a field of the handler's
+    result (`{ result: 'id' }`), checked against the result's type. A function of the result cannot
+    be typed: TypeScript fixes the result's type as `unknown` when the declaration comes before the
+    handler, as `staffAction({ permission, input, audit }, handler)` has it.
+  - **Permissions.** `permission` is a key of the permission table or `'every_member'`; a call
+    with neither fails the type check and fails when its module loads. `providerKind` is null until
+    memberships are linked to providers (E01-T01).
+  - **Input issues** hold paths and Zod codes only. A key that the schema does not declare as a
+    field (the keys of a record or of a catch-all object, which are values the browser sent) shows
+    as `*` in the path.
+  - **`audit.record()`** writes into the transaction's own clinic (`current_clinic_id()` in the
+    insert; there is no clinic parameter). Besides a personal field name in the metadata (checked
+    on the JSON that will be stored, so `toJSON` or a getter cannot hide one), it refuses an action
+    or entity type that is not a code (`patient.created`, `patient`), an id that is not a UUID, and
+    a user or patient-link actor without an id: no free text reaches the audit log's text columns.
+  - **Query errors (D-070).** An error that holds a query error (as its cause, among an
+    AggregateError's `errors`, or in another own property) is copied with its class, message, stack
+    and fields, and its inner errors cleaned, so a handler's own error class survives the cleaning.
+  - `asFormAction(action)` lets a plain `<form action>` take a wrapper-made action (React types a
+    form's action as returning nothing because it ignores the answer); the clinic picker uses it.
+- **Why:** each point is the smallest shape that keeps D-068–D-071 checked by the type checker as
+  well as at run time, and that a reviewer can read in one file.
+- **Revisit if:** E00-T04's forms need another call shape (`useActionState` calls an action with
+  `(previousState, formData)`); a handler must refuse with more than a code; an audit row needs an
+  actor or entity id that is not a UUID.

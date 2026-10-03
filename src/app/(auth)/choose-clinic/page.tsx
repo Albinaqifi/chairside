@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { asFormAction } from '@/app/_lib/actions';
 import { requireUser } from '@/app/_lib/auth';
 import { LogoutButton } from '@/app/_lib/logout-button';
 import { clinicsForUser, ROLE_LABELS } from '@/modules/auth';
@@ -23,7 +24,7 @@ export default async function ChooseClinicPage() {
           <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '0.5rem' }}>
             {choices.map((choice) => (
               <li key={choice.clinicId}>
-                <form action={chooseClinic}>
+                <form action={asFormAction(chooseClinic)}>
                   <input type="hidden" name="clinicId" value={choice.clinicId} />
                   <button type="submit">{choice.clinicName}</button> {ROLE_LABELS[choice.role]}
                 </form>
