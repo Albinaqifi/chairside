@@ -3,8 +3,9 @@
 Scheduling app for dental clinics with automated patient communication. Multi-clinic,
 holds health data, built by one developer with AI agents.
 
-**Status:** the project skeleton and database foundation exist (E00-T01). What is done and
-what comes next is on the board, `docs/progress/board.md`.
+**Status:** the project skeleton and database foundation (E00-T01) and login with clinic
+membership (E00-T02) exist. What is done and what comes next is on the board,
+`docs/progress/board.md`.
 
 ## Start of every session (in this order)
 
@@ -59,6 +60,11 @@ Every script must work on Windows (the owner's OS): no bash-only syntax in `pack
 
 ```
 src/app/              Next.js routes. Thin: parse input, call a module, render.
+  (auth)/             Login and the clinic picker: the pages a user sees before they have a clinic.
+  (staff)/            The staff app. Its layout and every page start from currentStaff().
+  _lib/               Request-edge helpers: who is signed in, for which clinic; the browser auth client.
+  api/auth/           The auth library's routes (sign-in, sign-out, get-session). No code of ours.
+src/proxy.ts          Sends requests without a session cookie to /login. Not a security check.
 src/modules/<name>/   All business logic. index.ts = public API, schema.ts = its tables.
 src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts.
 src/lib/              Small shared pieces: clock, ids, logger, personal-fields.
@@ -86,10 +92,16 @@ Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tes
 - Database: only inside `withTenant(clinicId, async (tx) => …)` from `src/db/tenant.ts`, opened
   once at the edge (action wrapper, job handler). Module functions take that `tx` as a parameter;
   a `withTenant` inside another is refused with an error (D-060). Waiting for a pooled connection
-  or a lock fails after 5 s. Never import `src/db/client.ts` elsewhere, never set `app.clinic_id`.
+  or a lock fails after 5 s. Never set `app.clinic_id`. Never import `src/db/client.ts` elsewhere,
+  with one exception: `src/modules/auth/` uses `getDb()` for the auth library's global tables and
+  for the cross-clinic function `clinics_for_user()` (D-062).
 - After each `withTenant` the connection is reset (`DISCARD ALL`) before it goes back to the pool,
   or closed if the reset fails (D-061): nothing set on a connection outlives its transaction. So
   no named prepared statements (`.prepare('name')`): pg would reuse ones the reset removed.
+- Who is signed in: `currentStaff()` from `src/app/_lib/auth.ts` (user, clinic, role, extra
+  permissions) in every staff page, layout and action; `can(role, extras, permission)` from
+  `@/modules/auth` for permissions. Login and logout are the auth library's routes, called from
+  the browser (`authClient`). Never read the session cookie or a password yourself (D-063).
 - Logs: `logger` from `src/lib/logger.ts`, ids and codes only. It drops the fields listed in
   `src/lib/personal-fields.ts` as a safety net, not as permission to log personal data.
 - Files Node runs directly (`src/db/migrate.ts`, `src/db/reset.ts`): import only packages and

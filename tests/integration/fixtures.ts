@@ -54,6 +54,8 @@ export const PG = {
   insufficientPrivilege: '42501', // also raised for row-level security violations
   lockNotAvailable: '55P03', // raised when lock_timeout ends a wait for a lock
   invalidCursorName: '34000', // the cursor does not exist (any more)
+  uniqueViolation: '23505',
+  checkViolation: '23514',
 } as const;
 
 /** Expects the promise to fail with the given Postgres error code. */
@@ -64,4 +66,36 @@ export async function expectPgError(promise: Promise<unknown>, code: string): Pr
   );
   expect(error, 'expected the database to refuse').toBeDefined();
   expect(pgErrorCode(error)).toBe(code);
+}
+
+/** A synthetic staff email that no real person can have. */
+export function testEmail(): string {
+  return `staff-${newId().slice(-12)}@example.test`;
+}
+
+/** Inserts a membership. The app role only reads memberships in E00-T02, so this uses the migrator. */
+export async function insertMembership(
+  db: pg.Pool,
+  membership: {
+    clinicId: string;
+    userId: string;
+    role?: string;
+    status?: string;
+    extraPermissions?: string[];
+  },
+): Promise<string> {
+  const id = newId();
+  await db.query(
+    `insert into memberships (id, clinic_id, user_id, role, status, extra_permissions)
+     values ($1, $2, $3, $4, $5, $6)`,
+    [
+      id,
+      membership.clinicId,
+      membership.userId,
+      membership.role ?? 'front_desk',
+      membership.status ?? 'active',
+      membership.extraPermissions ?? [],
+    ],
+  );
+  return id;
 }

@@ -26,7 +26,9 @@ export const PERSONAL_FIELDS = [
   'content',
   'comment',
   'cookie',
+  'setCookie', // response header carrying the session token
   'authorization',
+  'identifier', // the auth library's verification rows: an email address or a token
   // Postgres error details quote row values, e.g. "Key (email)=(...) already exists"
   'detail',
   // Postgres error context can quote the data, e.g. "JSON data, line 1: ..."

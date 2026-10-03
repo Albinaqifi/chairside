@@ -219,13 +219,19 @@ describe('meta-test rules', () => {
       },
     ],
   };
+  // Every allow-listed table exists in this made-up database, so only the example table is under test.
   const known: TableInfo[] = [
-    {
+    ...Object.keys(TENANT_ROOT_TABLES).map((table) => ({
       ...tenantTable,
-      table: 'public.clinics',
+      table,
       policies: [{ name: 'p', using: '(id = current_clinic_id())', check: null }],
-    },
-    { ...tenantTable, table: 'drizzle.__drizzle_migrations', rlsEnabled: false, policies: [] },
+    })),
+    ...Object.keys(GLOBAL_TABLES).map((table) => ({
+      ...tenantTable,
+      table,
+      rlsEnabled: false,
+      policies: [],
+    })),
   ];
   const problemsWith = (table: Partial<TableInfo>) =>
     tenantProblems([...known, { ...tenantTable, ...table }]);
@@ -266,7 +272,8 @@ describe('meta-test rules', () => {
   });
 
   it('reports an allow-list entry for a table that does not exist', () => {
-    expect(tenantProblems([known[1]!, tenantTable])).toEqual([
+    const withoutClinics = known.filter((table) => table.table !== 'public.clinics');
+    expect(tenantProblems([...withoutClinics, tenantTable])).toEqual([
       'public.clinics: on the allow-list but no such table exists',
     ]);
   });
@@ -305,16 +312,19 @@ describe('meta-test rules: views and functions', () => {
 
   it('accepts security_invoker views and ordinary functions', () => {
     expect(
-      bypassProblems([ordinary, { name: 'public.v', kind: 'view', runsAsOwner: false }]),
+      bypassProblems([ordinary, { name: 'public.v', kind: 'view', runsAsOwner: false }], {}),
     ).toEqual([]);
   });
 
   it('reports a view without security_invoker and any materialized view', () => {
     expect(
-      bypassProblems([
-        { name: 'public.v', kind: 'view', runsAsOwner: true },
-        { name: 'public.m', kind: 'materialized view', runsAsOwner: true },
-      ]),
+      bypassProblems(
+        [
+          { name: 'public.v', kind: 'view', runsAsOwner: true },
+          { name: 'public.m', kind: 'materialized view', runsAsOwner: true },
+        ],
+        {},
+      ),
     ).toEqual([
       'public.v: a view must be created WITH (security_invoker = true)',
       'public.m: a materialized view cannot have Row-Level Security',

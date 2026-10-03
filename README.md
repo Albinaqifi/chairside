@@ -47,7 +47,8 @@ command that differs is copying the settings file (step 3).
    ```
    pnpm dev
    ```
-   Open http://localhost:3000. The page says the app is running.
+   Open http://localhost:3000. You see the login page. Staff accounts come from the seed
+   (E00-T05); until it exists, `docs/progress/handoffs/E00-T02.md` says how to create one by hand.
 
 ## Everyday commands
 
@@ -66,6 +67,10 @@ command that differs is copying the settings file (step 3).
 - **`POSTGRES_PASSWORD` is missing** when starting Docker: step 3 was skipped. Create `.env`.
 - **`... is not set`** from a `pnpm` command: `.env` is missing or incomplete. Compare it with
   `.env.example`.
+- **`BETTER_AUTH_SECRET is not set`** (or `BETTER_AUTH_URL`): your `.env` is older than the login
+  feature. Copy the two `BETTER_AUTH_` lines from `.env.example` into it.
+- **`pnpm typecheck` fails on a page file that no longer exists:** old generated types in
+  `.next/`. Delete the `.next` folder and run it again.
 - **Cannot connect to the database:** start Docker Desktop, then `docker compose up -d --wait`.
 - **Port 5433 is already in use:** another program uses it. Stop that program, or change the
   port in `docker-compose.yml` and in the three database URLs in `.env`.

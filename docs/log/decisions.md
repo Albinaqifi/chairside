@@ -499,3 +499,82 @@ architecture), `changed` (differs from the original files), `process`.
   objects are stored database-wide, so no reset reaches them (risk R-31).
 - **Revisit if:** the extra round trip shows up in measurements, or named prepared statements
   become necessary (then run the commands `DISCARD ALL` stands for, except `DEALLOCATE ALL`).
+
+### D-062 · Login: the auth tables are global, the clinic is resolved from `memberships` on every request, and one cross-clinic function lists a user's clinics
+- **Origin:** process, E00-T02. A builder decision inside the task's scope; the owner reviews it
+  with the task.
+- **What:** The auth library's tables (`users`, `sessions`, `accounts`, `verifications`,
+  `rate_limits`) are global tables without `clinic_id`, on the meta-test allow-list. A session
+  belongs to a user, not to a clinic. The clinic a signed-in user acts for is resolved on every
+  request from their active memberships: the clinic named in the `chairside.clinic` cookie if they
+  have an active membership there, otherwise their only clinic, otherwise the clinic picker. The
+  cookie grants nothing by itself. Listing a user's clinics before any clinic is set is a
+  cross-clinic lookup: the SECURITY DEFINER function `clinics_for_user(user_id)` (migration 0001)
+  returns that user's active memberships (membership id, clinic id, clinic name, role, extra
+  permissions) and is on `CROSS_CLINIC_FUNCTIONS`. Memberships stay a tenant table with Row-Level
+  Security; `provider_id` is added by E01-T01, when providers exist.
+- **Why:** one person can work at several clinics (D-021), so identity cannot live inside a
+  clinic. Keeping the clinic choice out of the session row means switching clinics never touches
+  the auth library's tables, and a stale or forged cookie is harmless because the membership check
+  runs on every request. A named database function is the designed way to look across clinics
+  (security-privacy.md, section 1); the alternative, a policy with OR, is what the meta-test forbids.
+- **Revisit if:** sessions must be bound to a clinic (per-clinic session limits), or staff
+  management (E04) needs the function to return more than it does.
+
+### D-063 · Login details chosen in E00-T02
+- **Origin:** process, E00-T02.
+- **What:**
+  - Sessions live in the database and end 30 minutes after the last request. The end is moved
+    forward on use at most once a minute (`expiresIn` 1800 s, `updateAge` 60 s), so a session
+    can end up to a minute early, never late. Cookies are httpOnly, SameSite=Lax, and Secure
+    whenever `BETTER_AUTH_URL` starts with `https://`.
+  - Sign-in attempts are limited to 5 per minute per client address; the other auth routes keep
+    the library's defaults. Counters are rows in `rate_limits`, shared by every web instance and
+    kept across restarts. The client address is read from `x-forwarded-for` when it holds exactly
+    one address; otherwise all such requests share one bucket. Which proxy headers to trust is
+    settled with hosting (E00-T07, risk R-33).
+  - No self sign-up: the sign-up route is disabled. Users are created by `createStaffUser()`
+    (seed and operator script in E00-T05, invites in E04). The library hashes passwords (scrypt).
+  - The auth tables use our UUID v7 ids (`newId()`), plural snake_case names like every other
+    table, and the library's field names as TypeScript property names.
+  - Two settings, both required so nothing is inferred from request headers: `BETTER_AUTH_SECRET`
+    (signs the cookies; a real secret outside the local machine) and `BETTER_AUTH_URL` (the app's
+    address and the only trusted origin for login requests).
+  - Login and logout go from the browser to the library's routes under `/api/auth/*`; no code of
+    ours handles a password. The `(staff)` layout, every staff page and the action wrapper
+    (E00-T03) take the user and clinic from `currentStaff()` in `src/app/_lib/auth.ts`.
+    `src/proxy.ts` only sends requests without a session cookie to the login page.
+  - The role → permission table is one constant (`PERMISSION_TABLE`) that mirrors scope-v1.md row
+    by row; `can(role, extras, permission)` is pure. Extra permissions (import, export) count for
+    front desk only, as the scope table says. An owner records visits only when linked to a
+    provider, and approves aftercare only when linked to a dentist (D-051).
+- **Why:** each point is the library's standard way or a rule the documents already state,
+  written down so the next tasks build on the same assumptions.
+- **Revisit if:** a clinic's shared address locks its staff out (then limit per account too), or
+  dentists need extra permissions after all.
+
+### D-064 · The five E00-T02 builder questions, decided by the builder at the owner's request
+- **Origin:** process, E00-T02. On 2026-10-03 the owner delegated the five questions in
+  `handoffs/E00-T02.md` to the builder ("not that critical, decide").
+- **What:**
+  1. Extra permissions (`import`, `export`) stay front-desk only, as the scope table says. Owners
+     have both by role; dentists and hygienists cannot be given them.
+  2. `BETTER_AUTH_SECRET` stays a required setting. `.env.example` holds a local-only value;
+     staging and production get their own random value (E00-T07).
+  3. Sessions keep `ip_address` and `user_agent`. Turning IP tracking off in the library would also
+     turn off per-address rate limiting; the values serve a "your sessions" screen (E04) and go
+     with the session when it is cleaned up (E07-T04).
+  4. A login is audited as `user.logged_in` in every clinic the person has an active membership
+     in, written when the library creates the session (`databaseHooks.session.create.after`),
+     with the session's `createdAt` as "now". Failed logins are not audited: the rate limit and
+     the library's warn lines cover them. Entering a clinic through the picker is not audited on
+     its own. E00-T03 builds this once `audit.record()` exists.
+  5. The sign-in limit stays per client address and goes from 5 to 10 requests a minute. Every
+     sign-in request counts, successful ones too, and a clinic's staff share one address, so 5
+     could lock out a team logging in at shift start; 10 still makes guessing slow (600 tries an
+     hour against one address). No per-account limit for now; revisit if a pilot clinic is locked
+     out (R-33).
+- **Why:** each is the smallest choice that keeps the documents' rules and the library's
+  defaults, written down so E00-T03 and E04 build on the same assumptions.
+- **Revisit if:** the pilot shows lockouts, or a clinic asks who logged in when (the audit viewer
+  in E07 then shows the rows from point 4).

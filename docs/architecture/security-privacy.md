@@ -18,8 +18,9 @@ This document has two parts: rules that code must follow, and the gate before re
   Never create a database connection or query outside them.
 - The app's database role cannot bypass Row-Level Security, cannot change schema, cannot
   update or delete audit rows.
-- Cross-clinic lookups exist only as a few named database functions (resolve a link token,
-  list clinics for the planner, claim due messages). Adding one is a critical change.
+- Cross-clinic lookups exist only as a few named database functions (list a user's clinics at
+  login: `clinics_for_user`, D-062; resolve a link token; list clinics for the planner; claim due
+  messages). Adding one is a critical change.
 - Ids from the client are never trusted to belong to the current clinic: the policy and the
   composite foreign keys decide.
 

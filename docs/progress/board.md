@@ -6,15 +6,16 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Tested` → `Reviewed` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.)
 
-_Last updated: 2026-10-02 — planning complete, no code yet. Owner answered Q-01, Q-02, Q-05, Q-10, Q-17, deferred Q-06, chose WhatsApp first with one product number (D-049 to D-056)._
+_Last updated: 2026-10-03 — E00-T02 tested: back to the builder (findings 1–4 with failing tests; 5–7 for the owner). Owner: add the two `BETTER_AUTH_` lines from `.env.example` to `.env`._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T01` (builder, critical)
+- **Next task to start:** `E00-T02` back to the builder (tester findings 1–4), then `E00-T03` (builder, critical)
+- **Owner decisions from the E00-T02 test:** findings 5–7 in `handoffs/E00-T02.md` (rate-limit address, the clinic an action runs in, self-rename)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
   business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
-- **Waiting on the owner:** nothing. Q-07 and Q-09 are open with working assumptions.
+- **Waiting on the owner:** copy the two `BETTER_AUTH_` lines from `.env.example` into `.env` (E00-T02). Q-07 and Q-09 are open with working assumptions.
 
 ## Next (in order)
 
@@ -50,6 +51,15 @@ turns lines into tasks or strikes them out.
 - 2026-10-03 · E00-T01 review · Outside local `db:reset`, nothing checks the app's database role. A hosted `DATABASE_URL` that names the table owner (or a superuser or BYPASSRLS role) switches off every policy without an error. Suggest a start-up check that refuses to serve, before E00-T07 (handoff, reviewer suggestion 1).
 - 2026-10-03 · E00-T01 review · "Never import `src/db/client.ts` elsewhere" is not a lint rule, and `getDb()` (tests only) gives a handle outside `withTenant`. E00-T02 or E00-T03: decide which file may use it (the auth library needs one for the global tables) and lint the rest.
 - 2026-10-03 · E00-T01 review · The `db:reset` guard accepts a `MIGRATION_DATABASE_URL` whose user is `chairside_app` or the admin user; the app role then owns the tables and skips the policies. Local only: `pnpm check` catches it, `pnpm dev` does not.
+- 2026-10-03 · E00-T02 · `memberships` exists without `provider_id`: the column and its foreign key (`clinic_id`, `provider_id`) → providers must come with E01-T01, when providers exist (D-062).
+- 2026-10-03 · E00-T02 · `data-model.md` says the audit log records logins, but a login has no clinic yet (sessions are global). Decided 2026-10-03 (D-064, owner delegated): a login is audited as `user.logged_in` in every clinic the person has an active membership in, from the session-creation hook; E00-T03 builds it.
+- 2026-10-03 · E00-T02 · The auth library reads the client address from `x-forwarded-for` only when it holds exactly one address; otherwise all such requests share one login rate-limit bucket. E00-T07: set `advanced.ipAddress.trustedProxies` (or the host's own header) once the host is known (R-33).
+- 2026-10-03 · E00-T02 · The app role has SELECT only on `memberships` and no INSERT on `clinics`. E00-T05: the seed and `clinic:create` must run as the migrator or get their own grants; `createStaffUser()` from `@/modules/auth` creates the user.
+- 2026-10-03 · E00-T02 · Sessions store the staff member's `ip_address` and `user_agent` (library default), and an expired session is deleted only when its cookie is seen again. E07-T04 (retention): a job that deletes expired `sessions`, `verifications` and stale `rate_limits` rows.
+- 2026-10-03 · E00-T02 · Decided: only `src/modules/auth/` imports `@/db/client` (D-062). The lint rule that enforces it is still to write (E00-T03, see the E00-T01 review line above).
+- 2026-10-03 · E00-T02 · Removing a route leaves old generated types in `.next/dev/types`, so `pnpm typecheck` fails locally until `.next` is deleted (README says so). A fresh checkout (CI, E00-T06) is not affected.
+- 2026-10-03 · E00-T02 test · Next.js prints an error thrown while rendering a page, values of a failed query included (`params`); our logger never sees it. Today only ids; from E01 patient values. Take the values out where query errors are created, before E01 (handoff, tester finding 2).
+- 2026-10-03 · E00-T02 test · The auth library's queries (`getDb()`) have no lock timeout: "waiting for a lock fails after 5 s" (CLAUDE.md) holds inside `withTenant` only.
 - 2026-10-03 · E00-T01 review · `security-privacy.md` section 7 says `.env.example` lists names without values; the task allowed local values that are not secrets, which the file has. Owner: adjust the sentence.
 
 ---
@@ -61,7 +71,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
 | E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
-| E00-T02 | Login, sessions and clinic membership | builder | critical | Planned | |
+| E00-T02 | Login, sessions and clinic membership | builder | critical | **In progress** | Tester: back to builder, findings 1–4 have failing tests (24 h session via `rememberMe`, values in error output, `/verify-password` limit, `can()` fail-closed); 5–7 for the owner. Owner: add `BETTER_AUTH_*` to `.env`. See `handoffs/E00-T02.md` |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | |
