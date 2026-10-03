@@ -26,6 +26,15 @@ function resolveSource(source, importerFile) {
   return null; // a package
 }
 
+/** The text of an import source: a string, or a template literal without `${}` in it. */
+function sourceText(node) {
+  if (node?.type === 'Literal' && typeof node.value === 'string') return node.value;
+  if (node?.type === 'TemplateLiteral' && node.expressions.length === 0) {
+    return node.quasis[0].value.cooked;
+  }
+  return null;
+}
+
 const moduleBoundaries = {
   meta: {
     type: 'problem',
@@ -41,8 +50,9 @@ const moduleBoundaries = {
     const importer = modulePath(context.filename);
 
     function check(sourceNode) {
-      if (!sourceNode || typeof sourceNode.value !== 'string') return;
-      const target = resolveSource(sourceNode.value, context.filename);
+      const source = sourceText(sourceNode);
+      if (source === null) return;
+      const target = resolveSource(source, context.filename);
       if (!target) return;
       const [targetModule, ...rest] = modulePath(target) ?? [];
       if (!targetModule) return;
@@ -58,6 +68,14 @@ const moduleBoundaries = {
       ExportNamedDeclaration: (node) => check(node.source),
       ExportAllDeclaration: (node) => check(node.source),
       ImportExpression: (node) => check(node.source),
+      // CommonJS require('…'), TypeScript's import x = require('…'), and import('…') as a type.
+      CallExpression: (node) => {
+        if (node.callee.type === 'Identifier' && node.callee.name === 'require') {
+          check(node.arguments[0]);
+        }
+      },
+      TSExternalModuleReference: (node) => check(node.expression),
+      TSImportType: (node) => check(node.source),
     };
   },
 };

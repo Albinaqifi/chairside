@@ -58,6 +58,37 @@ describe('the db:reset guard', () => {
     );
   });
 
+  it.each(URL_NAMES)('refuses %s on another port of this machine', (name) => {
+    // Another PostgreSQL server can listen on this machine, for example on the default port.
+    const urls = { ...LOCAL, [name]: LOCAL[name].replace(':5433', ':5432') };
+    expect(() => checkResetTargets(urls)).toThrow('must name the same host and port');
+  });
+
+  it.each(URL_NAMES)('refuses a port given in the query string of %s, which pg uses', (name) => {
+    const urls = { ...LOCAL, [name]: `${LOCAL[name]}?port=5432` };
+    expect(() => checkResetTargets(urls)).toThrow('must name the same host and port');
+  });
+
+  it('refuses this machine named in two ways, which may be two servers', () => {
+    const urls = { ...LOCAL, adminUrl: LOCAL.adminUrl.replace('127.0.0.1', 'localhost') };
+    expect(() => checkResetTargets(urls)).toThrow(
+      'must name the same host and port (they name localhost:5433, 127.0.0.1:5433, 127.0.0.1:5433)',
+    );
+  });
+
+  it('compares the port pg will use for a URL without one: PGPORT, or else 5432', () => {
+    const withoutPort = (url: string) => url.replace(':5433', '');
+    const adminWithoutPort = { ...LOCAL, adminUrl: withoutPort(LOCAL.adminUrl) };
+    expect(() => checkResetTargets(adminWithoutPort)).toThrow('must name the same host and port');
+    const noPorts = Object.fromEntries(
+      URL_NAMES.map((name) => [name, withoutPort(LOCAL[name])]),
+    ) as unknown as DatabaseUrls;
+    expect(() => checkResetTargets(noPorts)).not.toThrow();
+
+    vi.stubEnv('PGPORT', '5433');
+    expect(() => checkResetTargets(adminWithoutPort)).not.toThrow();
+  });
+
   it('refuses migration and app connections to different databases', () => {
     const urls = { ...LOCAL, appUrl: LOCAL.appUrl.replace('/guard_db', '/other_db') };
     expect(() => checkResetTargets(urls)).toThrow('must name the same database');

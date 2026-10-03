@@ -284,6 +284,31 @@ describe('logger, errors from failed database queries', () => {
     });
   });
 
+  it('drops the value PostgreSQL quotes in a syntax error, as the full-text search parsers report it', () => {
+    const { logger, output } = capture();
+    // SQLSTATE 42601. Messages as PostgreSQL 18 writes them; the last one is a syntax error in
+    // the SQL itself, whose quoted token goes too.
+    const messages = [
+      `syntax error in tsquery: "${MARKER} & |"`,
+      `there is no escaped character: "${MARKER}\\"`,
+      `syntax error at or near "${MARKER}"`,
+    ];
+    for (const message of messages) {
+      logger.error({ err: Object.assign(new Error(message), { code: '42601' }) }, 'search failed');
+    }
+
+    expect(output()).not.toContain(MARKER);
+    const kept = output()
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line).err);
+    expect(kept).toMatchObject([
+      { code: '42601', message: 'syntax error in tsquery: "…"' },
+      { code: '42601', message: 'there is no escaped character: "…"' },
+      { code: '42601', message: 'syntax error at or near "…"' },
+    ]);
+  });
+
   it('keeps the message of other database errors, quoted names included', () => {
     const { logger, output } = capture();
     const message = 'new row for relation "clinics" violates check constraint "clinics_name_check"';
@@ -301,6 +326,39 @@ describe('logger, errors from failed database queries', () => {
 
     expect(output()).not.toContain(MARKER);
     expect(JSON.parse(output()).err.stack).toBeUndefined();
+  });
+});
+
+describe('logger, errors and objects outside the logged object', () => {
+  const SQL = 'update clinics set name = $1 where id = $2';
+
+  it('writes a cleaned error through %s as its type and message, with the SQL kept', () => {
+    const { logger, output } = capture();
+    const err = new DrizzleQueryError(SQL, [MARKER, 'clinic-1'], new Error('check failed'));
+    logger.error('update failed: %s', err);
+
+    expect(JSON.parse(output()).msg).toBe(`update failed: Error: Failed query: ${SQL}`);
+  });
+
+  it('cleans an object in the place of the message, and objects inside an array argument', () => {
+    const { logger, output } = capture();
+    const patient = { firstName: MARKER, appointmentId: 'appointment-1' };
+    // pino writes a message that is not text as JSON. Its types expect text; plain JavaScript does not.
+    logger.info({ requestId: 'request-1' }, patient as unknown as string);
+    logger.info('reminders planned for %j', [patient, { phone: MARKER, messageId: 'message-1' }]);
+
+    expect(output()).not.toContain(MARKER);
+    expect(output()).toContain('appointment-1');
+    expect(output()).toContain('message-1');
+  });
+
+  it('keeps the message prefix of a child logger in front of a cleaned error', () => {
+    const { logger, output } = capture();
+    const child = logger.child({ jobId: 'job-1' }, { msgPrefix: '[job] ' });
+    child.error('send failed: %s', new DrizzleQueryError(SQL, [MARKER], new Error('x')));
+
+    expect(output()).not.toContain(MARKER);
+    expect(JSON.parse(output()).msg).toBe(`[job] send failed: Error: Failed query: ${SQL}`);
   });
 });
 

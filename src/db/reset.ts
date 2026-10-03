@@ -23,20 +23,22 @@ export interface DatabaseUrls {
 /** Where pg will really connect, and as whom. */
 export interface ConnectionTarget {
   host: string;
+  port: number;
   user: string;
   password: string;
   database: string;
 }
 
 /**
- * What pg will really use for a connection string. Query parameters such as `?host=` and
- * `?user=` win over the URL's own parts, and PG* environment variables fill in missing ones, so
- * the URL's parts alone cannot be trusted. Creating a Client does not connect.
+ * What pg will really use for a connection string. Query parameters such as `?host=`, `?port=`
+ * and `?user=` win over the URL's own parts, and PG* environment variables fill in missing ones,
+ * so the URL's parts alone cannot be trusted. Creating a Client does not connect.
  */
 export function connectionTarget(url: string): ConnectionTarget {
   const client = new pg.Client({ connectionString: url });
   return {
     host: client.host,
+    port: client.port,
     user: client.user ?? '',
     password: client.password ?? '',
     database: client.database ?? '',
@@ -44,20 +46,36 @@ export function connectionTarget(url: string): ConnectionTarget {
 }
 
 /**
- * The guard, run before anything connects: all three connections go to this machine, never
- * with NODE_ENV=production, the migration role and the app role use the same database, and the
- * app connects as the role the migrations grant access to. Throws if any of that is not so.
+ * The guard, run before anything connects: all three connections go to this machine and to one
+ * database server on it (the same host and port), never with NODE_ENV=production, the migration
+ * role and the app role use the same database, and the app connects as the role the migrations
+ * grant access to. Throws if any of that is not so.
  */
 export function checkResetTargets({ adminUrl, migratorUrl, appUrl }: DatabaseUrls): {
   migrator: ConnectionTarget;
   app: ConnectionTarget;
 } {
-  const migrator = connectionTarget(migratorUrl);
-  const app = connectionTarget(appUrl);
-  for (const { host } of [connectionTarget(adminUrl), migrator, app]) {
+  const targets = [
+    connectionTarget(adminUrl),
+    connectionTarget(migratorUrl),
+    connectionTarget(appUrl),
+  ];
+  const [, migrator, app] = targets as [ConnectionTarget, ConnectionTarget, ConnectionTarget];
+  for (const { host } of targets) {
     if (!LOCAL_HOSTS.has(host)) {
       throw new Error(`Refusing to reset a database on "${host}": only local ones.`);
     }
+  }
+  // Another server on this machine, such as a second PostgreSQL on another port, is never
+  // touched: the roles, the dropped database and the migrations must all be on the same one.
+  const servers = targets.map(
+    ({ host, port }) => `${host.includes(':') ? `[${host}]` : host}:${port}`,
+  );
+  if (new Set(servers).size !== 1) {
+    throw new Error(
+      'Refusing to reset: DATABASE_ADMIN_URL, MIGRATION_DATABASE_URL and DATABASE_URL must name ' +
+        `the same host and port (they name ${servers.join(', ')}).`,
+    );
   }
   if (process.env.NODE_ENV === 'production') {
     throw new Error('Refusing to reset a database when NODE_ENV is production.');

@@ -14,15 +14,16 @@ interface DbState {
 }
 
 /**
- * Longest wait for a connection, whether every pooled one is busy or a new one is being opened.
- * Then the call fails with "timeout exceeded when trying to connect": nothing waits forever.
+ * Longest wait for a connection. When every pooled connection is busy, the call then fails with
+ * "timeout exceeded when trying to connect"; when opening a new connection takes too long, with
+ * "Connection terminated due to connection timeout". Nothing waits forever.
  */
 export const CONNECTION_TIMEOUT_MS = 5_000;
 
 // One pool per process, kept on globalThis so hot reloads in development reuse it.
 const state = globalThis as typeof globalThis & { chairsideDb?: DbState };
 
-export function getDb(): NodePgDatabase {
+function dbState(): DbState {
   if (!state.chairsideDb) {
     const pool = new pg.Pool({
       connectionString: requiredEnv('DATABASE_URL'),
@@ -33,7 +34,19 @@ export function getDb(): NodePgDatabase {
     pool.on('error', (err) => logger.error({ err }, 'idle database connection failed'));
     state.chairsideDb = { pool, db: drizzle(pool) };
   }
-  return state.chairsideDb.db;
+  return state.chairsideDb;
+}
+
+export function getDb(): NodePgDatabase {
+  return dbState().db;
+}
+
+/**
+ * Takes one connection from the pool, waiting at most CONNECTION_TIMEOUT_MS. Only withTenant uses
+ * it: it resets the connection before releasing it.
+ */
+export function connect(): Promise<pg.PoolClient> {
+  return dbState().pool.connect();
 }
 
 /** Closes the pool: for tests and graceful shutdown. */

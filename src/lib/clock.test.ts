@@ -48,6 +48,18 @@ describe('fakeClock', () => {
     expect(() => fakeClock('2026-03-10T09:00:00Z').advance(Number.NaN)).toThrow(RangeError);
   });
 
+  it('refuses a jump that would leave the range of valid dates, and stays where it was', () => {
+    const clock = fakeClock('2026-03-10T09:00:00Z');
+    expect(() => clock.advance(8.64e15)).toThrow(RangeError);
+    expect(() => clock.advance(-2 * 8.64e15)).toThrow(RangeError);
+    expect(clock.now().toISOString()).toBe('2026-03-10T09:00:00.000Z');
+
+    // The last valid moment can still be reached.
+    const edge = fakeClock(new Date(0));
+    edge.advance(8.64e15);
+    expect(edge.now().toISOString()).toBe('+275760-09-13T00:00:00.000Z');
+  });
+
   it('rejects a day its month does not have, instead of moving into the next month', () => {
     // JavaScript reads 2026-02-30 as 2 March. A timing test must not run on a date it did not ask for.
     expect(() => fakeClock('2026-02-30T09:00:00Z')).toThrow(RangeError);

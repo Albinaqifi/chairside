@@ -478,3 +478,24 @@ architecture), `changed` (differs from the original files), `process`.
   mistake loud the first time it runs, and the limits end every other wait with an error.
 - **Revisit if:** work really must run inside an outer transaction (then pass the outer `tx`, or
   use savepoints), or 5 seconds proves too short or too long under real load.
+
+### D-061 · `withTenant` resets its connection with `DISCARD ALL` before the pool gets it back
+- **Origin:** process, E00-T01 (tester findings 7 and 15). Decided by the owner on 2026-10-03.
+  Adds to D-060, which stays as it is.
+- **What:** after every `withTenant` transaction, committed or rolled back, the connection runs
+  `DISCARD ALL` before it is released to the pool. A connection whose reset fails is closed, never
+  pooled again; the transaction's own outcome stands, and the failed reset is logged. While
+  `withTenant` holds a connection it listens for that connection's `error` event, so a connection
+  that dies fails the call instead of ending the Node process.
+- **Why:** some session state outlives the transaction that created it: a cursor declared
+  `WITH HOLD`, a session-level `SET` (such as `SET app.clinic_id`), a session-level advisory lock
+  (which even survives a rollback). On a pooled connection it reaches the next transaction, which
+  may be another clinic's. One reset ends all of it without listing each kind.
+- **Consequences:** one more round trip per transaction. Named prepared statements (Drizzle's
+  `.prepare('name')`) cannot be used: the reset removes them on the server while pg still counts
+  them as prepared, so their next use on that connection fails (SQLSTATE 26000). A setting every
+  connection needs must come from the connection string or the role's or database's defaults,
+  which the reset keeps; a command run after connecting is undone by the first reset. Large
+  objects are stored database-wide, so no reset reaches them (risk R-31).
+- **Revisit if:** the extra round trip shows up in measurements, or named prepared statements
+  become necessary (then run the commands `DISCARD ALL` stands for, except `DEALLOCATE ALL`).

@@ -35,6 +35,10 @@ export function fakeClock(start: Date | string): FakeClock {
       if (!Number.isFinite(ms)) {
         throw new RangeError('fakeClock.advance: ms must be a finite number');
       }
+      // A Date holds at most 100 million days either side of 1970; beyond that it is Invalid Date.
+      if (Number.isNaN(new Date(current + ms).getTime())) {
+        throw new RangeError('fakeClock.advance: the clock would leave the range of valid dates');
+      }
       current += ms;
     },
   };

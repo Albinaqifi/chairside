@@ -48,7 +48,7 @@ Stack and reasons: `docs/architecture/overview.md`. First-time setup: `README.md
 | `pnpm exec vitest run <file>` | One test file. |
 | `pnpm lint` · `pnpm typecheck` | ESLint (a warning fails too) · `next typegen` + `tsc`. |
 | `pnpm format` · `pnpm format:check` | Prettier: fix · check only. Markdown and `docs/` are not formatted. |
-| `pnpm db:reset` | Rebuild the local database from nothing: roles, database, every migration. Refuses any non-local host. |
+| `pnpm db:reset` | Rebuild the local database from nothing: roles, database, every migration. Refuses any non-local host, and URLs that do not all name the same host and port. |
 | `pnpm db:migrate` | Apply pending migrations as the migration role. |
 | `pnpm db:generate --name <what>` | Generate a migration from changed `schema.ts` files. |
 | `pnpm build` · `pnpm start` | Production build · run it. |
@@ -87,6 +87,9 @@ Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tes
   once at the edge (action wrapper, job handler). Module functions take that `tx` as a parameter;
   a `withTenant` inside another is refused with an error (D-060). Waiting for a pooled connection
   or a lock fails after 5 s. Never import `src/db/client.ts` elsewhere, never set `app.clinic_id`.
+- After each `withTenant` the connection is reset (`DISCARD ALL`) before it goes back to the pool,
+  or closed if the reset fails (D-061): nothing set on a connection outlives its transaction. So
+  no named prepared statements (`.prepare('name')`): pg would reuse ones the reset removed.
 - Logs: `logger` from `src/lib/logger.ts`, ids and codes only. It drops the fields listed in
   `src/lib/personal-fields.ts` as a safety net, not as permission to log personal data.
 - Files Node runs directly (`src/db/migrate.ts`, `src/db/reset.ts`): import only packages and

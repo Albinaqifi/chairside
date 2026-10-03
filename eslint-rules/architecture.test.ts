@@ -21,6 +21,9 @@ interface Case {
 
 const IN_MODULE = 'src/modules/scheduling/slots.ts';
 const DECLARE = 'declare const DateTime: any; declare const Temporal: any;';
+/** A framework import, a deep import and a clock read, in that order. */
+const ALL_THREE =
+  "import x from 'react'; import { y } from '@/modules/tenancy/schema'; export const a = [x, y, Date.now()];";
 
 const cases: Case[] = [
   // (a) No reading the clock inside src/modules.
@@ -120,6 +123,72 @@ const cases: Case[] = [
     code: "export const a = new globalThis.Date('2026-03-10T09:00:00Z');",
     expected: [],
   },
+  {
+    name: 'a: Date[`now`]() in a module',
+    file: IN_MODULE,
+    code: 'export const a = Date[`now`]();',
+    expected: [CLOCK],
+  },
+  {
+    name: "a: globalThis['Date'].now() in a module",
+    file: IN_MODULE,
+    code: "export const a = globalThis['Date'].now();",
+    expected: [CLOCK],
+  },
+  {
+    name: "a: new globalThis['Date']() in a module",
+    file: IN_MODULE,
+    code: "export const a = new globalThis['Date']();",
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: Reflect.construct(Date, []) in a module',
+    file: IN_MODULE,
+    code: 'export const a = Reflect.construct(Date, []);',
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: new Date(...[]) in a module',
+    file: IN_MODULE,
+    code: 'export const a = new Date(...[]);',
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: Luxon through a namespace import',
+    file: IN_MODULE,
+    code: "import * as luxon from 'luxon'; export const a = luxon.DateTime.now();",
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: Luxon DateTime imported under another name',
+    file: IN_MODULE,
+    code: "import { DateTime as DT } from 'luxon'; export const a = DT.now();",
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: DateTime.local(options) with a variable',
+    file: IN_MODULE,
+    code: `${DECLARE} declare const options: object; export const a = DateTime.local(options);`,
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: globalThis.Temporal.Now in a module',
+    file: IN_MODULE,
+    code: 'export const a = globalThis.Temporal.Now.instant();',
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: DateTime.local(year) with a number is fine',
+    file: IN_MODULE,
+    code: `${DECLARE} export const a = DateTime.local(2026);`,
+    expected: [],
+  },
+  {
+    name: 'a: Luxon DateTime imported under its own name is fine',
+    file: IN_MODULE,
+    code: "import { DateTime } from 'luxon'; export const a = DateTime.fromISO('2026-03-10T09:00:00Z');",
+    expected: [],
+  },
 
   // (b) Modules are imported only through index.ts.
   {
@@ -188,9 +257,29 @@ const cases: Case[] = [
     code: "import { x } from '@/modules/tenancy/settings'; export { x };",
     expected: [BOUNDARY],
   },
+  {
+    name: 'b: deep dynamic import written as a template literal',
+    file: 'src/modules/audit/record.ts',
+    code: 'export const load = () => import(`@/modules/patients/search`);',
+    expected: [BOUNDARY],
+  },
+  {
+    name: "b: deep import('…') used as a type",
+    file: 'src/modules/audit/record.ts',
+    code: "export type Result = import('@/modules/patients/search').Result;",
+    expected: [BOUNDARY],
+  },
 
   // (c) No Next.js or React inside src/modules.
-  ...['next/headers', 'next', 'react', 'react-dom/server', 'server-only'].map((source) => ({
+  ...[
+    'next/headers',
+    'next',
+    'react',
+    'react-dom/server',
+    'server-only',
+    'next-intl',
+    '@react-email/components',
+  ].map((source) => ({
     name: `c: '${source}' in a module`,
     file: IN_MODULE,
     code: `import x from '${source}'; export { x };`,
@@ -237,6 +326,44 @@ const cases: Case[] = [
     file: IN_MODULE,
     code: "export const load = () => import('zod');",
     expected: [],
+  },
+  {
+    name: 'c: import(`react`) written as a template literal',
+    file: IN_MODULE,
+    code: 'export const load = () => import(`react`);',
+    expected: [FRAMEWORK_SYNTAX],
+  },
+  {
+    name: "c: import('react') used as a type",
+    file: IN_MODULE,
+    code: "export type Node = import('react').ReactNode;",
+    expected: [FRAMEWORK_SYNTAX],
+  },
+
+  // All three rules, in every kind of script file a module folder can hold.
+  ...['js', 'mjs', 'mts', 'cts'].map((extension) => ({
+    name: `a, b, c: a .${extension} file in a module`,
+    file: `src/modules/scheduling/slots.${extension}`,
+    code: ALL_THREE,
+    expected: [FRAMEWORK, BOUNDARY, CLOCK],
+  })),
+  {
+    name: 'a, b, c: a .jsx file in a module',
+    file: 'src/modules/scheduling/slot-label.jsx',
+    code: `${ALL_THREE} export const b = <span>slot</span>;`,
+    expected: [FRAMEWORK, BOUNDARY, CLOCK, FRAMEWORK_SYNTAX],
+  },
+  {
+    name: 'a, b, c: a .cjs file in a module, importing with require()',
+    file: 'src/modules/scheduling/slots.cjs',
+    code: "const x = require('react'); const { y } = require('@/modules/tenancy/schema'); module.exports = [x, y, Date.now()];",
+    expected: [FRAMEWORK_SYNTAX, BOUNDARY, CLOCK],
+  },
+  {
+    name: 'b, c: import x = require(…) in a .cts file in a module',
+    file: 'src/modules/scheduling/slots.cts',
+    code: "import x = require('react'); import y = require('@/modules/tenancy/schema'); export = [x, y];",
+    expected: [FRAMEWORK, BOUNDARY],
   },
 ];
 
