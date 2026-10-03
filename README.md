@@ -11,6 +11,8 @@ Scheduling for small dental clinics, with automatic patient reminders. What and 
 - **Docker Desktop**, running: https://www.docker.com/products/docker-desktop. It runs the local
   PostgreSQL database.
 - **Git**.
+- **GitHub CLI** (`gh`), logged in with `gh auth login`: agents use it to open pull requests.
+  On Windows: `winget install GitHub.cli`.
 
 The commands below work in PowerShell, Command Prompt and macOS or Linux terminals. The one
 command that differs is copying the settings file (step 3).
@@ -79,3 +81,7 @@ command that differs is copying the settings file (step 3).
 
 Read `CLAUDE.md` first: the start-of-session ritual, the rules that are never broken, and the
 technical conventions. Tasks and their status: `docs/backlog/` and `docs/progress/board.md`.
+
+To run one task through builder, reviewer and tester in a single Claude Code session, type
+`/pipeline <task-id>`, for example `/pipeline E00-T03`. How it works and when it stops for you:
+`docs/process/workflow.md`.
