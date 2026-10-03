@@ -609,3 +609,26 @@ architecture), `changed` (differs from the original files), `process`.
   time, because the roles share the board and the local database.
 - **Revisit if:** CI exists (E00-T06), then the automatic review can also run on GitHub when a
   pull request opens; or two fix rounds prove too few or too many.
+
+### D-066 · Login rules a client cannot ask its way around (E00-T02, tester findings 1–4)
+- **Origin:** E00-T02, fix round 1 for the tester's findings 1–4 (`handoffs/E00-T02.md`).
+- **What:**
+  - A sign-in that sends `rememberMe: false` is refused (400). The library would give that
+    session a fixed 24 hours that requests never move forward, past the 30-minute rule. A
+    "Remember me" box (E04 or later) needs a decision first: the rule has no exception today.
+  - Every library route that checks a password is limited like sign-in: `/sign-in/email`,
+    `/verify-password` and `/change-password`, 10 requests a minute per client address and path.
+    For these two routes this replaces "the other auth routes keep the library's defaults" in
+    D-063 (the defaults were 100 and 3 per 10 seconds).
+  - Every error the auth library's database adapter throws is replaced by a copy without the
+    values the query was sent (`withoutQueryValues`, `src/lib/query-errors.ts`): the message
+    without them, the PostgreSQL code and the names of the table, column and constraint kept,
+    `params`, `detail` and `where` left out. The library's router prints unexpected errors with
+    `console.error`, outside our logger. Errors from our own queries (`withTenant`,
+    `clinicsForUser()`) are not changed here: that is the page side of the same finding, for the
+    owner and E00-T03 (board, Discovered).
+  - `can()` answers false for a role, permission or provider kind it does not know.
+- **Why:** security-privacy.md sections 2 and 6 hold whatever a client sends or a query fails
+  with; the tester showed three ways around them through the library's own routes.
+- **Revisit if:** a "Remember me" or "confirm your password" screen is wanted (E04), or the
+  library offers a setting for any of these.

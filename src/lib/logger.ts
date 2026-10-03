@@ -6,6 +6,7 @@ import pino, {
   type LoggerOptions,
 } from 'pino';
 import { isPersonalField } from './personal-fields';
+import { messageWithoutValues, restack } from './query-errors';
 
 /**
  * Structured JSON logs. Log ids and codes, never personal data (security-privacy.md, section 6).
@@ -110,44 +111,4 @@ function errorToObject(error: Error): Record<string, unknown> {
   }
   if (error.cause !== undefined) result.cause = error.cause;
   return result;
-}
-
-/**
- * PostgreSQL errors whose message quotes the value a query was sent: data errors (SQLSTATE class
- * 22), and syntax errors (42601), which is how the full-text search parsers report text they
- * cannot read. A syntax error in the SQL itself loses its quoted token too; the SQL, with `$1`
- * placeholders, and the error's `position` stay.
- */
-const VALUE_QUOTING_CODE = /^(22[0-9A-Z]{3}|42601)$/;
-
-/**
- * The error's message without the values a failed database query was sent. Drizzle adds them to
- * its own message (`Failed query: … params: …`) and keeps them in `params`, which is dropped as a
- * personal field. PostgreSQL quotes the offending value in some messages, for example
- * `invalid input syntax for type uuid: "…"` or `syntax error in tsquery: "…"`.
- */
-function messageWithoutValues(error: Error): string {
-  const { query, params, code } = error as Error & {
-    query?: unknown;
-    params?: unknown;
-    code?: unknown;
-  };
-  if (typeof query === 'string' && Array.isArray(params)) return `Failed query: ${query}`;
-  if (typeof code === 'string' && VALUE_QUOTING_CODE.test(code)) {
-    // From the first quote to the last, so a value that contains quotes is removed whole.
-    return error.message.replace(/"[\s\S]*"/, '"…"');
-  }
-  return error.message;
-}
-
-/**
- * The stack with the cleaned message in place of the original one, which it starts with. A stack
- * that does not contain the original message (it was changed later) is dropped: where the values
- * are in it is unknown.
- */
-function restack(error: Error, message: string): string | undefined {
-  const { stack } = error;
-  if (stack === undefined || !stack.includes(error.message)) return undefined;
-  // A function, so `$&` and similar in the message are not read as replacement patterns.
-  return stack.replace(error.message, () => message);
 }
