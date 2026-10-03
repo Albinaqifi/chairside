@@ -15,6 +15,12 @@ export const PERSONAL_FIELDS = [
   'street',
   'city',
   'postalCode',
+  'postcode',
+  'zip',
+  'ip',
+  'to', // a message's recipient: a phone number or an email address
+  'from',
+  'reason', // free text, e.g. why a patient cancelled
   'text',
   'subject',
   'content',
@@ -23,6 +29,8 @@ export const PERSONAL_FIELDS = [
   'authorization',
   // Postgres error details quote row values, e.g. "Key (email)=(...) already exists"
   'detail',
+  // Postgres error context can quote the data, e.g. "JSON data, line 1: ..."
+  'where',
 ] as const;
 
 /** Endings that mark personal data, so compound names such as `patientEmail` match too. */
@@ -32,15 +40,26 @@ export const PERSONAL_FIELD_ENDINGS = [
   'phone',
   'phoneNumber',
   'mobile',
+  'msisdn',
+  'waId', // WhatsApp id: the phone number
+  'recipient',
+  'contact',
   'address',
   'dateOfBirth',
   'birthDate',
+  'birthday',
+  'diagnosis',
   'note',
   'notes',
   'body', // message and request bodies
   'html',
   'smsText',
   'messageText',
+  'params', // the values a database query was sent; request and search parameters
+  'url', // URLs and paths can carry patient link tokens
+  'href',
+  'link',
+  'path',
   'token',
   'apiKey',
 ] as const;

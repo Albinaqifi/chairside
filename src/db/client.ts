@@ -13,12 +13,21 @@ interface DbState {
   db: NodePgDatabase;
 }
 
+/**
+ * Longest wait for a connection, whether every pooled one is busy or a new one is being opened.
+ * Then the call fails with "timeout exceeded when trying to connect": nothing waits forever.
+ */
+export const CONNECTION_TIMEOUT_MS = 5_000;
+
 // One pool per process, kept on globalThis so hot reloads in development reuse it.
 const state = globalThis as typeof globalThis & { chairsideDb?: DbState };
 
 export function getDb(): NodePgDatabase {
   if (!state.chairsideDb) {
-    const pool = new pg.Pool({ connectionString: requiredEnv('DATABASE_URL') });
+    const pool = new pg.Pool({
+      connectionString: requiredEnv('DATABASE_URL'),
+      connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
+    });
     // An idle connection can fail, for example when the database restarts. Log it instead of
     // letting the error crash the process; the pool replaces the connection.
     pool.on('error', (err) => logger.error({ err }, 'idle database connection failed'));

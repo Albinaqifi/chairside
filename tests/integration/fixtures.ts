@@ -52,6 +52,7 @@ export function pgErrorCode(error: unknown): string | undefined {
 /** Postgres error codes the tests expect. */
 export const PG = {
   insufficientPrivilege: '42501', // also raised for row-level security violations
+  lockNotAvailable: '55P03', // raised when lock_timeout ends a wait for a lock
 } as const;
 
 /** Expects the promise to fail with the given Postgres error code. */

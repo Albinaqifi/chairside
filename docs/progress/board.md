@@ -38,6 +38,11 @@ turns lines into tasks or strikes them out.
 - 2026-10-03 · E00-T01 · Next.js collects anonymous usage telemetry by default (`next dev`, `next build`). Owner to decide whether to turn it off (`NEXT_TELEMETRY_DISABLED=1`) locally, in CI and on staging.
 - 2026-10-03 · E00-T01 · The app role may UPDATE every column of `clinics`, including `status`. E01-T08 (clinic settings) should decide whether staff may change all of them (column grants).
 - 2026-10-03 · E00-T01 · Newer major versions exist than the stack uses: TypeScript 7, ESLint 10, drizzle-orm 1.0 (release candidate). Kept on the versions in D-059; an upgrade would be its own task.
+- 2026-10-03 · E00-T01 · The agent guard (`.claude/settings.json`) covers fewer `.env` names than `.gitignore` (not e.g. `.env.staging`), and its PowerShell patterns miss a quoted file name (tester finding 11).
+- 2026-10-03 · E00-T01 · `pnpm dev` listens on every network interface (the dev log shows a LAN address); `next dev -H 127.0.0.1` would keep it on this machine (tester finding 12).
+- 2026-10-03 · E00-T01 · The logger writes a `URL` object under any key as its full address (link tokens), and a `Buffer` as bytes that decode back to text. Value shapes from tester finding 10; only the field names were in scope.
+- 2026-10-03 · E00-T01 · `eslint-rules/architecture.test.ts` can hit its 60 s `beforeAll` limit when the file cache is cold (first run of a session on Windows: 56 s, once over 60 s); warm runs take about 2 s.
+- 2026-10-03 · E00-T01 · Luxon also reads the clock when a date has no day: its docs show `DateTime.fromObject({ hour: 10 })` as "today at 10:00". Lint rule (a) does not catch it; check before E02 uses Luxon.
 
 ---
 
@@ -47,7 +52,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
-| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **In progress** | Back from testing: fix findings 1–3 (failing tests added); owner decides 2's approach and 4–12. See `handoffs/E00-T01.md` |
+| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Built** | Round 2: findings 1–5 and 8–10 fixed as the owner decided; 6, 7, 11, 12 recorded. Ready for the tester again. See `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | Planned | |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |

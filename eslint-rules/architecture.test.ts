@@ -9,6 +9,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 const CLOCK = 'no-restricted-syntax';
 const FRAMEWORK = 'no-restricted-imports';
 const BOUNDARY = 'chairside/module-boundaries';
+// (c) for what no-restricted-imports cannot see (JSX, dynamic import) is a syntax rule too.
+const FRAMEWORK_SYNTAX = 'no-restricted-syntax';
 
 interface Case {
   name: string;
@@ -68,6 +70,54 @@ const cases: Case[] = [
     name: 'a: the clock may be read outside modules',
     file: 'src/lib/clock.ts',
     code: 'export const a = Date.now();',
+    expected: [],
+  },
+  {
+    name: 'a: Date() called without new in a module',
+    file: IN_MODULE,
+    code: 'export const a = Date();',
+    expected: [CLOCK],
+  },
+  {
+    name: "a: Date['now']() in a module",
+    file: IN_MODULE,
+    code: "export const a = Date['now']();",
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: globalThis.Date.now() in a module',
+    file: IN_MODULE,
+    code: 'export const a = globalThis.Date.now();',
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: new globalThis.Date() in a module',
+    file: IN_MODULE,
+    code: 'export const a = new globalThis.Date();',
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: DateTime.local({ zone }) in a module',
+    file: IN_MODULE,
+    code: `${DECLARE} export const a = DateTime.local({ zone: 'Europe/Skopje' });`,
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: DateTime.utc({ locale }) in a module',
+    file: IN_MODULE,
+    code: `${DECLARE} export const a = DateTime.utc({ locale: 'en' });`,
+    expected: [CLOCK],
+  },
+  {
+    name: 'a: DateTime.utc(...) with values and options is fine',
+    file: IN_MODULE,
+    code: `${DECLARE} export const a = DateTime.utc(2026, 3, 10, { locale: 'en' });`,
+    expected: [],
+  },
+  {
+    name: 'a: new globalThis.Date(value) is fine',
+    file: IN_MODULE,
+    code: "export const a = new globalThis.Date('2026-03-10T09:00:00Z');",
     expected: [],
   },
 
@@ -150,6 +200,42 @@ const cases: Case[] = [
     name: 'c: Next.js is fine in src/app',
     file: 'src/app/page.tsx',
     code: "import { cookies } from 'next/headers'; export { cookies };",
+    expected: [],
+  },
+  {
+    name: 'c: JSX in a module .tsx file (an implicit react/jsx-runtime import)',
+    file: 'src/modules/scheduling/slot-label.tsx',
+    code: 'export const a = <span>slot</span>;',
+    expected: [FRAMEWORK_SYNTAX],
+  },
+  {
+    name: 'c: a JSX fragment in a module .tsx file',
+    file: 'src/modules/scheduling/slot-label.tsx',
+    code: 'export const a = <></>;',
+    expected: [FRAMEWORK_SYNTAX],
+  },
+  {
+    name: "c: import('react') in a module",
+    file: IN_MODULE,
+    code: "export const load = () => import('react');",
+    expected: [FRAMEWORK_SYNTAX],
+  },
+  {
+    name: "c: import('next/headers') in a module",
+    file: IN_MODULE,
+    code: "export const load = () => import('next/headers');",
+    expected: [FRAMEWORK_SYNTAX],
+  },
+  {
+    name: 'c: JSX is fine in src/app',
+    file: 'src/app/slot-label.tsx',
+    code: 'export const a = <span>slot</span>;',
+    expected: [],
+  },
+  {
+    name: 'c: a dynamic import of another package is fine in a module',
+    file: IN_MODULE,
+    code: "export const load = () => import('zod');",
     expected: [],
   },
 ];

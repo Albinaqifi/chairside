@@ -21,7 +21,8 @@ export interface FakeClock extends Clock {
 
 /**
  * A clock for tests. It stands still until moved. Strings must be ISO times with `Z` or an
- * offset, so a test never depends on the time zone of the machine running it.
+ * offset, so a test never depends on the time zone of the machine running it, and must name a
+ * day that exists: `2026-02-30` is refused, not read as 2 March.
  */
 export function fakeClock(start: Date | string): FakeClock {
   let current = toTime(start);
@@ -42,10 +43,19 @@ export function fakeClock(start: Date | string): FakeClock {
 const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
 
 function toTime(at: Date | string): number {
-  if (typeof at === 'string' && !ISO_WITH_ZONE.test(at)) {
-    throw new RangeError(
-      'fakeClock: use an ISO time with Z or an offset, e.g. 2026-03-10T09:00:00Z',
-    );
+  if (typeof at === 'string') {
+    if (!ISO_WITH_ZONE.test(at)) {
+      throw new RangeError(
+        'fakeClock: use an ISO time with Z or an offset, e.g. 2026-03-10T09:00:00Z',
+      );
+    }
+    // JavaScript moves a day the month does not have into the next month. Read the written
+    // date on its own: if it comes back as another date, that day does not exist.
+    const day = at.slice(0, 10);
+    const parsed = new Date(`${day}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== day) {
+      throw new RangeError(`fakeClock: ${day} is not a day of the calendar`);
+    }
   }
   const time = new Date(at).getTime();
   if (Number.isNaN(time)) throw new RangeError('fakeClock: invalid date');

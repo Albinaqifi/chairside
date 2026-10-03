@@ -463,3 +463,18 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a script needs to import application modules (Node cannot resolve the `@/`
   paths; a runner such as tsx then needs a decision); Render changes its PostgreSQL version;
   Next.js supports TypeScript 7 and ESLint 10.
+
+### D-060 · `withTenant` is opened once, at the edge; a nested call is refused; waits for a connection or a lock are limited
+- **Origin:** process, E00-T01 (tester finding 2). Decided by the owner on 2026-10-03; the 5-second
+  limits were chosen by the builder.
+- **What:** the action wrapper or the job handler opens one `withTenant` per unit of work, and
+  module functions receive its `tx` as a parameter. A `withTenant` call made while another one is
+  still open in the same flow fails at once with an error (tracked with Node's
+  `AsyncLocalStorage`). The app's pool gives up waiting for a connection after 5 seconds, and
+  every tenant transaction sets `lock_timeout` to 5 seconds.
+- **Why:** a nested call opens a second transaction on a second pooled connection. It can wait
+  forever for a lock its own outer transaction holds, or for a connection when outer calls hold
+  them all, with no error and no log line. Nothing may fail silently: refusing the call makes the
+  mistake loud the first time it runs, and the limits end every other wait with an error.
+- **Revisit if:** work really must run inside an outer transaction (then pass the outer `tx`, or
+  use savepoints), or 5 seconds proves too short or too long under real load.

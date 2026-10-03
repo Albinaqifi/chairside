@@ -47,6 +47,19 @@ describe('the app role', () => {
     }
   });
 
+  it('cannot create temporary tables', async () => {
+    // A temporary table outlives its transaction and is found before the real table of the same
+    // name, so it could hand one clinic's rows to the next transaction on a pooled connection.
+    await expectPgError(
+      app.query('create temporary table audit_log (id uuid)'),
+      PG.insufficientPrivilege,
+    );
+    const { rows } = await app.query(
+      `select has_database_privilege(current_user, current_database(), 'TEMPORARY') as allowed`,
+    );
+    expect(rows).toEqual([{ allowed: false }]);
+  });
+
   it('cannot read the migration journal', async () => {
     await expectPgError(
       app.query('select * from drizzle.__drizzle_migrations'),

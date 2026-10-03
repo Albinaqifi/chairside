@@ -159,4 +159,49 @@ describe('withTenant', () => {
     ).rejects.toThrow(TypeError);
     expect(called).toBe(false);
   });
+
+  it('refuses a withTenant call inside another at once, and the outer one carries on', async () => {
+    const auditId = newId();
+    let nestedRan = false;
+    const refusal = await withTenant(clinicA, async (tx) => {
+      const error = await withTenant(clinicA, async () => {
+        nestedRan = true;
+      }).then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      await insertAuditRow(tx, clinicA, auditId);
+      return error;
+    });
+
+    expect(refusal).toBeInstanceOf(Error);
+    expect((refusal as Error).message).toContain('called inside another withTenant');
+    expect(nestedRan).toBe(false);
+    const { rows } = await admin.query('select id from audit_log where id = $1', [auditId]);
+    expect(rows).toEqual([{ id: auditId }]);
+  });
+
+  it('refuses it for another clinic too, and from work started without await', async () => {
+    const outcomes = await withTenant(clinicA, async () => {
+      const calls = [
+        withTenant(clinicB, visibleClinics),
+        Promise.resolve().then(() => withTenant(clinicA, visibleClinics)),
+      ];
+      return (await Promise.allSettled(calls)).map((result) => result.status);
+    });
+    expect(outcomes).toEqual(['rejected', 'rejected']);
+  });
+
+  it('allows a call from work the first one started, once its transaction has ended', async () => {
+    let release!: () => void;
+    const firstEnded = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let later!: Promise<unknown[]>;
+    await withTenant(clinicA, async () => {
+      later = firstEnded.then(() => withTenant(clinicB, visibleClinics));
+    });
+    release();
+    expect(await later).toEqual([clinicB]);
+  });
 });

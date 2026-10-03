@@ -83,8 +83,10 @@ Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tes
 - Files `kebab-case.ts`. Tables and columns `snake_case`, tables plural. TypeScript `camelCase`.
 - Ids: `newId()` from `src/lib/ids.ts` (UUID v7). Moments `timestamptz`, calendar dates `date`.
   `updated_at` is set from the passed-in `now` when a row changes.
-- Database: only inside `withTenant(clinicId, async (tx) => …)` from `src/db/tenant.ts`. Never
-  import `src/db/client.ts` elsewhere, never set `app.clinic_id` yourself.
+- Database: only inside `withTenant(clinicId, async (tx) => …)` from `src/db/tenant.ts`, opened
+  once at the edge (action wrapper, job handler). Module functions take that `tx` as a parameter;
+  a `withTenant` inside another is refused with an error (D-060). Waiting for a pooled connection
+  or a lock fails after 5 s. Never import `src/db/client.ts` elsewhere, never set `app.clinic_id`.
 - Logs: `logger` from `src/lib/logger.ts`, ids and codes only. It drops the fields listed in
   `src/lib/personal-fields.ts` as a safety net, not as permission to log personal data.
 - Files Node runs directly (`src/db/migrate.ts`, `src/db/reset.ts`): import only packages and
@@ -95,7 +97,8 @@ Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tes
 ### Database roles and settings
 
 - `chairside_migrator` runs migrations and owns the schema. `chairside_app` is the app's role:
-  owns nothing, cannot bypass Row-Level Security, cannot change the schema.
+  owns nothing, cannot bypass Row-Level Security, cannot change the schema or create temporary
+  tables.
 - Settings are listed in `.env.example`. Agents cannot read `.env` files (`.claude/settings.json`);
   never print environment values. If `.env` is missing, ask the owner.
 
@@ -116,9 +119,14 @@ Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tes
    GRANT SELECT, INSERT, UPDATE, DELETE ON "x" TO chairside_app; -- only what the app needs
    ```
 4. `pnpm db:reset`, then `pnpm test:integration`. The meta-test
-   (`tests/integration/tenant-tables.test.ts`) fails if `clinic_id`, RLS or the policy is missing.
-5. A table without a clinic is rare and critical: add it to `tests/integration/tenant-allow-list.ts`
-   with the reason, and flag it in the handoff note.
+   (`tests/integration/tenant-tables.test.ts`) fails if `clinic_id`, RLS or the policy is missing,
+   or if a policy does more than compare `clinic_id` with `current_clinic_id()`: extra conditions
+   joined with AND are fine, OR and NOT are not. It also fails for a view without
+   `WITH (security_invoker = true)`, for any materialized view, and for a SECURITY DEFINER
+   function that is not in `CROSS_CLINIC_FUNCTIONS`.
+5. A table without a clinic, or a SECURITY DEFINER function that looks across clinics, is rare and
+   critical: add it to `tests/integration/tenant-allow-list.ts` (`GLOBAL_TABLES` or
+   `CROSS_CLINIC_FUNCTIONS`) with the reason, and flag it in the handoff note.
 
 ### How to write a migration
 
