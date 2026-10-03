@@ -47,6 +47,10 @@ turns lines into tasks or strikes them out.
 - 2026-10-03 · E00-T01 · E00-T03's action wrapper: keep a caught error as `cause`; never copy `err.message` into a new error or a template string. The logger cannot clean text, and a failed query's values are in that message (tester round 2).
 - 2026-10-03 · E00-T01 · When a rollback fails (for example because the connection died), Drizzle's `transaction()` throws the rollback's error instead of the error that caused it. `withTenant` logs the connection failure; E00-T03 should not count on seeing the first error.
 - 2026-10-03 · E00-T01 · Nothing limits how long a statement waits for the database to answer (no `statement_timeout`, no pg `query_timeout`). The 5 s limits cover locks and connections only: a database that stops answering mid-statement, or during `withTenant`'s reset, keeps the call waiting.
+- 2026-10-03 · E00-T01 review · Outside local `db:reset`, nothing checks the app's database role. A hosted `DATABASE_URL` that names the table owner (or a superuser or BYPASSRLS role) switches off every policy without an error. Suggest a start-up check that refuses to serve, before E00-T07 (handoff, reviewer suggestion 1).
+- 2026-10-03 · E00-T01 review · "Never import `src/db/client.ts` elsewhere" is not a lint rule, and `getDb()` (tests only) gives a handle outside `withTenant`. E00-T02 or E00-T03: decide which file may use it (the auth library needs one for the global tables) and lint the rest.
+- 2026-10-03 · E00-T01 review · The `db:reset` guard accepts a `MIGRATION_DATABASE_URL` whose user is `chairside_app` or the admin user; the app role then owns the tables and skips the policies. Local only: `pnpm check` catches it, `pnpm dev` does not.
+- 2026-10-03 · E00-T01 review · `security-privacy.md` section 7 says `.env.example` lists names without values; the task allowed local values that are not secrets, which the file has. Owner: adjust the sentence.
 
 ---
 
@@ -56,7 +60,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
-| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Tested** | Round 3 re-test (owner's short scope): findings 13–17 and the minor notes fixed as decided. See `handoffs/E00-T01.md` |
+| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | Planned | |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
