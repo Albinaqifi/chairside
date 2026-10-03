@@ -6,7 +6,8 @@ clinics cannot see each other's data, and every change is checked automatically.
 **Why first:** everything else stands on tenant isolation, login and the action wrapper.
 Getting them right once, with tests, is cheaper than fixing them under features.
 
-Order: T01 → T02 → T03 → (T04, T05, T06 in any order) → T07.
+Order: T01 → T02 → T03 → T08 → (T04, T05, T06 in any order) → T07. T08 is the second half of
+T03 (split in D-071), so it sits right after T03 in this file.
 
 ---
 
@@ -115,40 +116,170 @@ table (patients, appointments…). CI (T06). Deployment (T07). The worker (T07).
 
 ---
 
-### E00-T03 · The action wrapper, permission checks and audit log
+### E00-T03 · Action wrappers, permission checks and audit log
 
 - **Role:** builder · **Risk:** critical · **Depends on:** E00-T02
-- **Read:** `overview` (How a staff action flows) · `security` (Part 1, sections 1, 2, 10) · `data-model` (`audit_log`)
+- **Read:** `overview` (How a staff action flows) · `security` (Part 1, sections 1, 2, 6, 10) ·
+  `data-model` (`audit_log`) · D-062, D-066, D-068, D-069, D-070, D-071 · the architect section of
+  `handoffs/E00-T03.md`
 
 **Why.** One wrapper that every staff action passes through is what makes "permissions are
-always checked" and "everything is audited" true by construction instead of by discipline.
+always checked" and "everything is audited" true by construction instead of by discipline. It is
+also where an action learns which clinic it runs in, and the last place an error passes before a
+framework prints it.
 
 **Do.**
-- `staffAction({ permission, input: zodSchema, audit }, handler)`: session → membership →
-  permission check → input validation → tenant transaction → handler → audit row written in
-  the same transaction → typed result or typed error.
-- `audit.record(...)` in the `audit` module: actor, action, entity, metadata (ids and field
-  names only, never values of personal fields).
-- A read variant for queries that logs patient-record views when asked to.
-- A lint rule or test that fails if a server action or route handler in `(staff)` does not use the wrapper.
-- Document the pattern in `CLAUDE.md` with one short example.
+- **`staffAction({ permission, input, audit }, handler)`** in `src/app/_lib/`, for every server
+  action that changes data. In this order, stopping at the first step that fails:
+  1. *Who:* `currentStaff()`. No session → the login page; clinic not settled → the picker, as
+     pages do today.
+  2. *Which clinic (D-069):* the call carries the id of the clinic its page was shown for. When it
+     differs from the clinic `currentStaff()` resolved, or is missing, refuse with
+     `clinic_changed`.
+  3. *Allowed:* `can(role, extras, permission)`, else `forbidden`.
+  4. *Valid:* parse the input with Zod (D-068), else `invalid_input` with field paths and issue
+     codes, never the values sent.
+  5. *Do it:* one `withTenant` for the resolved clinic. The handler gets the parsed input, the
+     transaction, the staff member and `now` (the clock read once, here at the edge).
+  6. *Audit:* exactly one row through `audit.record()`, in the same transaction, from the action's
+     `audit` declaration (action name, entity type and id, optional metadata).
+  7. *Answer:* a typed result, or a typed error code.
+- **Handler refusals.** A handler can refuse with its own typed error (for example `not_found`):
+  nothing it did is kept, no audit row is written, and the code goes back to the caller.
+- **Unexpected errors.** Anything else the handler or the database throws is rolled back, logged
+  once through `logger` (ids, the error as `err`), and answered as `internal` with no detail. Keep
+  a caught error as `cause`; never copy `err.message` into a new error or a string. Do not rely on
+  seeing the handler's first error: when the rollback fails, Drizzle throws the rollback's error
+  instead (board, Discovered, E00-T01).
+- **A read helper** for pages and read-only actions: the same steps, but no audit row unless the
+  read declares a patient-record view, which then writes one (security §10). Step 2 applies when it
+  is called as an action from the browser (polling, a drawer that loads): it then carries the
+  clinic id like `staffAction`. A page reading while it renders on the server skips step 2 (D-069).
+- **Every wrapper call names its permission**, or says explicitly that every active member may (a
+  read that every role has). There is no default.
+- **`userAction({ input }, handler)`** for a signed-in person before a clinic is chosen: session →
+  Zod → handler. No clinic, no transaction, no audit row. Move `chooseClinic` onto it, parsing its
+  form field as a UUID.
+- **`audit.record(tx, entry)`** in `src/modules/audit`, public through its `index.ts`: one
+  `audit_log` row with the transaction's clinic, `at` = the passed-in now, actor type and id,
+  action, entity type and id, metadata. It throws (so the action rolls back) when a metadata key
+  at any depth is a personal field (`isPersonalField()`, `src/lib/personal-fields.ts`). Metadata
+  holds ids, codes and field names only.
+- **Query errors without values (D-070).** Every error that leaves `withTenant` (from the work
+  inside, the commit or the rollback) and every error from `clinicsForUser()` is the copy
+  `withoutQueryValues()` makes, also when the query error sits deeper in the `cause` chain of
+  another error. Code, table and constraint names stay, so the wrapper can still tell a
+  constraint violation apart.
+- **Add `zod`** as a dependency at the version the lockfile already holds (D-068).
+- **`CLAUDE.md`:** the pattern with one short example, and the three wrappers in "Who is signed
+  in". Keep the file near its current length.
 
-**Out of scope.** The audit viewer screen (E07). Patient-link actions (E02 uses its own wrapper).
+**Out of scope.** The lint rules that make the wrappers the only way in, and the login audit rows:
+E00-T08. How a form shows each typed error: E00-T04. The audit viewer (E07). Patient-link actions
+(E02 builds its own wrapper). Real screens and real actions: tests use actions made for the tests.
 
 **Acceptance.**
-- [ ] An action without the needed permission returns a forbidden error and writes nothing.
-- [ ] Invalid input is rejected before the handler runs.
-- [ ] If the handler throws, neither its changes nor the audit row are saved (one transaction).
-- [ ] A successful action writes exactly one audit row with actor, action, entity.
-- [ ] The "every staff action uses the wrapper" check fails when a bare action is added.
-- [ ] Audit metadata rejects values for fields on the personal-data list (test).
+- [ ] An action without the needed permission returns `forbidden`; the handler does not run and
+      nothing is written.
+- [ ] Invalid input returns `invalid_input` with paths and codes before the handler runs; neither
+      the answer nor the log holds a value that was sent (test with marker values).
+- [ ] Two clinics: an action carrying clinic A's id while the request resolves to clinic B (B picked
+      in another tab, or A's membership disabled since the page was shown) returns `clinic_changed`
+      and writes nothing in either clinic. A missing id is refused the same way. The matching id runs.
+- [ ] If the handler throws, neither its changes nor the audit row are saved (one transaction), and
+      the answer is `internal` with no detail.
+- [ ] A handler's own refusal comes back as its code, with nothing saved.
+- [ ] A successful action writes exactly one audit row with actor, action and entity, and `at`
+      equal to the action's now.
+- [ ] A read that declares a patient-record view writes one audit row; other reads write none.
+- [ ] `audit.record()` refuses metadata with a personal field name at any depth, and the action
+      rolls back (test).
+- [ ] A failed query inside `withTenant` and inside `clinicsForUser()` (a constraint violation, a
+      value of the wrong type) throws an error whose message, stack and cause chain, as
+      `util.inspect` prints them, hold none of the values sent (marker values), and which keeps the
+      PostgreSQL code (and the constraint name, where there is one). The same when the handler wraps
+      that error as the `cause` of its own.
+- [ ] `chooseClinic` runs through `userAction`: a malformed id is refused before any lookup; a
+      clinic without an active membership still goes back to the picker with no cookie; the
+      person's own clinic still sets the cookie.
+- [ ] `pnpm check` passes.
+
+---
+
+### E00-T08 · Guards around the action wrappers, and the login audit
+
+- **Role:** builder · **Risk:** critical · **Depends on:** E00-T03
+- **Read:** `security` (Part 1, sections 1, 2, 10) · `docs/log/risks.md` (R-32) · D-062, D-064
+  (point 4), D-067, D-071 · `handoffs/E00-T03.md` (what E00-T03 built)
+
+**Why.** E00-T03 builds the wrappers. This task makes them the only way in, so a forgotten
+wrapper, a stray database handle or a query that is not awaited fails `pnpm lint` instead of
+waiting for a reviewer to notice. It also writes the login rows the audit log promises
+(security §10), now that `audit.record()` exists. Split from E00-T03 to keep each diff readable
+(D-071).
+
+**Do.**
+- **Every server action is made by a wrapper.** A lint rule, with cases in
+  `eslint-rules/architecture.test.ts`: every function exported from a `'use server'` file under
+  `src/app`, in every route group, is made by `staffAction`, the read helper or `userAction`; an
+  inline `'use server'` function is reported. Route handlers under `src/app/api/` other than
+  `api/auth/` must be on a list in the same place, each with a reason (none today). Later
+  wrappers (E02's patient links, E03's webhooks) are added to that list in their tasks.
+- **Who may reach the database (D-062, D-071).** Lint: `@/db/client`, by any path, may be imported
+  only in `src/db/` and `src/modules/auth/`. A value import of `withTenant` only in the wrappers'
+  file, `src/db/` and `src/modules/auth/` (the login hook below). A type-only import of
+  `TenantTransaction` is allowed everywhere. Tests are exempt.
+- **Un-awaited promises (R-32).** Type-aware linting for `src/`, with
+  `@typescript-eslint/no-floating-promises` and `@typescript-eslint/no-misused-promises`, so a
+  query that is not awaited (`items.forEach(async …)`, a bare `tx.insert(…)`) fails lint. Fix what
+  they find in existing code without changing behaviour, each fix listed in the handoff note, with
+  `pnpm lint`'s time before and after.
+- **Login audit rows (D-064, point 4).** When the auth library creates a session
+  (`databaseHooks.session.create.after`), write `user.logged_in` in every clinic where the person
+  has an active membership: one `withTenant` per clinic, one after another (never nested), `at` =
+  the session's `createdAt`, actor and entity = the user. No address, user agent, email or token
+  in the row. A person with no active membership gets no row. If a row cannot be written, the
+  sign-in fails: no session cookie reaches the browser, and the failure is logged with ids only
+  (D-071).
+- **An action sent after the session ended.** Today the proxy answers it with a 307, which the
+  browser follows as a POST to `/login`, so the wrapper's own redirect is never reached (board,
+  Discovered, E00-T02 delta review). Should: nothing runs, and the person ends on the login page,
+  not on an error. How is the builder's choice; for example, the proxy lets a server-action request
+  without a valid session through to the wrapper, whose `currentStaff()` redirects. The proxy stays
+  the one place the session is moved forward (D-067).
+- **Docs:** `CLAUDE.md` module rules name the new lint rules; R-32 in `docs/log/risks.md` says what
+  now covers it.
+
+**Out of scope.** Failed logins in the audit log (D-064: not audited). The audit viewer (E07).
+Narrowing the proxy matcher for patient pages (E02-T08). A `tx` that refuses work after its
+transaction ended (R-32's other option; the lint rules are the chosen one).
+
+**Acceptance.**
+- [ ] Lint fails on a server action not made by a wrapper, in `(staff)`, in `(auth)` and as an
+      inline `'use server'` function, and on an unlisted route handler under `src/app/api/` (cases
+      in `architecture.test.ts`). The existing actions pass.
+- [ ] Lint fails on `@/db/client` imported from a page, an action file and a module other than
+      `auth`, and on a value import of `withTenant` outside the allowed files. A type-only import of
+      `TenantTransaction` in a module passes.
+- [ ] Lint fails on `items.forEach(async (i) => tx.insert(…))` and on an un-awaited `tx.insert(…)`
+      inside `withTenant`.
+- [ ] A sign-in by a person with active memberships in two clinics and a disabled one in a third
+      writes exactly one `user.logged_in` row in each of the two, with `at` equal to the session's
+      start, and none in the third. No row holds an address, user agent, email or token
+      (integration test through the library's handler).
+- [ ] When a login row cannot be written (a grant taken from the app role for one request, as in
+      `auth-attacks.test.ts`), the sign-in answers an error and sets no session cookie, and the
+      output holds no token, email or query value.
+- [ ] A server action sent with an ended session runs nothing and the person ends on the login
+      page (test through `proxy()` and the wrapper; the tester checks it once in a real browser).
+- [ ] `pnpm check` passes.
 
 ---
 
 ### E00-T04 · App shell and design system
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T02
-- **Read:** `design-ref` (all) · `scope` (Navigation and roles) · D-009, D-015 ·
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T02, E00-T03
+- **Read:** `design-ref` (all) · `scope` (Navigation and roles) · D-009, D-015, D-069 ·
   demo lines 13–58 (page styles, sidebar)
 
 **Why.** Every screen is built from the same tokens and components, so the app looks like
@@ -167,6 +298,10 @@ the design and agents do not invent styles per screen.
   only. No second language and no language switcher are built (D-053): the message file is
   what makes the owner's later translation pass cheap.
 - A hidden `/dev/components` page (non-production only) showing every component, for visual checks.
+- One way for a form to call a wrapped action (E00-T03) and show its typed errors: `forbidden`,
+  `invalid_input` next to the fields, `clinic_changed` with a reload (D-069), and a general
+  failure for `internal`. The staff layout gives client components the clinic id the page was
+  rendered for, so every form sends it.
 
 **Out of scope.** Any real screen content. Dark mode. Patient-page layout (E02).
 
@@ -178,12 +313,15 @@ the design and agents do not invent styles per screen.
 - [ ] No hard-coded user-visible strings in components (lint rule or documented check).
 - [ ] Layout works at 1280 px wide and on a tablet in landscape (1024 px).
 - [ ] Components are keyboard-usable and labelled (automated accessibility check passes on `/dev/components`).
+- [ ] A form on `/dev/components` shows each typed error of the action wrapper in its standard way,
+      and a form shown for one clinic, sent after another tab switched clinic, shows the reload message.
 
 ---
 
 ### E00-T05 · Seed data and the clinic provisioning script
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T02
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T02, E00-T03 (`clinic:create` writes
+  its audit row through `audit.record()`)
 - **Read:** `security` (Part 1, section 9) · D-042, D-044 · demo lines 1369–1404 (sample clinic)
 
 **Why.** Agents and tests need realistic data that is obviously fake, and the operator needs
