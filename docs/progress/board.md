@@ -85,7 +85,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 |---|---|---|---|---|---|
 | E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | **Done** | Merged by the owner (PR #5). Tester finding 6 → D-069, finding 2's page side → D-070; findings 5 and 7 on the Discovered list. See `handoffs/E00-T02.md` |
-| E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Built** | `staffAction`, `staffRead`, `userAction` in `src/app/_lib/actions.ts`; `audit.record()`; D-070 at the source; D-072. Three logger tests take their raw error outside `withTenant` now (handoff). See `handoffs/E00-T03.md` |
+| E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Built** | `staffAction`, `staffRead`, `userAction` in `src/app/_lib/actions.ts`; `audit.record()`; D-070 at the source; D-072. Three logger tests take their raw error outside `withTenant` now (handoff). PR #7. See `handoffs/E00-T03.md` |
 | E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | Planned | Split from E00-T03 (D-071): lint rules (wrappers only, database imports, R-32), login audit rows, action after session end. Fully specified; Ready when E00-T03 is Done |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | |
