@@ -14,7 +14,7 @@ _Last updated: 2026-10-03 — E00-T02 built (login, sessions, clinic membership)
 - **Next task to start:** test `E00-T02` (tester), then `E00-T03` (builder, critical)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
   business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
-- **Waiting on the owner:** copy the two `BETTER_AUTH_` lines from `.env.example` into `.env` (E00-T02); the five builder questions in `handoffs/E00-T02.md`. Q-07 and Q-09 are open with working assumptions.
+- **Waiting on the owner:** copy the two `BETTER_AUTH_` lines from `.env.example` into `.env` (E00-T02). Q-07 and Q-09 are open with working assumptions.
 
 ## Next (in order)
 
@@ -51,7 +51,7 @@ turns lines into tasks or strikes them out.
 - 2026-10-03 · E00-T01 review · "Never import `src/db/client.ts` elsewhere" is not a lint rule, and `getDb()` (tests only) gives a handle outside `withTenant`. E00-T02 or E00-T03: decide which file may use it (the auth library needs one for the global tables) and lint the rest.
 - 2026-10-03 · E00-T01 review · The `db:reset` guard accepts a `MIGRATION_DATABASE_URL` whose user is `chairside_app` or the admin user; the app role then owns the tables and skips the policies. Local only: `pnpm check` catches it, `pnpm dev` does not.
 - 2026-10-03 · E00-T02 · `memberships` exists without `provider_id`: the column and its foreign key (`clinic_id`, `provider_id`) → providers must come with E01-T01, when providers exist (D-062).
-- 2026-10-03 · E00-T02 · `data-model.md` says the audit log records logins, but a login has no clinic yet (sessions are global). E00-T03 or the architect: decide which event is audited and with which clinic (entering a clinic through the picker is the natural one).
+- 2026-10-03 · E00-T02 · `data-model.md` says the audit log records logins, but a login has no clinic yet (sessions are global). Decided 2026-10-03 (D-064, owner delegated): a login is audited as `user.logged_in` in every clinic the person has an active membership in, from the session-creation hook; E00-T03 builds it.
 - 2026-10-03 · E00-T02 · The auth library reads the client address from `x-forwarded-for` only when it holds exactly one address; otherwise all such requests share one login rate-limit bucket. E00-T07: set `advanced.ipAddress.trustedProxies` (or the host's own header) once the host is known (R-33).
 - 2026-10-03 · E00-T02 · The app role has SELECT only on `memberships` and no INSERT on `clinics`. E00-T05: the seed and `clinic:create` must run as the migrator or get their own grants; `createStaffUser()` from `@/modules/auth` creates the user.
 - 2026-10-03 · E00-T02 · Sessions store the staff member's `ip_address` and `user_agent` (library default), and an expired session is deleted only when its cookie is seen again. E07-T04 (retention): a job that deletes expired `sessions`, `verifications` and stale `rate_limits` rows.

@@ -552,3 +552,29 @@ architecture), `changed` (differs from the original files), `process`.
   written down so the next tasks build on the same assumptions.
 - **Revisit if:** a clinic's shared address locks its staff out (then limit per account too), or
   dentists need extra permissions after all.
+
+### D-064 · The five E00-T02 builder questions, decided by the builder at the owner's request
+- **Origin:** process, E00-T02. On 2026-10-03 the owner delegated the five questions in
+  `handoffs/E00-T02.md` to the builder ("not that critical, decide").
+- **What:**
+  1. Extra permissions (`import`, `export`) stay front-desk only, as the scope table says. Owners
+     have both by role; dentists and hygienists cannot be given them.
+  2. `BETTER_AUTH_SECRET` stays a required setting. `.env.example` holds a local-only value;
+     staging and production get their own random value (E00-T07).
+  3. Sessions keep `ip_address` and `user_agent`. Turning IP tracking off in the library would also
+     turn off per-address rate limiting; the values serve a "your sessions" screen (E04) and go
+     with the session when it is cleaned up (E07-T04).
+  4. A login is audited as `user.logged_in` in every clinic the person has an active membership
+     in, written when the library creates the session (`databaseHooks.session.create.after`),
+     with the session's `createdAt` as "now". Failed logins are not audited: the rate limit and
+     the library's warn lines cover them. Entering a clinic through the picker is not audited on
+     its own. E00-T03 builds this once `audit.record()` exists.
+  5. The sign-in limit stays per client address and goes from 5 to 10 requests a minute. Every
+     sign-in request counts, successful ones too, and a clinic's staff share one address, so 5
+     could lock out a team logging in at shift start; 10 still makes guessing slow (600 tries an
+     hour against one address). No per-account limit for now; revisit if a pilot clinic is locked
+     out (R-33).
+- **Why:** each is the smallest choice that keeps the documents' rules and the library's
+  defaults, written down so E00-T03 and E04 build on the same assumptions.
+- **Revisit if:** the pilot shows lockouts, or a clinic asks who logged in when (the audit viewer
+  in E07 then shows the rows from point 4).

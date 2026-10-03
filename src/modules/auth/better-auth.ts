@@ -22,8 +22,12 @@ export const SESSION_IDLE_SECONDS = 30 * 60;
  */
 export const SESSION_REFRESH_SECONDS = 60;
 
-/** Sign-in attempts allowed per client address in one window (seconds). */
-export const SIGN_IN_RATE_LIMIT = { window: 60, max: 5 } as const;
+/**
+ * Sign-in requests allowed per client address in one window (seconds). Every request counts,
+ * successful ones too, and a clinic's computers usually share one address, so the limit leaves
+ * room for a whole team logging in within a minute while still making guessing slow (D-064, R-33).
+ */
+export const SIGN_IN_RATE_LIMIT = { window: 60, max: 10 } as const;
 
 function createAuth() {
   return betterAuth({
