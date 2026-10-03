@@ -1,3 +1,5 @@
+import { DrizzleQueryError } from 'drizzle-orm';
+import type { Logger } from 'pino';
 import { describe, expect, it } from 'vitest';
 import { createLogger } from './logger';
 import { PERSONAL_FIELD_ENDINGS, PERSONAL_FIELD_WORDS, PERSONAL_FIELDS } from './personal-fields';
@@ -299,5 +301,89 @@ describe('logger, errors from failed database queries', () => {
 
     expect(output()).not.toContain(MARKER);
     expect(JSON.parse(output()).err.stack).toBeUndefined();
+  });
+});
+
+// Added by the tester (round 2). pino also writes printf-style arguments (%s, %o, %O, %j) into
+// msg. A failed query passed that way must lose its values, and an object passed that way must
+// lose its personal fields: the same safety net as for the logged object (finding 1, field list).
+describe('logger, printf-style arguments', () => {
+  /** A failed query as Drizzle throws it: its message and params hold the values. */
+  function failedQuery() {
+    const cause = Object.assign(
+      new Error(
+        'new row for relation "clinics" violates check constraint "clinics_currency_check"',
+      ),
+      { code: '23514', detail: `Failing row contains (${MARKER}).` },
+    );
+    return new DrizzleQueryError(
+      'update clinics set name = $1 where id = $2',
+      [MARKER, 'clinic-1'],
+      cause,
+    );
+  }
+
+  // Literal messages: pino's types check the arguments against the placeholders they contain.
+  it.each([
+    {
+      placeholder: '%s',
+      write: (logger: Logger) => logger.error('update failed: %s', failedQuery()),
+    },
+    {
+      placeholder: '%o',
+      write: (logger: Logger) => logger.error('update failed: %o', failedQuery()),
+    },
+    {
+      placeholder: '%O',
+      write: (logger: Logger) => logger.error('update failed: %O', failedQuery()),
+    },
+    {
+      placeholder: '%j',
+      write: (logger: Logger) => logger.error('update failed: %j', failedQuery()),
+    },
+  ])('drops the values of a failed query passed with $placeholder', ({ write }) => {
+    const { logger, output } = capture();
+    write(logger);
+
+    expect(output()).toContain('update failed');
+    expect(output()).not.toContain(MARKER);
+  });
+
+  it('drops them when the error is logged as a field and again as an argument', () => {
+    const { logger, output } = capture();
+    const err = failedQuery();
+    logger.error({ err }, 'update failed: %s', err);
+
+    expect(output()).not.toContain(MARKER);
+  });
+
+  const patient = { firstName: MARKER, phone: MARKER, appointmentId: 'appointment-1' };
+
+  it.each([
+    {
+      placeholder: '%o',
+      write: (logger: Logger) => logger.info('reminder planned for %o', patient),
+    },
+    {
+      placeholder: '%O',
+      write: (logger: Logger) => logger.info('reminder planned for %O', patient),
+    },
+    {
+      placeholder: '%j',
+      write: (logger: Logger) => logger.info('reminder planned for %j', patient),
+    },
+  ])('drops personal fields of an object passed with $placeholder', ({ write }) => {
+    const { logger, output } = capture();
+    write(logger);
+
+    expect(output()).toContain('reminder planned for');
+    expect(output()).not.toContain(MARKER);
+  });
+
+  it('still writes plain values such as ids', () => {
+    const { logger, output } = capture();
+    logger.info('message %s planned for clinic %s', 'message-1', 'clinic-1');
+
+    expect(JSON.parse(output()).msg).toBe('message message-1 planned for clinic clinic-1');
   });
 });

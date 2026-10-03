@@ -62,4 +62,25 @@ describe('the db:reset guard', () => {
     const urls = { ...LOCAL, appUrl: LOCAL.appUrl.replace('/guard_db', '/other_db') };
     expect(() => checkResetTargets(urls)).toThrow('must name the same database');
   });
+
+  it('refuses other connection-string forms that send pg to another host', () => {
+    // Added by the tester (round 2). A URL without a host makes pg use PGHOST.
+    vi.stubEnv('PGHOST', 'db.example.invalid');
+    expect(() =>
+      checkResetTargets({ ...LOCAL, adminUrl: 'postgres://postgres:pw@/postgres' }),
+    ).toThrow('Refusing to reset a database on "db.example.invalid"');
+    vi.unstubAllEnvs();
+
+    for (const adminUrl of [
+      `${LOCAL.adminUrl}?host=localhost&host=db.example.invalid`, // pg takes the last one
+      'postgres://postgres:pw@localhost,db.example.invalid:5433/postgres', // two hosts
+      'postgres://postgres:pw@%2Ftmp/postgres', // a socket folder
+      'socket://postgres:pw@/var/run/postgresql?db=postgres',
+      'host=db.example.invalid dbname=postgres user=postgres password=pw', // key=value form
+    ]) {
+      expect(() => checkResetTargets({ ...LOCAL, adminUrl }), adminUrl).toThrow(
+        'Refusing to reset a database on',
+      );
+    }
+  });
 });

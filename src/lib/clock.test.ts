@@ -61,6 +61,20 @@ describe('fakeClock', () => {
       '2026-02-28T23:30:00.000Z',
     );
   });
+
+  it('follows the leap-year rule for century years, and refuses month 13 and day 0', () => {
+    // Added by the tester (round 2). Recall tests use 29 February and month ends (test-strategy.md).
+    expect(() => fakeClock('2100-02-29T09:00:00Z')).toThrow(RangeError); // not a leap year
+    expect(() => fakeClock('1900-02-29T09:00:00Z')).toThrow(RangeError); // not a leap year
+    expect(() => fakeClock('2026-03-10T09:00:00Z').set('2100-02-29T00:00:00Z')).toThrow(RangeError);
+    expect(fakeClock('2000-02-29T09:00:00Z').now().toISOString()).toBe('2000-02-29T09:00:00.000Z');
+    expect(() => fakeClock('2026-13-01T09:00:00Z')).toThrow(RangeError);
+    expect(() => fakeClock('2026-03-00T09:00:00Z')).toThrow(RangeError);
+    // The offset moves the moment into the next year; the written day is real.
+    expect(fakeClock('2026-12-31T23:30:00-01:00').now().toISOString()).toBe(
+      '2027-01-01T00:30:00.000Z',
+    );
+  });
 });
 
 describe('systemClock', () => {
