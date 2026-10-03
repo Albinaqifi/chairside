@@ -6,12 +6,13 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Tested` → `Reviewed` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.)
 
-_Last updated: 2026-10-03 — E00-T02 built (login, sessions, clinic membership), waiting for the tester. Owner: add the two `BETTER_AUTH_` lines from `.env.example` to `.env`._
+_Last updated: 2026-10-03 — E00-T02 tested: back to the builder (findings 1–4 with failing tests; 5–7 for the owner). Owner: add the two `BETTER_AUTH_` lines from `.env.example` to `.env`._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** test `E00-T02` (tester), then `E00-T03` (builder, critical)
+- **Next task to start:** `E00-T02` back to the builder (tester findings 1–4), then `E00-T03` (builder, critical)
+- **Owner decisions from the E00-T02 test:** findings 5–7 in `handoffs/E00-T02.md` (rate-limit address, the clinic an action runs in, self-rename)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
   business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
 - **Waiting on the owner:** copy the two `BETTER_AUTH_` lines from `.env.example` into `.env` (E00-T02). Q-07 and Q-09 are open with working assumptions.
@@ -57,6 +58,8 @@ turns lines into tasks or strikes them out.
 - 2026-10-03 · E00-T02 · Sessions store the staff member's `ip_address` and `user_agent` (library default), and an expired session is deleted only when its cookie is seen again. E07-T04 (retention): a job that deletes expired `sessions`, `verifications` and stale `rate_limits` rows.
 - 2026-10-03 · E00-T02 · Decided: only `src/modules/auth/` imports `@/db/client` (D-062). The lint rule that enforces it is still to write (E00-T03, see the E00-T01 review line above).
 - 2026-10-03 · E00-T02 · Removing a route leaves old generated types in `.next/dev/types`, so `pnpm typecheck` fails locally until `.next` is deleted (README says so). A fresh checkout (CI, E00-T06) is not affected.
+- 2026-10-03 · E00-T02 test · Next.js prints an error thrown while rendering a page, values of a failed query included (`params`); our logger never sees it. Today only ids; from E01 patient values. Take the values out where query errors are created, before E01 (handoff, tester finding 2).
+- 2026-10-03 · E00-T02 test · The auth library's queries (`getDb()`) have no lock timeout: "waiting for a lock fails after 5 s" (CLAUDE.md) holds inside `withTenant` only.
 - 2026-10-03 · E00-T01 review · `security-privacy.md` section 7 says `.env.example` lists names without values; the task allowed local values that are not secrets, which the file has. Owner: adjust the sentence.
 
 ---
@@ -68,7 +71,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
 | E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
-| E00-T02 | Login, sessions and clinic membership | builder | critical | **Built** | Owner: add `BETTER_AUTH_*` to `.env`. New global tables and one cross-clinic function (D-062). See `handoffs/E00-T02.md` |
+| E00-T02 | Login, sessions and clinic membership | builder | critical | **In progress** | Tester: back to builder, findings 1–4 have failing tests (24 h session via `rememberMe`, values in error output, `/verify-password` limit, `can()` fail-closed); 5–7 for the owner. Owner: add `BETTER_AUTH_*` to `.env`. See `handoffs/E00-T02.md` |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | |

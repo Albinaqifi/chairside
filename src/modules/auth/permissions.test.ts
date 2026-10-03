@@ -93,3 +93,27 @@ describe('can(role, extras, permission): every role × permission in scope-v1.md
     expect(can('owner', asHygienist, 'aftercare.approve')).toBe(false);
   });
 });
+
+// Tester, E00-T02: the cases the table above does not name.
+describe('can(): kinds and values the table leaves out', () => {
+  const asOther: MembershipExtras = { extraPermissions: [], providerKind: 'other' };
+
+  it('an owner linked to a provider of kind "other" records visits but does not approve aftercare', () => {
+    expect(can('owner', asOther, 'visit.record')).toBe(true);
+    expect(can('owner', asOther, 'aftercare.approve')).toBe(false);
+  });
+
+  it('a link to a dentist column gives front desk and hygienists nothing extra', () => {
+    for (const role of ['front_desk', 'hygienist'] as const) {
+      expect(can(role, asDentist, 'aftercare.approve')).toBe(false);
+      expect(can(role, asDentist, 'import.run')).toBe(false);
+    }
+  });
+
+  it('answers false, never undefined, for a role or link it does not know', () => {
+    // Values from outside the type system (a database row, a JavaScript caller) must fail closed.
+    expect(can('admin' as Role, nothing, 'calendar.manage')).toBe(false);
+    const unlinked = { extraPermissions: [] } as unknown as MembershipExtras; // providerKind missing
+    expect(can('owner', unlinked, 'visit.record')).toBe(false);
+  });
+});
