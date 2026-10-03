@@ -28,7 +28,12 @@ export default defineConfig({
           name: 'integration',
           include: ['tests/integration/**/*.test.ts'],
           globalSetup: ['tests/integration/global-setup.ts'],
-          env: testDatabaseEnv(process.env),
+          env: {
+            ...testDatabaseEnv(process.env),
+            // Fixed login settings, so the tests do not depend on anyone's .env.
+            BETTER_AUTH_SECRET: 'test-only-secret-7c1d9e2b4a6f8e0d1c3b5a7f9e2d4c6b',
+            BETTER_AUTH_URL: 'http://localhost:3000',
+          },
           // The test files share one database.
           fileParallelism: false,
           hookTimeout: 60_000,
