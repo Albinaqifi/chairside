@@ -248,7 +248,8 @@ beforeAll(async () => {
   const run = promisify(execFile)(process.execPath, [helper], { cwd: root });
   run.child.stdin?.end(JSON.stringify(cases.map(({ code, file }) => ({ code, file }))));
   reported = JSON.parse((await run).stdout);
-}, 60_000);
+  // Starting ESLint takes about 2 s when warm, but close to a minute on a cold Windows file cache.
+}, 180_000);
 
 describe('architecture lint rules', () => {
   it.each(cases.map((c, index) => ({ ...c, index })))('$name', ({ index, expected }) => {

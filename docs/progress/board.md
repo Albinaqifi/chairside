@@ -40,8 +40,8 @@ turns lines into tasks or strikes them out.
 - 2026-10-03 · E00-T01 · Newer major versions exist than the stack uses: TypeScript 7, ESLint 10, drizzle-orm 1.0 (release candidate). Kept on the versions in D-059; an upgrade would be its own task.
 - 2026-10-03 · E00-T01 · The agent guard (`.claude/settings.json`) covers fewer `.env` names than `.gitignore` (not e.g. `.env.staging`), and its PowerShell patterns miss a quoted file name (tester finding 11).
 - 2026-10-03 · E00-T01 · `pnpm dev` listens on every network interface (the dev log shows a LAN address); `next dev -H 127.0.0.1` would keep it on this machine (tester finding 12).
-- 2026-10-03 · E00-T01 · The logger writes a `URL` object under any key as its full address (link tokens), and a `Buffer` as bytes that decode back to text. Value shapes from tester finding 10; only the field names were in scope.
-- 2026-10-03 · E00-T01 · `eslint-rules/architecture.test.ts` can hit its 60 s `beforeAll` limit when the file cache is cold (first run of a session on Windows: 56 s, once over 60 s); warm runs take about 2 s.
+- 2026-10-03 · E00-T01 · The logger writes a `URL` object under any key as its full address (link tokens), and a `Buffer` as bytes that decode back to text. Value shapes from tester finding 10; only the field names were in scope. **Owner, 2026-10-03: handle before E02** (link tokens arrive with E02-T08).
+- ~~2026-10-03 · E00-T01 · `eslint-rules/architecture.test.ts` can hit its 60 s `beforeAll` limit when the file cache is cold (first run of a session on Windows: 56 s, once over 60 s); warm runs take about 2 s.~~ Fixed in E00-T01 on the owner's decision: limit raised to 3 minutes.
 - 2026-10-03 · E00-T01 · Luxon also reads the clock when a date has no day: its docs show `DateTime.fromObject({ hour: 10 })` as "today at 10:00". Lint rule (a) does not catch it; check before E02 uses Luxon.
 
 ---
