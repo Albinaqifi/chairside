@@ -32,7 +32,7 @@ Each document has one job. Read only what your task points you to.
 
 | File | Job |
 |---|---|
-| [process/workflow.md](process/workflow.md) | How a task moves from planned to done. Roles, Definition of Ready, Definition of Done, handoffs. |
+| [process/workflow.md](process/workflow.md) | How a task moves from planned to done. Roles, the pipeline, Definition of Ready, Definition of Done, handoffs. |
 | [process/test-strategy.md](process/test-strategy.md) | What is tested how, AI evals, and the areas the owner reviews personally. |
 | [process/templates/](process/templates/) | Templates for tasks and handoff notes. |
 
@@ -58,6 +58,7 @@ Each document has one job. Read only what your task points you to.
 |---|---|
 | `CLAUDE.md` | Loaded automatically by every agent session: start ritual, the rules that are never broken, technical conventions. |
 | `.claude/agents/` | Role definitions (architect, builder, tester, reviewer) for Claude Code. |
+| `.claude/skills/pipeline/` | `/pipeline <task-id>`: runs one task through builder, reviewer and tester, each as a fresh subagent. |
 | `design/unpacked/` | Readable copies of the original HTML design files, and how to regenerate them. |
 
 ## Who reads what

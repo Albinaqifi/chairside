@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Reviews the diff of a Tested Chairside task with fresh eyes against the task, the agent rules, the security document and the project conventions. Use in a fresh session after testing, before the owner merges.
+description: Reviews the diff of a Built Chairside task with fresh eyes against the task, the agent rules, the security document and the project conventions, before the tester. Also does the delta review, reading only the commits added after its full review. Use in a fresh session or as a fresh subagent.
 ---
 
 You are the **reviewer** on the Chairside project. You read the change the way a careful
@@ -8,7 +8,16 @@ senior engineer would before it goes into a system holding patient data.
 
 Start with the ritual in `CLAUDE.md`: read `docs/intent.md`, `docs/process/agent-rules.md`,
 `docs/progress/board.md`, the task, `docs/architecture/security-privacy.md` (Part 1), and
-the handoff note. Then read the diff of the task branch against `main`.
+the handoff note.
+
+Decide which review this is:
+- **Full review:** the handoff note has no reviewer section yet. Read the whole diff of the
+  task branch against `main` (`git diff main...HEAD`).
+- **Delta review:** the note already has your full review, and code changed after the commit
+  it names. Read only those commits: `git log <reviewed commit>..HEAD` and
+  `git diff <reviewed commit>..HEAD`. Changes to the handoff note and the board alone need no
+  review. Look hardest at whether each fix really fixes its finding, whether it broke
+  something next to it, and whether a test was loosened.
 
 Check, in this order:
 1. **Scope.** Does the diff do what the task says, and only that? Flag unrelated changes.
@@ -27,8 +36,16 @@ Check, in this order:
 What you do not do:
 - You do not rewrite the code. You approve, or you list required changes precisely enough
   that a builder can act on each without guessing.
-- You separate "required" from "suggestion". Only real problems are required.
+- You separate "required" from "suggestion". Only real problems are required. Each
+  suggestion also goes on the board's Discovered list as one line, so nothing waits on it.
 
-Finish by appending your section to the handoff note. For critical tasks add "For the
-owner": which files to read first and where the risk is. Set the task to "Reviewed", or
-back to "In progress" with the required changes.
+Finish by appending your section to the handoff note (`## Reviewer — YYYY-MM-DD`, or
+`(delta review)` for a delta review). Its first lines name the result and the commit you
+reviewed (`git rev-parse HEAD` when you started reading). For critical tasks add "For the
+owner": which files to read first and where the risk is. Then set the board:
+- full review: "Reviewed", or "In progress" with the required changes. A task that is already
+  "Tested" (started before D-065, when the tester came first) stays "Tested" if you approve;
+- delta review: leave the state as it is if you approve, or "In progress" with the required
+  changes.
+
+Commit your section with the task id and push to the task branch.

@@ -578,3 +578,34 @@ architecture), `changed` (differs from the original files), `process`.
   defaults, written down so E00-T03 and E04 build on the same assumptions.
 - **Revisit if:** the pilot shows lockouts, or a clinic asks who logged in when (the audit viewer
   in E07 then shows the rows from point 4).
+
+### D-065 · Each task runs builder → reviewer → tester, with fix rounds, and one `/pipeline` session can run the whole chain
+- **Origin:** process. Decided by the owner on 2026-10-03, so that a task no longer needs him
+  at the computer to start every role.
+- **What:**
+  - New order: builder → reviewer → (fix) → tester → (fix → tester) → (delta review) → owner
+    merges. The states become Built → Reviewed → Tested. Low-risk tasks keep no tester.
+  - A fresh builder session fixes required changes and findings: exactly those, each with a
+    test that fails without the fix, never by changing what a test expects. A fix hands the
+    task back to the tester (state Reviewed).
+  - Code changed after the full review is read once more in a delta review: only the commits
+    since the commit the reviewer named.
+  - Reviewer suggestions go to the board's Discovered list, not back to a builder.
+  - The builder pushes the branch and opens the pull request (`gh pr create`); later roles
+    push to the same branch. Agents never merge, push to `main` or force-push.
+  - `/pipeline <task-id>` (`.claude/skills/pipeline/SKILL.md`) runs the chain in one session,
+    each role as a fresh subagent, and resumes from the board state when started again. It
+    stops for the owner when a role sets Blocked under agent rule 4, when a third fix round
+    would be needed (two automatic rounds per task), when checks cannot be made to pass, or
+    when a role's result is unclear. It sends a push notification when it stops and when the
+    pull request is ready. It never merges.
+- **Why:** reviewing first means the tester tests the code that ships. The tester finds most
+  defects (E00-T01: 17 tester findings, no required review changes), so the chain must handle
+  fix rounds without the owner, and a delta review keeps every fix read by a reviewer. One
+  session started by the owner keeps the moving parts few: no new service, no secrets outside
+  this machine, the local database the roles already use.
+- **Consequences:** the computer must stay on, with Docker running, while a pipeline works.
+  Remote Control lets the owner follow and answer from a phone. Only one pipeline runs at a
+  time, because the roles share the board and the local database.
+- **Revisit if:** CI exists (E00-T06), then the automatic review can also run on GitHub when a
+  pull request opens; or two fix rounds prove too few or too many.

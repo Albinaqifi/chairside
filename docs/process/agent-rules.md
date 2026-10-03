@@ -41,7 +41,9 @@ reviews impossible. A small diff can be checked. A large one gets waved through.
 - the task turns out to be much bigger than one session.
 
 How to stop: write what you found, the options, and your recommendation in the handoff
-note; set the task to **Blocked** on the board; end the session.
+note; set the task to **Blocked** on the board; end the session. When the pipeline started
+you, ending is how you hand the question over: the pipeline tells the owner. You cannot ask
+the owner yourself and wait for an answer.
 *Why:* a wrong guess in these areas is expensive or irreversible. A question costs minutes.
 
 **5. No real patient data. Ever. Anywhere but production.**
@@ -98,11 +100,14 @@ unsure about: list them plainly. A clear "this part failed" is worth more than a
 summary that hides it.
 
 **14. Hand off cleanly.**
-1. Commit on the task branch with the task id in the message. Do not merge to `main`.
-2. Append your section to `docs/progress/handoffs/<task-id>.md` (template in `docs/process/templates/`).
-3. Update the task's row on `docs/progress/board.md`.
+1. Append your section to `docs/progress/handoffs/<task-id>.md` (template in `docs/process/templates/`).
+2. Update the task's row on `docs/progress/board.md`.
+3. Commit on the task branch with the task id in the message, and push the branch. The
+   builder opens the pull request if there is none yet (`gh pr create`). Never merge, never
+   push to `main`, never force-push.
 4. Stop. Do not start the next task in the same session.
-*Why:* the next agent has none of your context. The note and the board are all it gets.
+*Why:* the next agent has none of your context. The note, the board and the pull request are
+all it gets.
 
 ---
 
@@ -111,15 +116,19 @@ summary that hides it.
 **Architect.** You write and refine tasks and documents, not application code. A task you
 mark Ready must pass the Definition of Ready (`workflow.md`). You record every decision.
 
-**Builder.** You implement one task and its tests. You do not review your own work.
-
-**Tester.** You start from the acceptance criteria and the handoff note, not from the code.
-Try to break it: wrong role, other clinic, double click, bad input, wrong time zone. You may
-add tests. You do not fix product code: you report, and the task goes back to a builder.
+**Builder.** You implement one task and its tests. You do not review your own work. When the
+task comes back with findings, you fix exactly those: nothing else, and never by changing
+what a test expects (rule 8).
 
 **Reviewer.** You read the diff with fresh eyes against the task, these rules,
 `security-privacy.md` and the conventions. You look hardest at rule 7. You do not rewrite:
-you approve, or list required changes. You confirm the docs were updated (rule 11).
+you approve, or list required changes. You confirm the docs were updated (rule 11). When a
+task comes back after your full review, you read only the commits since then.
+
+**Tester.** You come after the review. You start from the acceptance criteria and the handoff
+note, not from the code. Try to break it: wrong role, other clinic, double click, bad input,
+wrong time zone. You may add tests. You do not fix product code: you report, and the task
+goes back to a builder.
 
 ---
 
@@ -131,4 +140,4 @@ you approve, or list required changes. You confirm the docs were updated (rule 1
 - [ ] No real or personal data anywhere I wrote
 - [ ] New tables have `clinic_id` + policy; no direct provider, AI or clock calls
 - [ ] Docs updated if behaviour or schema differs from them
-- [ ] Handoff note written, board updated, nothing merged by me
+- [ ] Handoff note written, board updated, branch pushed, nothing merged by me

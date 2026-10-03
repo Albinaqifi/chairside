@@ -4,6 +4,10 @@ One file per task: `docs/progress/handoffs/<task-id>.md`.
 Each role appends its own section and never edits another role's section.
 No personal data here, not even synthetic names: use ids.
 
+Sections appear in the order the work happened: builder, reviewer, tester. A fix round adds a
+builder section after the reviewer or tester section it answers; a delta review adds a
+reviewer section at the end.
+
 ```markdown
 # E0X-T0Y · Task title
 
@@ -27,11 +31,36 @@ No personal data here, not even synthetic names: use ids.
 
 **Decisions and doc changes** (D-numbers, files touched in docs/)
 
-**For the tester: look hard at**
+**For the reviewer and tester: look hard at**
 - …
 
-**Questions for the owner**
+**Questions for the owner** (they do not block; the owner answers them before merging)
 - …
+
+**Pull request:** <link>
+
+## Reviewer — YYYY-MM-DD
+**Result:** Reviewed | Changes required
+**Reviewed commit:** <sha>
+
+**Checked:** scope stayed inside the task · safety rails (rule 7) · tests not weakened ·
+docs updated · conventions
+
+**Required changes**
+1. …
+
+**Suggestions (optional, not blocking; each is also a line on the board's Discovered list)**
+
+**For the owner** (only for critical tasks: what to read first, where the risk is)
+
+## Builder — YYYY-MM-DD (fix round N)
+**Fixes:** the required changes of the reviewer section above | the findings of the tester section above
+
+| # | Finding (short) | What I changed | Test that fails without the fix | Result |
+|---|---|---|---|---|
+| 1 | … | … | `…` | fixed |
+
+**Checks run in this session:** `<command>` → result
 
 ## Tester — YYYY-MM-DD
 **Result:** Tested | Back to builder
@@ -44,18 +73,12 @@ No personal data here, not even synthetic names: use ids.
 
 **Tests I added**
 
-## Reviewer — YYYY-MM-DD
-**Result:** Reviewed | Changes required
-
-**Checked:** scope stayed inside the task · safety rails (rule 7) · tests not weakened ·
-docs updated · conventions
+## Reviewer — YYYY-MM-DD (delta review)
+**Result:** Approved | Changes required
+**Reviewed commits:** <sha of the full review>..<sha>
 
 **Required changes**
 1. …
-
-**Suggestions (optional, not blocking)**
-
-**For the owner** (only for critical tasks: what to read first, where the risk is)
 
 ## Owner — YYYY-MM-DD
 Merged / sent back, with a line of why.
