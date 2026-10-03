@@ -16,8 +16,8 @@ screen in `scope-v1.md`.
 
 | File | What it is |
 |---|---|
-| `Chairside Demo v3 (offline).html` (repo root, moved to `design/originals/` by E00-T01) | The original clickable demo. Open it in a browser to see and click the design. A compressed bundle: do not try to read its source. |
-| `Architecture Explorer (1).html` (same) | The original architecture plan. Its content has been carried into `docs/architecture/`. |
+| `design/originals/Chairside Demo v3 (offline).html` | The original clickable demo. Open it in a browser to see and click the design. A compressed bundle: do not try to read its source. |
+| `design/originals/Architecture Explorer (1).html` | The original architecture plan. Its content has been carried into `docs/architecture/`. |
 | `design/unpacked/chairside-demo.html` | **Readable copy of the demo** (markup, then data and logic). Read this, by line range. |
 | `design/unpacked/architecture-explorer.html` | Readable copy of the architecture plan. Rarely needed. |
 | `design/unpacked/unpack.mjs` | Re-creates the readable copies if the design is exported again. |

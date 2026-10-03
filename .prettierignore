@@ -1,0 +1,10 @@
+# Prettier also skips everything in .gitignore.
+
+# Hand-written prose and design reference: never reformatted.
+*.md
+docs/
+design/
+
+# Generated files.
+pnpm-lock.yaml
+src/db/migrations/

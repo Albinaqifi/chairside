@@ -1,0 +1,8 @@
+# pnpm settings. This is a single package, not a monorepo: pnpm keeps its settings in this file.
+
+# Dependencies whose install scripts may run. None are needed: their prebuilt binaries
+# come as regular packages.
+allowBuilds:
+  esbuild: false
+  sharp: false
+  unrs-resolver: false

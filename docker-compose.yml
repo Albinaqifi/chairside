@@ -1,0 +1,22 @@
+# Local development database. Staging and production use a managed PostgreSQL (D-007).
+# Start: docker compose up -d --wait   Stop: docker compose stop
+name: chairside
+
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env first (see README.md)}
+    ports:
+      # Port 5433 on this machine only, so it does not clash with a locally installed PostgreSQL.
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  db-data:

@@ -87,13 +87,16 @@ tests/
   integration/               tests against real Postgres
   e2e/                       Playwright
   evals/                     AI output evaluations
+eslint-rules/                the module-boundary lint rule; tests of all architecture rules
 docs/  design/
 ```
 
 ### Module rules
 
 1. A module's tables are private. Other modules call its functions, never query its tables.
-2. Modules import each other only through `index.ts`. A lint rule enforces this.
+2. Modules import each other only through `index.ts`. A lint rule enforces this. One
+   exception: a module's `schema.ts` may import another module's `schema.ts`, only to declare
+   foreign keys (D-058).
 3. Modules contain no Next.js and no React imports, so the worker and tests can use them.
 4. Pure logic (timing, state machines, rendering, normalising) is written as functions with
    no database and no clock, so it can be tested with tables of inputs.

@@ -1,9 +1,10 @@
 # Dependencies
 node_modules/
 
-# Next.js build output
+# Next.js build output and generated types (`next typegen` recreates them)
 .next/
 out/
+next-env.d.ts
 
 # Environment files: real values never go into git. `.env.example` is the template.
 .env

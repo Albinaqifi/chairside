@@ -35,6 +35,18 @@ turns lines into tasks or strikes them out.
 
 - 2026-10-02 · planning · Since Chairside replaces the old tool (D-050), a clinic's already booked **future appointments** must be brought in at switch-over. No task covers it yet. E04-T00 must add one (file import of upcoming appointments, or a fast keying screen).
 - 2026-10-02 · planning · `docs/intent.md` still says "GDPR" and "data stays in the EU". With North Macedonia (D-049) the wording could mention the national law. Owner-only file: waiting for the owner.
+- 2026-10-03 · E00-T01 · Next.js collects anonymous usage telemetry by default (`next dev`, `next build`). Owner to decide whether to turn it off (`NEXT_TELEMETRY_DISABLED=1`) locally, in CI and on staging.
+- 2026-10-03 · E00-T01 · The app role may UPDATE every column of `clinics`, including `status`. E01-T08 (clinic settings) should decide whether staff may change all of them (column grants).
+- 2026-10-03 · E00-T01 · Newer major versions exist than the stack uses: TypeScript 7, ESLint 10, drizzle-orm 1.0 (release candidate). Kept on the versions in D-059; an upgrade would be its own task.
+- 2026-10-03 · E00-T01 · The agent guard (`.claude/settings.json`) covers fewer `.env` names than `.gitignore` (not e.g. `.env.staging`), and its PowerShell patterns miss a quoted file name (tester finding 11).
+- 2026-10-03 · E00-T01 · `pnpm dev` listens on every network interface (the dev log shows a LAN address); `next dev -H 127.0.0.1` would keep it on this machine (tester finding 12).
+- 2026-10-03 · E00-T01 · The logger writes a `URL` object under any key as its full address (link tokens), and a `Buffer` as bytes that decode back to text. Value shapes from tester finding 10; only the field names were in scope. **Owner, 2026-10-03: handle before E02** (link tokens arrive with E02-T08).
+- ~~2026-10-03 · E00-T01 · `eslint-rules/architecture.test.ts` can hit its 60 s `beforeAll` limit when the file cache is cold (first run of a session on Windows: 56 s, once over 60 s); warm runs take about 2 s.~~ Fixed in E00-T01 on the owner's decision: limit raised to 3 minutes.
+- 2026-10-03 · E00-T01 · Luxon also reads the clock when a date has no day: its docs show `DateTime.fromObject({ hour: 10 })` as "today at 10:00". Lint rule (a) does not catch it; check before E02 uses Luxon.
+- 2026-10-03 · E00-T01 · The logger still keeps field names that matter for messaging and links: `toNumber`, `fromNumber`, `waNumber`, `whatsappId`, `sender`, `referer`, `redirectUri`, `querystring`, `values`, and free text such as `cancelReason` (tester round 2). Look at them with the `URL`/`Buffer` line above, before E02.
+- 2026-10-03 · E00-T01 · E00-T03's action wrapper: keep a caught error as `cause`; never copy `err.message` into a new error or a template string. The logger cannot clean text, and a failed query's values are in that message (tester round 2).
+- 2026-10-03 · E00-T01 · When a rollback fails (for example because the connection died), Drizzle's `transaction()` throws the rollback's error instead of the error that caused it. `withTenant` logs the connection failure; E00-T03 should not count on seeing the first error.
+- 2026-10-03 · E00-T01 · Nothing limits how long a statement waits for the database to answer (no `statement_timeout`, no pg `query_timeout`). The 5 s limits cover locks and connections only: a database that stops answering mid-statement, or during `withTenant`'s reset, keeps the call waiting.
 
 ---
 
@@ -44,7 +56,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
-| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Ready** | First task |
+| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Tested** | Round 3 re-test (owner's short scope): findings 13–17 and the minor notes fixed as decided. See `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | Planned | |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
