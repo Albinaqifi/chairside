@@ -6,12 +6,12 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Tested` → `Reviewed` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.)
 
-_Last updated: 2026-10-03 — E00-T02 fix round 2 tested: the session cookie is renewed with the session (D-067), checked in a real browser; no findings. Tested: the delta review is next. A new pull request from the branch is still needed (PR #3 was merged before the fixes). Owner: add the two `BETTER_AUTH_` lines from `.env.example` to `.env`._
+_Last updated: 2026-10-03 — E00-T02 delta review of fix round 2 (`79fb209`): approved, no required changes, 3 suggestions (Discovered). Stays Tested. Next: a new pull request from the branch (PR #3 was merged before the fixes), then the owner merges. Owner: add the two `BETTER_AUTH_` lines from `.env.example` to `.env`._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T02` to the delta review (commits after `d5724b2`). Then `E00-T03` (builder, critical), once E00-T02 is merged; the owner decides E00-T02 finding 6 and finding 2's page side before it starts
+- **Next task to start:** `E00-T02` needs a new pull request from its branch (delta review approved), then the owner merges it (Done). Then `E00-T03` (builder, critical); the owner decides E00-T02 finding 6 and finding 2's page side before it starts
 - **Owner decisions from the E00-T02 test:** findings 5–7 in `handoffs/E00-T02.md` (rate-limit address, the clinic an action runs in, self-rename)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
   business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
@@ -67,6 +67,9 @@ turns lines into tasks or strikes them out.
 - 2026-10-03 · E00-T02 review · `chooseClinic` (`(auth)/choose-clinic/actions.ts`) is a server action outside `(staff)`: E00-T03's wrapper check will not see it, and it reads input without Zod. E00-T03: decide how actions before a clinic is chosen are checked.
 - 2026-10-03 · E00-T02 review · The builder's "For the tester" recipe in `handoffs/E00-T02.md` holds synthetic names, emails and a dev password; rule 6 and the template ask for ids. Point to the seed once E00-T05 exists.
 - 2026-10-03 · E00-T02 test · The proxy matcher (`src/proxy.ts`) skips every path that contains a dot or starts with `login`: a future staff route such as `/logins` or `/export.csv` would not renew the session. Keep staff routes clear of both, or narrow the pattern (E00-T04 navigation).
+- 2026-10-03 · E00-T02 delta review · The request proxy now reads and writes the database (D-067), using the pool and auth instance on `globalThis`. Next.js warns a proxy may run apart from the app (CDN). E00-T07: choose a host that runs it inside the app's Node.js process, or revisit D-067.
+- 2026-10-03 · E00-T02 delta review · The proxy's matcher covers every path but `/login…`, `/api/auth` and files. Patient link pages (E02-T08, T09) and webhooks (E03-T04) would go to `/login`, and on a staff computer a patient page would renew the staff session and set its cookie (security-privacy.md section 3). Narrow the matcher to staff routes when the first other route arrives.
+- 2026-10-03 · E00-T02 delta review · A server action sent after the session ended gets the proxy's 307, which `fetch` follows as a POST to `/login`, so `currentStaff()`'s redirect is never reached; what the person sees is unchecked (probably an error). Fails safe. E00-T03 or E00-T06: check it in a browser.
 
 ---
 
@@ -77,7 +80,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
 | E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
-| E00-T02 | Login, sessions and clinic membership | builder | critical | **Tested** | Fix round 2 tested: the reviewer's required change (cookie never renewed) is fixed in the proxy (D-067), no new findings; delta review next. 5 suggestions (Discovered). Tester findings 5–7 for the owner. No open PR (#3 merged before the fixes): a new one is needed. Owner: add `BETTER_AUTH_*` to `.env`. See `handoffs/E00-T02.md` |
+| E00-T02 | Login, sessions and clinic membership | builder | critical | **Tested** | Delta review of fix round 2 approved: the session cookie is renewed with the session (D-067), no required changes. 8 reviewer suggestions in all (Discovered). Tester findings 5–7 for the owner. No open PR (#3 merged before the fixes): a new one is needed. Owner: add `BETTER_AUTH_*` to `.env`. See `handoffs/E00-T02.md` |
 | E00-T03 | Action wrapper, permission checks, audit log | builder | critical | Planned | |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | |
