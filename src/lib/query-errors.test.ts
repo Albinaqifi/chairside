@@ -1,4 +1,4 @@
-import { inspect } from 'node:util';
+import { inspect, types } from 'node:util';
 import { DrizzleQueryError } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { QueryError, withoutQueryValues } from './query-errors';
@@ -76,5 +76,80 @@ describe('withoutQueryValues', () => {
 
     expect(inspect(copy)).not.toContain(MARKER);
     expect((copy as Error).cause).toBe(cause);
+  });
+
+  it('returns an error whose causes hold no failed query as it is', () => {
+    const error = new Error('outer', { cause: new TypeError('inner', { cause: 'text' }) });
+    expect(withoutQueryValues(error)).toBe(error);
+  });
+});
+
+// E00-T03 (D-070): a failed query deeper inside another error, for example an action that keeps
+// it as the `cause` of its own error, must not print its values either.
+describe('withoutQueryValues, for an error that holds a failed query', () => {
+  class BookingError extends Error {
+    override name = 'BookingError';
+    step = 'insert';
+  }
+
+  it('copies it with its class, message, stack and fields, and the failed query cleaned', () => {
+    const original = new BookingError('could not book', { cause: failedInsert() });
+    const copy = withoutQueryValues(original) as BookingError;
+
+    expect(inspect(original)).toContain(MARKER); // the test sees the leak it guards against
+    expect(inspect(copy)).not.toContain(MARKER);
+    expect(copy).not.toBe(original);
+    expect(copy).toBeInstanceOf(BookingError);
+    expect(types.isNativeError(copy)).toBe(true);
+    expect(copy).toMatchObject({ name: 'BookingError', message: 'could not book', step: 'insert' });
+    expect(copy.stack).toBe(original.stack);
+    expect(Object.keys(copy)).toEqual(Object.keys(original));
+    expect(copy.cause).toBeInstanceOf(QueryError);
+    expect((copy.cause as Error).cause).toMatchObject({
+      code: '23505',
+      constraint: 'users_email_unique',
+    });
+  });
+
+  it('finds it at any depth of the cause chain', () => {
+    const original = new Error('outer', {
+      cause: new Error('middle', { cause: new Error('inner', { cause: failedInsert() }) }),
+    });
+    const copy = withoutQueryValues(original) as Error;
+
+    expect(inspect(original, { depth: 10 })).toContain(MARKER);
+    expect(inspect(copy, { depth: 10 })).not.toContain(MARKER);
+    const middle = copy.cause as Error;
+    const inner = middle.cause as Error;
+    expect([copy.message, middle.message, inner.message]).toEqual(['outer', 'middle', 'inner']);
+    expect(inner.cause).toBeInstanceOf(QueryError);
+  });
+
+  it('finds it among the errors of an AggregateError and in other own properties', () => {
+    const fine = new Error('fine');
+    const aggregate = new AggregateError([fine, failedInsert()], 'all failed');
+    const holder = Object.assign(new Error('holder'), { original: failedInsert() });
+
+    for (const original of [aggregate, holder]) {
+      expect(inspect(original, { depth: 10 })).toContain(MARKER);
+      const copy = withoutQueryValues(original);
+      expect(inspect(copy, { depth: 10 })).not.toContain(MARKER);
+      expect(copy).toBeInstanceOf(original.constructor);
+    }
+    const copied = withoutQueryValues(aggregate) as AggregateError;
+    expect(copied.errors[0], 'an error without a query stays as it is').toBe(fine);
+    expect(copied.errors[1]).toBeInstanceOf(QueryError);
+  });
+
+  it('copies an error that holds itself once, and stops', () => {
+    const outer = new Error('outer');
+    const inner = new Error('inner', { cause: outer });
+    Object.assign(outer, { inner, failed: failedInsert() }); // outer → inner → outer: a loop
+
+    const copy = withoutQueryValues(outer) as Error & { inner: Error; failed: Error };
+
+    expect(inspect(copy, { depth: 10 })).not.toContain(MARKER);
+    expect(copy.inner.cause, 'the loop now runs between the copies').toBe(copy);
+    expect(copy.failed).toBeInstanceOf(QueryError);
   });
 });

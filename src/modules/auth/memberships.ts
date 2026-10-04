@@ -2,6 +2,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import type { TenantTransaction } from '@/db/tenant';
 import { isUuid } from '@/lib/ids';
+import { withoutQueryValues } from '@/lib/query-errors';
 import { isExtraPermission, isRole, type ExtraPermission, type Role } from './permissions';
 import type { ClinicChoice } from './resolve-clinic';
 import { memberships } from './schema';
@@ -21,12 +22,20 @@ export interface Membership {
  * the one named database function `clinics_for_user()` (migration 0001, on the allow-list in
  * tests/integration/tenant-allow-list.ts). The function returns clinic id, clinic name, role and
  * extra permissions for that one user, nothing else.
+ *
+ * A failed query throws the copy withoutQueryValues() makes, without the user id it was sent
+ * (D-070): every page and action calls this, and Next.js prints an error that escapes them.
  */
 export async function clinicsForUser(userId: string): Promise<ClinicChoice[]> {
   if (!isUuid(userId)) throw new TypeError('clinicsForUser: userId must be a UUID');
-  const { rows } = await getDb().execute(sql`
-    select membership_id, clinic_id, clinic_name, role, extra_permissions
-    from clinics_for_user(${userId})`);
+  let rows: Record<string, unknown>[];
+  try {
+    ({ rows } = await getDb().execute(sql`
+      select membership_id, clinic_id, clinic_name, role, extra_permissions
+      from clinics_for_user(${userId})`));
+  } catch (error) {
+    throw withoutQueryValues(error);
+  }
   return rows.map((row) => ({
     membershipId: String(row.membership_id),
     clinicId: String(row.clinic_id),

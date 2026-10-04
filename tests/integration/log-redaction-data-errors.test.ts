@@ -1,22 +1,18 @@
 import { sql } from 'drizzle-orm';
 import type { Logger } from 'pino';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { closeDb } from '@/db/client';
-import { withTenant } from '@/db/tenant';
 import { createLogger } from '@/lib/logger';
-import { insertClinic, migratorPool } from './fixtures';
+import { migratorPool, rawQueryError } from './fixtures';
 
 // PostgreSQL quotes the value it could not read in the message of a data error (SQLSTATE class
 // 22), and the start of invalid JSON in the error's context (`where`). Both are values a query
 // was sent, so neither may reach a log line (security-privacy.md, section 6). Values are synthetic.
+// The queries run outside withTenant, which cleans its errors since E00-T03 (D-070): the logger
+// must clean a raw error too.
 const MARKER = 'MARKER-9b2e';
 
 const admin = migratorPool();
-let clinicId: string;
-
-beforeAll(async () => {
-  clinicId = await insertClinic(admin);
-});
 
 afterAll(async () => {
   await closeDb();
@@ -62,12 +58,7 @@ const cases = [
 
 describe('logging a failed query whose PostgreSQL error quotes the value', () => {
   it.each(cases)('drops the value from $name', async ({ cast, value, kept, code }) => {
-    const error = await withTenant(clinicId, (tx) =>
-      tx.execute(sql`select ${value}::${sql.raw(cast)}`),
-    ).then(
-      () => undefined,
-      (e: unknown) => e,
-    );
+    const error = await rawQueryError(admin, sql`select ${value}::${sql.raw(cast)}`);
     // Guards the test: the database error really carries the value (or, for JSON, the marker).
     const secret = cast === 'jsonb' ? MARKER : value;
     const cause = (error as { cause?: Record<string, unknown> } | undefined)?.cause ?? {};

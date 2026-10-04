@@ -2,9 +2,8 @@ import { sql } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeDb } from '@/db/client';
-import { withTenant } from '@/db/tenant';
 import { createLogger } from '@/lib/logger';
-import { insertClinic, migratorPool } from './fixtures';
+import { insertClinic, migratorPool, rawQueryError } from './fixtures';
 
 // A failed query is the error the app will log most often. The values it was sent are row
 // values (later: patient names, phone numbers), so none of them may reach a log line
@@ -17,14 +16,11 @@ let failedQuery: unknown;
 
 beforeAll(async () => {
   const clinicId = await insertClinic(admin);
-  // Fails on the currency check constraint. The marker is one of the values sent.
-  failedQuery = await withTenant(clinicId, (tx) =>
-    tx.execute(
-      sql`update clinics set name = ${MARKER}, currency = 'invalid' where id = ${clinicId}`,
-    ),
-  ).then(
-    () => undefined,
-    (error: unknown) => error,
+  // Fails on the currency check constraint. The marker is one of the values sent. Run outside
+  // withTenant, which cleans its errors since E00-T03 (D-070): the logger must clean a raw one.
+  failedQuery = await rawQueryError(
+    admin,
+    sql`update clinics set name = ${MARKER}, currency = 'invalid' where id = ${clinicId}`,
   );
 });
 

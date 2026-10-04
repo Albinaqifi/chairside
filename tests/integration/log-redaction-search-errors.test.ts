@@ -1,25 +1,20 @@
 import { sql } from 'drizzle-orm';
 import type { Logger } from 'pino';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { closeDb } from '@/db/client';
-import { withTenant } from '@/db/tenant';
 import { createLogger } from '@/lib/logger';
-import { insertClinic, migratorPool } from './fixtures';
+import { migratorPool, rawQueryError } from './fixtures';
 
 // Added by the tester (round 2). PostgreSQL also quotes a value it could not read outside
 // SQLSTATE class 22: the full-text search parsers report `syntax error in tsquery: "<the text>"`
 // with code 42601. A patient search may parse what staff type, which can be a patient's name or
 // phone number, so these values may not reach a log line either (security-privacy.md, section 6).
-// Values are synthetic.
+// Values are synthetic. The queries run outside withTenant, which cleans its errors since E00-T03
+// (D-070): the logger must clean a raw error too.
 const MARKER = 'MARKER-3e8b';
 const SYNTAX_ERROR = '42601';
 
 const admin = migratorPool();
-let clinicId: string;
-
-beforeAll(async () => {
-  clinicId = await insertClinic(admin);
-});
 
 afterAll(async () => {
   await closeDb();
@@ -40,10 +35,7 @@ const cases = [
 
 describe('logging a failed full-text search query', () => {
   it.each(cases)('drops the value from $name', async ({ query }) => {
-    const error = await withTenant(clinicId, (tx) => tx.execute(query)).then(
-      () => undefined,
-      (e: unknown) => e,
-    );
+    const error = await rawQueryError(admin, query);
     // Guards the test: the database error really quotes the value.
     const cause = (error as { cause?: Record<string, unknown> } | undefined)?.cause ?? {};
     expect(cause.code).toBe(SYNTAX_ERROR);

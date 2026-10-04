@@ -4,6 +4,7 @@ import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type pg from 'pg';
 import { isUuid } from '@/lib/ids';
 import { logger } from '@/lib/logger';
+import { withoutQueryValues } from '@/lib/query-errors';
 import { connect } from './client';
 
 /** A database transaction scoped to one clinic. */
@@ -33,6 +34,11 @@ const tenantCall = new AsyncLocalStorage<{ open: boolean }>();
  * that need the database. A call made while another withTenant call is still running in the same
  * flow is refused at once: it would need a second connection, and could wait forever for a lock
  * the first transaction holds, or for a connection while the outer calls hold them all.
+ *
+ * No error leaves with the values a failed query was sent, whether it came from `fn`, the commit
+ * or the rollback, and also when it sits in the `cause` of another error (D-070): it is replaced
+ * by the copy withoutQueryValues() makes, which keeps the PostgreSQL code and constraint name.
+ * Next.js prints an error that escapes a page, outside our logger.
  */
 export async function withTenant<T>(
   clinicId: string,
@@ -48,6 +54,8 @@ export async function withTenant<T>(
   const call = { open: true };
   try {
     return await tenantCall.run(call, () => inTenantTransaction(clinicId, fn));
+  } catch (error) {
+    throw withoutQueryValues(error);
   } finally {
     call.open = false;
   }

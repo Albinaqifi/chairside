@@ -121,10 +121,11 @@ docs/  design/
 
 ## How a staff action flows
 
-Every server-side action from the staff app goes through a wrapper (built in E00-T03, D-071):
-`staffAction` for changes, a read helper for pages and read-only actions, and `userAction` for
-the few actions before a clinic is chosen (the clinic picker). Lint fails a server action that
-no wrapper made (E00-T08). No route talks to the database without them.
+Every server-side action from the staff app goes through a wrapper (built in E00-T03, D-071,
+D-072), all three in `src/app/_lib/actions.ts`: `staffAction` for changes, `staffRead` for pages
+(`.forPage`) and read-only actions, and `userAction` for the few actions before a clinic is chosen
+(the clinic picker). Lint fails a server action that no wrapper made (E00-T08). No route talks to
+the database without them.
 
 ```
 1. Who is this?            session → user

@@ -5,7 +5,8 @@
  *
  * The logger cleans every error it writes. `withoutQueryValues` is for errors that something
  * other than our logger prints: a library that writes unexpected errors to the console itself,
- * or a framework that prints an error that escapes.
+ * or a framework that prints an error that escapes. It is applied where errors are made: the auth
+ * library's adapter (D-066), withTenant() and clinicsForUser() (D-070).
  */
 
 /**
@@ -85,13 +86,36 @@ function isQueryError(error: unknown): error is Error {
  * A copy of a database error that is safe to print: the message without the values, the stack
  * with that message, the names PostgreSQL gives (code, table, column, constraint), and the cause
  * copied the same way. Everything else (`params`, `detail`, `where`, `hint`…) is left out.
- * Any other value, including an error that does not come from a query, is returned as it is.
+ *
+ * Another error is returned as it is, unless a query error sits inside it, at any depth: in its
+ * cause, in an AggregateError's `errors`, or in another of its own properties. Then the result is
+ * a copy of it (D-070): the same class, message, stack and fields, with every inner error copied
+ * the same way. So an action that wraps a failed query as the `cause` of its own error keeps its
+ * error, and loses only the values. Any value that is not an error is returned as it is.
  */
 export function withoutQueryValues(error: unknown): unknown {
-  if (!isQueryError(error)) return error;
+  return safeCopy(error, new Map());
+}
+
+/** The copies made so far in one call, by original: an error that holds itself is copied once. */
+type Copies = Map<Error, Error>;
+
+function safeCopy(value: unknown, copies: Copies): unknown {
+  if (!(value instanceof Error)) return value;
+  const copied = copies.get(value);
+  if (copied) return copied;
+  if (isQueryError(value)) return copyQueryError(value, copies);
+  if (!holdsQueryError(value, new Set())) return value;
+  return copyHolder(value, copies);
+}
+
+function copyQueryError(error: Error, copies: Copies): QueryError {
   const message = messageWithoutValues(error);
-  const cause = withoutQueryValues(error.cause);
-  const copy = new QueryError(message, cause === undefined ? undefined : { cause });
+  const copy = new QueryError(message);
+  copies.set(error, copy);
+  const cause = safeCopy(error.cause, copies);
+  // As `new Error(message, { cause })` would define it: not enumerable.
+  if (cause !== undefined) setOwn(copy, 'cause', cause);
   const fields = error as unknown as Record<string, unknown>;
   for (const field of NAMING_FIELDS) {
     const value = fields[field];
@@ -99,4 +123,75 @@ export function withoutQueryValues(error: unknown): unknown {
   }
   copy.stack = restack(error, message) ?? copy.stack;
   return copy;
+}
+
+/**
+ * A copy of an error that is not a query error but holds one. It is a real error object with the
+ * original's prototype, so `instanceof` still holds and printers show it as the same error.
+ */
+function copyHolder(error: Error, copies: Copies): Error {
+  const copy = Object.setPrototypeOf(new Error(), Object.getPrototypeOf(error) as object) as Error;
+  copies.set(error, copy);
+  for (const [key, descriptor] of ownProperties(error)) {
+    if (key === 'stack') {
+      // An accessor on the original that reads the original's internal state: copy its text.
+      setOwn(copy, 'stack', error.stack);
+    } else if ('value' in descriptor) {
+      Object.defineProperty(copy, key, {
+        ...descriptor,
+        value: copyInner(descriptor.value, copies),
+      });
+    } else {
+      Object.defineProperty(copy, key, descriptor);
+    }
+  }
+  // A cause the class defines on its prototype would still print the original: shadow it.
+  if (!Object.hasOwn(error, 'cause') && 'cause' in error) {
+    setOwn(copy, 'cause', safeCopy(error.cause, copies));
+  }
+  return copy;
+}
+
+/** A property value with every error in it copied safely: an error, or a list such as `errors`. */
+function copyInner(value: unknown, copies: Copies): unknown {
+  if (Array.isArray(value) && value.some((item) => item instanceof Error)) {
+    return value.map((item: unknown) => safeCopy(item, copies));
+  }
+  return safeCopy(value, copies);
+}
+
+/** True if a query error is held anywhere inside `error`. `visited` stops at a loop. */
+function holdsQueryError(error: Error, visited: Set<Error>): boolean {
+  if (visited.has(error)) return false;
+  visited.add(error);
+  return innerErrors(error).some((inner) => isQueryError(inner) || holdsQueryError(inner, visited));
+}
+
+/** The errors an error holds: its cause, and those in its own properties (getters are not read). */
+function innerErrors(error: Error): Error[] {
+  const values: unknown[] = 'cause' in error ? [error.cause] : [];
+  for (const [key, descriptor] of ownProperties(error)) {
+    if (key === 'stack' || !('value' in descriptor)) continue;
+    const value: unknown = descriptor.value;
+    if (Array.isArray(value)) values.push(...(value as unknown[]));
+    else values.push(value);
+  }
+  return values.filter((value): value is Error => value instanceof Error);
+}
+
+/** Every own property of an object, symbol keys included, with its descriptor. */
+function ownProperties(target: object): [PropertyKey, PropertyDescriptor][] {
+  const descriptors: Record<PropertyKey, PropertyDescriptor> =
+    Object.getOwnPropertyDescriptors(target);
+  return Reflect.ownKeys(descriptors).map((key) => [key, descriptors[key]!]);
+}
+
+/** Defines an own property the way JavaScript defines `cause` and `stack`: not enumerable. */
+function setOwn(target: object, key: string, value: unknown): void {
+  Object.defineProperty(target, key, {
+    value,
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
 }
