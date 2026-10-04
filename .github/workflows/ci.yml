@@ -36,7 +36,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 1
     steps:
       # Setup. When a setup step fails, the steps after it are skipped and the run is red.
       - name: 'Setup: check out'
