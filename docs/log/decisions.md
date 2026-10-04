@@ -814,3 +814,41 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** E00-T04's forms need another call shape (`useActionState` calls an action with
   `(previousState, formData)`); a handler must refuse with more than a code; an audit row needs an
   actor or entity id that is not a UUID.
+
+### D-073 · E00-T08 refined: `.forPage` and thrown non-errors are caught by lint; a read-only transaction for reads waits
+- **Origin:** process, refinement of E00-T08 on 2026-10-04. The first three points are the owner's
+  (2026-10-04, from E00-T03's review); the last two are architect choices inside D-071, which the
+  owner reviews with the task. Adds to D-071, which stays as it is.
+- **What:**
+  - **`.forPage` is never an action.** The lint rule that makes every server action a wrapper's
+    also reports a `staffRead(…).forPage` exported from a `'use server'` file, written directly or
+    through a read made elsewhere in the file or imported. `.forPage` skips the clinic check
+    (D-069, D-072), so exported as an action it would let a form shown for one clinic run in
+    another.
+  - **Only errors are thrown.** `@typescript-eslint/only-throw-error`, with its default options,
+    joins the type-aware rules of E00-T08 for `src/`. `withoutQueryValues()` walks an error's
+    `cause` chain, an AggregateError's `errors` and own properties that hold errors; a failed query
+    inside a thrown plain object (`throw { cause: e }`) is not found, and its values would print.
+    The rule also reports `throw refuse(…)`, which the wrappers answer `internal` (a refusal is
+    returned). The comment on `withoutQueryValues()` says which shapes it walks and which not; the
+    function itself does not change.
+  - **No read-only transaction yet.** A `READ ONLY` transaction for `staffRead` handlers that
+    declare no audit row (board, Discovered, E00-T03) is not part of E00-T08. It stays on the
+    Discovered list for a later task.
+  - **One accepted shape for an action.** In a `'use server'` file the only value export the rule
+    accepts is `export const name = staffAction(…)` (or `staffRead(…)`, `userAction(…)`), called
+    directly, with the wrapper imported from `src/app/_lib/actions.ts`. Type-only exports pass.
+    Everything else is reported, re-exports and `export async function` included. One shape is
+    easy to check, for the rule and for a reviewer, and it is the shape the only action today
+    (`chooseClinic`) already has.
+  - **No server action outside `src/app`.** A `'use server'` file or an inline `'use server'`
+    function anywhere else in `src/` is reported. A module cannot import Next.js (module rule 3),
+    but a `'use server'` directive is not an import: without this, a module file could become an
+    unwrapped action.
+- **Why:** both gaps were found in E00-T03's review, and both fall exactly where E00-T08 already
+  adds lint rules, so closing them costs one rule option and a few test cases. The read-only
+  transaction would change how every read runs, which is more than a lint rule; the owner chose to
+  leave it for later.
+- **Revisit if:** a server action needs another shape (a wrapper made through a helper of our own,
+  for example); the default options of `only-throw-error` let a real case through; a read that
+  writes is found in review (then the read-only transaction comes sooner).

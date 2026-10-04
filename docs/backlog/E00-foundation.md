@@ -209,31 +209,51 @@ E00-T08. How a form shows each typed error: E00-T04. The audit viewer (E07). Pat
 ### E00-T08 · Guards around the action wrappers, and the login audit
 
 - **Role:** builder · **Risk:** critical · **Depends on:** E00-T03
-- **Read:** `security` (Part 1, sections 1, 2, 10) · `docs/log/risks.md` (R-32) · D-062, D-064
-  (point 4), D-067, D-071 · `handoffs/E00-T03.md` (what E00-T03 built)
+- **Read:** `security` (Part 1, sections 1, 2, 6, 10) · `docs/log/risks.md` (R-32) · D-062, D-064
+  (point 4), D-067, D-071, D-072, D-073 · the architect section of `handoffs/E00-T08.md` (what is
+  already there) · in `handoffs/E00-T03.md`, the builder's "For E00-T08"
 
 **Why.** E00-T03 builds the wrappers. This task makes them the only way in, so a forgotten
 wrapper, a stray database handle or a query that is not awaited fails `pnpm lint` instead of
-waiting for a reviewer to notice. It also writes the login rows the audit log promises
-(security §10), now that `audit.record()` exists. Split from E00-T03 to keep each diff readable
-(D-071).
+waiting for a reviewer to notice. It also closes two gaps E00-T03's review found: a
+`staffRead(…).forPage`, which skips the clinic check, exported as an action; and a thrown value
+that is not an Error, inside which the query-error cleaning does not look. And it writes the login
+rows the audit log promises (security §10), now that `audit.record()` exists. Split from E00-T03
+to keep each diff readable (D-071).
 
 **Do.**
 - **Every server action is made by a wrapper.** A lint rule, with cases in
-  `eslint-rules/architecture.test.ts`: every function exported from a `'use server'` file under
-  `src/app`, in every route group, is made by `staffAction`, the read helper or `userAction`; an
-  inline `'use server'` function is reported. Route handlers under `src/app/api/` other than
-  `api/auth/` must be on a list in the same place, each with a reason (none today). Later
-  wrappers (E02's patient links, E03's webhooks) are added to that list in their tasks.
+  `eslint-rules/architecture.test.ts`. In a `'use server'` file under `src/app`, in every route
+  group, the only value export allowed is `export const name = staffAction(…)`, `staffRead(…)`
+  or `userAction(…)`, called directly, with the wrapper imported from `src/app/_lib/actions.ts`
+  (D-073). Every other export is reported, among them: `staffRead(…).forPage` (it skips the
+  clinic check, D-069, D-072), the `.forPage` of a read made elsewhere in the file or imported, an
+  `export async function`, `export default`, a re-export (`export { x }`, `export { x } from`,
+  `export *`), and a call to a local function that happens to be named like a wrapper. Type-only
+  exports pass. An inline `'use server'` function anywhere in `src/` is reported, and so is a
+  `'use server'` file in `src/` outside `src/app` (D-073). Route handlers under `src/app/api/` other than `api/auth/` must
+  be on a list in the same place, each with a reason (none today). Later wrappers (E02's patient
+  links, E03's webhooks) are added to that list in their tasks.
 - **Who may reach the database (D-062, D-071).** Lint: `@/db/client`, by any path, may be imported
   only in `src/db/` and `src/modules/auth/`. A value import of `withTenant` only in the wrappers'
   file, `src/db/` and `src/modules/auth/` (the login hook below). A type-only import of
   `TenantTransaction` is allowed everywhere. Tests are exempt.
-- **Un-awaited promises (R-32).** Type-aware linting for `src/`, with
-  `@typescript-eslint/no-floating-promises` and `@typescript-eslint/no-misused-promises`, so a
-  query that is not awaited (`items.forEach(async …)`, a bare `tx.insert(…)`) fails lint. Fix what
-  they find in existing code without changing behaviour, each fix listed in the handoff note, with
-  `pnpm lint`'s time before and after.
+- **Un-awaited promises and thrown non-errors (R-32, D-073).** Type-aware linting for `src/`,
+  with `@typescript-eslint/no-floating-promises`, `@typescript-eslint/no-misused-promises` and
+  `@typescript-eslint/only-throw-error` (its default options: rethrowing a caught error, and
+  throwing a value typed `unknown` or `any`, pass). So a query that is not awaited
+  (`items.forEach(async …)`, a bare `tx.insert(…)`) fails lint, and so does a thrown value that is
+  not an Error (`throw { cause: e }`, `throw refuse('not_found')`), inside which
+  `withoutQueryValues()` would not find a failed query's values. Fix what they find in existing
+  code without changing behaviour, each fix listed in the handoff note, with `pnpm lint`'s time
+  before and after. Every case already in `architecture.test.ts` keeps passing unchanged: those
+  snippets are linted at paths that do not exist on disk, which type-aware linting does not
+  accept as it is (architect section of the handoff note).
+- **Say which shapes are cleaned.** The comment on `withoutQueryValues()`
+  (`src/lib/query-errors.ts`) names where it looks for a query error (the `cause` chain, an
+  AggregateError's `errors`, own properties holding an error or a list of errors) and where it
+  does not (a plain object or a Map holding one, a thrown value that is not an Error). Comment
+  only; the function does not change.
 - **Login audit rows (D-064, point 4).** When the auth library creates a session
   (`databaseHooks.session.create.after`), write `user.logged_in` in every clinic where the person
   has an active membership: one `withTenant` per clinic, one after another (never nested), `at` =
@@ -247,22 +267,36 @@ waiting for a reviewer to notice. It also writes the login rows the audit log pr
   not on an error. How is the builder's choice; for example, the proxy lets a server-action request
   without a valid session through to the wrapper, whose `currentStaff()` redirects. The proxy stays
   the one place the session is moved forward (D-067).
-- **Docs:** `CLAUDE.md` module rules name the new lint rules; R-32 in `docs/log/risks.md` says what
-  now covers it.
+- **Docs:** `CLAUDE.md` module rules name the new lint rules (the wrapper rule, the database
+  imports, and the three type-aware rules); R-32 in `docs/log/risks.md` says what now covers it.
 
 **Out of scope.** Failed logins in the audit log (D-064: not audited). The audit viewer (E07).
 Narrowing the proxy matcher for patient pages (E02-T08). A `tx` that refuses work after its
-transaction ended (R-32's other option; the lint rules are the chosen one).
+transaction ended (R-32's other option; the lint rules are the chosen one). A `READ ONLY`
+transaction for `staffRead` (owner, 2026-10-04: later; D-073). Walking more shapes in
+`withoutQueryValues()`: only its comment changes. Treating a thrown refusal like a returned one,
+and `refuse()`'s comment (board, Discovered, E00-T03 review suggestion 2).
 
 **Acceptance.**
 - [ ] Lint fails on a server action not made by a wrapper, in `(staff)`, in `(auth)` and as an
-      inline `'use server'` function, and on an unlisted route handler under `src/app/api/` (cases
-      in `architecture.test.ts`). The existing actions pass.
+      inline `'use server'` function, on a `'use server'` file in `src/` outside `src/app`, and on
+      an unlisted route handler under `src/app/api/` (cases in `architecture.test.ts`). The
+      existing actions pass.
+- [ ] In a `'use server'` file, lint fails on `export const x = staffRead(…).forPage`, on the
+      `.forPage` of a read made earlier in the file or imported, on a re-export, on an
+      `export async function`, and on a call to a local function named `staffAction`;
+      `export const x = staffAction(…)`, `staffRead(…)` and `userAction(…)` with the wrapper
+      imported from `src/app/_lib/actions.ts` pass, and so does a type-only export (cases in
+      `architecture.test.ts`).
 - [ ] Lint fails on `@/db/client` imported from a page, an action file and a module other than
       `auth`, and on a value import of `withTenant` outside the allowed files. A type-only import of
       `TenantTransaction` in a module passes.
-- [ ] Lint fails on `items.forEach(async (i) => tx.insert(…))` and on an un-awaited `tx.insert(…)`
-      inside `withTenant`.
+- [ ] Lint fails on `items.forEach(async (i) => tx.insert(…))`, on an un-awaited `tx.insert(…)`
+      inside `withTenant`, and on `throw { cause: e }` and `throw refuse('not_found')`;
+      `throw new Error(…)` and rethrowing a caught error pass (cases in `architecture.test.ts`).
+      Every case that was in `architecture.test.ts` before this task passes unchanged.
+- [ ] The comment on `withoutQueryValues()` names the shapes it cleans and the ones it does not
+      (the reviewer checks it).
 - [ ] A sign-in by a person with active memberships in two clinics and a disabled one in a third
       writes exactly one `user.logged_in` row in each of the two, with `at` equal to the session's
       start, and none in the third. No row holds an address, user agent, email or token
