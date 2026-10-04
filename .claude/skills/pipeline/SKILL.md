@@ -59,9 +59,13 @@ Git Bash may need its full path, `"/c/Program Files/GitHub CLI/gh.exe"`.
    `origin`.
 2. Its run, found by that commit and the branch (a scratch branch can share the commit):
    `gh run list --workflow ci.yml --branch <branch> --commit <sha> --json databaseId,status,conclusion,url`.
-   `[]` means no run yet: ask again about every 30 seconds (in PowerShell, `Start-Sleep -Seconds
-   30` before the next `gh run list`). Not `gh pr checks`: before a run exists, it answers as if
-   the checks had failed.
+   `[]` means no run yet. Wait for it with one Bash command run in the background
+   (`run_in_background`, time limit 600000 ms), which ends as soon as the run exists; Claude Code
+   refuses a long sleep in the foreground:
+   `until [ "$(gh run list --workflow ci.yml --branch <branch> --commit <sha> --json databaseId --jq length 2>/dev/null)" -gt 0 ] 2>/dev/null; do sleep 30; done`.
+   When it ends, ask `gh run list` again for the run. When its time limit stops it, there is no
+   run 10 minutes after the push: **Stop**. Not `gh pr checks`: before a run exists, it answers as
+   if the checks had failed.
 3. Wait for that run to end: `gh run watch <databaseId> --exit-status --compact --interval 30`.
    If the call reaches its time limit with the run still going, call it again.
 4. Read its result:

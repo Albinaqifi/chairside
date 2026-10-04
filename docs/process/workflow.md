@@ -28,6 +28,7 @@ Planned ─► Ready ─► In progress ─► Built ─► Reviewed ─► Test
                      └── findings ───┴───────────┴────────┘
                       from the review, the test round or the delta review
 
+A red CI run: In progress, then back to the state it came from (below).
 Blocked: from any state. The board says why and who must act.
 ```
 

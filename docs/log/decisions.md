@@ -1087,7 +1087,9 @@ architecture), `changed` (differs from the original files), `process`.
     the database are two steps, in the README's order: install, `.env`, database.
   - **The run is found by commit and branch:** `gh run list --workflow ci.yml --branch <branch>
     --commit <sha>`. The commit alone is not enough: the scratch branch is made from the task
-    branch and its first run has the same head commit. The pipeline then waits with
+    branch, so its first run can have the same head commit. A run that does not exist yet is
+    waited for by a background `until` loop around `gh run list`, stopped after 10 minutes (Claude
+    Code refuses a long sleep in the foreground). The pipeline then waits with
     `gh run watch <id> --exit-status --compact --interval 30` and reads the result with
     `gh run view <id> --json status,conclusion,url,jobs`. It never re-runs a run.
   - **A CI fix round** sets the board to In progress while the builder works, then to Built or
