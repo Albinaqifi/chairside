@@ -42,6 +42,7 @@ a delta review adds a reviewer section at the end.
 ## Reviewer — YYYY-MM-DD
 **Result:** Reviewed | Changes required
 **Reviewed commit:** <sha>
+**CI run:** <link> (green on that commit)
 
 **Checked:** scope stayed inside the task · safety rails (rule 7) · tests not weakened ·
 docs updated · conventions
@@ -49,7 +50,7 @@ docs updated · conventions
 **Required changes**
 1. …
 
-**Suggestions (optional, not blocking; each is also a line on the board's Discovered list)**
+**Suggestions (optional, not blocking; each is also a line in `docs/progress/discovered.md`)**
 
 **For the owner** (only for critical tasks: what to read first, where the risk is)
 
@@ -76,6 +77,7 @@ docs updated · conventions
 ## Reviewer — YYYY-MM-DD (delta review)
 **Result:** Approved | Changes required
 **Reviewed commits:** <sha of the full review>..<sha>
+**CI run:** <link> (its state on the last commit when you wrote; the pipeline waits for it)
 
 **Required changes**
 1. …

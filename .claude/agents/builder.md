@@ -22,7 +22,7 @@ Before writing code:
 - Read two or three neighbouring files so your code matches what is there.
 
 While building:
-- Stay inside the task. Other things you notice go on the board's "Discovered" list.
+- Stay inside the task. Other things you notice go in `docs/progress/discovered.md`, one line each.
 - Tests come with the code. Never delete, skip or weaken a test to get green.
 - Never go around the safety rails (agent rule 7): tenant wrappers, the message pipeline,
   the AI prompt builder, the injected clock, the action wrapper.

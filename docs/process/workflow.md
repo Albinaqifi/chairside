@@ -137,7 +137,7 @@ adds a test for each that fails without the fix, appends a fix-round section, an
 task to the tester (state Reviewed).
 
 Reviewer suggestions (not required changes) do not go back to a builder. The reviewer adds
-each as a line on the board's Discovered list.
+each as a line in `docs/progress/discovered.md`.
 
 ## The board
 
@@ -146,8 +146,11 @@ row when they start and when they finish. It also holds:
 
 - **Now / Next:** the owner's current priorities, so a fresh session knows where to look.
 - **Blocked:** what is waiting and for whom.
-- **Discovered:** things agents noticed outside their task. The architect or owner turns
-  them into tasks, or dismisses them.
+
+Things agents noticed outside their task go to `docs/progress/discovered.md`, one line each
+(D-079). Nobody reads it at the start of a session. The architect or owner turns its lines into
+tasks or decisions and deletes them in the next planning pass; git history keeps them. It left
+the board so that the board stays short enough to read every session.
 
 ## Starting a session (for the owner)
 

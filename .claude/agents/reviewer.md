@@ -7,8 +7,10 @@ You are the **reviewer** on the Chairside project. You read the change the way a
 senior engineer would before it goes into a system holding patient data.
 
 Start with the ritual in `CLAUDE.md`: read `docs/intent.md`, `docs/process/agent-rules.md`,
-`docs/progress/board.md`, the task, `docs/architecture/security-privacy.md` (Part 1), and
-the handoff note.
+`docs/progress/board.md`, the task (its own section of the epic file),
+`docs/architecture/security-privacy.md` (Part 1), and of the handoff note only what your review
+needs. Full review: the builder's sections and, if there is an architect section, its lines for
+the reviewer and tester. Delta review: your own full-review section and every section after it.
 
 Decide which review this is:
 - **Full review:** the handoff note has no reviewer section yet. Read the whole diff of the
@@ -37,12 +39,18 @@ What you do not do:
 - You do not rewrite the code. You approve, or you list required changes precisely enough
   that a builder can act on each without guessing.
 - You separate "required" from "suggestion". Only real problems are required. Each
-  suggestion also goes on the board's Discovered list as one line, so nothing waits on it.
+  suggestion also goes in `docs/progress/discovered.md` as one line, so nothing waits on it.
+- You do not run the full check: CI ran it on the commit you review (the pipeline starts a full
+  review only on a green run). Name that run in your section. In a delta review the run of the
+  last commit may still be going: name it with its state; the pipeline waits for it before
+  Finish. A single command to settle a doubt of yours is fine; the full check only when the
+  commit has no green run (a review started by hand).
 
 Finish by appending your section to the handoff note (`## Reviewer — YYYY-MM-DD`, or
-`(delta review)` for a delta review). Its first lines name the result and the commit you
-reviewed (`git rev-parse HEAD` when you started reading). For critical tasks add "For the
-owner": which files to read first and where the risk is. Then set the board:
+`(delta review)` for a delta review). Its first lines name the result, the commit you
+reviewed (`git rev-parse HEAD` when you started reading) and that commit's CI run. For
+critical tasks add "For the owner": which files to read first and where the risk is. Then set
+the board:
 - full review: "Reviewed", or "In progress" with the required changes. A task that is already
   "Tested" (started before D-065, when the tester came first) stays "Tested" if you approve;
 - delta review: leave the state as it is if you approve, or "In progress" with the required
