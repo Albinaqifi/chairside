@@ -1106,3 +1106,47 @@ architecture), `changed` (differs from the original files), `process`.
   `gh run view` gives without downloading logs.
 - **Revisit if:** a second job or a matrix is added (the names then need a job prefix); GitHub Pro
   brings a merge rule (a required check names the job, `Check`); runs take over 10 minutes.
+
+### D-079 · Agents read less at the start, the Discovered list leaves the board, the reviewer names the CI run (process)
+- **Origin:** process. Decided by the owner on 2026-10-04 after a look at the four pipeline runs so
+  far (E00-T02's fix rounds, E00-T03, E00-T08, E00-T06a).
+- **What:**
+  - **The Discovered list lives in `docs/progress/discovered.md`,** not on the board. Agents append
+    one line each, as before; nobody reads the file at the start of a session; the architect or
+    owner turns lines into tasks or decisions and deletes them in the next planning pass. The 23
+    lines already struck through were dropped in the move, and the line about the board's
+    "States:" order was answered by fixing that line; git history keeps them.
+  - **"Your task" means its own section of the epic file** (its `### <task-id>` heading to the next
+    `###`) plus the epic's introduction, not the whole file. Another task is read only when the
+    task names it.
+  - **Of the handoff note, each role reads what it needs,** and its role file says which: the
+    tester the builder's sections, the reviewer's required changes and what it marked as the
+    tester's, and the architect's lines for the reviewer and tester; the reviewer the builder's
+    sections (full review), or its own section and everything after it (delta review).
+  - **The reviewer does not run the full check.** It reviews a commit CI has run (the pipeline
+    starts a full review only on a green run) and names that run in its section, which the handoff
+    template now asks for. A single command for a doubt of its own is fine; the full check only
+    when the commit has no green run. The builder and the tester still run it: the builder before
+    it hands off, the tester because it adds tests.
+  - **The architect says what a criterion costs to check** when it is more than a test run.
+- **Why:** measured on the four runs: a task takes 1 h 25 to 2 h 25 of pipeline time; each role
+  starts at about 38K tokens of context, reaches 60 to 100K after the start ritual and ends at
+  150 to 330K. The board had grown to 37 KB (71 Discovered lines, 23 struck), the E00 epic file to
+  52 KB for a 5 KB task, the notes to 40 to 87 KB. Agent rule 1 ("read in this order, and no
+  more") was written against exactly that: an agent that loads everything gets worse at its one
+  task. The reviewer's local check repeated CI's run of the same commands on the same commit.
+  None of this changes a check: the reviewer still reads the whole diff, the tester still verifies
+  every criterion and tries to break the code; fix rounds, the delta review, CI before review and
+  before Finish, and the two-round limit stay as in D-065 and D-075.
+- **Not done, on purpose:** skipping CI for pushes that change only `docs/progress/` (GitHub
+  filters a `pull_request` run on the whole pull request's diff, so a path filter would not skip
+  them; the logic would have to live in the workflow, and the pipeline's CI wait would have to
+  read a skipped run as something other than a Stop); and a line limit on handoff sections (the
+  sections are the evidence that a check ran; the cost of reading them is handled above).
+- **Consequences:** `CLAUDE.md`, `agent-rules.md` (rules 1, 3, 12), `workflow.md`, the handoff
+  template, the four role files, `docs/README.md`, `docs/backlog/README.md` and E07-T00's Read line
+  changed. Where D-065 and older task texts say "the board's Discovered list", read
+  `discovered.md`; earlier handoff notes keep their wording. The next pipeline run (E00-T09) is
+  the check: compare its minutes and tokens per role with the four runs above.
+- **Revisit if:** a role misses something it would have found in a section it no longer reads
+  (then widen that role's list, not the rule); or the board grows past about 15 KB again.

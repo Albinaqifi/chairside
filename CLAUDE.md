@@ -13,7 +13,9 @@ what comes next is on the board, `docs/progress/board.md`.
 1. `docs/intent.md` — what we build and why. Short. Always read it.
 2. `docs/process/agent-rules.md` — the working rules. Short. Always read it.
 3. `docs/progress/board.md` — what is done, in progress, next, blocked.
-4. Your task in `docs/backlog/` — then **only** the documents its "Read" line lists.
+4. Your task in `docs/backlog/`: its own section of the epic file (its `### <task-id>` heading to
+   the next `###`) and the epic's introduction, not the other tasks — then **only** the documents
+   its "Read" line lists.
 
 Do not read the whole `docs/` tree. `docs/README.md` is the map if you need to find something.
 
@@ -24,7 +26,7 @@ Do not read the whole `docs/` tree. `docs/README.md` is the map if you need to f
 - **Every outgoing message goes through the message pipeline** (a row in `messages` first). Never call a provider directly.
 - **Nothing AI-written reaches a patient without human approval,** and no patient identifiers go to the AI.
 - **No patient data in logs, errors, test snapshots, commits or handoff notes.**
-- **Stay inside your task.** Found something else? Write it in the board's "Discovered" list. Do not fix it.
+- **Stay inside your task.** Found something else? Write one line in `docs/progress/discovered.md`. Do not fix it.
 - **Never weaken or delete a test to make it pass.**
 - **Stop and ask the owner** when the rules say so (`agent-rules.md`, rule 4).
 

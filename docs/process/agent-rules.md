@@ -13,6 +13,11 @@ If a rule and your task conflict, the rule wins and you stop and say so.
 **1. Read in this order, and no more.**
 `docs/intent.md` → this file → `docs/progress/board.md` → your task → only the documents on
 your task's "Read" line → the task's handoff note if one exists.
+"Your task" is its own section of the epic file, from its `### <task-id>` heading to the next
+`###`, plus the epic's introduction above the first task; another task only when yours names
+it. Of the handoff note, read the sections your role needs: your role file in `.claude/agents/`
+says which. Read a long file in parts and a log only for what you look for: everything you read
+stays in your context for the whole session.
 *Why:* your attention is limited. Agents that load everything get worse at the one thing
 they were asked to do. The task tells you what you need.
 
@@ -24,7 +29,7 @@ If not, do not start: mark it Blocked on the board with the reason.
 
 **3. One task, one branch, one session. Stay inside the task.**
 Do what the task says, no more. You will notice other things: a bug, an ugly function, a
-missing feature. Write one line in the board's **Discovered** list and move on.
+missing feature. Write one line in `docs/progress/discovered.md` and move on.
 *Why:* "while I was here" changes are the main way agents break working code and make
 reviews impossible. A small diff can be checked. A large one gets waved through.
 
@@ -93,6 +98,10 @@ Never edit `docs/intent.md`. Never rewrite history in the logs.
 **12. "Done" means you ran it and saw it pass.**
 Run the full check command from `CLAUDE.md`. For each acceptance criterion, write how you
 verified it (command, test name, or what you saw on screen). "Should work" is not a result.
+The reviewer is the exception: it reviews a commit CI has already run (the pipeline starts a
+full review only on a green run) and names that run instead of running the check again. A single
+command to settle a doubt of its own is fine; the full check only when the commit has no green
+run (a review started by hand).
 
 **13. Say what is not done.**
 Tests you could not run, criteria you did not meet, shortcuts you took, things you are

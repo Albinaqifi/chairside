@@ -43,6 +43,7 @@ Each document has one job. Read only what your task points you to.
 | [backlog/README.md](backlog/README.md) | Epic index and the task format. One file per epic next to it. |
 | [progress/board.md](progress/board.md) | Status board. |
 | [progress/handoffs/](progress/handoffs/) | One note per task, appended by each role that worked on it. |
+| [progress/discovered.md](progress/discovered.md) | Things agents noticed outside their task, one line each. Not read at the start of a session; the architect or owner turns lines into tasks. |
 
 ## Logs (append-only)
 
@@ -67,5 +68,5 @@ Each document has one job. Read only what your task points you to.
 |---|---|
 | Architect | intent, the architecture docs, decisions, open questions, the epic being refined |
 | Builder | intent, rules, the task, the docs the task lists, `CLAUDE.md` conventions |
-| Tester | intent, rules, the task, test-strategy, the builder's handoff note |
-| Reviewer | intent, rules, the task, security-privacy, the diff, the handoff note |
+| Tester | intent, rules, the task, test-strategy, the builder's sections of the handoff note |
+| Reviewer | intent, rules, the task, security-privacy, the diff, the builder's sections of the note (delta review: its own section and those after it) |

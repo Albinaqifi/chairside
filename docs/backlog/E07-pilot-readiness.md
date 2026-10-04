@@ -12,7 +12,7 @@ Detail level: **Planned**. T00 refines the rest.
 
 ### E07-T00 · Refine this epic
 - **Role:** architect · **Risk:** low · **Depends on:** E03, E04, E05 done
-- **Read:** this file · `security` (all) · `docs/log/risks.md` · the board's Discovered list
+- **Read:** this file · `security` (all) · `docs/log/risks.md` · `docs/progress/discovered.md`
 
 **Do.** Refine tasks; walk the risk list and the Discovered list and turn anything unresolved
 into tasks here; re-check every decision marked "revisit if". Move tasks to Ready.

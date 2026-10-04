@@ -41,5 +41,5 @@ Template and guidance: `docs/process/templates/task.md`.
 
 - Task ids never change and are never reused.
 - A task that turns out too big is split by the architect: `E02-T04a`, `E02-T04b`.
-- New work found along the way goes to the board's Discovered list first.
+- New work found along the way goes to `docs/progress/discovered.md` first.
 - Every "schema" task is critical and updates the seed data so later tasks have data to work with.
