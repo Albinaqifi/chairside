@@ -1,4 +1,3 @@
-import './scratch-missing.css';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/app/_lib/auth';
