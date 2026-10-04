@@ -87,11 +87,20 @@ function isQueryError(error: unknown): error is Error {
  * with that message, the names PostgreSQL gives (code, table, column, constraint), and the cause
  * copied the same way. Everything else (`params`, `detail`, `where`, `hint`…) is left out.
  *
- * Another error is returned as it is, unless a query error sits inside it, at any depth: in its
- * cause, in an AggregateError's `errors`, or in another of its own properties. Then the result is
- * a copy of it (D-070): the same class, message, stack and fields, with every inner error copied
- * the same way. So an action that wraps a failed query as the `cause` of its own error keeps its
- * error, and loses only the values. Any value that is not an error is returned as it is.
+ * Another error is returned as it is, unless a query error sits inside it. Where it looks, in the
+ * error and again in every error it finds there, so at any depth:
+ * - the `cause`, and so the whole cause chain;
+ * - an AggregateError's `errors`;
+ * - any other own property that holds an error, or a list (an array) of errors.
+ * Then the result is a copy of it (D-070): the same class, message, stack and fields, with every
+ * inner error copied the same way. So an action that wraps a failed query as the `cause` of its
+ * own error keeps its error, and loses only the values.
+ *
+ * Where it does not look, so a failed query there still prints its values: inside a plain object,
+ * a Map or a Set that an error holds (`error.details = { failed: queryError }`), a list inside a
+ * list, a getter, and a thrown value that is not an Error at all (`throw { cause: queryError }`),
+ * which is returned as it is, like any value that is not an error. Lint refuses a throw of anything
+ * but an Error (only-throw-error, D-073): wrap a caught error as the `cause` of an Error.
  */
 export function withoutQueryValues(error: unknown): unknown {
   return safeCopy(error, new Map());

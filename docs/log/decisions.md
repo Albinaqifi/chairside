@@ -852,3 +852,51 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a server action needs another shape (a wrapper made through a helper of our own,
   for example); the default options of `only-throw-error` let a real case through; a read that
   writes is found in review (then the read-only transaction comes sooner).
+
+### D-074 · The guards around the action wrappers as built: lint options, test snippets, the proxy and the login rows (E00-T08)
+- **Origin:** process, E00-T08. Builder choices inside D-071 and D-073; the owner reviews them with
+  the task. Adds to D-067, which stays as it is.
+- **What:**
+  - **Un-awaited queries.** `@typescript-eslint/no-floating-promises` runs with
+    `checkThenables: true`. A Drizzle query (`tx.insert(…).values(…)`, `tx.execute(…)`,
+    `tx.select()…`) implements `Promise` without extending it; with the rule's default options
+    none of them is reported, which is exactly R-32's case. A promise marked `void` on purpose
+    still passes (the rule's default), as the login form's event handlers need.
+  - **Which files the type-aware rules see:** `src/**/*.{ts,tsx,mts}`, the TypeScript files
+    tsconfig.json includes. A `.js`, `.jsx`, `.mjs`, `.cjs` or `.cts` file in `src/` is in no
+    TypeScript project, so neither `tsc` nor these rules check it; none exists.
+  - **Snippets in `architecture.test.ts`** are linted at paths that do not exist on disk. The
+    snippet runner (`eslint-rules/lint-snippets.mjs`), and only it, lets those paths use the
+    TypeScript default project with tsconfig.json's options; the project's own config keeps
+    `projectService: true`. A snippet at a path that exists is linted as that file, whose own text
+    is put back afterwards. A snippet that cannot be parsed fails its case.
+  - **The one accepted shape** is checked through the binding: the wrapper must be imported under
+    its own name from `src/app/_lib/actions.ts` (by the `@/` alias or a relative path). An alias, a
+    local function of that name, `export let`, `export default`, every re-export, and a wrapper's
+    result passed through another function are reported.
+  - **Route handlers anywhere in `src/app`** need a line in `ROUTE_HANDLERS`
+    (`eslint-rules/server-actions.mjs`), not only those under `src/app/api/`: a `route.ts` in a
+    page folder is the same way in. The auth library's handler is on the list by its exact path,
+    so another file under `api/auth/` is not exempt.
+  - **A server action after the session ended.** The proxy lets a server action through without a
+    valid session: a POST with the `Next-Action` header, or a multipart/form-data POST (a form
+    posted without JavaScript), the two shapes Next.js runs an action for. Its wrapper then runs
+    nothing and redirects to `/login`: Next.js answers the page with `x-action-redirect: /login`,
+    and a form posted without JavaScript with a 303 to `/login`. Every other request without a
+    valid session is still redirected by the proxy, with the library's cookie removal as before.
+    Measured on a production build: before, a form posted without JavaScript followed the proxy's
+    307 to `/login` and got a 500 ("Failed to find Server Action").
+  - **Login rows** (`src/modules/auth/login-audit.ts`, as `databaseHooks.session.create.after`).
+    On a failure the hook logs once, with the user and clinic ids and the cleaned error, and throws
+    the auth library's `APIError` (500), which carries none of that error: an error of another kind
+    the library would print again (its logger and `console.error`), and an `APIError`'s body goes
+    to the browser as it is. The login form shows "Login did not work. Try again." Rows already
+    written in other clinics stay: each clinic has its own transaction. Every new session writes
+    the rows, so a password change that ends the other sessions (`revokeOtherSessions`, which
+    starts a new session) writes them too.
+- **Why:** each is the smallest choice that makes the task's acceptance true while keeping D-067,
+  D-071 and D-073: the lint rules must see the real query type, the snippet tests must keep
+  passing unchanged (agent rule 8), and a person whose session ended must land on the login page.
+- **Revisit if:** a query library returns real Promises (`checkThenables` can go); `.js` files
+  appear in `src/`; Next.js recognises a server action request differently (then `isServerAction()`
+  in `src/proxy.ts` follows); the login rows of a password change are unwanted (E04).
