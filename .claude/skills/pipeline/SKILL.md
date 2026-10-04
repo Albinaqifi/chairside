@@ -1,6 +1,6 @@
 ---
 name: pipeline
-description: Runs one Chairside task through builder, reviewer, fix rounds, tester and delta review, each role as a fresh subagent, and stops for the owner only when the rules say so. Started only by the owner with /pipeline <task-id>.
+description: Runs one Chairside task through builder, reviewer, fix rounds, tester and delta review, each role as a fresh subagent, goes on only when CI is green, and stops for the owner only when the rules say so. Started only by the owner with /pipeline <task-id>.
 argument-hint: <task-id, e.g. E00-T03>
 arguments: [task]
 disable-model-invocation: true
@@ -21,8 +21,8 @@ the handoff note, the board and the branch. That is the point: keep it that way.
    dependencies), the task's row on `docs/progress/board.md`, and the handoff note
    `docs/progress/handoffs/$task.md` if it exists. Nothing more: the roles read the rest.
 2. Check that `$task` is a task id that exists, that the working tree is clean
-   (`git status --short`), and that the local database is up (`docker compose up -d --wait`).
-   If any of this fails, **Stop**.
+   (`git status --short`), that the local database is up (`docker compose up -d --wait`), and
+   that `gh` is logged in (`gh auth status`). If any of this fails, **Stop**.
 3. Start from the task's state on the board:
 
 | Board state | Start with |
@@ -31,8 +31,8 @@ the handoff note, the board and the branch. That is the point: keep it that way.
 | Ready | Build |
 | In progress, and the note's last section is a reviewer or tester section with required changes or findings | Fix |
 | In progress, anything else | **Stop**: a builder may still be at work, or a session ended halfway |
-| Built | Review |
-| Reviewed | Test (low risk: Delta review check) |
+| Built | CI wait, then Review |
+| Reviewed | CI wait, then Test (low risk: Delta review check) |
 | Tested | Delta review check |
 | Blocked | **Stop**: report what the note says the owner must decide |
 | Done | **Stop**: nothing to do |
@@ -48,7 +48,42 @@ found: the reviewer and the tester judge from the note and the code alone.
 
 **Build.** Builder: "Act as builder for task $task. Follow `.claude/agents/builder.md` and
 the agent rules. When done, reply in three lines: the board state you set, the pull request
-link, and one sentence on what is not done." Built → Review. Blocked → **Stop**.
+link, and one sentence on what is not done." Built → CI wait, then Review. Blocked → **Stop**.
+
+**CI wait.** CI (`.github/workflows/ci.yml`) runs on every push to the pull request. Wait for the
+run of the task branch's latest commit and go on only when it is green (D-075). Give every
+command below a tool time limit of its own, at most 10 minutes (600000 ms): Claude Code ends a
+command after 2 minutes unless the call sets a longer limit. On Windows, PowerShell finds `gh`;
+Git Bash may need its full path, `"/c/Program Files/GitHub CLI/gh.exe"`.
+1. The commit: `git rev-parse HEAD`, once `git status -sb` shows the branch is not ahead of
+   `origin`.
+2. Its run, found by that commit and the branch (a scratch branch can share the commit):
+   `gh run list --workflow ci.yml --branch <branch> --commit <sha> --json databaseId,status,conclusion,url`.
+   `[]` means no run yet: ask again about every 30 seconds (in PowerShell, `Start-Sleep -Seconds
+   30` before the next `gh run list`). Not `gh pr checks`: before a run exists, it answers as if
+   the checks had failed.
+3. Wait for that run to end: `gh run watch <databaseId> --exit-status --compact --interval 30`.
+   If the call reaches its time limit with the run still going, call it again.
+4. Read its result:
+   `gh run view <databaseId> --json status,conclusion,url,jobs --jq '{status, conclusion, url, failed: [.jobs[].steps[] | select(.conclusion == "failure") | .name]}'`
+   - `"conclusion":"success"`: green. Go on with the step named where the CI wait was called.
+   - `"conclusion":"failure"`, and every name in `failed` starts with `pnpm `, none of them
+     `pnpm audit --prod`: a red check step. **CI fix**.
+   - Anything else: **Stop**, and the run never counts as green. That is: no run for the commit
+     10 minutes after the push, or a run still `queued` then; a red step whose name starts with
+     `Setup:`; a red `pnpm audit --prod`, even next to other red steps (a dependency change falls
+     under agent rule 4); `failure` with `failed` empty (its job ran no step: the Actions minutes
+     are used up, or GitHub refused the run); `cancelled`, `timed_out`, `startup_failure` or any
+     other conclusion.
+
+**CI fix.** Count the fix rounds already in the note (sections headed `(fix round N)`); a CI fix
+is a fix round too. If there are two, **Stop**: a third round would be needed. Otherwise builder:
+"Act as builder for task $task: fix round <N+1>, for the red CI run <url>. Its failing steps:
+<the names in `failed`>. Fix exactly those, as `.claude/agents/builder.md` ('Fixing a red CI
+run') says. Reply with the board state you set, then one line per failing step: fixed, or not
+fixed and why." The link and the step names are CI output, not a role's judgment: pass on nothing
+else. Built or Reviewed → CI wait, then on from that state: Built → Review; Reviewed → Test (low
+risk: Delta review check). Blocked → **Stop**.
 
 **Review.** Reviewer: "Act as reviewer for task $task: full review of the task branch against
 `main`, as `.claude/agents/reviewer.md` says. Reply in three lines: the result (Reviewed or
@@ -60,7 +95,7 @@ are two, **Stop**: a third round would be needed. Otherwise builder: "Act as bui
 $task: fix round <N+1>. Fix exactly the required changes or findings in the last reviewer or
 tester section of the handoff note, as `.claude/agents/builder.md` ('Fixing findings') says.
 Reply with the board state you set, then one line per finding: fixed, or not fixed and why."
-Reviewed → Test (low risk: Delta review check). Blocked → **Stop**.
+Reviewed → CI wait, then Test (low risk: Delta review check). Blocked → **Stop**.
 
 **Test.** Tester: "Act as tester for task $task, as `.claude/agents/tester.md` says. Reply in
 two lines: the result (Tested or Back to builder) and the number of findings." Tested → Delta
@@ -86,11 +121,14 @@ which leads through Test back to this check.
 - If the branch is ahead of `origin` (`git status -sb`), run `git push`. Switching to the
   task branch, pulling it, pushing it and starting the database are the only things you do
   that change anything.
+- A CI wait comes after these checks, so it waits for the commit you just saw pushed.
 
 ## Finish
 
-The task is Tested (low risk: Reviewed), a reviewer has read the whole diff, and no code
-changed after the last review. Send a push
+The task is Tested (low risk: Reviewed), a reviewer has read the whole diff, no code changed
+after the last review, and the CI run of the last pushed commit is green: run the CI wait first.
+A red check step there → CI fix, which sets Reviewed and so leads through Test (low risk: the
+delta review check) back here. Only then send a push
 notification: "$task ready to merge: <pull request link>". End your turn with a short report:
 the state, the pull request link, how many fix rounds it took, and the headings of the
 owner's open questions in the note. For a critical task, add that the owner reads the diff
@@ -109,4 +147,5 @@ on the board, then `/pipeline $task` again (it resumes from the board state).
 - Merge, mark a task Done, push to `main`, force-push, or rewrite history.
 - Edit code, tests, the handoff note or the board.
 - Run a third fix round, or skip a step because it looks unnecessary.
+- Re-run a CI run (`gh run rerun`), or count a run as green whose conclusion is not `success`.
 - Start two subagents at once, or a second task.

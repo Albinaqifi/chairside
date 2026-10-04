@@ -5,8 +5,8 @@ Each role appends its own section and never edits another role's section.
 No personal data here, not even synthetic names: use ids.
 
 Sections appear in the order the work happened: builder, reviewer, tester. A fix round adds a
-builder section after the reviewer or tester section it answers; a delta review adds a
-reviewer section at the end.
+builder section after the reviewer or tester section it answers (for a red CI run, at the end);
+a delta review adds a reviewer section at the end.
 
 ```markdown
 # E0X-T0Y · Task title
@@ -54,7 +54,7 @@ docs updated · conventions
 **For the owner** (only for critical tasks: what to read first, where the risk is)
 
 ## Builder — YYYY-MM-DD (fix round N)
-**Fixes:** the required changes of the reviewer section above | the findings of the tester section above
+**Fixes:** the required changes of the reviewer section above | the findings of the tester section above | the red CI run <link>: its failing steps (one row per step)
 
 | # | Finding (short) | What I changed | Test that fails without the fix | Result |
 |---|---|---|---|---|

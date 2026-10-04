@@ -4,9 +4,9 @@ Scheduling app for dental clinics with automated patient communication. Multi-cl
 holds health data, built by one developer with AI agents.
 
 **Status:** the project skeleton and database foundation (E00-T01), login with clinic
-membership (E00-T02), the action wrappers with the audit log (E00-T03), and the lint rules that
-guard them with the login audit (E00-T08) exist. What is done and what comes next is on the
-board, `docs/progress/board.md`.
+membership (E00-T02), the action wrappers with the audit log (E00-T03), the lint rules that
+guard them with the login audit (E00-T08), and CI on GitHub (E00-T06a) exist. What is done and
+what comes next is on the board, `docs/progress/board.md`.
 
 ## Start of every session (in this order)
 
@@ -56,6 +56,33 @@ Stack and reasons: `docs/architecture/overview.md`. First-time setup: `README.md
 | `pnpm build` · `pnpm start` | Production build · run it. |
 
 Every script must work on Windows (the owner's OS): no bash-only syntax in `package.json`.
+
+### CI
+
+`.github/workflows/ci.yml` runs on every pull request to `main`, every push to `main` and every
+Monday on `main`: Ubuntu, a fresh checkout, `.env` copied from `.env.example`, the database from
+`docker compose` (D-075). It runs each command of `pnpm check` as its own step with `TZ=UTC`, then
+`pnpm build`, then `pnpm test` and `pnpm test:integration` again with `TZ=Pacific/Auckland` (the
+Auckland steps: a test that passes in one zone only depends on the server's time zone), then
+`pnpm audit --prod` (an advisory in a production dependency turns the run red) and the full
+`pnpm audit` (printed only). Every check runs even after an earlier one failed; a failed setup step
+ends the run. GitHub does not block a merge on red: the pipeline goes on only on green, and the
+owner merges only on green (R-34). The step names are the pipeline's input: a red `Setup: …` step
+or `pnpm audit --prod` stops it for the owner, any other red `pnpm …` step is a fix round (D-078).
+
+Each level on your machine, with the database up:
+
+| Level | Command |
+|---|---|
+| The `pnpm check` steps | `pnpm check`, or one of its commands |
+| The build | `pnpm build` |
+| The Auckland steps, PowerShell | `$env:TZ = 'Pacific/Auckland'; pnpm test; pnpm test:integration; Remove-Item Env:TZ` |
+| The Auckland steps, macOS or Linux | `TZ=Pacific/Auckland pnpm test && TZ=Pacific/Auckland pnpm test:integration` |
+| The dependency check | `pnpm audit --prod` (must pass) · `pnpm audit` (everything; read it). Never `--fix`, `--ignore` or `--ignore-unfixable`: they write `pnpm-workspace.yaml` |
+
+Not Git Bash for the Auckland steps (the agents' Bash tool): it drops `TZ=Pacific/Auckland` before
+Node starts, and Node then runs in the machine's own zone without an error (`TZ=UTC` gets through).
+The zone Node really has: `node -e "console.log(Intl.DateTimeFormat().resolvedOptions().timeZone)"`.
 
 ### Folder structure
 

@@ -89,6 +89,7 @@ tests/
   evals/                     AI output evaluations
 eslint-rules/                our lint rules (module boundaries, server actions, database access);
                              tests of all architecture rules
+.github/workflows/           ci.yml: CI on every pull request, every push to main, weekly (E00-T06a)
 docs/  design/
 ```
 
