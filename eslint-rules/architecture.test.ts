@@ -584,6 +584,37 @@ const cases: Case[] = [
     code: `${USE_SERVER} ${WRAPPERS} ${ARGS} declare function logged<T>(action: T): T; export const renamePatient = logged(staffAction(spec, handler));`,
     expected: [SERVER_ACTIONS],
   },
+  // Tester, E00-T08: shapes a change to the rule could stop seeing.
+  {
+    name: "d (tester): a bare action when 'use strict' comes before 'use server'",
+    file: STAFF_ACTIONS,
+    code: `'use strict'; ${USE_SERVER} export async function save() {}`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d (tester): an escaped 'use server' is the directive too (Next.js reads its value)",
+    file: STAFF_ACTIONS,
+    code: "'use\\x20server'; export async function save() {}",
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d (tester): a wrapper's result destructured in the export",
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} export const [renamePatient] = staffAction(spec, handler);`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd (tester): an exported class',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} export class Patients {}`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd (tester): an unlisted route handler written as route.tsx',
+    file: 'src/app/(staff)/export/route.tsx',
+    code: "export async function GET() { return new Response('ok'); }",
+    expected: [SERVER_ACTIONS],
+  },
 
   // (e) Only the files that open transactions reach the database (D-062, D-071).
   {
@@ -596,6 +627,12 @@ const cases: Case[] = [
     name: "e: '@/db/client' in an action file",
     file: STAFF_ACTIONS,
     code: `${USE_SERVER} import { getDb } from '@/db/client'; ${WRAPPERS} ${ARGS} export const listPatients = staffRead(spec, async () => getDb());`,
+    expected: [DATABASE],
+  },
+  {
+    name: "e (tester): '@/db/client' imported for its side effects only, in a page",
+    file: STAFF_PAGE,
+    code: "import '@/db/client'; export default function Page() { return null; }",
     expected: [DATABASE],
   },
   {
@@ -724,6 +761,12 @@ const cases: Case[] = [
     name: 'f: an un-awaited tx.execute(…)',
     file: IN_MODULE,
     code: `import { sql } from 'drizzle-orm'; ${TX} export async function touch(tx: TenantTransaction) { tx.execute(sql\`select 1\`); }`,
+    expected: [FLOATING],
+  },
+  {
+    name: 'f (tester): an un-awaited tx.update(…).set(…).where(…)',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} import { eq } from 'drizzle-orm'; export async function touch(tx: TenantTransaction, id: string) { tx.update(marks).set({ id }).where(eq(marks.id, id)); }`,
     expected: [FLOATING],
   },
   {

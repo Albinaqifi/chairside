@@ -6,12 +6,13 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Tested` → `Reviewed` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.)
 
-_Last updated: 2026-10-04 — reviewer: E00-T08 Reviewed at `f12e90c` (no required changes, 4 suggestions on the Discovered list); the tester is next. Before: builder: E00-T08 Built (D-074)._
+_Last updated: 2026-10-04 — tester: E00-T08 Tested at `cab0a76` (no findings, 5 notes on the Discovered list, one of them a security problem in the login form from E00-T02). Before: reviewer: E00-T08 Reviewed at `f12e90c`._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T08` is Reviewed and goes to the tester (criterion 8 in a real browser; `handoffs/E00-T08.md`); after it, E00-T04, E00-T05, E00-T06
+- **Next task to start:** `E00-T08` is Tested and waits for the owner (review and merge, PR #9); after it, E00-T04, E00-T05, E00-T06
+- **Security, from the E00-T08 test:** with JavaScript off, the login form sends the email and password in the address (Discovered). Owner: fix before staging (E00-T07)
 - **Owner decisions from the E00-T02 test, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list. Finding 6 is decided (D-069)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
   business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
@@ -90,6 +91,11 @@ turns lines into tasks or strikes them out.
 - 2026-10-04 · E00-T08 review · A signed-out multipart POST now reaches any page in the proxy's matcher (Next.js renders the page when the form names no action). Every page today checks the session itself; say in `CLAUDE.md` that a page outside `(staff)` must too, or be public on purpose, before E00-T04 adds pages (handoff, reviewer suggestion 2).
 - 2026-10-04 · E00-T08 review · `chairside/database-access` skips `src/db/` and `src/modules/auth/` whole, so a re-export of `withTenant` or `getDb` from a file there (the auth module's `index.ts`, say) would let every file import them unreported. Report such re-exports in those folders too (handoff, reviewer suggestion 3).
 - 2026-10-04 · E00-T08 review · An inline `eslint-disable` comment switches off any architecture rule, and nothing forbids one (none in `src/` today). `linterOptions.noInlineConfig` for `src/`, or a test that fails on `eslint-disable` in `src/`, would keep the guards on (handoff, reviewer suggestion 4).
+- 2026-10-04 · E00-T08 test · **Security, owner:** the login form (E00-T02) has only an `onSubmit` handler, so with JavaScript off the browser submits it as a GET with the email and password in the address: browser history, `pnpm dev`'s request log (seen), a host's access logs. Fix before staging (E00-T07), not with E00-T04 (handoff, tester note 1).
+- 2026-10-04 · E00-T08 test · The type-aware rules pass `tx.insert(…).catch(() => {})` and `.then(ok, fail)` (handled, like `void`) and `return Promise.reject({ cause: e })` (not a throw; its values would print). R-32's review check could name the first two; `@typescript-eslint/prefer-promise-reject-errors` (installed) reports the third (tester note 2).
+- 2026-10-04 · E00-T08 test · `chairside/database-access` covers `@/db/client` and `withTenant` only: a file in `src/` can import `pg` or `drizzle-orm/node-postgres` and open its own connection, or import `@/db/reset` or `@/db/migrate`, unreported. Allow them only in `src/db/` (tester note 3).
+- 2026-10-04 · E00-T08 test · `chairside/server-actions` looks at `src/app` only: a Pages Router API route (`src/pages/api/…`), which Next.js 16 serves next to `src/app`, is not reported, and a `'use server'` file outside `src/` is not linted at all (tester note 4).
+- 2026-10-04 · E00-T08 test · Any client can make the server log "Failed to find Server Action" with a stack (answer 500) by posting multipart/form-data that names no action: at `/login` since E00-T02, and without a session at every path in the proxy's matcher since E00-T08. No page content is sent. E07-T03: do not alert on it, or answer such posts without an error (tester note 5).
 
 ---
 
@@ -102,7 +108,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 | E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | **Done** | Merged by the owner (PR #5). Tester finding 6 → D-069, finding 2's page side → D-070; findings 5 and 7 on the Discovered list. See `handoffs/E00-T02.md` |
 | E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Done** | Merged by the owner (PR #7). `staffAction`, `staffRead`, `userAction` in `src/app/_lib/actions.ts`; `audit.record()`; D-070 at the source; D-072. Review suggestions and tester notes on the Discovered list. See `handoffs/E00-T03.md` |
-| E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | **Reviewed** | Branch `task/E00-T08-action-guards`, PR #9: lint rules `chairside/server-actions`, `chairside/database-access` and three type-aware ones; login rows; an action after the session ended reaches its wrapper (D-074). Reviewed at `f12e90c`: no required changes, 4 suggestions (Discovered). Next: tester. See `handoffs/E00-T08.md` |
+| E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | **Tested** | Branch `task/E00-T08-action-guards`, PR #9: lint rules `chairside/server-actions`, `chairside/database-access` and three type-aware ones; login rows; an action after the session ended reaches its wrapper (D-074). Reviewed at `f12e90c`: no required changes, 4 suggestions. Tested at `cab0a76`: no findings, criterion 8 checked in a real browser, 5 notes (Discovered). Next: owner review and merge. See `handoffs/E00-T08.md` |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | |
 | E00-T06 | CI and the first end-to-end test | builder | normal | Planned | Owner: create GitHub repo |

@@ -282,3 +282,72 @@ describe('what the proxy still sends to the login page itself', () => {
     expect(runs).toBe(1);
   });
 });
+
+// Tester, E00-T08: the exception is for what Next.js runs as an action (a POST), and a double
+// click after the session ended. Next.js 16.3.8 runs an action only for a POST
+// (server-action-request-meta.js), so any other method with the same headers is a page request.
+describe('tester: the exception is for a POST only, and a double click is answered the same', () => {
+  /** A request to a staff page without a valid session, with a method and extra headers. */
+  async function withoutSession(
+    method: string,
+    extra: Record<string, string>,
+    cookie = '',
+  ): Promise<NextResponse> {
+    const headers = new Headers({ 'x-forwarded-for': freshAddress(), ...extra });
+    if (cookie) headers.set('cookie', cookie);
+    return proxy(new NextRequest(`${ORIGIN}/`, { method, headers }));
+  }
+
+  const ACTION_HEADER = { 'next-action': '7f00c0ffee00000000000000000000000000000001' };
+  const MULTIPART = { 'content-type': 'multipart/form-data; boundary=----tester' };
+
+  it('a GET, HEAD, PUT or DELETE with the Next-Action header or a multipart type goes to the login page', async () => {
+    for (const method of ['GET', 'HEAD', 'PUT', 'DELETE']) {
+      for (const extra of [ACTION_HEADER, MULTIPART]) {
+        const response = await withoutSession(method, extra);
+        expect(getRedirectUrl(response), `${method} ${Object.keys(extra)[0]}`).toBe(
+          `${ORIGIN}/login`,
+        );
+        expect(passedOn(response)).toBe(false);
+      }
+    }
+  });
+
+  it('the same with an ended session: redirected, and the cookie removed', async () => {
+    const cookie = await signedIn();
+    await expire(cookie);
+
+    const response = await withoutSession('GET', ACTION_HEADER, cookie);
+
+    expect(getRedirectUrl(response)).toBe(`${ORIGIN}/login`);
+    expect(sessionCookieOf(response)).toMatch(/Max-Age=0(;|$)/);
+  });
+
+  it('a URL-encoded POST, which Next.js does not run as an action, goes to the login page', async () => {
+    const response = await withoutSession('POST', {
+      'content-type': 'application/x-www-form-urlencoded',
+    });
+
+    expect(getRedirectUrl(response)).toBe(`${ORIGIN}/login`);
+  });
+
+  it('a double click after the session ended: both calls pass on, and neither runs anything', async () => {
+    for (const end of [expire, remove]) {
+      const cookie = await signedIn();
+      await end(cookie);
+
+      const responses = await Promise.all([actionCall(cookie), actionCall(cookie)]);
+
+      for (const response of responses) {
+        expect(getRedirectUrl(response), end.name).toBeNull();
+        expect(passedOn(response), end.name).toBe(true);
+        expect(sessionCookieOf(response) ?? '', 'never a renewed cookie').not.toMatch(
+          /Max-Age=[1-9]/,
+        );
+      }
+      const [first, second] = await Promise.all([eachActionWith(cookie), eachActionWith(cookie)]);
+      expect([...first, ...second]).toEqual(Array(6).fill('/login'));
+      expect(runs, 'no handler ran').toBe(0);
+    }
+  });
+});
