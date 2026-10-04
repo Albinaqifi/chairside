@@ -66,8 +66,13 @@ Git Bash may need its full path, `"/c/Program Files/GitHub CLI/gh.exe"`.
    When it ends, ask `gh run list` again for the run. When its time limit stops it, there is no
    run 10 minutes after the push: **Stop**. Not `gh pr checks`: before a run exists, it answers as
    if the checks had failed.
-3. Wait for that run to end: `gh run watch <databaseId> --exit-status --compact --interval 30`.
-   If the call reaches its time limit with the run still going, call it again.
+3. Wait for that run to end, with a time limit of 600000 ms:
+   `gh run watch <databaseId> --exit-status --compact --interval 30`. It returns only when the run
+   has completed, not while it is still `queued`. If the call reaches its time limit, read the
+   run's status: `gh run view <databaseId> --json status --jq .status`.
+   - `completed`: step 4.
+   - `in_progress`: call `gh run watch` again.
+   - `queued`, or any other status: **Stop** (a run still queued 10 minutes after the push).
 4. Read its result:
    `gh run view <databaseId> --json status,conclusion,url,jobs --jq '{status, conclusion, url, failed: [.jobs[].steps[] | select(.conclusion == "failure") | .name]}'`
    - `"conclusion":"success"`: green. Go on with the step named where the CI wait was called.
