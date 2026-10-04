@@ -6,12 +6,12 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `Tested` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.) Things noticed outside a task: `discovered.md`, next to this file.
 
-_Last updated: 2026-10-04 — owner, process change D-079 (branch `process/pipeline-trim`): the Discovered list moved to `discovered.md` and its struck lines were removed; every role reads its task's own section and only the note sections its role file names; the reviewer names the green CI run instead of re-running the full check. The States line above now shows the D-065 order. Before: 2026-10-04 — reviewer: E00-T06a delta review of `3110144..5e280f8` approved: fix round 1 fixes required change 1, no required changes, 1 suggestion on the Discovered list; stays Tested. Next: the pipeline's Finish (CI wait on the last commit), then the owner merges PR #11._
+_Last updated: 2026-10-04 — architect: E00-T06a Done (PR #11 merged by the owner at `1eea949`); the first CI run on `main` after the merge is green (run 37230797928). Next: E00-T09, then E00-T10 (both Ready). Branch `plan/E00-T06a-done`; the owner merges it before E00-T09 starts._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T06a` is Tested and its delta review approved (`handoffs/E00-T06a.md`): the pipeline's Finish (CI green on the last commit), then the owner merges PR #11. Then `E00-T09`, then `E00-T10` (both Ready)
+- **Next task to start:** `E00-T09` (`/pipeline E00-T09`; Ready, D-076), once the owner has merged the planning branch `plan/E00-T06a-done`: the builder branches from `main`. Then `E00-T10` (Ready, D-077)
 - **Security, from the E00-T08 test:** with JavaScript off, the login form sends the email and password in the URL. `E00-T09` fixes it, before staging (E00-T07)
 - **Owner action for CI (D-075):** add a payment method and a small GitHub Actions budget (for example $10 a month); after two weeks of runs, decide on GitHub Pro (R-34). Optional: in the repository's Settings → Actions, require actions pinned to a full commit SHA and allow only GitHub's and pnpm's actions
 - **Owner decisions from the E00-T02 test, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list. Finding 6 is decided (D-069)
@@ -41,7 +41,7 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T02 | Login, sessions and clinic membership | builder | critical | **Done** | Merged by the owner (PR #5). Tester finding 6 → D-069, finding 2's page side → D-070; findings 5 and 7 on the Discovered list. See `handoffs/E00-T02.md` |
 | E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Done** | Merged by the owner (PR #7). `staffAction`, `staffRead`, `userAction` in `src/app/_lib/actions.ts`; `audit.record()`; D-070 at the source; D-072. Review suggestions and tester notes on the Discovered list. See `handoffs/E00-T03.md` |
 | E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | **Done** | Merged by the owner (PR #9). Lint rules `chairside/server-actions`, `chairside/database-access` and three type-aware ones; login rows; an action after the session ended reaches its wrapper (D-074). Review suggestions and tester notes on the Discovered list. See `handoffs/E00-T08.md` |
-| E00-T06a | CI: every pull request and `main` checked on GitHub | builder | normal | **Tested** | Branch `task/E00-T06a-ci`, PR #11: `.github/workflows/ci.yml`, green on the PR (about 4.5 minutes a run); the pipeline skill and `builder.md` wait for CI (D-075, D-078). Reviewed at `3110144`: 1 required change (skill, CI wait step 3: a run that stays queued never stops it), fixed in fix round 1; 5 suggestions (Discovered). Tested at `b5c5508`: no findings; scratch PR #12 (red, cancelled and Auckland-only runs) closed unmerged. Delta review of `3110144..5e280f8`: approved, 1 suggestion (Discovered). Next: CI wait (Finish), then the owner merges PR #11. Owner: Actions budget. See `handoffs/E00-T06a.md` |
+| E00-T06a | CI: every pull request and `main` checked on GitHub | builder | normal | **Done** | Merged by the owner (PR #11). `.github/workflows/ci.yml` checks every pull request, every push to `main` and every Monday; the pipeline skill and `builder.md` wait for green (D-075, D-078). Review suggestions and tester notes in `discovered.md`. See `handoffs/E00-T06a.md` |
 | E00-T09 | The login form never puts the password in the URL | builder | critical | **Ready** | From E00-T08's test, note 1 (owner: its own task, before staging). Form posts, button disabled until the script runs, lint for every form (D-076). See `handoffs/E00-T09.md` |
 | E00-T10 | Close the gaps in the lint guards | builder | critical | **Ready** | From E00-T08's review (suggestions 3, 4), test (notes 2–4) and builder (`.js` files) (D-077). See `handoffs/E00-T10.md` |
 | E00-T04 | App shell and design system | builder | normal | Planned | After E00-T09 and E00-T10. Too big for one session as written (D-075): split when it is refined |
@@ -184,3 +184,4 @@ Outline. Needs E07-T00.
 - E00-T02 · Login, sessions and clinic membership · merged 2026-10-03 (PR #5)
 - E00-T03 · Action wrappers, permission checks and audit log · merged 2026-10-04 (PR #7)
 - E00-T08 · Guards around the action wrappers, and the login audit · merged 2026-10-04 (PR #9)
+- E00-T06a · CI: every pull request and `main` checked on GitHub · merged 2026-10-04 (PR #11)
