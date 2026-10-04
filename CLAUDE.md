@@ -4,8 +4,9 @@ Scheduling app for dental clinics with automated patient communication. Multi-cl
 holds health data, built by one developer with AI agents.
 
 **Status:** the project skeleton and database foundation (E00-T01), login with clinic
-membership (E00-T02), and the action wrappers with the audit log (E00-T03) exist. What is done
-and what comes next is on the board, `docs/progress/board.md`.
+membership (E00-T02), the action wrappers with the audit log (E00-T03), and the lint rules that
+guard them with the login audit (E00-T08) exist. What is done and what comes next is on the
+board, `docs/progress/board.md`.
 
 ## Start of every session (in this order)
 
@@ -64,13 +65,15 @@ src/app/              Next.js routes. Thin: parse input, call a module, render.
   (staff)/            The staff app. Its layout and every page start from currentStaff().
   _lib/               Request-edge helpers: who is signed in; the action wrappers; the auth client.
   api/auth/           The auth library's routes (sign-in, sign-out, get-session). No code of ours.
-src/proxy.ts          Moves the session forward and renews its cookie (D-067); no valid session → /login.
+src/proxy.ts          Moves the session forward and renews its cookie (D-067); no valid session → /login,
+                      except a server action: its wrapper sends the person there (D-074).
                       Not the permission check: pages and actions still call currentStaff().
 src/modules/<name>/   All business logic. index.ts = public API, schema.ts = its tables.
 src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts.
 src/lib/              Small shared pieces: clock, ids, logger, personal-fields.
 tests/integration/    Tests against real PostgreSQL, including the tenant meta-test.
-eslint-rules/         The module-boundary lint rule and the tests of all architecture rules.
+eslint-rules/         Our lint rules (module boundaries, server actions, database access) and the
+                      tests of all architecture rules.
 ```
 
 Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tests/e2e` (E00-T06), `src/worker` (E00-T07).
@@ -83,6 +86,18 @@ Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tes
 3. No Next.js or React in `src/modules`, so the worker and tests can use every module.
 4. No reading the clock in `src/modules` (`Date.now()`, `new Date()`, `DateTime.now()`…).
    Take `now: Date` as a parameter, or a `Clock` from `src/lib/clock.ts`; tests use `fakeClock`.
+5. Every server action is `export const name = staffAction(…)` (or `staffRead`, `userAction`) in
+   a `'use server'` file in `src/app`, the wrapper imported from `@/app/_lib/actions` under its own
+   name. Such a file exports nothing else but types, and never a `.forPage`. No inline
+   `'use server'`, no `'use server'` file outside `src/app`. A route handler (`route.ts`) needs a
+   line with its reason in `ROUTE_HANDLERS` in `eslint-rules/server-actions.mjs` (D-071, D-073).
+6. `@/db/client` only in `src/db/` and `src/modules/auth/`; `withTenant` only in
+   `src/app/_lib/actions.ts`, `src/db/` and `src/modules/auth/`; `import type { TenantTransaction }`
+   anywhere. Tests are exempt (D-062, D-071).
+7. Type-aware, for the `.ts`, `.tsx` and `.mts` files in `src/`: every promise is awaited, Drizzle
+   queries included (`no-floating-promises`; `no-misused-promises`, so no
+   `items.forEach(async …)`), and only Errors are thrown (`only-throw-error`: a refusal is
+   returned, never thrown) (R-32, D-073, D-074).
 
 ### Code conventions
 

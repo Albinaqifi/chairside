@@ -87,7 +87,8 @@ tests/
   integration/               tests against real Postgres
   e2e/                       Playwright
   evals/                     AI output evaluations
-eslint-rules/                the module-boundary lint rule; tests of all architecture rules
+eslint-rules/                our lint rules (module boundaries, server actions, database access);
+                             tests of all architecture rules
 docs/  design/
 ```
 
@@ -129,7 +130,8 @@ one, which would skip the clinic check (E00-T08, D-073). No route talks to the d
 them.
 
 ```
-1. Who is this?            session → user
+1. Who is this?            session → user; no valid session → the login page, nothing
+                           run (also for an action sent after the session ended, D-074)
 2. Which clinic, what role? membership → role + permissions; the clinic the page was shown
                            for must be the clinic the request resolves to, else
                            "clinic changed" and nothing runs (D-069)

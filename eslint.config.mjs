@@ -1,7 +1,9 @@
 import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
 import nextTs from 'eslint-config-next/typescript';
+import databaseAccess from './eslint-rules/database-access.mjs';
 import moduleBoundaries from './eslint-rules/module-boundaries.mjs';
+import serverActions from './eslint-rules/server-actions.mjs';
 
 // Architecture rules (CLAUDE.md, "Module rules"). Tested in eslint-rules/architecture.test.ts.
 
@@ -12,7 +14,23 @@ const frameworkMessage =
   'Modules contain no Next.js or React code, so the worker and tests can use them. Keep it in src/app.';
 
 // Every kind of script file, so no rule depends on the extension a file happens to use.
-const SCRIPT_FILES = '*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}';
+const SCRIPT_EXTENSIONS = '{ts,tsx,mts,cts,js,jsx,mjs,cjs}';
+const SCRIPT_FILES = `*.${SCRIPT_EXTENSIONS}`;
+
+/**
+ * The files type-aware linting covers: the TypeScript files in src that tsconfig.json includes
+ * (it lists .ts, .tsx and .mts). eslint-rules/lint-snippets.mjs gives its snippets the same.
+ */
+export const TYPED_FILES = 'src/**/*.{ts,tsx,mts}';
+
+// Our own rules, in one plugin.
+const chairside = {
+  rules: {
+    'module-boundaries': moduleBoundaries,
+    'server-actions': serverActions,
+    'database-access': databaseAccess,
+  },
+};
 
 // Next.js, React and packages built on them, for selectors: a package name or one of its paths.
 const FRAMEWORK_SOURCE =
@@ -26,10 +44,40 @@ export default defineConfig([
   ...nextVitals,
   ...nextTs,
   {
-    // (b) Modules are imported only through their index.ts.
     files: [`src/**/${SCRIPT_FILES}`],
-    plugins: { chairside: { rules: { 'module-boundaries': moduleBoundaries } } },
-    rules: { 'chairside/module-boundaries': 'error' },
+    plugins: { chairside },
+    rules: {
+      // (b) Modules are imported only through their index.ts.
+      'chairside/module-boundaries': 'error',
+      // (d) Every server action is made by an action wrapper; no other route in without a reason
+      // (D-071, D-073).
+      'chairside/server-actions': 'error',
+    },
+  },
+  {
+    // (e) Only the files that open transactions reach the database (D-062, D-071). Tests are
+    // exempt: they set up and inspect rows directly.
+    files: [`src/**/${SCRIPT_FILES}`],
+    ignores: [`src/**/*.test.${SCRIPT_EXTENSIONS}`],
+    plugins: { chairside },
+    rules: { 'chairside/database-access': 'error' },
+  },
+  {
+    // (f) Every promise is awaited and only errors are thrown (R-32, D-071, D-073). These rules ask
+    // TypeScript what each expression is, so they need the project (tsconfig.json).
+    files: [TYPED_FILES],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
+    rules: {
+      // checkThenables: a Drizzle query is a thenable, not a Promise. Without it, an un-awaited
+      // tx.insert(…) would pass, and could run after its transaction has ended (R-32).
+      '@typescript-eslint/no-floating-promises': ['error', { checkThenables: true }],
+      '@typescript-eslint/no-misused-promises': 'error',
+      // A thrown value that is not an Error hides a failed query from withoutQueryValues()
+      // (src/lib/query-errors.ts); a refusal is returned, never thrown.
+      '@typescript-eslint/only-throw-error': 'error',
+    },
   },
   {
     files: [`src/modules/**/${SCRIPT_FILES}`],

@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -11,6 +13,23 @@ const FRAMEWORK = 'no-restricted-imports';
 const BOUNDARY = 'chairside/module-boundaries';
 // (c) for what no-restricted-imports cannot see (JSX, dynamic import) is a syntax rule too.
 const FRAMEWORK_SYNTAX = 'no-restricted-syntax';
+const SERVER_ACTIONS = 'chairside/server-actions';
+const DATABASE = 'chairside/database-access';
+const FLOATING = '@typescript-eslint/no-floating-promises';
+const MISUSED = '@typescript-eslint/no-misused-promises';
+const THROWN = '@typescript-eslint/only-throw-error';
+const ARCHITECTURE_RULES = [
+  CLOCK,
+  FRAMEWORK,
+  BOUNDARY,
+  SERVER_ACTIONS,
+  DATABASE,
+  FLOATING,
+  MISUSED,
+  THROWN,
+];
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 interface Case {
   name: string;
@@ -24,6 +43,21 @@ const DECLARE = 'declare const DateTime: any; declare const Temporal: any;';
 /** A framework import, a deep import and a clock read, in that order. */
 const ALL_THREE =
   "import x from 'react'; import { y } from '@/modules/tenancy/schema'; export const a = [x, y, Date.now()];";
+
+/** A file of the project as it is on disk: real code that must pass. */
+const asItIs = (file: string) => ({ file, code: readFileSync(path.join(ROOT, file), 'utf8') });
+
+const STAFF_ACTIONS = 'src/app/(staff)/patients/actions.ts';
+const AUTH_ACTIONS = 'src/app/(auth)/login/actions.ts';
+const STAFF_PAGE = 'src/app/(staff)/patients/page.tsx';
+const USE_SERVER = "'use server';";
+const WRAPPERS = "import { refuse, staffAction, staffRead, userAction } from '@/app/_lib/actions';";
+/** What a wrapper is called with does not matter to the rule. */
+const ARGS = 'declare const spec: never; declare const handler: never;';
+/** A table of its own, so a snippet's queries have Drizzle's real types. */
+const TABLE =
+  "import { pgTable, uuid } from 'drizzle-orm/pg-core'; const marks = pgTable('marks', { id: uuid('id') });";
+const TX = "import type { TenantTransaction } from '@/db/tenant';";
 
 const cases: Case[] = [
   // (a) No reading the clock inside src/modules.
@@ -365,6 +399,418 @@ const cases: Case[] = [
     code: "import x = require('react'); import y = require('@/modules/tenancy/schema'); export = [x, y];",
     expected: [FRAMEWORK, BOUNDARY],
   },
+
+  // (d) Every server action is made by an action wrapper (D-071, D-073).
+  {
+    name: "d: a bare async function exported from a 'use server' file in (staff)",
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} export async function renamePatient() {}`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: a bare async function exported from a 'use server' file in (auth)",
+    file: AUTH_ACTIONS,
+    code: `${USE_SERVER} export async function signIn() {}`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: a bare action exported as an arrow function',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} export const renamePatient = async () => {};`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: an inline 'use server' function in a page",
+    file: STAFF_PAGE,
+    code: "export default function Page() { async function save() { 'use server'; } return <form action={save} />; }",
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: an inline 'use server' arrow function",
+    file: STAFF_PAGE,
+    code: "export const save = async () => { 'use server'; };",
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: an inline 'use server' function in a module",
+    file: IN_MODULE,
+    code: "export async function save() { 'use server'; }",
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: a 'use server' file in a module",
+    file: 'src/modules/scheduling/actions.ts',
+    code: `${USE_SERVER} export async function save() {}`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: a 'use server' file in src/lib",
+    file: 'src/lib/actions.ts',
+    code: `${USE_SERVER} export async function save() {}`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: an unlisted route handler under src/app/api/',
+    file: 'src/app/api/export/route.ts',
+    code: "export async function GET() { return new Response('ok'); }",
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: an unlisted route handler in a route group',
+    file: 'src/app/(staff)/export/route.ts',
+    code: "export async function GET() { return new Response('ok'); }",
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: the auth library's route handler is on the list",
+    ...asItIs('src/app/api/auth/[...all]/route.ts'),
+    expected: [],
+  },
+  {
+    name: "d: the clinic picker's action, as it is, passes",
+    ...asItIs('src/app/(auth)/choose-clinic/actions.ts'),
+    expected: [],
+  },
+  {
+    name: "d: the wrappers' own file, as it is, passes",
+    ...asItIs('src/app/_lib/actions.ts'),
+    expected: [],
+  },
+  {
+    name: 'd: export const x = staffAction(…) passes',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} export const renamePatient = staffAction(spec, handler);`,
+    expected: [],
+  },
+  {
+    name: 'd: export const x = staffRead(…) passes',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} export const readPatient = staffRead(spec, handler);`,
+    expected: [],
+  },
+  {
+    name: 'd: export const x = userAction(…) passes',
+    file: AUTH_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} export const signIn = userAction(spec, handler);`,
+    expected: [],
+  },
+  {
+    name: 'd: the wrapper imported by a relative path passes',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} import { staffAction } from '../../_lib/actions'; ${ARGS} export const renamePatient = staffAction(spec, handler);`,
+    expected: [],
+  },
+  {
+    name: 'd: type-only exports pass',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} export type Input = { name: string }; export interface Output { id: string } export type { Refusal } from '@/app/_lib/actions';`,
+    expected: [],
+  },
+  {
+    name: 'd: export const x = staffRead(…).forPage',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} export const readPatient = staffRead(spec, handler).forPage;`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: the .forPage of a read made earlier in the file',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} const read = staffRead(spec, handler); export const readPatient = read.forPage;`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: the .forPage of an imported read',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} import { readPatient } from './reads'; export const viewPatient = readPatient.forPage;`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: a read's .forPage taken out and re-exported",
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} const { forPage } = staffRead(spec, handler); export { forPage };`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: a re-export, export { x }, even of a wrapper-made action',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} const renamePatient = staffAction(spec, handler); export { renamePatient };`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: a re-export from another file, export { x } from',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} export { renamePatient } from './other-actions';`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: export * from another file',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} export * from './other-actions';`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: export default, even of a wrapper-made action',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} export default staffAction(spec, handler);`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: a call to a local function named staffAction',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} function staffAction(...args: unknown[]) { return async () => args; } export const renamePatient = staffAction({});`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: a function named staffAction imported from another file',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} import { staffAction } from '@/lib/actions'; ${ARGS} export const renamePatient = staffAction(spec, handler);`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: a wrapper imported under another name',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} import { staffAction as makeAction } from '@/app/_lib/actions'; ${ARGS} export const renamePatient = makeAction(spec, handler);`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: export let, which the file could replace later',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} export let renamePatient = staffAction(spec, handler);`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: a wrapper's action passed through another function",
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} declare function logged<T>(action: T): T; export const renamePatient = logged(staffAction(spec, handler));`,
+    expected: [SERVER_ACTIONS],
+  },
+  // Tester, E00-T08: shapes a change to the rule could stop seeing.
+  {
+    name: "d (tester): a bare action when 'use strict' comes before 'use server'",
+    file: STAFF_ACTIONS,
+    code: `'use strict'; ${USE_SERVER} export async function save() {}`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d (tester): an escaped 'use server' is the directive too (Next.js reads its value)",
+    file: STAFF_ACTIONS,
+    code: "'use\\x20server'; export async function save() {}",
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d (tester): a wrapper's result destructured in the export",
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} export const [renamePatient] = staffAction(spec, handler);`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd (tester): an exported class',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} export class Patients {}`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd (tester): an unlisted route handler written as route.tsx',
+    file: 'src/app/(staff)/export/route.tsx',
+    code: "export async function GET() { return new Response('ok'); }",
+    expected: [SERVER_ACTIONS],
+  },
+
+  // (e) Only the files that open transactions reach the database (D-062, D-071).
+  {
+    name: "e: '@/db/client' in a page",
+    file: STAFF_PAGE,
+    code: "import { getDb } from '@/db/client'; export const db = getDb;",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: '@/db/client' in an action file",
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} import { getDb } from '@/db/client'; ${WRAPPERS} ${ARGS} export const listPatients = staffRead(spec, async () => getDb());`,
+    expected: [DATABASE],
+  },
+  {
+    name: "e (tester): '@/db/client' imported for its side effects only, in a page",
+    file: STAFF_PAGE,
+    code: "import '@/db/client'; export default function Page() { return null; }",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: '@/db/client' in a module other than auth",
+    file: IN_MODULE,
+    code: "import { getDb } from '@/db/client'; export const db = getDb;",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: '@/db/client' by a relative path",
+    file: IN_MODULE,
+    code: "import { getDb } from '../../db/client'; export const db = getDb;",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: '@/db/client' with a dynamic import",
+    file: IN_MODULE,
+    code: "export const load = () => import('@/db/client');",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: '@/db/client' through require()",
+    file: 'src/modules/scheduling/slots.cjs',
+    code: "const { getDb } = require('@/db/client'); module.exports = getDb;",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: '@/db/client' in src/modules/auth is fine",
+    file: 'src/modules/auth/sessions.ts',
+    code: "import { getDb } from '@/db/client'; export const db = getDb;",
+    expected: [],
+  },
+  {
+    name: "e: '@/db/client' in src/db is fine",
+    file: 'src/db/anything.ts',
+    code: "import { getDb } from './client'; export const db = getDb;",
+    expected: [],
+  },
+  {
+    name: 'e: withTenant in a module',
+    file: IN_MODULE,
+    code: "import { withTenant } from '@/db/tenant'; export const open = withTenant;",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: withTenant in a page',
+    file: STAFF_PAGE,
+    code: "import { withTenant } from '@/db/tenant'; export const open = withTenant;",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: withTenant under another name',
+    file: IN_MODULE,
+    code: "import { withTenant as open } from '@/db/tenant'; export { open };",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: the tenant file as a namespace, which holds withTenant',
+    file: IN_MODULE,
+    code: "import * as tenant from '@/db/tenant'; export const open = tenant.withTenant;",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: withTenant re-exported',
+    file: IN_MODULE,
+    code: "export { withTenant } from '@/db/tenant';",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: export * of the tenant file',
+    file: IN_MODULE,
+    code: "export * from '@/db/tenant';",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: the tenant file with a dynamic import',
+    file: IN_MODULE,
+    code: "export const load = () => import('@/db/tenant');",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: withTenant in src/modules/auth is fine (the login audit)',
+    file: 'src/modules/auth/sessions.ts',
+    code: "import { withTenant } from '@/db/tenant'; export const open = withTenant;",
+    expected: [],
+  },
+  {
+    name: 'e: a type-only import of TenantTransaction in a module passes',
+    file: IN_MODULE,
+    code: `${TX} export type Tx = TenantTransaction;`,
+    expected: [],
+  },
+  {
+    name: 'e: an inline type import of TenantTransaction passes',
+    file: IN_MODULE,
+    code: "import { type TenantTransaction } from '@/db/tenant'; export type Tx = TenantTransaction;",
+    expected: [],
+  },
+  {
+    name: 'e: tests are exempt',
+    file: 'src/modules/scheduling/slots.test.ts',
+    code: "import { getDb } from '@/db/client'; import { withTenant } from '@/db/tenant'; export const a = [getDb, withTenant];",
+    expected: [],
+  },
+
+  // (f) Every promise is awaited and only errors are thrown (R-32, D-073). Type-aware.
+  {
+    name: 'f: items.forEach(async (i) => tx.insert(…))',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function markAll(tx: TenantTransaction, ids: string[]) { ids.forEach(async (id) => tx.insert(marks).values({ id })); }`,
+    expected: [MISUSED],
+  },
+  {
+    name: 'f: an un-awaited tx.insert(…) inside withTenant',
+    file: 'src/db/jobs.ts',
+    code: `${TABLE} import { withTenant } from '@/db/tenant'; export async function mark(clinicId: string, id: string) { await withTenant(clinicId, async (tx) => { tx.insert(marks).values({ id }); }); }`,
+    expected: [FLOATING],
+  },
+  {
+    name: 'f: an un-awaited tx.insert(…) in a module function',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function mark(tx: TenantTransaction, id: string) { tx.insert(marks).values({ id }); }`,
+    expected: [FLOATING],
+  },
+  {
+    name: 'f: an un-awaited tx.execute(…)',
+    file: IN_MODULE,
+    code: `import { sql } from 'drizzle-orm'; ${TX} export async function touch(tx: TenantTransaction) { tx.execute(sql\`select 1\`); }`,
+    expected: [FLOATING],
+  },
+  {
+    name: 'f (tester): an un-awaited tx.update(…).set(…).where(…)',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} import { eq } from 'drizzle-orm'; export async function touch(tx: TenantTransaction, id: string) { tx.update(marks).set({ id }).where(eq(marks.id, id)); }`,
+    expected: [FLOATING],
+  },
+  {
+    name: 'f: an awaited query passes',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function mark(tx: TenantTransaction, id: string) { await tx.insert(marks).values({ id }); }`,
+    expected: [],
+  },
+  {
+    name: 'f: an async click handler where nothing waits for it',
+    file: 'src/app/(staff)/save-button.tsx',
+    code: 'export function SaveButton({ save }: { save: () => Promise<void> }) { return <button onClick={save}>Save</button>; }',
+    expected: [MISUSED],
+  },
+  {
+    name: 'f: throw { cause: e }',
+    file: IN_MODULE,
+    code: 'export async function load(read: () => Promise<void>) { try { await read(); } catch (e) { throw { cause: e }; } }',
+    expected: [THROWN],
+  },
+  {
+    name: "f: throw refuse('not_found')",
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} export const removePatient = staffAction(spec, async () => { throw refuse('not_found'); });`,
+    expected: [THROWN],
+  },
+  {
+    name: 'f: throw new Error(…) passes',
+    file: IN_MODULE,
+    code: "export function check(ok: boolean) { if (!ok) throw new Error('not ok'); }",
+    expected: [],
+  },
+  {
+    name: 'f: rethrowing a caught error passes',
+    file: IN_MODULE,
+    code: 'export async function load(read: () => Promise<void>) { try { await read(); } catch (error) { throw error; } }',
+    expected: [],
+  },
+  {
+    name: 'f: throwing what withoutQueryValues() returns (unknown) passes',
+    file: IN_MODULE,
+    code: "import { withoutQueryValues } from '@/lib/query-errors'; export async function load(read: () => Promise<void>) { try { await read(); } catch (error) { throw withoutQueryValues(error); } }",
+    expected: [],
+  },
 ];
 
 let reported: string[][] = [];
@@ -380,9 +826,10 @@ beforeAll(async () => {
 
 describe('architecture lint rules', () => {
   it.each(cases.map((c, index) => ({ ...c, index })))('$name', ({ index, expected }) => {
-    const architectureRules = (reported[index] ?? []).filter((rule) =>
-      [CLOCK, FRAMEWORK, BOUNDARY].includes(rule),
-    );
+    const messages = reported[index] ?? [];
+    // A snippet that cannot be parsed reports no rule, so it would pass a case that expects none.
+    expect(messages.filter((message) => message.startsWith('parse error'))).toEqual([]);
+    const architectureRules = messages.filter((rule) => ARCHITECTURE_RULES.includes(rule));
     expect(architectureRules).toEqual(expected);
   });
 });

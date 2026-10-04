@@ -7,6 +7,7 @@ import { AUTH_COOKIE_PREFIX } from '@/lib/cookies';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { withoutQueryValues } from '@/lib/query-errors';
+import { recordLogin } from './login-audit';
 import { accounts, rateLimits, sessions, users, verifications } from './schema';
 
 /**
@@ -115,6 +116,9 @@ function createAuth() {
       expiresIn: SESSION_IDLE_SECONDS,
       updateAge: SESSION_REFRESH_SECONDS,
     },
+    // Every new session writes `user.logged_in` in the person's clinics, before its cookie is set:
+    // if that fails, so does the sign-in (login-audit.ts).
+    databaseHooks: { session: { create: { after: recordLogin } } },
     hooks: { before: refuseDontRememberMe },
     rateLimit: {
       // On in every environment, not only in production, so tests and local runs see it.
