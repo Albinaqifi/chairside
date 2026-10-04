@@ -76,7 +76,7 @@ eslint-rules/         Our lint rules (module boundaries, server actions, databas
                       tests of all architecture rules.
 ```
 
-Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tests/e2e` (E00-T06), `src/worker` (E00-T07).
+Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tests/e2e` (E00-T06b), `src/worker` (E00-T07).
 
 ### Module rules (lint enforces them; `eslint-rules/architecture.test.ts` proves it)
 

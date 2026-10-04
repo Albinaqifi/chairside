@@ -52,7 +52,9 @@ into the runbook.
 **Do.** Nightly canary job per clinic: every appointment tomorrow has a pending reminder or a
 recorded reason; otherwise alert the operator. Alerts for: failure-rate spike, cap reached,
 worker heartbeat missing, stuck `sending` rows. A minimal operator page or script: planned,
-sent, failed, skipped per clinic per day (counts only, no personal data).
+sent, failed, skipped per clinic per day (counts only, no personal data). Next.js's "Failed to
+find Server Action" error, which any client can cause (E00-T08 tester note 5; D-075), is never an
+alert on its own.
 
 **Acceptance.** - [ ] Deleting a planned reminder in a test makes the canary alert. - [ ] Stopping the worker triggers the heartbeat alert. - [ ] Alerts contain ids and counts only.
 
@@ -122,7 +124,8 @@ indexes where needed.
 - **Role:** owner + builder · **Risk:** critical · **Depends on:** E07-T01 … E07-T08, E07-T10
 - **Read:** `security` (Part 2) · runbook · Q-03, Q-07
 
-**Do.** Create production (separate database, secrets, domain, monitoring). Rehearse
+**Do.** Create production (separate database, secrets, domain, monitoring; Next.js telemetry off,
+D-075). Rehearse
 migrations. Finish the runbook (messages stopped, database down, suspected breach, restoring,
 onboarding a clinic). Walk the gate checklist line by line with evidence.
 

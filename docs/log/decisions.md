@@ -900,3 +900,174 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a query library returns real Promises (`checkThenables` can go); `.js` files
   appear in `src/`; Next.js recognises a server action request differently (then `isServerAction()`
   in `src/proxy.ts` follows); the login rows of a password change are unwanted (E04).
+
+### D-075 · E00 after E00-T08: CI comes first, two new tasks from E00-T08's review and test, and how CI runs
+- **Origin:** process, planning after E00-T08 (PR #9) on 2026-10-04. The owner decided: the
+  login-form fix is its own task; E00-T06 is split so that CI comes first; the repository stays on
+  GitHub Free with a small Actions budget, and GitHub Pro is decided after two weeks of runs; the
+  dependency check fails a run only for production dependencies; Next.js telemetry is off
+  everywhere; the pipeline waits for CI, a red run becomes a fix round, and "ready to merge" comes
+  only on green. These answers also settle Q-16 (GitHub for code and CI). The other points are
+  architect choices, which the owner reviews with the tasks.
+- **What:**
+  - **Split and order.** E00-T06 becomes E00-T06a (CI) and E00-T06b (Playwright and journey J1).
+    J1 needs the seeded users (E00-T05) and the Today page of the app shell (E00-T04); CI needs
+    neither. Two tasks come from E00-T08's review and test: E00-T09, the login form (D-076), and
+    E00-T10, the lint gaps (D-077). Order: T06a → T09 → T10 → (T04, T05 in any order) → T06b →
+    T07. E00-T04 waits for E00-T09, because it restyles the login form, and for E00-T10, so that no
+    inline comment can switch a lint guard off in the components it copies into `src/`. E00-T07
+    still comes last, its dependencies named directly: E00-T05, E00-T06b, E00-T09. E00-T04 as
+    written is about 1,160 changed lines of product code (estimated against the code on `main`:
+    tokens, fonts and strings; the components page; the sidebar and its pages; the form pattern),
+    about three times the one-session rule of thumb, so it is split when it is refined.
+  - **How CI runs (E00-T06a).** One workflow on every pull request and every push to `main`, on
+    `ubuntu-24.04` only: every agent already runs `pnpm check` on the owner's Windows machine, and
+    GitHub's Windows runners cannot run the Linux database container. The database starts as on a
+    developer machine (`.env.example` copied to `.env`, then `docker compose up -d --wait`), so no
+    GitHub secret exists. Each command of `pnpm check` is its own step, then `pnpm build`, then the
+    unit and integration tests again with `TZ=Pacific/Auckland`. Every check step runs even when an
+    earlier check failed, but not after a failed setup step (never `always()`), so
+    one red run names every failing check. The token is
+    read-only, every action is pinned to a full commit SHA, every job has a time limit, and a newer
+    push to a pull request cancels its older run.
+  - **No enforced merge rule (owner).** GitHub refuses branch protection and rulesets for a
+    private repository on the Free plan (the API answers 403). The repository stays on Free: the
+    pipeline says "ready to merge" only on a green run, and the owner merges only on green (R-34).
+    The owner adds a payment method with a small Actions budget (for example $10 a month), so CI
+    does not stop when the 2,000 free minutes are used up (estimate: 40 to 55 minutes a task), and
+    decides on GitHub Pro ($4 a month: the merge rule and 3,000 minutes) after two weeks of
+    measured use.
+  - **Dependency check (owner).** `pnpm audit --prod` fails the run: production dependencies are
+    what reaches staging and patient data. The full `pnpm audit` is printed and fails nothing; on
+    2026-10-04 it reports two advisories in development tools, one without a fix. A weekly run on
+    `main` shows a new advisory without waiting for a pull request. CI never passes `--fix`,
+    `--ignore` or `--ignore-unfixable`: they write `pnpm-workspace.yaml`.
+  - **Telemetry (owner).** Next.js's anonymous telemetry is off everywhere: in CI and in
+    `.env.example` (E00-T06a), on staging (E00-T07) and on production (E07-T09). In CI, Next.js only
+    changes where it keeps its telemetry settings; it still sends data unless
+    `NEXT_TELEMETRY_DISABLED=1` is set.
+  - **The pipeline waits for CI (owner; the path is the architect's).** After Build and after each
+    Fix, the pipeline waits for the run of the branch's latest commit, found by that commit
+    (`gh pr checks` cannot tell a run that has not started from a red one). A red check step becomes
+    a fix round: the pipeline gives the builder the run's link and the names of its failing steps. That is
+    CI output, not a role's judgment, so it does not break the rule that the pipeline passes on
+    nothing a role found. The builder fixes exactly those under the usual fix-round rules, records
+    them in its fix-round section, and sets the state the task had before: Built when the note has
+    no reviewer section yet, so the full review still comes next; otherwise Reviewed. The round
+    counts toward the two automatic rounds. The pipeline stops for the owner, and never counts it as
+    green, when no run exists for that commit 10 minutes after the push, when a run stays queued or
+    is refused (minutes used up, GitHub down; such a run is red with no red check step), when a
+    setup step is red, and when
+    `pnpm audit --prod` is red: a dependency change falls under agent rule 4. "Ready to merge" only when the run of the last pushed commit
+    is green. This is how `workflow.md`'s "CI must be green before review" is kept. E00-T06a writes
+    it into the pipeline skill and `builder.md`.
+  - **One scratch pull request (architect choice).** E00-T06a's tester shows the red runs on one
+    scratch pull request: a branch made from the task branch (before the merge only it has the
+    workflow), against `main`, with "scratch" in its title; never merged, closed and its branch
+    deleted afterwards. It is the one exception to one branch and one pull request per task, and
+    the closed pull request stays visible on GitHub. An ordinary pull request, not a draft: on
+    GitHub Free, draft pull requests exist only for public repositories.
+  - **The test clock control** stays in E00-T06b and is designed when that task is refined. Its
+    guard cannot be `NODE_ENV`: `next build` writes `production` into the build that end-to-end
+    tests run against, so such a guard would switch the control off in those tests too.
+  - **The other lines from E00-T08's review and test.** Every page checks the session itself or is
+    public on purpose: `security-privacy.md` section 2 now, the `CLAUDE.md` sentence in E00-T04,
+    the first task that adds pages. Next.js's "Failed to find Server Action" error, which anyone can
+    cause by posting a multipart form that names no server action, is not sent to Sentry (E00-T07)
+    and is never an alert on its own (E07-T03). E00-T07's scrubbing also removes request headers
+    and cookies: Next.js hands a request's headers, the session cookie among them, to the error
+    hook that reports to Sentry.
+  - **`.env.example` (D-064, point 2).** `security-privacy.md` section 7 still said the file lists
+    names without values, while D-064 decided it holds local values that are not secrets, which CI
+    now uses. The section now says what D-064 decided.
+- **Why:** CI needs nothing from E00-T04 or E00-T05. Doing it first means every later task is
+  checked by a machine, on Linux and from a fresh checkout, which agents' claims need. The two new
+  tasks keep a small critical login fix out of E00-T04's large diff, and close the lint gaps before
+  E01 writes the first domain code. Each CI choice is the smallest that keeps the documents true:
+  local values and no secret, a red run only for what reaches production, nothing about our builds
+  leaving the machines.
+- **Revisit if:** two weeks of runs show the minutes or the budget are too tight (then GitHub Pro,
+  which also brings the merge rule); a run takes over 10 minutes; an advisory in a production
+  dependency has no fix; the automatic review on GitHub that D-065 mentions is wanted.
+
+### D-076 · The login form posts to `/login`, and its button stays disabled until its script runs; login still needs JavaScript (E00-T09)
+- **Origin:** process, E00-T08 test, tester note 1. On 2026-10-04 the owner made it its own task,
+  to be fixed before staging. The approach is the architect's choice inside D-063; the owner reviews
+  it with the task.
+- **What:**
+  - The form gets `method="post"` and `action="/login"`, with the default encoding. With
+    JavaScript, its `onSubmit` handler still stops the browser's own submission and signs in
+    through the auth library's client (D-063). If the form is ever submitted without that handler
+    (a script calling `form.submit()`), the browser sends the fields to `/login` in the request
+    body, never in the URL. Next.js 16.3.8 answers a URL-encoded POST that is not a server action
+    with the page itself and does not read the body, and the proxy never sees `/login`. The `action`
+    is written out because a form without one posts to the page's own URL, query string included.
+  - The submit button is disabled in the HTML the server sends, and enabled once the form runs in
+    the browser. A disabled default button also stops Enter from submitting the form, so with
+    JavaScript off nothing is sent at all. A line for browsers without JavaScript says it is needed
+    to log in.
+  - A lint rule reports a `<form>` in `src/` that could put its fields in the URL: one whose
+    `action` is neither a function nor a URL it posts to, and a button or input whose `formMethod`
+    is not `post`. Later forms with secrets (two-factor codes, new passwords, E04) get the same
+    guard.
+  - Login without JavaScript is not built. Posting the form straight to the auth library's sign-in
+    route would show the person a JSON page that holds the session token. Signing in from our own
+    server code instead would skip the library's rate limit, which runs only for HTTP requests to
+    its routes (security-privacy.md section 2, D-064 point 5), and would put the password through
+    our own code, which D-063 rules out.
+- **Why:** with only an `onSubmit` handler, the browser sends the fields as a GET whenever the
+  handler does not run: JavaScript off; before the page's script has run (a slow network, a
+  password manager that submits at once); a script that failed to load after a deploy;
+  `form.submit()`. The fields then stay in the browser history, the development server's request
+  log (seen in E00-T08's test) and a host's access logs. The disabled button stops those
+  submissions before they start, and posting keeps the fields out of the URL when one gets through.
+  Standard attributes and one documented React hook; a unit test of the server's HTML pins it.
+- **Consequences:** on a very slow connection the person waits for the button. When a script
+  fails to load, the button stays disabled with no message; a reload fixes it. A script that calls
+  `form.submit()` after the page has loaded gets the login page back, not a login, and nothing
+  leaks.
+- **Revisit if:** login must work without JavaScript (then a route of our own that keeps the rate
+  limit, an owner decision); E00-T04 moves the login form to a React form action (then the form's
+  test changes only with the owner's agreement, agent rule 8).
+
+### D-077 · E00-T10: the lint guards close the gaps found in E00-T08's review and test
+- **Origin:** process, planning on 2026-10-04. The architect turned six Discovered lines into one
+  task: E00-T08 review suggestions 3 and 4, test notes 2 to 4, and the builder's line on `.js`
+  files. Architect choices inside D-062, D-071, D-073 and D-074; the owner reviews them with the
+  task. D-074 stays as it is.
+- **What:**
+  - **No database handle passed on.** `chairside/database-access` also checks the places allowed to
+    use `withTenant` or the database client (`src/db/`, `src/modules/auth/`, the wrappers' file),
+    and reports a value re-export of either there. Only re-exports are reported: an
+    `export const x = withTenant`, and a function that wraps it, stay review checks, so that no
+    existing test case changes (agent rule 8).
+  - **Database drivers only in `src/db/`.** Outside it, a value import of `pg` or a `pg-…` package,
+    of any `drizzle-orm/…` path except `drizzle-orm/pg-core`, or of `src/db/reset` or
+    `src/db/migrate` is reported. `drizzle-orm` itself and `drizzle-orm/pg-core` stay allowed
+    everywhere, and type-only imports pass. An allow-list, because drizzle-orm has hundreds of entry
+    points and dozens of drivers. The worker's folder joins the list for pg-boss in E00-T07.
+  - **No inline switch.** `linterOptions.noInlineConfig` for `src/`: an `eslint-disable` comment
+    there switches nothing off, and lint reports the comment as a warning, which
+    `--max-warnings=0` fails. The config option, not the command-line flag, which ignores the
+    comments silently and does not reach editors.
+  - **Rejections and swallowed promises.** `@typescript-eslint/prefer-promise-reject-errors`, with
+    `allowThrowingAny` and `allowThrowingUnknown` as `only-throw-error` has them. In
+    `src/**/*.{ts,mts}`, a statement that only hangs `.catch(…)` or a two-argument `.then(…)` on a
+    promise is reported: `no-floating-promises` counts such a promise as handled, so a query could
+    still run after its transaction ended (R-32) and its error would vanish. A client `.tsx` file
+    keeps `void`, as D-074 allows.
+  - **Routes only in `src/app`.** A file under `src/pages/` is reported: Next.js 16 serves the Pages
+    Router next to `src/app`, outside the wrappers and `ROUTE_HANDLERS`, and since E00-T08 the proxy
+    lets a signed-out POST shaped like a server action through to it. `chairside/server-actions`
+    runs on every script file in the repository, so a `'use server'` file outside `src/` is reported
+    too.
+  - **No `.js`, `.jsx`, `.mjs`, `.cjs` or `.cts` files in `src/`.** A test, not a lint rule, fails
+    when `src/` holds one. Those files are outside tsconfig.json's `include` and outside the files
+    the type-aware lint rules check (`TYPED_FILES` in `eslint.config.mjs`), so none of those rules
+    sees them (D-074). A lint rule would add a report to seven existing test cases.
+- **Why:** since E00-T08, lint is a security guard, and each of these is a way past it that a
+  reviewer may not notice. All six are small and live in the same files, so one task closes them.
+  Doing it before E00-T04 copies components into `src/`, and before E01 writes the first domain
+  modules, keeps "lint fails" true from the start.
+- **Revisit if:** a real need meets one of these (a module that must reach a driver, a generated
+  file that needs a lint comment); `void` should be refused in server code too (D-074).

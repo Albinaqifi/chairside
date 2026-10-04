@@ -32,6 +32,10 @@ This document has two parts: rules that code must follow, and the gate before re
 - An action runs only in the clinic its page was shown for. The page sends that clinic's id,
   and the wrapper refuses when the request now resolves to another clinic (another tab switched,
   a membership was disabled). The id grants nothing; memberships decide (D-069).
+- Every page checks the session itself (`currentStaff()`, or `requireUser()` before a clinic is
+  chosen), or is public on purpose and says so. The request proxy is not the check: it lets a
+  signed-out POST that looks like a server action through without a redirect, and a later Next.js
+  could render the page for it (D-074, D-075).
 - Sessions end after 30 minutes of inactivity (clinic computers are shared).
 - Login and 2FA attempts are rate-limited.
 
@@ -85,7 +89,8 @@ This document has two parts: rules that code must follow, and the gate before re
 
 ### 7. Secrets and configuration
 - Secrets live in the host's secret store and in a local `.env` that is never committed.
-  `.env.example` lists names without values.
+  `.env.example` lists every setting, with local-only values that are not secrets (D-064, point 2);
+  a real secret never appears in it.
 - Agents do not read or print `.env` files.
 - Production credentials never exist on a development machine.
 
@@ -93,9 +98,13 @@ This document has two parts: rules that code must follow, and the gate before re
 - HTTPS everywhere, secure and http-only cookies, CSRF protection on every state-changing
   request, security headers (content security policy, frame denial).
 - All input parsed with Zod at the edge. All output escaped by React; no raw HTML from data.
+- A form never puts its fields in the URL: it posts to a URL named in its `action`, or takes a
+  function as its action. The login form's submit button stays disabled until the page's script
+  has run, and login needs JavaScript (D-076).
 - Webhooks verify the provider's signature before doing anything.
 - File uploads: size limit, type check, parsed in the worker, never executed or served back.
-- Dependencies: lockfile committed, automated vulnerability check in CI.
+- Dependencies: lockfile committed, automated vulnerability check in CI (an advisory in a
+  production dependency turns the run red, D-075).
 
 ### 9. Data in non-production (D-044)
 - Synthetic data only: generated names, phone numbers from ranges reserved for testing,
