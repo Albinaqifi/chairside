@@ -6,12 +6,12 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Tested` → `Reviewed` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.)
 
-_Last updated: 2026-10-04 — builder: E00-T08 Built (D-074), ready for review. Before: architect: E00-T03 Done (PR #7 merged). E00-T08 refined and Ready (D-073): the wrapper lint rule also reports an exported `.forPage`, and `only-throw-error` joins the type-aware rules; the read-only transaction waits (owner)._
+_Last updated: 2026-10-04 — reviewer: E00-T08 Reviewed at `f12e90c` (no required changes, 4 suggestions on the Discovered list); the tester is next. Before: builder: E00-T08 Built (D-074)._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T08` is Built and goes to review, then test (`handoffs/E00-T08.md`); after it, E00-T04, E00-T05, E00-T06
+- **Next task to start:** `E00-T08` is Reviewed and goes to the tester (criterion 8 in a real browser; `handoffs/E00-T08.md`); after it, E00-T04, E00-T05, E00-T06
 - **Owner decisions from the E00-T02 test, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list. Finding 6 is decided (D-069)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
   business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
@@ -86,6 +86,10 @@ turns lines into tasks or strikes them out.
 - 2026-10-04 · E00-T08 · A password change with `revokeOtherSessions` starts a new session and so writes `user.logged_in` rows; if they cannot be written, the change fails after the other sessions are already deleted. E04-T02: decide whether a password change should count as a login (D-074).
 - 2026-10-04 · E00-T08 · Login rows are written one clinic at a time: when a later clinic's row fails, the sign-in fails but the earlier clinics keep a `user.logged_in` row for it. E07-T01 (audit viewer): a login row does not prove the sign-in completed (D-074).
 - 2026-10-04 · E00-T08 · `eslint-rules/module-boundaries.mjs` keeps its own copy of the import-path helpers that the new `eslint-rules/import-paths.mjs` holds; a cleanup can switch it over (left untouched to keep the diff to the task).
+- 2026-10-04 · E00-T08 review · No test pins that the proxy's server-action exception holds for POST only (`isServerAction()`, `src/proxy.ts`): a GET with a `Next-Action` header or a multipart content type should still be redirected; deleting the method check fails nothing (handoff, reviewer suggestion 1).
+- 2026-10-04 · E00-T08 review · A signed-out multipart POST now reaches any page in the proxy's matcher (Next.js renders the page when the form names no action). Every page today checks the session itself; say in `CLAUDE.md` that a page outside `(staff)` must too, or be public on purpose, before E00-T04 adds pages (handoff, reviewer suggestion 2).
+- 2026-10-04 · E00-T08 review · `chairside/database-access` skips `src/db/` and `src/modules/auth/` whole, so a re-export of `withTenant` or `getDb` from a file there (the auth module's `index.ts`, say) would let every file import them unreported. Report such re-exports in those folders too (handoff, reviewer suggestion 3).
+- 2026-10-04 · E00-T08 review · An inline `eslint-disable` comment switches off any architecture rule, and nothing forbids one (none in `src/` today). `linterOptions.noInlineConfig` for `src/`, or a test that fails on `eslint-disable` in `src/`, would keep the guards on (handoff, reviewer suggestion 4).
 
 ---
 
@@ -98,7 +102,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 | E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | **Done** | Merged by the owner (PR #5). Tester finding 6 → D-069, finding 2's page side → D-070; findings 5 and 7 on the Discovered list. See `handoffs/E00-T02.md` |
 | E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Done** | Merged by the owner (PR #7). `staffAction`, `staffRead`, `userAction` in `src/app/_lib/actions.ts`; `audit.record()`; D-070 at the source; D-072. Review suggestions and tester notes on the Discovered list. See `handoffs/E00-T03.md` |
-| E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | **Built** | Builder 2026-10-04, branch `task/E00-T08-action-guards`: lint rules `chairside/server-actions`, `chairside/database-access` and three type-aware ones (found nothing in existing code); login rows; an action after the session ended reaches its wrapper (D-074). PR #9. See `handoffs/E00-T08.md` |
+| E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | **Reviewed** | Branch `task/E00-T08-action-guards`, PR #9: lint rules `chairside/server-actions`, `chairside/database-access` and three type-aware ones; login rows; an action after the session ended reaches its wrapper (D-074). Reviewed at `f12e90c`: no required changes, 4 suggestions (Discovered). Next: tester. See `handoffs/E00-T08.md` |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | |
 | E00-T06 | CI and the first end-to-end test | builder | normal | Planned | Owner: create GitHub repo |
