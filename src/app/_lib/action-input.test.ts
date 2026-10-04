@@ -77,4 +77,27 @@ describe('parseInput', () => {
     const parsed = await parseInput(z.object({ clinicId: z.uuid() }), MARKER);
     expect(parsed).toEqual({ ok: false, issues: [{ path: [], code: 'invalid_type' }] });
   });
+
+  // Added by the tester (E00-T03): two more places a key that was sent can reach a path.
+  it('shows a sent key as * inside a union branch, and in a path a custom issue builds', async () => {
+    const inBranch = await parseInput(
+      z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('counts'), counts: z.record(z.string(), z.number()) }),
+      ]),
+      { kind: 'counts', counts: { [MARKER]: MARKER } },
+    );
+    const custom = await parseInput(
+      z.object({ note: z.string() }).superRefine((value, ctx) => {
+        // A schema whose author built the path from a value that was sent.
+        ctx.addIssue({ code: 'custom', path: ['note', value.note], message: value.note });
+      }),
+      { note: MARKER },
+    );
+
+    expect(inBranch).toEqual({
+      ok: false,
+      issues: [{ path: ['counts', '*'], code: 'invalid_type' }],
+    });
+    expect(custom).toEqual({ ok: false, issues: [{ path: ['note', '*'], code: 'custom' }] });
+  });
 });
