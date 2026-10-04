@@ -34,7 +34,9 @@ command that differs is copying the settings file (step 3).
    copy .env.example .env           # Command Prompt
    cp .env.example .env             # macOS or Linux
    ```
-   The values in it only work with the local database and are fine as they are.
+   The values in it only work with the local database and are fine as they are. Its last line,
+   `NEXT_TELEMETRY_DISABLED=1`, stops Next.js from sending anonymous usage data; if your `.env` is
+   older than that line, copy it over from `.env.example`.
 4. Start the database and wait until it is ready:
    ```
    docker compose up -d --wait
@@ -81,6 +83,9 @@ command that differs is copying the settings file (step 3).
 
 Read `CLAUDE.md` first: the start-of-session ritual, the rules that are never broken, and the
 technical conventions. Tasks and their status: `docs/backlog/` and `docs/progress/board.md`.
+
+GitHub checks every pull request and every push to `main` (`.github/workflows/ci.yml`); merge
+only when its run is green. What it runs, and how to run each step yourself: `CLAUDE.md`, "CI".
 
 To run one task through builder, reviewer and tester in a single Claude Code session, type
 `/pipeline <task-id>`, for example `/pipeline E00-T03`. How it works and when it stops for you:

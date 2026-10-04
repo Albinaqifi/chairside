@@ -28,6 +28,7 @@ Planned ─► Ready ─► In progress ─► Built ─► Reviewed ─► Test
                      └── findings ───┴───────────┴────────┘
                       from the review, the test round or the delta review
 
+A red CI run: In progress, then back to the state it came from (below).
 Blocked: from any state. The board says why and who must act.
 ```
 
@@ -35,17 +36,21 @@ Blocked: from any state. The board says why and who must act.
 |---|---|---|
 | **Planned** | Exists in the backlog, may need refinement. | Architect (or owner) → Ready |
 | **Ready** | Passes the Definition of Ready. Can be picked up. | Builder → In progress |
-| **In progress** | A builder is building it, or fixing findings. One builder at a time. | Builder → Built (first build) or → Reviewed (after fixing findings) |
+| **In progress** | A builder is building it, or fixing findings. One builder at a time. | Builder → Built (first build) or → Reviewed (after fixing findings); after fixing a red CI run, the state it had before (Built or Reviewed) |
 | **Built** | Code and tests written, checks green, handoff note written, branch pushed, pull request open. | Reviewer → Reviewed, or → In progress with required changes |
 | **Reviewed** | The reviewer has read the whole diff, and every required change from it is fixed. Code changed after that review is checked by the tester now and by the delta review at the end. | Tester → Tested, or → In progress with findings. Low-risk tasks have no tester: the delta review, if needed, then the owner. |
 | **Tested** | Acceptance criteria verified independently. | Reviewer (delta review, only if code changed after the full review) → stays Tested, or → In progress. Then the owner → Done (merge). |
 | **Done** | Merged to `main`, board updated. | — |
 | **Blocked** | Cannot continue. The board says why and who must act. | whoever unblocks |
 
-A fix always hands the task back to the tester (state Reviewed), because a fix can break what
-was tested. Whatever changed after the full review is read once more in the **delta review**:
-the reviewer reads only the commits since the commit it reviewed, which its handoff section
-names. Changes to the handoff note and the board alone do not need one.
+A fix of a review or test finding always hands the task back to the tester (state Reviewed),
+because a fix can break what was tested. Whatever changed after the full review is read once
+more in the **delta review**: the reviewer reads only the commits since the commit it reviewed,
+which its handoff section names. Changes to the handoff note and the board alone do not need one.
+
+A red CI run (a check step failed) also goes back to a fresh builder, as a fix round. It sets the
+state the task had before: Built when no reviewer section exists yet, so the full review still
+comes next; otherwise Reviewed (D-075).
 
 ## Risk levels decide how much checking a task gets
 
@@ -109,7 +114,11 @@ A task is Done only when all of these are true:
   Built (`gh pr create`); later roles push their commits to the same branch. The PR
   description links the task and the handoff note.
 - Agents never merge, never push to `main` and never force-push. The owner merges.
-- CI must be green before review (once CI exists, E00-T06a).
+- CI must be green before review. `.github/workflows/ci.yml` checks every pull request and every
+  push to `main` (E00-T06a). After Build and after each Fix, the pipeline waits for the run of the
+  branch's latest commit; Review and Test start only on green, a red check step becomes a fix
+  round, and "ready to merge" comes only when the run of the last pushed commit is green. GitHub
+  does not stop a merge on red (GitHub Free, D-075): the owner merges only on green (R-34).
 - Migrations that are merged are never edited: a fix is a new migration.
 
 ## Handoffs
@@ -158,11 +167,12 @@ and the rules. Use this to redo one step, or when the pipeline stopped and you w
 continue step by step.
 
 Typical rhythm for one task, by either way:
-1. Builder → Built, branch pushed, pull request open.
+1. Builder → Built, branch pushed, pull request open. CI checks it; a red check step → a fresh
+   builder fixes it → Built.
 2. Reviewer → Reviewed, or required changes → a fresh builder fixes them → Reviewed.
 3. Tester → Tested, or findings → a fresh builder fixes them → the tester checks again.
 4. If code changed after the full review: the reviewer reads only those commits.
-5. You look (critical tasks: read the diff), merge, mark Done.
+5. You look (critical tasks: read the diff), merge only on a green CI run, mark Done.
 
 Two tasks can run in parallel when they do not depend on each other and touch different
 modules (the board's notes column says which). Parallel tasks use separate branches or git
@@ -170,15 +180,20 @@ worktrees. Run one pipeline at a time: two would share the board and the local d
 
 ## When the pipeline stops for the owner
 
-The pipeline fixes what the reviewer and tester report without asking you, except when:
+The pipeline fixes what the reviewer, the tester and CI report without asking you, except when:
 
 - a role stopped under agent rule 4 and set the task to **Blocked** (an open question, a data
   model change, a new library or secret, a login or tenant change the task did not ask for,
   deleting data, cost, a test whose expectation would have to change, a task too big);
-- a third fix round would be needed: two automatic rounds per task, then something is wrong
-  and you look;
+- a third fix round would be needed: two automatic rounds per task, a round for a red CI run
+  included, then something is wrong and you look;
 - the full check fails and the role says it cannot make it pass;
-- a role's result is unclear, or does not match what it wrote on the board.
+- a role's result is unclear, or does not match what it wrote on the board;
+- CI cannot give an answer, or gives one only you can act on (D-075), and the run is never
+  counted as green: no run for the latest commit 10 minutes after the push, or a run still
+  queued then; a run refused or cut short (Actions minutes used up, GitHub down: red with no red
+  check step; cancelled; timed out); a red setup step; a red `pnpm audit --prod` (a dependency
+  change falls under agent rule 4).
 
 Each time, it sends a push notification and ends with what you must decide and where in the
 handoff note to read. Questions that do not block (the builder's "Questions for the owner")

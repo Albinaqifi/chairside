@@ -1071,3 +1071,38 @@ architecture), `changed` (differs from the original files), `process`.
   modules, keeps "lint fails" true from the start.
 - **Revisit if:** a real need meets one of these (a module that must reach a driver, a generated
   file that needs a lint comment); `void` should be refused in server code too (D-074).
+
+### D-078 · CI and the pipeline's CI wait as built: step names, the run found by commit and branch, time limits (E00-T06a)
+- **Origin:** process, E00-T06a. Builder choices inside D-075; the owner reviews them with the
+  task.
+- **What:**
+  - **Step names are the pipeline's input.** Setup steps are named `Setup: …`; each check step is
+    named by its command (`pnpm lint`, `pnpm test (TZ=Pacific/Auckland)`, `pnpm audit --prod`).
+    The pipeline reads the names of the red steps from `gh run view --json jobs`: a red `Setup: …`
+    step or a red `pnpm audit --prod` stops it for the owner; any other red step whose name starts
+    with `pnpm ` is a fix round; a red run with no red step is a Stop. A comment at the top of
+    `ci.yml` says so, for whoever adds or renames a step.
+  - **The last setup step is the database start** (`id: database`); every check step runs
+    `if: ${{ !cancelled() && steps.database.outcome == 'success' }}`. Copying `.env` and starting
+    the database are two steps, in the README's order: install, `.env`, database.
+  - **The run is found by commit and branch:** `gh run list --workflow ci.yml --branch <branch>
+    --commit <sha>`. The commit alone is not enough: the scratch branch is made from the task
+    branch, so its first run can have the same head commit. A run that does not exist yet is
+    waited for by a background `until` loop around `gh run list`, stopped after 10 minutes (Claude
+    Code refuses a long sleep in the foreground). The pipeline then waits with
+    `gh run watch <id> --exit-status --compact --interval 30` and reads the result with
+    `gh run view <id> --json status,conclusion,url,jobs`. It never re-runs a run.
+  - **A CI fix round** sets the board to In progress while the builder works, then to Built or
+    Reviewed. A failure the builder cannot reproduce or explain from its log (a flaky test, an
+    outage in the middle of a step) is Blocked, not re-run and not "fixed" in the test.
+  - **Times.** The job's limit is 20 minutes, twice the 10 a run should stay under, so a slow
+    runner does not end a good run, and a hung step costs at most 20 minutes. The weekly run is on
+    Mondays at 05:17 UTC.
+  - **The full audit** runs `pnpm audit` and, when it exits non-zero, writes a warning annotation
+    on the run; the step itself stays green, so a red step in the list always means a failed
+    check.
+- **Why:** the pipeline must tell a check it can send to a builder from a failure only the owner
+  can act on, from CI output alone, without a role's judgment (D-075). Step names are what
+  `gh run view` gives without downloading logs.
+- **Revisit if:** a second job or a matrix is added (the names then need a job prefix); GitHub Pro
+  brings a merge rule (a required check names the job, `Check`); runs take over 10 minutes.
