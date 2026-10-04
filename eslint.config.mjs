@@ -2,6 +2,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
 import nextTs from 'eslint-config-next/typescript';
 import databaseAccess from './eslint-rules/database-access.mjs';
+import formsPost from './eslint-rules/forms-post.mjs';
 import moduleBoundaries from './eslint-rules/module-boundaries.mjs';
 import serverActions from './eslint-rules/server-actions.mjs';
 
@@ -29,6 +30,7 @@ const chairside = {
     'module-boundaries': moduleBoundaries,
     'server-actions': serverActions,
     'database-access': databaseAccess,
+    'forms-post': formsPost,
   },
 };
 
@@ -78,6 +80,13 @@ export default defineConfig([
       // (src/lib/query-errors.ts); a refusal is returned, never thrown.
       '@typescript-eslint/only-throw-error': 'error',
     },
+  },
+  {
+    // (g) A form never puts its fields in the URL: its action is a function, or it posts to a URL
+    // (D-076). Telling a function from a URL in action={…} needs the types, so the same files as (f).
+    files: [TYPED_FILES],
+    plugins: { chairside },
+    rules: { 'chairside/forms-post': 'error' },
   },
   {
     files: [`src/modules/**/${SCRIPT_FILES}`],

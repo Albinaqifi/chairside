@@ -6,13 +6,13 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `Tested` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.) Things noticed outside a task: `discovered.md`, next to this file.
 
-_Last updated: 2026-10-04 — architect: E00-T06a Done (PR #11 merged by the owner at `1eea949`); the first CI run on `main` after the merge is green (run 37230797928). Next: E00-T09, then E00-T10 (both Ready). Branch `plan/E00-T06a-done`; the owner merges it before E00-T09 starts._
+_Last updated: 2026-10-04 — builder: E00-T09 Built (D-080); the review starts on a green CI run of its pull request. Before: architect: E00-T06a Done (PR #11 merged by the owner at `1eea949`); the first CI run on `main` after the merge is green (run 37230797928). Next: E00-T09, then E00-T10 (both Ready). Branch `plan/E00-T06a-done`; the owner merges it before E00-T09 starts._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T09` (`/pipeline E00-T09`; Ready, D-076), once the owner has merged the planning branch `plan/E00-T06a-done`: the builder branches from `main`. Then `E00-T10` (Ready, D-077)
-- **Security, from the E00-T08 test:** with JavaScript off, the login form sends the email and password in the URL. `E00-T09` fixes it, before staging (E00-T07)
+- **Next task to start:** `E00-T09` is Built and goes to review once CI is green on its pull request, then test (`handoffs/E00-T09.md`). Then `E00-T10` (Ready, D-077)
+- **Security, from the E00-T08 test:** with JavaScript off, the login form sends the email and password in the URL. `E00-T09` fixes it, before staging (E00-T07): Built
 - **Owner action for CI (D-075):** add a payment method and a small GitHub Actions budget (for example $10 a month); after two weeks of runs, decide on GitHub Pro (R-34). Optional: in the repository's Settings → Actions, require actions pinned to a full commit SHA and allow only GitHub's and pnpm's actions
 - **Owner decisions from the E00-T02 test, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list. Finding 6 is decided (D-069)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
@@ -42,7 +42,7 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Done** | Merged by the owner (PR #7). `staffAction`, `staffRead`, `userAction` in `src/app/_lib/actions.ts`; `audit.record()`; D-070 at the source; D-072. Review suggestions and tester notes on the Discovered list. See `handoffs/E00-T03.md` |
 | E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | **Done** | Merged by the owner (PR #9). Lint rules `chairside/server-actions`, `chairside/database-access` and three type-aware ones; login rows; an action after the session ended reaches its wrapper (D-074). Review suggestions and tester notes on the Discovered list. See `handoffs/E00-T08.md` |
 | E00-T06a | CI: every pull request and `main` checked on GitHub | builder | normal | **Done** | Merged by the owner (PR #11). `.github/workflows/ci.yml` checks every pull request, every push to `main` and every Monday; the pipeline skill and `builder.md` wait for green (D-075, D-078). Review suggestions and tester notes in `discovered.md`. See `handoffs/E00-T06a.md` |
-| E00-T09 | The login form never puts the password in the URL | builder | critical | **Ready** | From E00-T08's test, note 1 (owner: its own task, before staging). Form posts, button disabled until the script runs, lint for every form (D-076). See `handoffs/E00-T09.md` |
+| E00-T09 | The login form never puts the password in the URL | builder | critical | **Built** | Builder 2026-10-04, branch `task/E00-T09-login-form-posts`. The form posts to `/login`, its button is disabled until the script runs, a `<noscript>` line; lint `chairside/forms-post` for every form (D-076, D-080). See `handoffs/E00-T09.md` |
 | E00-T10 | Close the gaps in the lint guards | builder | critical | **Ready** | From E00-T08's review (suggestions 3, 4), test (notes 2–4) and builder (`.js` files) (D-077). See `handoffs/E00-T10.md` |
 | E00-T04 | App shell and design system | builder | normal | Planned | After E00-T09 and E00-T10. Too big for one session as written (D-075): split when it is refined |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | After E00-T10 (D-075). Refined before it starts |
