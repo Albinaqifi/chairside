@@ -6,8 +6,10 @@ clinics cannot see each other's data, and every change is checked automatically.
 **Why first:** everything else stands on tenant isolation, login and the action wrapper.
 Getting them right once, with tests, is cheaper than fixing them under features.
 
-Order: T01 → T02 → T03 → T08 → (T04, T05, T06 in any order) → T07. T08 is the second half of
-T03 (split in D-071), so it sits right after T03 in this file.
+Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → (T04, T05 in any order) → T06b → T07. T08 is
+the second half of T03 (split in D-071), so it sits right after T03 in this file. T06 is split in
+two (D-075): CI (T06a) comes first, Playwright and journey J1 (T06b) after T04 and T05. T09 and T10
+come from E00-T08's review and test (D-076, D-077). The tasks sit in this file in that order.
 
 ---
 
@@ -310,11 +312,277 @@ and `refuse()`'s comment (board, Discovered, E00-T03 review suggestion 2).
 
 ---
 
+### E00-T06a · CI: every pull request and `main` checked on GitHub
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T08
+- **Read:** `test-strategy` (The levels; Message timing: "Hidden local time") ·
+  `docs/process/workflow.md` (Definition of Done; Git; When the pipeline stops for the owner) ·
+  `security` (Part 1, sections 7 and 8) · `README.md` (Run it locally, from zero) ·
+  `.claude/skills/pipeline/SKILL.md` · `.claude/agents/builder.md` (Fixing findings) · D-014,
+  D-059, D-064 (point 2), D-065, D-075 · the architect section of `handoffs/E00-T06a.md`
+
+**Why.** Agents' claims must be checked by a machine on every change, not only on the computer of
+the agent that made them. Nothing runs on GitHub today. With CI first, every later task is checked
+the same way, on Linux and from a fresh checkout. The end-to-end part waits for the seed and the
+app shell (E00-T06b; split in D-075).
+
+**Do.**
+- **One workflow**, `.github/workflows/ci.yml`: on every pull request to `main`, every push to
+  `main`, and once a week on `main`. Runner `ubuntu-24.04`, named rather than `ubuntu-latest`. A
+  read-only token (`permissions: contents: read`), no secrets, a `timeout-minutes` on every job. A
+  newer push to a pull request cancels its older run; a run on `main` is never cancelled (a
+  concurrency group shared by runs on `main` would still cancel a waiting one: key the group by the
+  pull request, and keep runs on `main` out of it). Every action is pinned to a full commit SHA
+  with its version in a comment, and checkout keeps no token (`persist-credentials: false`). Node
+  comes from `engines` and pnpm from `packageManager` in `package.json`, so no version is written
+  twice. The pnpm store is cached on the lockfile; install with `pnpm install --frozen-lockfile`.
+- **The database as on a developer machine:** copy `.env.example` to `.env`, then
+  `docker compose up -d --wait`. Its values are local values, not secrets (D-064, point 2).
+- **The steps.** Each command of `pnpm check` is its own step, in the same order, with `TZ=UTC`.
+  Then `pnpm build`. Then `pnpm test` and `pnpm test:integration` a second time with
+  `TZ=Pacific/Auckland` (the Auckland steps). Every check step (each command of `pnpm check`, the
+  build, the Auckland steps, both audits) runs even when an earlier check failed, with
+  `if: ${{ !cancelled() && steps.<last setup step>.outcome == 'success' }}`; never `always()`, which
+  keeps a cancelled run going. So a failed setup step (checkout, install, the database start) ends
+  the job. So a red run names every failing check
+  at once. The time zone is set in the workflow, not in a `package.json` script (no bash-only
+  syntax there). Telemetry off: `NEXT_TELEMETRY_DISABLED=1` in the workflow and, with a comment, in
+  `.env.example` (D-075).
+- **Dependency check (D-075).** A step with `pnpm audit --prod` fails the run. A step with the full
+  `pnpm audit` prints its findings and fails nothing. Never with `--fix`, `--ignore` or
+  `--ignore-unfixable`: they write `pnpm-workspace.yaml`.
+- **The pipeline waits for CI (D-075).** `.claude/skills/pipeline/SKILL.md` and
+  `.claude/agents/builder.md` describe one path:
+  - After Build and after each Fix, the pipeline waits for the run of the branch's latest commit.
+    It finds that run by the commit (`gh run list --commit <sha>`) and waits for it to end
+    (`gh run watch`); each wait call sets its own time limit under 10 minutes (Claude Code ends a
+    command after 2 minutes unless told otherwise, 10 at most).
+    Not `gh pr checks`: before a run exists, it answers as if the checks had failed. Green: on as
+    before. Review and Test start only on a green run.
+  - A red check step: a fix round for the red run. A red run with no red check step (its job ran
+    no step, for example when the minutes are used up) is not a fix round but a Stop. The pipeline gives the builder the run's link
+    and the names of its failing steps; that is CI output, not a role's judgment. The builder fixes
+    exactly those, under the usual fix-round rules, records them in its fix-round section, and sets
+    the state the task had before: Built when the note has no reviewer section yet (so the full
+    review comes next), otherwise Reviewed. The round counts toward the two automatic rounds.
+  - Stop for the owner, never counted as green: no run for that commit 10 minutes after the push;
+    a run still queued, or refused (minutes used up, GitHub down); a red setup step; a red
+    `pnpm audit --prod` (a dependency change falls under agent rule 4).
+  - Finish only when the run of the last pushed commit is green.
+- **Docs.** `CLAUDE.md`: what CI runs, and how to run each level locally, the Auckland steps on
+  Windows included: PowerShell's `$env:TZ`, because Git Bash drops `TZ=Pacific/Auckland` before
+  Node starts (architect section); show in the handoff note that the zone really changes.
+  `README.md`: one line on CI, and the new `.env.example` line. `docs/process/workflow.md`: in Git,
+  "CI must be green before review" says how (the pipeline waits; the owner merges only on green,
+  R-34), and "When the pipeline stops for the owner" adds the Stop cases above.
+  `docs/process/templates/handoff.md`: a fix round's "Fixes:" line can name a red CI run.
+  `docs/architecture/overview.md`: `.github/workflows/` in the folder structure.
+
+**Out of scope.** Playwright, journey J1 and the test clock control (E00-T06b). A Windows job
+(D-075). Deploys (E00-T07). Caching `.next/` (if a run takes over 10 minutes, cache `.next/cache`
+only, and say so in the handoff note). Dependabot or other automatic updates. Fixing the two
+advisories in development tools. Skipping CI for pushes that change only documents. Automatic
+review on GitHub (D-065). Branch protection (not available on the current plan, D-075).
+
+**Owner action.** Add a payment method and a small Actions budget (D-075). Optional: in the
+repository's Settings → Actions, require actions pinned to a full commit SHA, and allow only
+GitHub's and pnpm's actions. After the merge: check that the run on `main` is green, and copy the
+new `.env.example` line into `.env`.
+
+**Acceptance.**
+- [ ] This task's pull request gets a CI run, and it is green.
+- [ ] A run turns red, names the failing step, and still runs the later steps with their own
+      results, for each of: a failing unit test, a failing integration test, a lint error, a type
+      error, a formatting error, a build error. Shown on one scratch pull request (D-075): a branch
+      made from the task branch, against `main`, with "scratch" in its title; one commit per case,
+      or several in one commit when each turns a different step red; never merged, closed and its
+      branch deleted afterwards. Links to the runs in the handoff note (tester).
+- [ ] Every run repeats the unit and integration tests with `TZ=Pacific/Auckland`. On the scratch
+      pull request, a test that succeeds only when the time zone is UTC succeeds in the `pnpm check`
+      steps and fails in the Auckland steps, which turns the run red (tester).
+- [ ] `pnpm audit --prod` runs on every pull request and is green on this task's pull request. On
+      the scratch pull request, a production dependency with a known advisory turns the run red,
+      while the full audit's findings in development tools do not (tester).
+- [ ] The reviewer reads the workflow and finds: no secret; a read-only token;
+      `persist-credentials: false`; every action pinned to a full commit SHA; `ubuntu-24.04`; Node
+      and pnpm versions taken from `package.json`; `--frozen-lockfile`; a time limit on every job;
+      runs on `main` in no shared concurrency group; check steps that run after a failed check but
+      not after a failed setup step; no `--fix` or
+      `--ignore`; telemetry off in the workflow and in `.env.example`; the weekly run on `main`. The
+      tester sees a newer push cancel the older run of the same pull request.
+- [ ] A full run takes under 10 minutes (three runs listed in the handoff note).
+- [ ] The pipeline skill and `builder.md` describe the same red-run path, with every point of the
+      Do item: the wait by commit, the fix round with the run's link and failing steps, the state
+      set after it, the count toward the two rounds, the Stop cases, and green before Finish (the
+      reviewer reads both). On the scratch pull request, the tester runs the skill's wait commands
+      against a green, a red and a cancelled run, and each gives what the skill expects.
+- [ ] `CLAUDE.md` says how to run each level locally, the Auckland steps on Windows included, and
+      the handoff note shows that the zone really changes there.
+- [ ] `pnpm check` passes.
+
+---
+
+### E00-T09 · The login form never puts the password in the URL
+
+- **Role:** builder · **Risk:** critical · **Depends on:** E00-T02, E00-T08
+- **Read:** `security` (Part 1, sections 2, 6 and 8) · D-063, D-074, D-076 · the architect section
+  of `handoffs/E00-T09.md`
+
+**Why.** The login form (E00-T02) has only an `onSubmit` handler. Whenever that handler does not
+run, the browser submits the form itself: a GET to `/login` with the email and password in the
+URL. They then stay in the browser history, in `pnpm dev`'s request log (seen in E00-T08's test,
+tester note 1) and in a host's access logs. That happens with JavaScript off, and also with it on:
+before the page's script has run (a slow network, a password manager that submits at once), when a
+script fails to load (after a deploy), and when a script calls `form.submit()`. The owner wants it
+fixed before staging (E00-T07).
+
+**Do.**
+- **The form posts.** In `src/app/(auth)/login/login-form.tsx` the form gets `method="post"` and
+  `action="/login"`, with the default encoding (no `encType`). With JavaScript nothing changes:
+  `onSubmit` still stops the browser's own submission and signs in through the auth library's
+  client (D-063). If the form is ever submitted without that handler (a script calling
+  `form.submit()`), the browser posts the fields to `/login` in the request body, and Next.js
+  answers with the login page without reading the body (architect section).
+- **Nothing is sent before the script runs.** The submit button is disabled in the HTML the server
+  sends and enabled once the form runs in the browser: `useSyncExternalStore` with a server snapshot
+  of `false` (setting state in an effect fails lint). While the button is disabled, Enter does not
+  submit the form either, so with JavaScript off nothing is sent at all.
+- **Say why.** A `<noscript>` line in the form: JavaScript is needed to log in. Plain text, like the
+  form's other strings, until E00-T04 moves them to the message file.
+- **Every form posts (lint).** A type-aware lint rule of our own, its id added to
+  `ARCHITECTURE_RULES`, checks every `<form>` in `src/`. A form passes when its `action` is a
+  function (a server action, a React form action), or when it has a literal `method="post"` (any
+  letter case) and a non-empty `action` URL, written or in a string variable. It is reported when it
+  has no `action`, an empty one, or one typed as a string-or-function union, `any` or `unknown`;
+  when its `method` is an expression; and when a spread gives it props but no explicit `action`. A
+  button or input whose `formMethod` is not `post` is reported too. Cases in
+  `eslint-rules/architecture.test.ts` (architect section).
+- **Test.** A unit test of the form's HTML as the server renders it (`react-dom/server`, with
+  `next/navigation` mocked), in a `.ts` file: the unit project collects `src/**/*.test.ts`. It
+  checks the attributes, and that the `<noscript>` line is there and not empty, through one render
+  helper and not by its English words, so E00-T04 can translate the form without changing a check.
+- **Docs:** `CLAUDE.md`, Code conventions: a form posts to a URL named in its `action`, or takes a
+  function as its action; never only `onSubmit` (D-076).
+
+**Out of scope.** A login that works without JavaScript (D-076: posting to the auth library's route
+would show the session token, and signing in from our own server code would skip the rate limit;
+the owner decides if it is ever wanted). Logout without JavaScript (its button sends nothing, so
+nothing leaks). Restyling the login page and moving its strings to the message file (E00-T04). A
+JavaScript-off check in Playwright (E00-T06b). Cleaning up URLs that the old form already left in
+browser histories or logs (local development only, synthetic accounts).
+
+**Acceptance.**
+- [ ] The HTML of `/login`, as a production build sends it (`curl`), has a form with
+      `method="post"`, `action="/login"` and no `enctype`, a submit button with `disabled`, and a
+      `<noscript>` line saying JavaScript is needed to log in.
+- [ ] A unit test renders the form with `react-dom/server` and checks those five points. It fails
+      when `method` is removed, when `action` is removed or changed, when an `encType` is added, and
+      when the button is enabled in the server's HTML (each shown once in the handoff note).
+- [ ] With JavaScript off, in a real browser against a production build: Enter in either field and
+      a click on "Log in" send no request, and neither the address bar nor the browser history holds
+      the email or password (tester).
+- [ ] A URL-encoded POST of the form's fields to `/login` (`curl`; what a browser sends when the
+      form is submitted without our handler): the answer is the login page (200), and no line of the
+      server's output (`next start`, and `pnpm dev`) holds the email or password.
+- [ ] With JavaScript on, while the page's scripts are held back (browser developer tools): Enter
+      and a click send nothing; once they have loaded, the button is enabled and logging in works.
+      When a script fails to load, nothing is sent (tester).
+- [ ] With JavaScript on, logging in, a wrong password ("Wrong email or password.") and "Logging
+      in…" while waiting work as before; the existing tests pass unchanged.
+- [ ] Lint fails on a `<form>` with only `onSubmit`, with `method="get"`, with an `action` URL but no
+      `method="post"` (written, and in a string variable), with `method="post"` but no `action`, with
+      `action=""`, with an `action` typed as a string-or-function union, and on a button with
+      `formMethod="get"`. The login form, the clinic picker and a form whose `action` is a function
+      pass (cases in `architecture.test.ts`; every earlier case passes unchanged).
+- [ ] `pnpm check` passes.
+
+---
+
+### E00-T10 · Close the gaps in the lint guards
+
+- **Role:** builder · **Risk:** critical · **Depends on:** E00-T08
+- **Read:** `docs/log/risks.md` (R-32) · D-062, D-071, D-073, D-074, D-077 · in
+  `handoffs/E00-T08.md`: the builder's "Not done", the reviewer's suggestions 3 and 4, the tester's
+  notes 2 to 4 · the architect section of `handoffs/E00-T10.md`
+
+**Why.** Since E00-T08, lint is a security guard: it is what stops an unwrapped server action, a
+stray database handle or a query nobody waits for. E00-T08's review and test found six ways past
+it, none used today. An allowed folder can pass `withTenant` or the database client on; an inline
+comment can switch any rule off; a query handled with `.catch(() => {})`, or a rejection with a
+plain object, passes; any file can open its own connection with `pg`; a Pages Router route sits
+outside every rule; and a `.js` or `.cts` file in `src/` is seen by no type-aware rule. Closing them
+before E00-T04 copies components into `src/`, and before E01, keeps "lint fails" true (D-077).
+
+**Do.** Cases for each in `eslint-rules/architecture.test.ts`; every earlier case passes unchanged,
+and `pnpm lint` passes on the code as it is.
+- **No handle passed on.** `chairside/database-access` also checks `src/db/`, `src/modules/auth/`
+  and the wrappers' file, and reports there a value re-export of `withTenant` or of anything from
+  the database client file (`getDb`, `connect`, `closeDb` and the rest): `export { … } from`,
+  `export *` of the tenant or client file, and `export { x }` of an imported handle. Type-only
+  re-exports pass.
+- **Drivers only in `src/db/`.** The same rule reports, outside `src/db/`, a value import of `pg` or
+  a `pg-…` package, of any `drizzle-orm/…` path except `drizzle-orm/pg-core`, and of `src/db/reset`
+  or `src/db/migrate`. `drizzle-orm` and `drizzle-orm/pg-core` stay allowed everywhere; type-only
+  imports pass.
+- **No inline switch.** `linterOptions: { noInlineConfig: true }` for `src/`, so a lint comment
+  there switches nothing off and is itself reported. The snippet runner calls a message a parse
+  error only when ESLint marks it fatal, and gives a non-fatal message without a rule id a fixed
+  label that `ARCHITECTURE_RULES` lists, so a case can expect the report.
+- **Rejections and promises nobody waits for.** `@typescript-eslint/prefer-promise-reject-errors`
+  for the type-aware files, with `allowThrowingAny` and `allowThrowingUnknown` (as
+  `only-throw-error` has them). In `src/**/*.{ts,mts}`, a statement that only hangs `.catch(…)` or a
+  two-argument `.then(…)` on a promise is reported. It is added to the modules' existing
+  `no-restricted-syntax` list, never replacing it (architect section).
+- **Routes only in `src/app`.** `chairside/server-actions` reports any file under `src/pages/`, and
+  runs on every script file in the repository, so a `'use server'` file outside `src/` is reported
+  too.
+- **No `.js`, `.jsx`, `.mjs`, `.cjs` or `.cts` files in `src/`.** A test fails when `src/` holds
+  one: no type-aware rule sees them (D-074). Other files, such as styles and images, are not
+  affected.
+- **Docs:** `CLAUDE.md` module rules 5 to 7 say what is now covered; R-32 in `docs/log/risks.md` gets
+  an appended line.
+
+**Out of scope.** Refusing `void` in server code (D-074 keeps it a review check). Reporting
+`export const x = withTenant`, a function that wraps `withTenant` or returns the client, or a cast
+that hides a promise: these stay review checks. A rule against imports from `src/` that resolve
+outside it. The copy of the import-path helpers in `eslint-rules/module-boundaries.mjs` (board). The
+forms rule (E00-T09).
+
+**Acceptance.**
+- [ ] Lint fails on `export { withTenant } from '@/db/tenant'` and on
+      `export { getDb } from '@/db/client'` in `src/modules/auth/`, on `export *` of the tenant and
+      client files in `src/db/`, on an imported `withTenant` exported again under another name, on
+      `export { withTenant } from '@/db/tenant'` in `src/app/_lib/actions.ts`, and on
+      `export { connect } from './client'` in `src/db/`. `export type { TenantTransaction }` passes,
+      and so do the real files.
+- [ ] Lint fails on `pg`, `pg-boss`, `drizzle-orm/node-postgres`,
+      `drizzle-orm/node-postgres/migrator`, `drizzle-orm/postgres-js`, `@/db/reset` and
+      `@/db/migrate` imported in a module, and on `pg` imported in a page and in
+      `src/modules/auth/`. `pg` in `src/db/`, type-only imports of `pg`, and `drizzle-orm` and
+      `drizzle-orm/pg-core` in a module pass.
+- [ ] An `eslint-disable` comment in `src/`, for the next line and for the whole file, switches off
+      none of `chairside/server-actions`, `chairside/database-access`, the clock rule and
+      `no-floating-promises`, and lint reports the comment itself.
+- [ ] Lint fails on `return Promise.reject({ cause: e })` and on `reject({ code })` in a
+      `new Promise`; rejecting with a caught error, with `withoutQueryValues(error)` or with a new
+      Error passes. Lint fails on `tx.insert(…).catch(() => {})` and `….then(ok, fail)` as statements
+      in a module and in an action file, and on `p?.catch(…)`; the same awaited or returned, and a
+      `.then(ok, fail)` statement in a client `.tsx` component, pass. `Date.now()` in a module is
+      still reported.
+- [ ] Lint fails on `src/pages/api/x.ts`, on `src/pages/x.tsx` and on a `'use server'` file
+      outside `src/`. It does not fail on a folder named `pages` inside `src/app`.
+- [ ] A test fails when a `.js`, `.jsx`, `.mjs`, `.cjs` or `.cts` file is put in `src/` (shown once
+      in the handoff note, then removed).
+- [ ] For each fix, taking it out again fails its cases (listed in the handoff note).
+- [ ] `pnpm check` passes.
+
+---
+
 ### E00-T04 · App shell and design system
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T02, E00-T03
-- **Read:** `design-ref` (all) · `scope` (Navigation and roles) · D-009, D-015, D-069 ·
-  demo lines 13–58 (page styles, sidebar)
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T02, E00-T03, E00-T09, E00-T10
+- **Read:** `design-ref` (all) · `scope` (Navigation and roles) · `security` (Part 1, section 2) ·
+  D-009, D-015, D-069, D-076 · demo lines 13–58 (page styles, sidebar)
 
 **Why.** Every screen is built from the same tokens and components, so the app looks like
 the design and agents do not invent styles per screen.
@@ -327,7 +595,10 @@ the design and agents do not invent styles per screen.
   toast, dialog, empty state.
 - Staff layout: sidebar with navigation as in the demo (items the user's role may see),
   clinic name, signed-in user with logout. Pages for each nav item as "coming soon" placeholders.
-- Restyle the login page.
+- Restyle the login page. Keep what E00-T09 made: the form posts to `/login`, its button is
+  disabled until the script runs, and the line for browsers without JavaScript stays (its text
+  moves to the message file). E00-T09's unit test keeps every check it makes; it may only gain
+  what rendering with translations needs, such as a provider or a mock (D-076).
 - Translations set up (next-intl): every visible string comes from the message file; English
   only. No second language and no language switcher are built (D-053): the message file is
   what makes the owner's later translation pass cheap.
@@ -335,7 +606,12 @@ the design and agents do not invent styles per screen.
 - One way for a form to call a wrapped action (E00-T03) and show its typed errors: `forbidden`,
   `invalid_input` next to the fields, `clinic_changed` with a reload (D-069), and a general
   failure for `internal`. The staff layout gives client components the clinic id the page was
-  rendered for, so every form sends it.
+  rendered for, so every form sends it. A form takes the action as `action={…}`: lint refuses a
+  form with only `onSubmit` (D-076).
+- **Docs:** `CLAUDE.md` says that a page outside `(staff)` starts from `currentStaff()` or
+  `requireUser()` too, or is public on purpose and says so in a comment: the proxy lets a
+  signed-out POST that looks like a server action through (`security` section 2; board,
+  Discovered, E00-T08 review suggestion 2). The login page, public on purpose, gets that comment.
 
 **Out of scope.** Any real screen content. Dark mode. Patient-page layout (E02).
 
@@ -388,39 +664,46 @@ a way to create a real clinic (there is no sign-up page).
 
 ---
 
-### E00-T06 · CI and the first end-to-end test
+### E00-T06b · Playwright and the first end-to-end journey (J1)
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04, E00-T05
-- **Read:** `test-strategy` (The levels; End-to-end journeys) · `docs/process/workflow.md` (Git) · D-014
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04, E00-T05, E00-T06a, E00-T09
+- **Read:** `test-strategy` (The levels; End-to-end journeys) · D-012, D-014, D-075, D-076 · the
+  handoff notes of E00-T04, E00-T05 and E00-T06a
 
-**Why.** Agents' claims must be checked by a machine on every change.
+**Why.** A few journeys through a real browser prove that the pieces are wired together: login,
+session, layout, logout. Split from E00-T06 (D-075): it needs the seeded users (E00-T05) and the
+Today page of the app shell (E00-T04). It is refined against what they built, once they are done.
 
 **Do.**
-- GitHub Actions workflow on every pull request and on `main`: install, `check` (format,
-  lint, types, unit), integration tests with a PostgreSQL service, build, Playwright.
-- Playwright set up against a freshly seeded database; journey **J1** (log in, see Today
-  placeholder, log out; wrong password refused).
-- A way for end-to-end tests to control "now" (test-only clock control, impossible to enable
-  in production).
-- The whole suite also runs with `TZ=Pacific/Auckland`.
-- Dependency vulnerability check.
-- Document in `CLAUDE.md` how to run each level locally.
+- Playwright (named in D-012; its exact version gets a decision entry at refinement), set up
+  against a freshly seeded end-to-end database, never the development database, testing a
+  production build on its own port.
+- Journey **J1**: log in, see Today, log out; a wrong password is refused. With JavaScript off, the
+  login form sends nothing, and neither the address bar nor the browser history holds the password
+  (E00-T09).
+- A way for end-to-end tests to control "now" (test-only clock control), impossible to enable on
+  staging or production. `NODE_ENV` cannot be its guard: `next build` writes `production` into the
+  build the tests run against (D-075). Sized when this task is refined; if it does not fit, it gets
+  its own task before the first journey that needs it.
+- A CI job for the journeys, after the build. Traces only on failure, kept briefly, synthetic data
+  only.
+- `CLAUDE.md`: how to run the journeys locally.
 
-**Owner action.** Create the private GitHub repository and turn on "require green CI before merge" for `main`.
+**Out of scope.** Other journeys. The fake channel (E02-T04). The worker's clock (E02-T07).
 
 **Acceptance.**
-- [ ] A pull request with a failing test, a lint error or a type error is marked red.
-- [ ] J1 passes in CI.
-- [ ] The time-zone run is part of CI and green.
-- [ ] The clock-control hook cannot be enabled when `NODE_ENV=production` (test).
-- [ ] A full CI run takes under 10 minutes.
+- [ ] J1 passes in CI and locally on Windows.
+- [ ] J1 fails when login or logout is broken (tester).
+- [ ] The clock control cannot be enabled on staging or production (test).
+- [ ] A run leaves the development database untouched.
+- [ ] A full CI run still takes under 10 minutes.
 
 ---
 
 ### E00-T07 · Staging: web, worker and database deployed
 
-- **Role:** builder + owner · **Risk:** critical · **Depends on:** E00-T06 · **Needs:** Q-07 (working assumption accepted for staging)
-- **Read:** `overview` (The shape; Environments; Things that keep it running) · `security` (Part 1, section 7) · D-005, D-007, D-013
+- **Role:** builder + owner · **Risk:** critical · **Depends on:** E00-T05, E00-T06b, E00-T09 · **Needs:** Q-07 (working assumption accepted for staging)
+- **Read:** `overview` (The shape; Environments; Things that keep it running) · `security` (Part 1, section 7) · D-005, D-007, D-013, D-075, D-077
 
 **Why.** A walking skeleton in a real environment exposes deployment problems while the app is
 still tiny, and gives every later milestone a place to be demonstrated.
@@ -428,12 +711,19 @@ still tiny, and gives every later milestone a place to be demonstrated.
 **Do.**
 - One Dockerfile; the same image runs as `web` or `worker`.
 - Worker entry point: starts pg-boss, registers one repeating "heartbeat" job that logs and
-  pings an external monitor URL if configured, shuts down gracefully.
+  pings an external monitor URL if configured, shuts down gracefully. The worker's folder joins
+  `chairside/database-access`'s lists: pg-boss, and `withTenant` for the job handler (D-071, D-077).
 - Infrastructure description for the host (web service, background worker, managed
-  PostgreSQL in Frankfurt), migrations run on deploy with the migration role.
+  PostgreSQL in Frankfurt), migrations run on deploy with the migration role. Next.js telemetry
+  off on staging (`NEXT_TELEMETRY_DISABLED=1`, D-075).
 - `/api/health`: checks the database and that the worker's heartbeat is recent.
-- Sentry (EU) wired in both processes with personal-data scrubbing on; inactive when no key is set.
+- Sentry (EU) wired in both processes with personal-data scrubbing on. The scrubbing also removes
+  request headers and cookies, so no session cookie or client address reaches Sentry: Next.js hands
+  a request's headers to its error hook. Inactive when no key is set. Next.js's "Failed to find
+  Server Action" error is not sent: anyone can cause it, without a session, by posting a multipart
+  form that names no server action (board, Discovered, E00-T08 tester note 5; D-075).
 - `docs/runbook.md` started: how to deploy, roll back, read logs, run a migration, create a clinic.
+  It says a "Failed to find Server Action" log line is noise unless it follows a deploy.
 
 **Owner action.** Create the hosting, Sentry and monitor accounts; enter secrets in the host's
 secret store (agents never see them); run `clinic:create` on staging.
@@ -445,6 +735,8 @@ secret store (agents never see them); run `clinic:create` on staging.
 - [ ] The worker runs as its own process and the heartbeat job fires on schedule.
 - [ ] `/api/health` turns unhealthy when the worker is stopped (demonstrated).
 - [ ] A deliberate test error appears in Sentry with no personal fields in it.
+- [ ] A multipart POST that names no action, sent to staging without a session, adds no event in
+      Sentry; the deliberate test error still does.
 - [ ] Deploys happen from `main` automatically; a rollback is documented and was tried once.
 - [ ] No secret is in the repository or the image.
 - [ ] Staging holds synthetic data only.

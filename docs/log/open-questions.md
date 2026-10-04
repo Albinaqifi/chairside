@@ -26,7 +26,7 @@ When answered: write the answer here, mark it **Answered (date)**, and add a dec
 | Q-13 | Are Anthropic's API data terms acceptable? | E06-T05 | Open |
 | Q-14 | Cancel-by-link: allowed, and what cut-off? | E02-T09 | Assumed: allowed, 24 h default, per-clinic setting |
 | Q-15 | How are children / guardians handled in the pilot country? | E01-T01 (patient fields) | Assumed (D-033) |
-| Q-16 | GitHub for code and CI? | E00-T01 | Assumed yes (D-014) |
+| Q-16 | GitHub for code and CI? | E00-T01 | **Answered 2026-10-04: yes, a private repository on GitHub Free, GitHub Actions with a small budget; GitHub Pro decided after two weeks of runs** (D-075) |
 | Q-17 | SMS in the real alphabet (Cyrillic, ë, ç) or in plain Latin letters? | E03-T10 (SMS, when added) | **Answered 2026-10-02: plain Latin** (D-054); applies to SMS only, WhatsApp carries Cyrillic |
 | Q-18 | WhatsApp sender: one product number for all clinics, or one number per clinic? | E03-T01, E03-T03 | **Answered 2026-10-02: one product number** (D-056) |
 
@@ -150,8 +150,12 @@ on by default with a 24-hour cut-off; both are clinic settings.
 **Assumed (D-033):** a patient record can carry a guardian name and the contact details are
 the guardian's. Confirm this matches how clinics in North Macedonia record children.
 
-### Q-16 · Code hosting
-**Assumed:** private GitHub repository, GitHub Actions for CI.
+### Q-16 · Code hosting — Answered 2026-10-04
+**Answer: GitHub.** A private repository on the Free plan, GitHub Actions for CI with a small
+budget, and GitHub Pro decided after two weeks of measured runs (D-075). On Free, `main` cannot be
+protected, so the pipeline waits for green CI and the owner merges only on green (R-34).
+
+_Was assumed:_ private GitHub repository, GitHub Actions for CI.
 
 ### Q-17 · SMS alphabet — Answered 2026-10-02
 **Answer: plain Latin letters in SMS.** Recorded as D-054: SMS text is converted to the basic

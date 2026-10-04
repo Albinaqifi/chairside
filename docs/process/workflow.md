@@ -109,7 +109,7 @@ A task is Done only when all of these are true:
   Built (`gh pr create`); later roles push their commits to the same branch. The PR
   description links the task and the handoff note.
 - Agents never merge, never push to `main` and never force-push. The owner merges.
-- CI must be green before review (once CI exists, E00-T06).
+- CI must be green before review (once CI exists, E00-T06a).
 - Migrations that are merged are never edited: a fix is a new migration.
 
 ## Handoffs

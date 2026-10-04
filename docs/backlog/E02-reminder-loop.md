@@ -173,6 +173,9 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
   the next channel in the rule's order (same base key, other channel); the original row ends `failed` with the reason.
 - Global kill switch `MESSAGING_ENABLED`; clinic `paused` status respected.
 - `failed` creates a `failed_message` task.
+- End-to-end tests can set the worker's "now" through the test clock control of E00-T06b, with the
+  same guard (never on staging or production), so journey J3 (E02-T14) can move time forward
+  (D-075).
 
 **Out of scope.** Daily/monthly caps, allow-list, webhooks (E03). Frequency cap (E05).
 
@@ -187,6 +190,7 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 - [ ] Permanent `not_on_whatsapp` from the fake adapter produces exactly one email row for the same reminder and no second WhatsApp row.
 - [ ] With the kill switch off, nothing is claimed and nothing is lost.
 - [ ] Invalid state transitions are rejected by the state machine (all pairs tested).
+- [ ] The worker's test clock cannot be enabled on staging or production (test).
 
 ---
 
