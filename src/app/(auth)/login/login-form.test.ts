@@ -10,7 +10,7 @@ vi.mock('next/navigation', () => ({
 
 /**
  * The login form's HTML as the server renders it: the attributes of the form and of its submit
- * buttons, and the text of its <noscript> lines. The checks read only these, never the form's
+ * buttons and inputs, and the text of its <noscript> lines. The checks read only these, never the form's
  * English words, so the form can be translated (E00-T04) without changing a check.
  */
 function renderLoginForm() {
@@ -22,6 +22,10 @@ function renderLoginForm() {
     // A button without a type submits its form too.
     submitButtons: startTags(html, 'button').filter(
       (button) => (button.get('type') ?? 'submit').toLowerCase() === 'submit',
+    ),
+    // An input can submit its form too, and the first submit control in the form is what Enter uses.
+    submitInputs: startTags(html, 'input').filter((input) =>
+      ['submit', 'image'].includes((input.get('type') ?? 'text').toLowerCase()),
     ),
     noscripts: textsOf(html, 'noscript'),
   };
@@ -60,6 +64,12 @@ describe("the login form, in the server's HTML (D-076)", () => {
     const { submitButtons } = renderLoginForm();
     expect(submitButtons, 'the submit buttons').not.toHaveLength(0);
     for (const button of submitButtons) expect(button.has('disabled')).toBe(true);
+  });
+
+  it('has no enabled submit input either, which would send the form before the script runs', () => {
+    // Tester, E00-T09: an enabled <input type="submit"> or "image" ahead of the disabled button
+    // would become what Enter and a click use. None today; any one must be disabled too.
+    for (const input of renderLoginForm().submitInputs) expect(input.has('disabled')).toBe(true);
   });
 
   it('says in a <noscript> line why logging in needs JavaScript', () => {
