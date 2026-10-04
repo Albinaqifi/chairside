@@ -6,12 +6,12 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Tested` → `Reviewed` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.)
 
-_Last updated: 2026-10-04 — tester: E00-T03 is Tested at `51c9086` (no findings; 3 notes on the Discovered list, 18 tests added). The owner reviews and merges PR #7._
+_Last updated: 2026-10-04 — reviewer: delta review of the tester's tests for E00-T03 (`c3b6817`): approved, no required changes. Stays Tested. They also cover the reviewer's suggestion 3 (owner: strike its Discovered line). The owner reviews and merges PR #7._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T03` is Tested: the owner reviews and merges PR #7. Then `E00-T08`
+- **Next task to start:** `E00-T03` is Tested and its delta review approved: the owner reviews and merges PR #7. Then `E00-T08`
 - **Owner decisions from the E00-T02 test, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list. Finding 6 is decided (D-069)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
   business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
@@ -93,7 +93,7 @@ Fully specified. A task becomes Ready when its dependencies are Done.
 |---|---|---|---|---|---|
 | E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | **Done** | Merged by the owner (PR #5). Tester finding 6 → D-069, finding 2's page side → D-070; findings 5 and 7 on the Discovered list. See `handoffs/E00-T02.md` |
-| E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Tested** | `staffAction`, `staffRead`, `userAction` in `src/app/_lib/actions.ts`; `audit.record()`; D-070 at the source; D-072. Reviewed at `308457d`: no required changes, 5 suggestions (Discovered). Tested at `51c9086`: no findings, 3 notes (Discovered), 18 tests added. Owner merges. PR #7. See `handoffs/E00-T03.md` |
+| E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Tested** | `staffAction`, `staffRead`, `userAction` in `src/app/_lib/actions.ts`; `audit.record()`; D-070 at the source; D-072. Reviewed at `308457d`: no required changes, 5 suggestions (Discovered). Tested at `51c9086`: no findings, 3 notes (Discovered), 18 tests added. Delta review of those tests (`c3b6817`): approved. Owner merges. PR #7. See `handoffs/E00-T03.md` |
 | E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | Planned | Split from E00-T03 (D-071): lint rules (wrappers only, database imports, R-32), login audit rows, action after session end. Fully specified; Ready when E00-T03 is Done |
 | E00-T04 | App shell and design system | builder | normal | Planned | |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | |
