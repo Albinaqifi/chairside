@@ -6,12 +6,12 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Tested` → `Reviewed` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.)
 
-_Last updated: 2026-10-04 — architect: E00-T08 Done (PR #9 merged). E00-T06 split (D-075): E00-T06a (CI) Ready, E00-T06b (Playwright, J1) Planned. New and Ready: E00-T09 (login form, D-076) and E00-T10 (lint gaps, D-077). E00-T08's review and test lines settled. Branch `plan/E00-T06a-ready`; the owner merges it before E00-T06a starts._
+_Last updated: 2026-10-04 — builder: E00-T06a Built (D-078), PR #11 with a green CI run; ready for review. Before: architect: E00-T08 Done (PR #9 merged). E00-T06 split (D-075): E00-T06a (CI) Ready, E00-T06b (Playwright, J1) Planned. New and Ready: E00-T09 (login form, D-076) and E00-T10 (lint gaps, D-077). E00-T08's review and test lines settled. Branch `plan/E00-T06a-ready`; the owner merges it before E00-T06a starts._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T06a` (`/pipeline E00-T06a`), once the owner has merged the planning branch `plan/E00-T06a-ready`: the builder branches from `main`. Then `E00-T09`, then `E00-T10` (both Ready)
+- **Next task to start:** `E00-T06a` is Built (PR #11, CI green) and goes to review, then test (`handoffs/E00-T06a.md`). Then `E00-T09`, then `E00-T10` (both Ready)
 - **Security, from the E00-T08 test:** with JavaScript off, the login form sends the email and password in the URL. `E00-T09` fixes it, before staging (E00-T07)
 - **Owner action for CI (D-075):** add a payment method and a small GitHub Actions budget (for example $10 a month); after two weeks of runs, decide on GitHub Pro (R-34). Optional: in the repository's Settings → Actions, require actions pinned to a full commit SHA and allow only GitHub's and pnpm's actions
 - **Owner decisions from the E00-T02 test, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list. Finding 6 is decided (D-069)
@@ -98,6 +98,8 @@ turns lines into tasks or strikes them out.
 - ~~2026-10-04 · E00-T08 test · `chairside/server-actions` looks at `src/app` only: a Pages Router API route (`src/pages/api/…`), which Next.js 16 serves next to `src/app`, is not reported, and a `'use server'` file outside `src/` is not linted at all (tester note 4).~~ In E00-T10 (D-077).
 - ~~2026-10-04 · E00-T08 test · Any client can make the server log "Failed to find Server Action" with a stack (answer 500) by posting multipart/form-data that names no action: at `/login` since E00-T02, and without a session at every path in the proxy's matcher since E00-T08. No page content is sent. E07-T03: do not alert on it, or answer such posts without an error (tester note 5).~~ In E00-T07 (not sent to Sentry; a runbook line) and E07-T03 (never an alert on its own); D-075.
 - 2026-10-04 · planning · In Git Bash (the agents' Bash tool) on the owner's machine, `TZ=Pacific/Auckland` never reaches Node, which then runs in the machine's own zone; `TZ=UTC` does, and so does PowerShell's `$env:TZ`. Earlier "Auckland" or "Chatham" runs made from Git Bash (E00-T02, E00-T03 and E00-T08 tests) may not have used those zones. E00-T06a's CI runs the Auckland steps for real, and its `CLAUDE.md` gives the PowerShell form.
+- 2026-10-04 · E00-T06a · `pnpm audit --prod` is green only because pnpm does not count `drizzle-kit` as production: it is our development dependency and also an optional peer of `better-auth`, and the full audit lists the esbuild advisory through both paths. If pnpm or better-auth changes that, `--prod` turns red over a tool's advisory and the pipeline stops for the owner.
+- 2026-10-04 · E00-T06a · The "States:" line at the top of this board still reads `Built` → `Tested` → `Reviewed`, the order before D-065; `workflow.md` and the pipeline use `Built` → `Reviewed` → `Tested`.
 
 ---
 
@@ -111,7 +113,7 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T02 | Login, sessions and clinic membership | builder | critical | **Done** | Merged by the owner (PR #5). Tester finding 6 → D-069, finding 2's page side → D-070; findings 5 and 7 on the Discovered list. See `handoffs/E00-T02.md` |
 | E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Done** | Merged by the owner (PR #7). `staffAction`, `staffRead`, `userAction` in `src/app/_lib/actions.ts`; `audit.record()`; D-070 at the source; D-072. Review suggestions and tester notes on the Discovered list. See `handoffs/E00-T03.md` |
 | E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | **Done** | Merged by the owner (PR #9). Lint rules `chairside/server-actions`, `chairside/database-access` and three type-aware ones; login rows; an action after the session ended reaches its wrapper (D-074). Review suggestions and tester notes on the Discovered list. See `handoffs/E00-T08.md` |
-| E00-T06a | CI: every pull request and `main` checked on GitHub | builder | normal | **In progress** | Builder 2026-10-04, branch `task/E00-T06a-ci`. Split from E00-T06 (D-075): CI on every pull request; the pipeline waits for green. Owner: Actions budget. See `handoffs/E00-T06a.md` |
+| E00-T06a | CI: every pull request and `main` checked on GitHub | builder | normal | **Built** | Builder 2026-10-04, branch `task/E00-T06a-ci`, PR #11: `.github/workflows/ci.yml`, green on the PR (about 4.5 minutes a run); the pipeline skill and `builder.md` wait for CI (D-075, D-078). The scratch pull request's red runs are the tester's. Owner: Actions budget. See `handoffs/E00-T06a.md` |
 | E00-T09 | The login form never puts the password in the URL | builder | critical | **Ready** | From E00-T08's test, note 1 (owner: its own task, before staging). Form posts, button disabled until the script runs, lint for every form (D-076). See `handoffs/E00-T09.md` |
 | E00-T10 | Close the gaps in the lint guards | builder | critical | **Ready** | From E00-T08's review (suggestions 3, 4), test (notes 2–4) and builder (`.js` files) (D-077). See `handoffs/E00-T10.md` |
 | E00-T04 | App shell and design system | builder | normal | Planned | After E00-T09 and E00-T10. Too big for one session as written (D-075): split when it is refined |
