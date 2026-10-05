@@ -1177,3 +1177,72 @@ architecture), `changed` (differs from the original files), `process`.
   in `eslint-rules/architecture.test.ts`.
 - **Revisit if:** a form component in E00-T04 needs a shape the rule refuses; forms are made with
   `createElement`; `.jsx` files appear in `src/`.
+
+### D-081 · The form lint also checks a button's own URL, spreads onto buttons and inputs, and refuses `next/form` (E00-T10)
+- **Origin:** process, planning on 2026-10-05. Two Discovered lines from E00-T09: the reviewer's
+  suggestion 1 (full review) and the tester's line on `next/form` (both in `handoffs/E00-T09.md`).
+  Architect choices inside D-076 and D-080, folded into E00-T10; the owner reviews them with the
+  task, **the spread choice above all** (it shapes E00-T04's components). D-077 and D-080 stay as
+  they are.
+- **What:** `chairside/forms-post` also reports, in the files it covers:
+  - **A button's or input's own URL.** A `formAction` on `<button>` or `<input>` is read as a
+    form's `action` is (D-080), with one difference: a value that may be missing passes. Without
+    a `formAction` the element sends the form the way the form says, and the form is checked on its
+    own. So a function passes, and so do `undefined`, `null` and no value at all (parts of a type
+    that are `undefined` or `null` are left out before the rest is classified). A URL passes only
+    with `formMethod="post"` written as a string on the same element. An empty URL, and a value
+    that may be a string or a function (React's own type for it), `any` or `unknown`, are reported
+    even with `formMethod="post"`, as on a form. Lint sees the element alone, not the form around
+    it (a button can sit in another component), so the element must say that it posts.
+  - **A spread onto `<button>` or `<input>` that could carry those two props.** Reported when the
+    spread's type may hold `formAction` or `formMethod`: a property of either name, in any letter
+    case, on any part of the type (a type parameter counts as its constraint); an index signature;
+    `any` or `unknown`. Read from the type, wherever the spread sits: the props a component
+    receives are what the type allows, and TypeScript holds every caller to that type.
+  - **`next/form`.** A value import of `next/form` (also by its paths `next/form.js` and
+    `next/dist/client/form`, with or without `.js`), an `export … from` it, and an `import()` of it
+    written as a string. Type-only imports pass. The check lives in `chairside/forms-post`, not in
+    `no-restricted-imports`: a second block of that rule matching `src/modules/**` would replace
+    the modules' own list (the same flat-config trap as `no-restricted-syntax`, E00-T10's architect
+    section). In a module the import is reported twice, by both rules.
+- **How a component that spreads its props stays possible (E00-T04).** A button or input component
+  types its props without the two: `Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'>`.
+  If it needs a form action, it adds `formAction` typed as a function, takes it out of the props
+  and writes `formAction={formAction}` on the element. Its callers then cannot pass a URL or a
+  method at all: TypeScript refuses them before lint runs. A spread of an object built in the code
+  (`{...{ disabled: pending }}`, a form library's `{ name, onChange, onBlur, ref }`) passes as it
+  is.
+- **Why:**
+  - *The button's URL.* React renders a form whose action is a function with no `method`, and
+    leaves a submitter whose `formAction` is a URL to the browser, before and after hydration: one
+    click sends a GET with every field in the URL, with JavaScript on (react-dom 19.2.8, traced in
+    E00-T09's review). It is the same leak D-076 closed for the login form.
+  - *The spread.* React's own types for a button or input (`ComponentProps<'button'>`, the
+    `…HTMLAttributes` interfaces) include `formAction?: string | function` and
+    `formMethod?: string`, so the first design-system button that spreads them would carry the gap
+    into every form. Refusing every spread instead would make E00-T04 list each prop by hand;
+    checking the property types instead (a function-only `formAction` passes) is more code for a
+    need nobody has. Not checking spreads at all (only naming them in D-080's "Not checked") leaves
+    the likeliest way in open.
+  - *`next/form`.* With a string `action`, Next.js's `<Form>` always sends a GET with the fields
+    as search params; `method`, `formMethod` and `encType` are not supported (Next.js 16.3.8's own
+    docs, `01-app/03-api-reference/02-components/form.md`). With a function action it is React's
+    form with nothing added. So checking `<Form>` as a `<form>` would refuse every string action
+    and pass only what `<form>` already does; refusing the import says the same with less code,
+    and needs no knowledge of where a `<Form>` came from. A patient search (E01-T02) is its
+    likeliest first use, with patient names in URLs and request logs.
+  - A prototype in the architect's scratch space (never committed) added about 75 lines to the
+    rule; with it, all 163 cases of `eslint-rules/architecture.test.ts` passed unchanged and
+    `pnpm lint` passed on the tree. 22 of the 23 shapes this entry reports pass the rule as merged
+    in E00-T09.
+- **Consequences:** a button with its own URL inside a form that already posts must still write
+  `formMethod="post"`: lint cannot see the form. A button or input component cannot spread React's
+  full prop type (above). Once E00-T10's test keeps `.jsx` files out of `src/` (D-077), D-080's
+  "Not checked" `.jsx` file cannot occur.
+- **Not checked (review checks):** `createElement('button', …)`, as for forms (D-080);
+  `require('next/form')` and `import x = require('next/form')`; a URL built in code from the
+  fields (`router.push` with a query string, a link's `href`), which is not a form.
+- **Revisit if:** E00-T04 needs a component that spreads a function-only `formAction` (then check
+  the property types rather than their presence); E01-T02 or a later screen wants search terms in
+  the URL (an owner decision: it changes D-076 and `security-privacy.md` section 8); React or
+  Next.js change how a submitter's URL or `<Form>` is sent.

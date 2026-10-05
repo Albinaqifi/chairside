@@ -500,18 +500,21 @@ browser histories or logs (local development only, synthetic accounts).
 
 ### E00-T10 · Close the gaps in the lint guards
 
-- **Role:** builder · **Risk:** critical · **Depends on:** E00-T08
-- **Read:** `docs/log/risks.md` (R-32) · D-062, D-071, D-073, D-074, D-077 · in
+- **Role:** builder · **Risk:** critical · **Depends on:** E00-T08, E00-T09
+- **Read:** `docs/log/risks.md` (R-32) · D-062, D-071, D-073, D-074, D-076, D-077, D-080, D-081 · in
   `handoffs/E00-T08.md`: the builder's "Not done", the reviewer's suggestions 3 and 4, the tester's
-  notes 2 to 4 · the architect section of `handoffs/E00-T10.md`
+  notes 2 to 4 · the architect sections of `handoffs/E00-T10.md`
 
 **Why.** Since E00-T08, lint is a security guard: it is what stops an unwrapped server action, a
 stray database handle or a query nobody waits for. E00-T08's review and test found six ways past
 it, none used today. An allowed folder can pass `withTenant` or the database client on; an inline
 comment can switch any rule off; a query handled with `.catch(() => {})`, or a rejection with a
 plain object, passes; any file can open its own connection with `pg`; a Pages Router route sits
-outside every rule; and a `.js` or `.cts` file in `src/` is seen by no type-aware rule. Closing them
-before E00-T04 copies components into `src/`, and before E01, keeps "lint fails" true (D-077).
+outside every rule; and a `.js` or `.cts` file in `src/` is seen by no type-aware rule. E00-T09's
+review and test found two more in its form rule: a button or input that sends its form to a URL of
+its own, or gets that URL through a spread, and Next.js's `<Form>`, which sends every field in the
+URL whenever its action is a URL. Closing them before E00-T04 copies components into `src/`, and
+before E01, keeps "lint fails" true (D-077, D-081).
 
 **Do.** Cases for each in `eslint-rules/architecture.test.ts`; every earlier case passes unchanged,
 and `pnpm lint` passes on the code as it is.
@@ -539,14 +542,30 @@ and `pnpm lint` passes on the code as it is.
 - **No `.js`, `.jsx`, `.mjs`, `.cjs` or `.cts` files in `src/`.** A test fails when `src/` holds
   one: no type-aware rule sees them (D-074). Other files, such as styles and images, are not
   affected.
+- **Every way a form is sent** (D-081). `chairside/forms-post` also reports:
+  - on `<button>` and `<input>`, a `formAction` read as a form's `action` is, except that a value
+    that may be missing passes (parts typed `undefined` or `null` are left out first; no value at
+    all passes too). A function passes; a URL passes only with `formMethod="post"` written as a
+    string on the same element; an empty URL, or a value that may be a string or a function, `any`
+    or `unknown`, is reported.
+  - on `<button>` and `<input>`, a spread whose type may carry `formAction` or `formMethod`: a
+    property of either name in any letter case on any part of its type (a type parameter counts as
+    its constraint), an index signature, `any` or `unknown`. Wherever the spread sits.
+  - in every file it covers, a value import of `next/form` (also `next/form.js` and
+    `next/dist/client/form`, with or without `.js`), an `export … from` it, and an `import()` of it
+    written as a string. Type-only imports pass. In this rule, not in `no-restricted-imports`
+    (architect section, 2026-10-05).
 - **Docs:** `CLAUDE.md` module rules 5 to 7 say what is now covered; R-32 in `docs/log/risks.md` gets
-  an appended line.
+  an appended line. `CLAUDE.md`'s Forms line says that a `formAction` follows a form's rule, that a
+  component spreading props onto a button or input types them without `formAction` and
+  `formMethod` (D-081), and that `next/form` is not used.
 
 **Out of scope.** Refusing `void` in server code (D-074 keeps it a review check). Reporting
 `export const x = withTenant`, a function that wraps `withTenant` or returns the client, or a cast
 that hides a promise: these stay review checks. A rule against imports from `src/` that resolve
-outside it. The copy of the import-path helpers in `eslint-rules/module-boundaries.mjs` (board). The
-forms rule (E00-T09).
+outside it. The copy of the import-path helpers in `eslint-rules/module-boundaries.mjs` (board).
+Of the form rule: `createElement`, `require('next/form')`, and a URL built in code from a form's
+fields (review checks, D-081); any change to the login form.
 
 **Acceptance.**
 - [ ] Lint fails on `export { withTenant } from '@/db/tenant'` and on
@@ -573,6 +592,26 @@ forms rule (E00-T09).
       outside `src/`. It does not fail on a folder named `pages` inside `src/app`.
 - [ ] A test fails when a `.js`, `.jsx`, `.mjs`, `.cjs` or `.cts` file is put in `src/` (shown once
       in the handoff note, then removed).
+- [ ] Lint fails on `<button formAction="/patients">` in a form whose action is a function, on
+      `<input type="submit" formAction="/patients">`, on a `formAction` URL in a string variable
+      without `formMethod`, on `formAction=""` with `formMethod="post"`, and on a `formAction`
+      typed `ComponentProps<'button'>['formAction']` with `formMethod="post"`. A function, a
+      function-or-`undefined`, `formAction={undefined}`, and a URL with `formMethod="post"` (also
+      `"POST"`, and with the URL in a string variable) pass.
+- [ ] Lint fails on a spread onto `<button>` typed `ComponentProps<'button'>`,
+      `Omit<ComponentProps<'button'>, 'formAction'>`, `any` or `Record<string, string>`, or a type
+      parameter constrained by `ComponentProps<'button'>`, and onto `<input>` typed
+      `ComponentProps<'input'>`. Passing: a spread typed
+      `Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'>`; a button component of that type
+      plus `formAction` typed as a function, written as `formAction={formAction}` after the spread;
+      `{...{ disabled: pending }}`; and an input spread of an object with `name`, `onChange`,
+      `onBlur` and `ref`.
+- [ ] Lint fails on `import Form from 'next/form'` in a page and in a client component, on
+      `import { default as F } from 'next/form'`, on `import Form, { type FormProps } from
+      'next/form'`, on `export { default } from 'next/form'`, on `export * from 'next/form'`, on
+      `import('next/form')`, and on imports of `next/form.js` and `next/dist/client/form`.
+      `import type { FormProps } from 'next/form'`, `import { type FormProps } from 'next/form'` and
+      `next/link` pass.
 - [ ] For each fix, taking it out again fails its cases (listed in the handoff note).
 - [ ] `pnpm check` passes.
 
