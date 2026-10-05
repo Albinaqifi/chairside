@@ -7,7 +7,7 @@ How a piece of work moves from an idea to done, adapted to one owner working wit
 | Role | Who | Does |
 |---|---|---|
 | **Owner** | Albin | Sets priorities, answers open questions, reviews critical work, merges to `main`. |
-| **Architect** | agent | Refines tasks until they are Ready, keeps the architecture documents true, records decisions. Writes no application code. |
+| **Architect** | agent (`/architect <task-id>`) | Refines tasks until they are Ready, keeps the architecture documents true, records decisions. Writes no application code. After a merge, marks the task Done and settles what it left open. |
 | **Builder** | agent | Implements one task with its tests, pushes the branch and opens the pull request. A fresh builder session fixes the findings of a review or a test round. |
 | **Reviewer** | agent, fresh session | Reviews the diff against the task, the rules and the security document. Reads only the new commits when a task comes back after its review (delta review). |
 | **Tester** | agent, fresh session | Verifies the acceptance criteria independently and tries to break the result. Comes after the review, so it tests the code that will ship. |
@@ -154,7 +154,14 @@ the board so that the board stays short enough to read every session.
 
 ## Starting a session (for the owner)
 
-There are two ways. To pick the next task, read "Next" on the board.
+There are three ways. To pick the next task, read "Next" on the board.
+
+**The architect pass (`/architect E01-T04`).** After you have merged a task's pull request, or
+before a task that is not yet Ready starts. In a new Claude Code session, type `/architect` and
+the task id. It marks the merged task Done, checks the first CI run on `main`, goes through what
+the task left open (the note's questions for you, its Discovered lines) and asks you where the
+choice is yours, refines the next task to Ready, and opens a planning pull request. Merge that
+on green, then `/pipeline` the next task. `/architect E05-T00` refines a whole epic.
 
 **The pipeline (usual).** In a new Claude Code session, type `/pipeline E01-T04`. It runs the
 whole rhythm below by itself, each role as a fresh subagent, and stops only when you are
@@ -175,7 +182,8 @@ Typical rhythm for one task, by either way:
 2. Reviewer → Reviewed, or required changes → a fresh builder fixes them → Reviewed.
 3. Tester → Tested, or findings → a fresh builder fixes them → the tester checks again.
 4. If code changed after the full review: the reviewer reads only those commits.
-5. You look (critical tasks: read the diff), merge only on a green CI run, mark Done.
+5. You look (critical tasks: read the diff), merge only on a green CI run. Then
+   `/architect <task-id>` marks it Done and gets the next task Ready.
 
 Two tasks can run in parallel when they do not depend on each other and touch different
 modules (the board's notes column says which). Parallel tasks use separate branches or git

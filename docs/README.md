@@ -60,6 +60,7 @@ Each document has one job. Read only what your task points you to.
 | `CLAUDE.md` | Loaded automatically by every agent session: start ritual, the rules that are never broken, technical conventions. |
 | `.claude/agents/` | Role definitions (architect, builder, tester, reviewer) for Claude Code. |
 | `.claude/skills/pipeline/` | `/pipeline <task-id>`: runs one task through builder, reviewer and tester, each as a fresh subagent. |
+| `.claude/skills/architect/` | `/architect <task-id>`: the architect pass after a merge (Done, leftovers, the next task Ready) or before a task starts (Ready). |
 | `design/unpacked/` | Readable copies of the original HTML design files, and how to regenerate them. |
 
 ## Who reads what

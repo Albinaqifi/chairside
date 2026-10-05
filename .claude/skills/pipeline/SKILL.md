@@ -141,7 +141,9 @@ delta review check) back here. Only then send a push
 notification: "$task ready to merge: <pull request link>". End your turn with a short report:
 the state, the pull request link, how many fix rounds it took, and the headings of the
 owner's open questions in the note. For a critical task, add that the owner reads the diff
-personally, starting with the reviewer's "For the owner".
+personally, starting with the reviewer's "For the owner". End with the step after the merge:
+`/architect $task` marks the task Done, settles what the note and the Discovered list left open,
+and refines the next task (D-083).
 
 ## Stop
 
