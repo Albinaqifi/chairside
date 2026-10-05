@@ -6,10 +6,31 @@ No personal data here, not even synthetic names: use ids.
 
 Sections appear in the order the work happened: builder, reviewer, tester. A fix round adds a
 builder section after the reviewer or tester section it answers (for a red CI run, at the end);
-a delta review adds a reviewer section at the end.
+a delta review adds a reviewer section at the end. An architect's Ready pass opens the note,
+before the builder; its Done pass, after the owner's merge, closes it (`/architect <task-id>`,
+D-083).
 
 ```markdown
 # E0X-T0Y · Task title
+
+## Architect — YYYY-MM-DD
+**Branch:** plan/E0X-T0Y-ready (documents only; the owner merges it before the builder starts)
+**Result:** Ready | Planned | Blocked
+
+**What was settled** (the owner's answers and the architect's choices, each with its D-number;
+which one the owner should look at)
+- …
+
+**Doc changes** (the task's section, files touched in docs/, Discovered lines deleted)
+
+**For the builder: what is already there** (checked on `main` at <sha>)
+- …
+
+**For the reviewer and tester** (what each criterion costs to check)
+- …
+
+**Questions for the owner**
+- …
 
 ## Builder — YYYY-MM-DD
 **Branch:** task/E0X-T0Y-short-name
@@ -81,6 +102,20 @@ docs updated · conventions
 
 **Required changes**
 1. …
+
+## Architect — YYYY-MM-DD (Done pass)
+**Branch:** plan/E0X-T0Y-done (documents only; pull request "E0X-T0Y: Done")
+**Result:** Done. Merged by the owner (PR #n) at <sha>; CI run on `main` <link>: green | red at step …
+
+**What I changed** (the board, the logs, the tasks the leftovers went into)
+
+**Where each leftover went**
+| # | Leftover (short) | From | Went to |
+|---|---|---|---|
+| 1 | … | builder question 1 · reviewer "For the owner" · Discovered line of … | owner: … · D-0xx · E0X-T0Z Do item · struck: … |
+
+**For the owner: still to do**
+- …
 
 ## Owner — YYYY-MM-DD
 Merged / sent back, with a line of why.

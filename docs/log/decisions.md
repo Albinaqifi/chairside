@@ -1307,3 +1307,43 @@ architecture), `changed` (differs from the original files), `process`.
   not a promise's; E00-T04 writes a generic button or input component (then the mapped-type gap
   matters); the worker's folder needs `pg-boss` (E00-T07: `DRIVERS_FOLDER` in `database-access.mjs`
   becomes a list); a lint comment is needed outside `src/`.
+
+### D-083 · The architect pass is started with `/architect <task-id>` (process)
+- **Origin:** process, 2026-10-05. The owner asked for a way to start the architect from a task
+  id, after five planning passes (E00-T03, E00-T08, E00-T06a, E00-T09, E00-T10) were each started
+  with a prompt written by hand; merging this change is the decision.
+- **What:** `.claude/skills/architect/SKILL.md` holds the standing instructions of a planning
+  pass, the way the pipeline skill holds a task's. The owner types `/architect <task-id>` in a new
+  session, and the skill chooses the pass from the board:
+  - a **Done pass** when the task's pull request is merged: mark it Done, name the first CI run
+    on `main` after the merge, collect the leftovers (the builder's questions for the owner and
+    known gaps, the reviewer's and the tester's lines for the owner, the Discovered lines that
+    name the task), sort each into the owner's, the architect's, work or struck, and refine the
+    next task of the Next list;
+  - a **Ready pass** when the task is Planned, or Ready with leftovers that name it;
+  - a stop with a reason for any other state.
+  It runs in the owner's session, not in a subagent, so the architect asks the owner where agent
+  rule 4 says so: every item in one round, each with a recommendation. The pass ends as before: a
+  `plan/<task>-done` or `plan/<task>-ready` branch, the architect section(s) in the handoff
+  note(s), one pull request the owner merges before the next `/pipeline`. The pipeline's Finish
+  now names `/architect <task>` as the step after the merge, and the handoff template has the two
+  architect sections (Ready pass at the top of a note, Done pass at its end).
+- **Why:** every pass so far did the same four things, and each time the owner asked the session
+  that had run the pipeline to write the prompt for it. The last such prompt took that session 24
+  minutes (it rebuilt the precedent with a multi-agent search) and still held answer lines the
+  owner had to fill in by hand. Everything task-specific those prompts carried is in the
+  repository (the board row names the pull request, the note holds the questions, the Discovered
+  lines name the task), so a standing skill can find it; only the owner's answers are not, and the
+  architect can ask for them in the session. The pipeline skill showed the shape works: one
+  command, and the precedent lives in a file, not in a chat.
+- **Not done, on purpose:** running the architect as a subagent from the pipeline's Finish (the
+  owner merges first, and the architect must be able to ask the owner, which a subagent cannot);
+  and refining the whole epic in every Done pass (the next task, usually one, is what the next
+  `/pipeline` needs; a `T00` task refines its epic).
+- **Consequences:** `.claude/skills/architect/SKILL.md` (new); `.claude/skills/pipeline/SKILL.md`
+  (Finish); `.claude/agents/architect.md`; `docs/process/workflow.md` (the people table,
+  "Starting a session", the rhythm); `docs/process/templates/handoff.md`; `docs/README.md`. The
+  first use is E00-T10's Done pass, still owed when this was written: `/architect E00-T10`.
+- **Revisit if:** a pass needs instructions the skill cannot know (then a prompt for that pass
+  only, on top of the skill); or the skill's reading list makes the architect miss a leftover
+  (then widen step 3's list, not the rule).
