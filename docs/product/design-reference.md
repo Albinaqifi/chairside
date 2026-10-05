@@ -32,7 +32,7 @@ The markup uses a small template language: `{{ name }}` is a value, `<sc-for>` i
 
 | Screen | Markup lines | Logic lines | Built in |
 |---|---|---|---|
-| Sidebar / navigation | 24–58 | 2085–2088 | E00-T04 |
+| Sidebar / navigation | 24–58 | 2085–2088 | E00-T04b |
 | Today | 62–213 | 1783–1810 | E01-T10, then E02, E05, E06 add panels |
 | Calendar: header and day view | 215–283 | 1812–1847 | E01-T04 |
 | Calendar: week view | 284–314 | 1835–1845 | E01-T07 |
@@ -59,7 +59,7 @@ The markup uses a small template language: `{{ name }}` is a value, `<sc-for>` i
 | Drawer: appointment details | 1197–1258 | 1937–1957, 1720–1727 | E01-T06, E02-T12 |
 | Drawer: aftercare review | 1259–1322 | 1975–1994 | E06-T08 |
 | Drawer: new appointment | 1323–1362 | 1958–1964, 2116–2135 | E01-T05 |
-| Toast | 1364–1366 | 1615 (`flash`) | E00-T04 |
+| Toast | 1364–1366 | 1615 (`flash`) | E00-T04c |
 
 Useful data in the logic section:
 
@@ -77,7 +77,7 @@ them as wording reference, not as final copy.
 
 ## Design tokens
 
-Take these from the demo and define them once (Tailwind theme / CSS variables) in E00-T04.
+Take these from the demo and define them once (Tailwind theme / CSS variables) in E00-T04a.
 Never hard-code a colour in a component.
 
 **Fonts.** UI: `Figtree`. Headings and big numbers: `Newsreader` (serif, weight 400–500).

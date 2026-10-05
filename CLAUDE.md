@@ -106,7 +106,7 @@ eslint-rules/         Our lint rules (module boundaries, server actions, databas
                       the tests of all architecture rules.
 ```
 
-Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tests/e2e` (E00-T06b), `src/worker` (E00-T07).
+Create a folder only when it has content. Coming later: `src/ui` (E00-T04a), `tests/e2e` (E00-T06b), `src/worker` (E00-T07).
 
 ### Module rules (lint enforces them; `eslint-rules/architecture.test.ts` proves it)
 
@@ -140,10 +140,11 @@ No lint comment switches a rule off, in `src/` or anywhere else in the repositor
    `items.forEach(async …)`), and only Errors are thrown or rejected (`only-throw-error`,
    `prefer-promise-reject-errors`: a refusal is returned, never thrown). In the `.ts` and `.mts`
    files, a statement that only hangs `.catch(…)`, `.then(ok, fail)` or `.finally(…)` on a promise
-   is reported: await it or return it. A `'use server'` file is a `.ts` file (rule 5), so every
-   action handler is under that check; a client `.tsx` file is not. `src/` holds no `.js`, `.jsx`,
-   `.mjs`, `.cjs` or `.cts` files, which these rules would not see (a test fails) (R-32, D-073,
-   D-074, D-077, D-084).
+   is reported: await it or return it. A `'use server'` file is a `.ts` file (rule 5), so a
+   handler written in it is under that check. A handler written in a `.tsx` file and passed to the
+   wrapper is not, and neither is a client `.tsx` file: reviewers check where a handler is written
+   (D-086). `src/` holds no `.js`, `.jsx`, `.mjs`, `.cjs` or `.cts` files, which these rules would
+   not see (a test fails) (R-32, D-073, D-074, D-077, D-084).
 
 ### Code conventions
 
