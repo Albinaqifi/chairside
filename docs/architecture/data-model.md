@@ -4,8 +4,8 @@ The target schema for version 1. Tables are **created by the epic that first nee
 (D-016); this document is the design they follow.
 
 **Changing this model** (new table, new column, changed meaning) is never done silently:
-update this file and add a decision-log entry in the same change, and flag it for owner review
-(agent rules 4 and 11).
+update this file and add a decision-log entry in the same change, and flag it for the owner's
+decision (agent rules 4 and 11).
 
 ## Conventions
 

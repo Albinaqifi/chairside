@@ -1,6 +1,6 @@
 ---
 name: pipeline
-description: Runs one Chairside task through builder, reviewer, fix rounds, tester and delta review, each role as a fresh subagent, goes on only when CI is green, and stops for the owner only when the rules say so. Started only by the owner with /pipeline <task-id>.
+description: Runs one Chairside task through builder, reviewer, fix rounds, tester, delta review and, for a critical task, the critical review, each role as a fresh subagent, goes on only when CI is green, and stops for the owner only when the rules say so. Started only by the owner with /pipeline <task-id>.
 argument-hint: <task-id, e.g. E00-T03>
 arguments: [task]
 disable-model-invocation: true
@@ -33,7 +33,7 @@ the handoff note, the board and the branch. That is the point: keep it that way.
 | In progress, anything else | **Stop**: a builder may still be at work, or a session ended halfway |
 | Built | CI wait, then Review |
 | Reviewed | CI wait, then Test (low risk: Delta review check) |
-| Tested | Delta review check |
+| Tested | Delta review check, then for a critical task the critical review |
 | Blocked | **Stop**: report what the note says the owner must decide |
 | Done | **Stop**: nothing to do |
 
@@ -44,7 +44,9 @@ later step, check out the task branch first (`git switch <branch>`, then `git pu
 
 Start each subagent in the foreground: the next step depends on its result. Give it only the
 task id, the step, and the reply format below. Never pass on what an earlier role thought or
-found: the reviewer and the tester judge from the note and the code alone.
+found: the reviewer and the tester judge from the note and the code alone. Read the time with
+Bash `date +%H:%M` right before each step starts and right after it ends, a CI wait included:
+Finish and Stop report the minutes of each step.
 
 **Build.** Builder: "Act as builder for task $task. Follow `.claude/agents/builder.md` and
 the agent rules. When done, reply in three lines: the board state you set, the pull request
@@ -113,16 +115,29 @@ review check. In progress → Fix.
 **Delta review check.** If the note has no reviewer section at all (a task started before
 D-065, when the tester came first), there is nothing to compare against: start the reviewer
 for a full review instead, with the prompt and reply of Review, and tell it the task is
-already Tested. Reviewed → Finish. In progress → Fix.
+already Tested. Reviewed → Critical review for a critical task, Finish for any other.
+In progress → Fix.
 
 Otherwise take the last commit a reviewer read: the `Reviewed commit` of the
-full review, or the end of the `Reviewed commits` range of the latest delta review. List what
-changed after it, leaving out the handoff notes and the board:
-`git diff --name-only <commit>..HEAD -- . ":(exclude)docs/progress"`. Nothing → Finish.
-Otherwise reviewer: "Act as reviewer for task $task: delta review of the commits after
-<commit>, as `.claude/agents/reviewer.md` says. Reply in two lines: the result (Approved or
-Changes required) and the number of required changes." Approved → Finish. In progress → Fix,
-which leads through Test back to this check.
+full review, or the end of the `Reviewed commits` range of the latest delta review or critical
+review. List what changed after it, leaving out the handoff notes and the board:
+`git diff --name-only <commit>..HEAD -- . ":(exclude)docs/progress"`. Nothing → Critical review
+for a critical task, Finish for any other. Otherwise reviewer: "Act as reviewer for task $task:
+delta review of the commits after <commit>, as `.claude/agents/reviewer.md` says. Reply in two
+lines: the result (Approved or Changes required) and the number of required changes." Approved
+→ Critical review for a critical task, Finish for any other. In progress → Fix, which leads
+through Test back to this check.
+
+**Critical review.** Only for a task whose risk is critical. If the note's last section is a
+critical review with the result Approved, and nothing changed after the end of its
+`Reviewed commits` range (`git diff --name-only <that commit>..HEAD -- . ":(exclude)docs/progress"`
+is empty), it is done: Finish. Otherwise reviewer: "Act as reviewer for task $task: critical
+review, as `.claude/agents/reviewer.md` says. Reply in two lines: the result (Approved or
+Changes required) and the number of required changes." After a fix the note already has a
+critical review section: take the end of the last one's `Reviewed commits` range, and the
+prompt says "critical review of the commits after <commit>", as the delta review's does.
+Approved → Finish. In progress → Fix, which leads through Test and the delta review check back
+here; it is a fix round like any other, and the limit of two counts it.
 
 **After every step,** before the next one:
 - Read the task's board row and the last section of the handoff note yourself. If they do not
@@ -135,23 +150,31 @@ which leads through Test back to this check.
 ## Finish
 
 The task is Tested (low risk: Reviewed), a reviewer has read the whole diff, no code changed
-after the last review, and the CI run of the last pushed commit is green: run the CI wait first.
-A red check step there → CI fix, which sets Reviewed and so leads through Test (low risk: the
-delta review check) back here. Only then send a push
-notification: "$task ready to merge: <pull request link>". End your turn with a short report:
-the state, the pull request link, how many fix rounds it took, and the headings of the
-owner's open questions in the note. For a critical task, add that the owner reads the diff
-personally, starting with the reviewer's "For the owner". End with the step after the merge:
-`/architect $task` marks the task Done, settles what the note and the Discovered list left open,
-and refines the next task (D-083).
+after the last review, for a critical task the critical review approved, and the CI run of the
+last pushed commit is green: run the CI wait first. A red check step there → CI fix, which sets
+Reviewed and so leads through Test, the delta review check and, for a critical task, the
+critical review back here (low risk: through the delta review check). Only then send a push
+notification: "$task ready to merge: <pull request link>". End your turn with a short report in
+plain words, the owner's action first: merge the pull request (its link) on this green run. Then
+the note's open questions for the owner, each listed with the recommended answer the note gives:
+they do not block the merge, and `/architect $task` asks them after it. Then the state and how
+many fix rounds it took. For a screen, add the note's "Try it" steps, to try on `main` after the
+merge. Then one line with the minutes of each step that ran (the builder, the reviewer, the
+tester, each fix round, each CI wait, each delta review, the critical review) and the total. End
+with the step after the merge: `/architect $task` marks the task Done, settles what the note and
+the Discovered list left open, and refines the next task (D-083).
 
 ## Stop
 
 Whenever a step says **Stop**, or anything unexpected happens, do not repair it yourself and
 do not guess. Send a push notification: one line, under 200 characters, saying what the owner
-must decide. End your turn with: where the task stands, what happened, what the owner must
-decide, which section of the handoff note to read, and how to continue: answer in the note or
-on the board, then `/pipeline $task` again (it resumes from the board state).
+must decide. End your turn with a short report in plain words, the owner's action first: what
+the owner must decide or do, each question listed with its recommended answer (the note's, when
+it gives one). Then where the task stands, what happened, which section of the handoff note
+holds the detail, how to continue (answer in the note or on the board, then `/pipeline $task`
+again; it resumes from the board state; at the limit of two fix rounds, the owner first decides
+whether a third runs, by hand in a new session: "Act as builder for task $task: fix round 3"),
+and the line of minutes, as in Finish.
 
 ## Never
 

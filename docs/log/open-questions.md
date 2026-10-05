@@ -29,6 +29,7 @@ When answered: write the answer here, mark it **Answered (date)**, and add a dec
 | Q-16 | GitHub for code and CI? | E00-T01 | **Answered 2026-10-04: yes, a private repository on GitHub Free, GitHub Actions with a small budget; GitHub Pro decided after two weeks of runs** (D-075) |
 | Q-17 | SMS in the real alphabet (Cyrillic, ë, ç) or in plain Latin letters? | E03-T10 (SMS, when added) | **Answered 2026-10-02: plain Latin** (D-054); applies to SMS only, WhatsApp carries Cyrillic |
 | Q-18 | WhatsApp sender: one product number for all clinics, or one number per clinic? | E03-T01, E03-T03 | **Answered 2026-10-02: one product number** (D-056) |
+| Q-19 | A paid human security review of the critical areas before go-live? | E07-T09 (the go-live gate) | Open. Working assumption: yes, scoped at E07-T00 (D-087) |
 
 ---
 
@@ -189,3 +190,13 @@ WhatsApp messages come from a phone number with a business name attached.
 - **One number per clinic:** patients see the clinic's name; each clinic needs its own
   verification, number and template approvals, which is onboarding work per clinic.
 Decided: one product number first (D-056).
+
+### Q-19 · A human security review before go-live
+No person reads the code: the owner merges on green, and every review is by an agent (R-35,
+D-087). Before real patient data, a security-minded developer could review the critical areas
+once: those in `test-strategy.md`'s table, such as the migrations and policies, login and the
+action wrappers, the dispatcher, patient links, the AI boundary and deletion. It costs money, so
+it is the owner's (agent rule 4). The other option: go live on agent review and machine checks
+alone, with R-35 accepted in writing.
+**Working assumption:** yes, one paid review. E07-T00 finds out its scope and budget; it happens
+before E07-T09's go-live gate.

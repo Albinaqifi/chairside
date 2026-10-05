@@ -22,7 +22,8 @@ Before writing code:
 - Read two or three neighbouring files so your code matches what is there.
 
 While building:
-- Stay inside the task. Other things you notice go in `docs/progress/discovered.md`, one line each.
+- Stay inside the task. Other things you notice go in `docs/progress/discovered.md`, one line
+  each, starting with its weight (agent rule 15).
 - Tests come with the code. Never delete, skip or weaken a test to get green.
 - Never go around the safety rails (agent rule 7): tenant wrappers, the message pipeline,
   the AI prompt builder, the injected clock, the action wrapper.
@@ -30,11 +31,17 @@ While building:
 - Stop and ask the owner in the situations listed in agent rule 4.
 
 When done:
-- Run the full check command from `CLAUDE.md` and make sure it passes.
-- Write your section of `docs/progress/handoffs/<task-id>.md`: what you built, where, how
-  you verified each acceptance criterion, what is not done, what the reviewer and tester
-  should look at.
-- Update any document your change made untrue.
+- Run the full check command from `CLAUDE.md` and `pnpm build`, and make sure both pass: CI
+  runs the build too, and a red build is a fix round.
+- Write your section of `docs/progress/handoffs/<task-id>.md`, about 80 lines: what you built,
+  where, the acceptance table naming the test or the command for each criterion (one line
+  each), what is not done, what the reviewer and tester should look hard at, and for a screen
+  "Try it": the steps the owner can click through in the app, with the seed login named by
+  role, never a name or email. The code, the tests and the diff hold the rest.
+- Update any document your change made untrue. A decision entry (about 15 lines) only when
+  your change makes a document untrue (the data model, a convention in `CLAUDE.md`, scope) or
+  adds a dependency. A choice inside the task's words is a code comment and a line under "look
+  hard at", not an entry.
 - Set the task to "Built" on the board. Commit on the task branch and push it
   (`git push -u origin <branch>`).
 - Open the pull request against `main` if the branch has none yet: title
@@ -51,16 +58,16 @@ A fresh builder session fixes what the reviewer or the tester reported, nothing 
 - Read the whole handoff note. The findings to fix are in its last reviewer or tester section
   ("Required changes" or "Findings"). Suggestions are not yours to fix.
 - For each finding: fix it in the code, and make sure a test fails without the fix and passes
-  with it. Reuse the tester's test if it already wrote one. Never change what an existing test
-  expects; if you think a test or a finding is wrong, do not fix that finding: write why in
-  your section, set the task to Blocked, and stop (agent rule 8).
+  with it. Reuse the test the tester or the reviewer already wrote, if there is one. Never
+  change what an existing test expects; if you think a test or a finding is wrong, do not fix
+  that finding: write why in your section, set the task to Blocked, and stop (agent rule 8).
 - A finding whose fix falls under agent rule 4 (data model, new library or secret, login or
   tenant change the task did not ask for, deleting data, cost) is not fixed either: write the
   options and your recommendation, set Blocked, and stop.
-- Run the full check command and make sure it passes.
+- Run the full check command and `pnpm build`, and make sure both pass.
 - Append `## Builder — YYYY-MM-DD (fix round N)` to the handoff note: one line per finding
   with what you changed, the test that proves it, and the result. N counts every fix round of
-  the task, review, test and CI rounds together.
+  the task, review (the critical review included), test and CI rounds together.
 - Set the task to "Reviewed" on the board: the tester checks your fixes next. Commit with the
   task id and push to the same branch. Do not open another pull request.
 
@@ -88,7 +95,7 @@ A fresh builder session fixes the failing steps, nothing else.
   and 8 say so. A failure you cannot reproduce or explain from its log (a flaky test, an outage in
   the middle of a step): do not re-run CI and do not touch the test; write what you saw, set the
   task to Blocked, and stop.
-- Run the full check command and make sure it passes.
+- Run the full check command and `pnpm build`, and make sure both pass.
 - Append `## Builder — YYYY-MM-DD (fix round N)` to the handoff note. Its "Fixes:" line names the
   red run by its link; then one line per failing step: what you changed, the command that fails
   without the fix and passes with it, and the result.

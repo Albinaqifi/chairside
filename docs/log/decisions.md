@@ -1542,3 +1542,57 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a part does not fit one session when it is refined (split it again); a blind
   spot above turns up in product code (then it is work); the owner changes the order of E00 and
   E01.
+
+### D-087 · Weigh what you find; the lint guards are finished; sizes for notes, entries and `CLAUDE.md`; the critical review (process)
+- **Origin:** process, decided by the owner on 2026-10-05 after a look at the eight E00 tasks so
+  far (E00-T01, T02, T03, T08, T06a, T09, T10, T11): four of them lint guards (T08, T10, T11 and
+  half of T09), no patient screen. The numbers are in the pull request.
+- **What:**
+  - **Weights.** Agent rule 15: every finding, suggestion and Discovered line starts with what it
+    protects: `data`, `message`, `speed`, `slice` or `none`, in the intent file's order, which is
+    the order of the work. The lint guards are finished: a new way past one is a review check,
+    weighed `none`, unless product code on `main` would hit it today. The architect's Done pass
+    weighs leftovers before it sorts them; a new task ahead of the Next list is the owner's choice,
+    "not now" offered first. Critical means the diff touches an area of `test-strategy.md`'s table;
+    nothing is reclassified (owner). A tester verifies a non-product task's criteria and stops.
+  - **Sizes** (the handoff template and the role files): a builder section about 80 lines, a
+    reviewer's about 40 plus one per required change, a tester's about 60, an architect's about
+    60, a fix round as long as its table. A decision entry about 15 lines, only for a choice that
+    makes a document untrue or adds a dependency. `CLAUDE.md` holds only what no lint rule or test
+    enforces (240 → about 205 lines). The builder runs `pnpm build` before it hands off. The board
+    drops its "Last updated" paragraph, which made branches conflict, and lists the standing owner
+    actions in their own section.
+  - **The owner does not review code,** and the documents now say so. A critical task gets the
+    critical review in place of the owner's read: a second, independent review by a fresh reviewer
+    after the tester and the delta review check, starting from the tests. The owner decides what
+    rule 4 lists, merges every task pull request on green, and uses the product. Reports and
+    questions to the owner are short and plain: what the owner must do first, and each question
+    with its recommended answer. The board's "Owner review" lines stop: technical choices are the
+    architect's, recorded in an entry. R-35 records that no human reads the code; Q-19 asks for a
+    paid human review of the critical areas before real patient data.
+  - **The owner's other answers.** CI does not run on a pull request that changes only files
+    under `docs/`, Markdown files under `.claude/` (Prettier checks `.claude/settings.json`),
+    `CLAUDE.md` or `README.md`; a push to `main` and the weekly run are unchanged. The architect
+    merges its own such planning pull request; the owner merges every other one, on green (agent
+    rule 14). The owner adds the GitHub Actions payment method and budget when the free minutes
+    run out, not now, and decides on GitHub Pro then (D-075 and R-34 said after two weeks of
+    runs). The order: E00-T04a → E00-T04b → E00-T05 → E01-T01 → E00-T04c → E00-T04d → E01-T02 →
+    E00-T06b → E00-T07 → the rest of E01, so a receptionist sees a patient list before staging
+    exists. E00-T04c and E00-T04d stay before E01-T02, which depends on them (D-086); E00-T04c is
+    refined in E01-T01's Done pass. This replaces D-086's "E00-T05 still runs in any order with
+    them" and, for E00-T04c, "refined in the Done pass of the part before". E00-T01 is Done: the
+    builder's five round-3 answers are accepted as its reviewer recommended, the fifth (values go
+    in fields or arguments, never inside a log message's text) added to `CLAUDE.md`.
+- **Why:** D-079's "Not done, on purpose" declined "a line limit on handoff sections (the sections
+  are the evidence that a check ran; the cost of reading them is handled above)". They are not:
+  the test case in the repository and the CI run are, and a section names them. This entry
+  replaces that line of D-079; the rest of D-079 stays.
+- **Not done, on purpose:** removing or shrinking any lint rule (they work and cost nothing to
+  run); rewriting old notes or entries; two pipelines at once (after the first E01 tasks).
+- **Consequences:** the files of this change. The next three pipeline runs are the check: their
+  minutes per step against earlier runs (1 h 25 to 2 h 30 a task, 20 to 25 minutes a fix round).
+- **Revisit if:** a reviewer or tester misses a defect it would have written up under the old
+  sizes (then widen that role's size, not the rule); or a `none` turns out to be a real bug in
+  product code (then it was weighed wrong, not parked wrong); or CI becomes a required check
+  (GitHub Pro, R-34): a workflow that `paths-ignore` skips leaves a required check Pending, which
+  blocks the merge, so the documents-only filter moves into the job first.

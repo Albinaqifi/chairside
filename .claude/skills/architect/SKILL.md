@@ -11,9 +11,9 @@ disable-model-invocation: true
 You are the **architect** for this pass: follow `.claude/agents/architect.md` and the agent
 rules. The owner started you and is here, so where a choice is the owner's you ask (agent rule 4)
 instead of ending the session. You write documents, never application code. Everything you change
-goes on one planning branch and into one pull request that the owner merges before the next
-`/pipeline`. Nothing here is new: it is what the owner used to write into a prompt by hand after
-every pipeline run (D-083).
+goes on one planning branch and into one pull request, merged before the next `/pipeline`: by you
+when it changes only documents, otherwise by the owner on green (Done pass, step 7; D-087). It is
+what the owner used to write into a prompt by hand after every pipeline run (D-083).
 
 ## Before the first step
 
@@ -33,7 +33,7 @@ every pipeline run (D-083).
 | Board state | Pass |
 |---|---|
 | Tested (low risk: Reviewed), pull request merged | **Done pass** |
-| Tested (low risk: Reviewed), pull request not merged | **Stop**: the owner merges first; say what the note asks the owner to review |
+| Tested (low risk: Reviewed), pull request not merged | **Stop**: the owner merges it first, on green and after the pipeline's "ready to merge"; list the note's questions for the owner, each with its recommended answer |
 | In progress, Built, or Blocked | **Stop**: not the architect's turn; say what the board and the note's last section say |
 | Planned, or Ready with leftovers that name it (Done pass, step 3) | **Ready pass** |
 | Ready and nothing names it | **Stop**: it is Ready; `/pipeline $task` starts it |
@@ -58,24 +58,41 @@ Discovered lines folded into E00-T10); the last architect section of `handoffs/E
    which step is red, go on with the pass, and make it the first line of your reply. The owner
    decides what happens to `main`.
 3. **The task's leftovers.** Collect these, and only these:
-   - in `docs/progress/handoffs/$task.md`: "Questions for the owner" and "Not done / known gaps"
-     of every builder section, "For the owner" of the reviewer's and the tester's sections, and
-     the tester's notes for the owner. Not the rest of the note;
+   - in `docs/progress/handoffs/$task.md`: "Questions for the owner" of every architect, builder
+     and tester section, "Not done / known gaps" of every builder section, and, for a critical
+     task, the critical review's sections (`(critical review)`). Not the rest of the note;
    - in `docs/progress/discovered.md`: every line whose second field names `$task` (`· $task ·`,
-     `· $task review ·`, `· $task test ·`, `· $task delta review ·`).
+     `· $task review ·`, `· $task test ·`, `· $task delta review ·`, `· $task critical review ·`);
+   - for a screen, what the owner saw trying the note's "Try it" steps (ask).
 
-   Sort each into one of four, and write where it went in your section:
+   Weigh every leftover first (agent rule 15: `data`, `message`, `speed`, `slice` or `none`). A
+   leftover becomes work now only when its weight is `data` or `message`, or a task on the Next
+   list needs it; a `none` is struck as "review check" in one line, and so is a lint gap, unless
+   product code on `main` would hit it today (D-087). A way past a lint guard that a reviewer can
+   check on a diff also goes into `CLAUDE.md`, one line next to the rule it gets past, as module
+   rule 7's "reviewers check where a handler is written" (D-086). A `speed` or `slice` that no task
+   on the Next list needs stays on the Discovered list (a note leftover goes there), weighed, with
+   the epic it waits for after it ("→ E04-T00"). A new task that would go ahead of the Next list is
+   the owner's choice: the question's first option is "not now", whatever you recommend (mark the
+   recommended one), with the cost in sessions. On "not now", a `data` or `message` leftover still
+   becomes its task, after the Next list (rule 15); a `speed` or `slice` one stays on the
+   Discovered list, as above.
+
+   Then sort each into one of four, and write where it went, with its weight, in your section:
    - **The owner's** (agent rule 4: the data model, a library, a service, a secret, login,
      permissions, tenant isolation, links, consent, what the AI sees, cost, scope): ask the owner
-     now, every item in one round, each with its options and your recommendation (the
-     AskUserQuestion tool; a numbered list if it is not available). An answer becomes a decision
-     entry ("Owner, <date>: …"), and what it asks for becomes work (below). No answer: leave the
-     line where it is, add one line under "Now" on the board ("Owner decides, before <the task it
-     blocks>: …"), and build nothing on a guess.
-   - **The architect's** (how a rule, a check, a convention or a task text should go): decide,
-     record it as a decision entry when it affects more than one task, and put one line under
-     "Now" for the owner to review ("Owner review, before <task> starts: …"), as D-081's spread
-     choice was.
+     now, every item in one round (the AskUserQuestion tool; a numbered list if it is not
+     available), in plain words, short, without code, answerable without reading a diff, each with
+     the recommended answer first (a new task ahead of the Next list: "not now" first, above). An
+     answer that makes a document untrue or adds a dependency becomes a decision entry ("Owner,
+     <date>: …"), and what an answer asks for becomes work (below). No answer: leave the line
+     where it is, add one line to the board ("Owner decides, before <the task it blocks>: …"),
+     under "Now" when it blocks the next task, otherwise under "Owner actions (standing)", and
+     build nothing on a guess.
+   - **The architect's** (how a rule, a check, a convention or a task text should go): decide. A
+     choice that makes a document untrue or adds a dependency gets a decision entry; one inside a
+     task's words stays in the task text and your section. No line on the board for the owner to
+     review: technical choices are yours (D-087).
    - **Work:** a change that belongs in a task. Fold it into the task it names when that task has
      not started (a Do item, acceptance criteria, the Read line), as E00-T09's two lines went into
      E00-T10 (D-081). Otherwise a new task: a new id that is never reused (`E0X-T11`, or
@@ -84,14 +101,17 @@ Discovered lines folded into E00-T10); the last architect section of `handoffs/E
      later epic stays on the list with a note after it ("→ E04-T00") until that epic is refined.
    - **Struck:** only with the reason written after it in your section.
 
-   Delete every line you handled from `discovered.md` (git history keeps it). Leave every other
-   line exactly as it is.
+   A decision entry is about 15 lines (Origin, What, Why, Revisit if), only for a choice that makes
+   a document untrue (the data model, a rule, a convention, scope) or adds a dependency; the task
+   text and the note hold the detail, and the entry points to them (D-087). Delete every line you
+   handled from `discovered.md` (git history keeps it). Leave every other line exactly as it is.
 4. **The board.** The task's row: status **Done**; its notes start "Merged by the owner (PR #n)."
    then one short line on what shipped and where its leftovers went, then "See
    `handoffs/$task.md`". The Done list: `- $task · <title> · merged <date> (PR #n)`. "Now": "Next
    task to start" names the next task of the Next list, with `/pipeline <id>` when it is Ready, or
-   that this pass refines it; drop the lines the merge settled; add the owner lines from step 3.
-   The Next list, and the "Last updated" line.
+   that this pass refines it, and the line below it names the decisions that task waits on, or
+   none; drop the lines the merge settled, there and under "Owner actions (standing)"; add the
+   owner lines from step 3. The Next list.
 5. **The next task.** The first task of the Next list that is not Ready (Planned, "refined
    first", "split when refined"), or a Ready one that step 3 changed: run the **Ready pass** below
    for it, on this same branch. One task is the usual; two when they are the next two and both
@@ -100,13 +120,20 @@ Discovered lines folded into E00-T10); the last architect section of `handoffs/E
    `docs/progress/handoffs/$task.md` (the template's section): the branch; the result (Done, the
    merge commit, the run on `main`); what you changed on the board and in the logs; where each
    leftover went; "For the owner: still to do".
-7. **Hand off.** Documents only: `git status --short` shows nothing under `src/`, `tests/`,
-   `eslint-rules/` or `.github/`. One commit whose message starts with the task ids, as
+7. **Hand off.** Documents only: `git status --short` shows nothing under `src/`, `tests/` or
+   `eslint-rules/`. One commit whose message starts with the task ids, as
    `E00-T09: Done (PR #15 merged); E00-T10: the two form-lint gaps folded in (D-081)`;
    `git push -u origin plan/$task-done`; `gh pr create --base main --title "$task: Done" --body
-   "…"` with what the owner must review or decide. Never merge. Reply with: whether the run on
-   `main` is green; the pull request link; which task is Ready next and the command that starts
-   it (`/pipeline <id>`, after the owner merges this pull request); the owner's open decisions.
+   "…"` with what changed and the owner's open decisions. Then the merge (D-087): when
+   `git diff --name-only origin/main...HEAD` names only files under `docs/`, Markdown files under
+   `.claude/`, `CLAUDE.md` and `README.md`, it is a documents-only pull request, on which CI does
+   not run: merge it yourself, `gh pr merge <number> --merge` (a merge commit, as the owner's
+   merges are). When it names anything else (a change the owner asked for, such as
+   `.github/workflows/ci.yml`), the owner merges it on green. A merge that fails is left to the
+   owner: never force it. Reply to the owner short and plain, what the owner must do first (a red
+   run on `main`, a merge, a decision; each decision listed with your recommended answer), then: the
+   pull request link and whether you merged it; the run on `main`; which task is Ready next and
+   the command that starts it (`/pipeline <id>`, once the pull request is merged).
 
 ## Ready pass
 
@@ -135,24 +162,29 @@ you are inside a Done pass: then its branch.
      task and flagged for the owner, or the task is Blocked;
    - any schema it needs is in `data-model.md`; for screens, the `scope-v1.md` section and the
      `design-reference.md` lines are named;
-   - it stays inside the safety rails (agent rule 7), and its risk level still fits what it
-     touches.
+   - it stays inside the safety rails (agent rule 7), and its risk level follows `workflow.md`'s
+     definition: critical when it touches an area of `test-strategy.md`'s table (name the area
+     next to the level), otherwise normal or low, whatever else it changes (a lint rule, CI, a
+     script, a process file).
 3. **Edit the task** in the epic file: Role, Risk, Depends on, Read, Why, Do, Out of scope,
    Acceptance (`docs/process/templates/task.md`). Keep what is right; change what the code or the
-   decisions made wrong. Record what you settled as a decision entry (`Origin: process, planning
-   on <date>`; append, never edit an old one; "replaces D-0xx" when one changes). Keep
-   `docs/architecture/*`, `docs/product/scope-v1.md` and `CLAUDE.md` true to it, in the same
-   change. Where the choice is the owner's, ask as in the Done pass, step 3.
+   decisions made wrong. A choice you settle that makes a document untrue or adds a dependency
+   gets a decision entry of about 15 lines, as in the Done pass, step 3 (`Origin: process,
+   planning on <date>`; append, never edit an old one; "replaces D-0xx" when one changes); a
+   choice inside the task's words is the task text. Keep `docs/architecture/*`,
+   `docs/product/scope-v1.md` and `CLAUDE.md` true to it, in the same change. Where the choice is
+   the owner's, ask as in the Done pass, step 3.
 4. **The handoff note** `docs/progress/handoffs/<task>.md`: create it from the title line if it
    does not exist; append `## Architect — <date>` (the template's Ready-pass section): the
    branch; the result (Ready, or Planned or Blocked and why); "What was settled" (the owner's
-   answers and your choices, each with its D-number, and which one the owner should look at);
+   answers and your choices, each with its D-number);
    "Doc changes"; "For the builder: what is already there" (checked on `main` at `<sha>`: the
    files, functions and behaviours it builds on, the traps you found with your probes, what it
    must not change); "For the reviewer and tester" (what each criterion costs to check);
    "Questions for the owner".
-5. **The board:** the task's row (Ready; notes: where it came from, its D-numbers, "See
-   `handoffs/<task>.md`"), "Next task to start", the Next list, the "Last updated" line.
+5. **The board:** the task's row (Ready, and its Risk when you set it; notes: where it came from,
+   its D-numbers, "See
+   `handoffs/<task>.md`"), "Next task to start" and the Next list.
 6. **Hand off** as in the Done pass, step 7, on the branch you are on, with the title
    `<task>: Ready` when the pass is its own.
 
@@ -164,4 +196,5 @@ you are inside a Done pass: then its branch.
 - Answer an open question yourself, or decide an item on agent rule 4's list without the owner.
 - Mark a task Done whose pull request is not merged, or count a run on `main` as green whose
   conclusion is not `success`.
-- Merge, push to `main`, force-push, or start a `/pipeline` yourself.
+- Merge any pull request but your own documents-only one (Done pass, step 7), push to `main`,
+  force-push, or start a `/pipeline` yourself.
