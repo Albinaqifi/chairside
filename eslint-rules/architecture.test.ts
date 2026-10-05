@@ -1805,6 +1805,42 @@ const cases: Case[] = [
     code,
     expected: [],
   })),
+  // E00-T10 test: shapes a later edit to the rule could let through while every case above passes.
+  {
+    // HTML reads formmethod=" post" as get, as it does method=" post ": no trimming.
+    name: 'g: formMethod=" post" next to a formAction URL, which HTML reads as get',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formAction="/patients" formMethod=" post">Search</button></form>',
+      SAVE,
+    ),
+    expected: [FORMS, FORMS],
+  },
+  {
+    // An index signature whose key is a pattern holds formAction too, not only a string index.
+    name: 'g: a spread typed with a template-literal index signature',
+    file: STAFF_FORM,
+    code: 'export function Button(props: Record<`form${string}`, string>) { return <button {...props} />; }',
+    expected: [FORMS],
+  },
+  {
+    // The rule covers .ts files too: a .ts file that passed <Form> on would give every .tsx file a
+    // way to it that names no next/form path.
+    name: 'g: next/form re-exported from a .ts file',
+    file: 'src/ui/form.ts',
+    code: "export { default as Form } from 'next/form';",
+    expected: [FORMS],
+  },
+  ...[
+    // The two untyped copies under dist/esm/ that no case above names.
+    "import Form from 'next/dist/esm/api/form'; export { Form };",
+    "import Form from 'next/dist/esm/client/form.js'; export { Form };",
+  ].map((code) => ({
+    name: `g: next/form loaded: ${code}`,
+    file: STAFF_FORM,
+    code,
+    expected: [FORMS],
+  })),
 
   // (h) No lint comment switches a guard off in src/ (D-077): ESLint ignores it and reports it.
   {
