@@ -1266,11 +1266,15 @@ architecture), `changed` (differs from the original files), `process`.
   - **Lint comments.** `noInlineConfig` covers every script file in `src/`, tests included. The
     snippet runner labels a fatal message `parse error: …` and any other message without a rule id
     `inline config`.
-  - **Promises nobody waits for.** The check is syntax, not types: a statement `x.catch(…)`, or
-    `x.then(…)` with two or more arguments, is reported whether `x` is a promise or not; also
-    `x['catch'](…)`, `` x[`catch`](…) ``, `x?.catch(…)` and `x.catch?.(…)`. In the modules it is
-    part of their `no-restricted-syntax` list, so it covers every script extension there; elsewhere
-    the `.ts` and `.mts` files. A one-argument `.then(…)` stays `no-floating-promises`' alone.
+  - **Promises nobody waits for.** The check is syntax, not types: a statement `x.catch(…)`,
+    `x.then(…)` with two or more arguments, or `x.finally(…)`, is reported whether `x` is a promise
+    or not; also `x['catch'](…)`, `` x[`catch`](…) ``, `x?.catch(…)` and `x.catch?.(…)`, and the
+    same spellings of `then` and `finally`. `.finally(…)` is in the list because
+    `no-floating-promises` follows it back to the promise it hangs on, so `….catch(…).finally(…)`
+    passed that rule (E00-T10 review); a `.finally(…)` statement on a promise nobody handles gets
+    both reports. In the modules it is part of their `no-restricted-syntax` list, so it covers every
+    script extension there; elsewhere the `.ts` and `.mts` files. A one-argument `.then(…)` stays
+    `no-floating-promises`' alone.
   - **Routes.** `chairside/server-actions` runs on every script file in the repository; a file in
     `src/pages/`, at any depth, gets one report.
   - **Script files in `src/`.** The test lives in `eslint-rules/architecture.test.ts` and reads
@@ -1280,19 +1284,26 @@ architecture), `changed` (differs from the original files), `process`.
     `null` and `void` parts left out first; its messages are its own. A spread's type is read part by
     part, through unions and intersections; a generic type counts as its base constraint, and one
     without a constraint as `unknown`. `object` counts as `unknown` too: it names no property, and
-    `P extends object` is how a generic component says "any props". `next/form` is checked in
+    `P extends object` is how a generic component says "any props". `next/form` is checked by
+    every path the package publishes the component under, each with or without `.js`: `next/form`,
+    `next/dist/client/form` (the Pages Router's), `next/dist/client/app-dir/form` (the App
+    Router's, which a build puts in place of `next/form`), `next/dist/api/form` (a re-export, which
+    an ESM build puts in its place), and their untyped copies under `next/dist/esm/`; not
+    `next/dist/client/form-shared`, which holds helpers (E00-T10 review). It is checked in
     `import`, `export … from` and `import()` with a written path.
 - **Why:** each is the smallest choice that makes E00-T10's acceptance true while every earlier
   case of `architecture.test.ts` passes unchanged. The `object` choice closes the commonest generic
   way around the spread check and changes none of the shapes D-081 lets pass.
 - **Not checked (review checks):** `export default withTenant` and `export const x = withTenant`;
   `void` in front of a promise (D-074); a `.catch(…)` or `.then(ok, fail)` statement in a `.tsx`
-  file, server components included; a spread of a generic mapped type whose type parameter has no
-  constraint or `object` (`Partial<P>`); a caller's spread onto a component of an object that holds
-  `formAction` next to a prop the component takes (TypeScript checks extra props only on written
-  attributes); `require('next/form')`; a lint comment outside `src/`, which can still switch
-  `chairside/server-actions` off in a `'use server'` file there.
-- **Revisit if:** a library in `src/` has a `.catch` or two-argument `.then` that is not a promise's;
-  E00-T04 writes a generic button or input component (then the mapped-type gap matters); the
-  worker's folder needs `pg-boss` (E00-T07: `DRIVERS_FOLDER` in `database-access.mjs` becomes a
-  list); a lint comment is needed outside `src/`.
+  file, with or without a `.finally(…)` after it, server components included; `next/form` by a
+  path written another way (`next//form`, `next/dist/client/../client/form`, a relative path into
+  `node_modules`), which TypeScript resolves too; a spread of a generic mapped type whose type
+  parameter has no constraint or `object` (`Partial<P>`); a caller's spread onto a component of an
+  object that holds `formAction` next to a prop the component takes (TypeScript checks extra props
+  only on written attributes); `require('next/form')`; a lint comment outside `src/`, which can
+  still switch `chairside/server-actions` off in a `'use server'` file there.
+- **Revisit if:** a library in `src/` has a `.catch`, a two-argument `.then` or a `.finally` that is
+  not a promise's; E00-T04 writes a generic button or input component (then the mapped-type gap
+  matters); the worker's folder needs `pg-boss` (E00-T07: `DRIVERS_FOLDER` in `database-access.mjs`
+  becomes a list); a lint comment is needed outside `src/`.

@@ -46,16 +46,18 @@ const date = (path) =>
 const method = (name) =>
   `:matches([callee.property.name='${name}'], [callee.property.value='${name}'], [callee.property.quasis.0.value.cooked='${name}'])`;
 
-// (f) A statement that only hangs .catch(…) or a two-argument .then(…) on a promise, also through
-// p?.catch(…). no-floating-promises counts such a promise as handled, yet nothing waits for it
-// (R-32, D-077). Used twice below: in the modules' list, and for the other TypeScript files.
-const unawaitedCall = `CallExpression:matches(${method('catch')}, ${method('then')}[arguments.length>=2])`;
+// (f) A statement that only hangs .catch(…), a two-argument .then(…) or .finally(…) on a promise,
+// also through p?.catch(…). no-floating-promises counts such a promise as handled (a .finally(…)
+// as handled when the promise it hangs on is, so ….catch(…).finally(…) too), yet nothing waits for
+// it (R-32, D-077). A .finally(…) statement on a promise nobody handles gets both reports. Used
+// twice below: in the modules' list, and for the other TypeScript files.
+const unawaitedCall = `CallExpression:matches(${method('catch')}, ${method('then')}[arguments.length>=2], ${method('finally')})`;
 const unawaitedPromise = {
   selector: `ExpressionStatement > ${unawaitedCall}, ExpressionStatement > ChainExpression > ${unawaitedCall}`,
   message:
-    'Nothing waits for a promise that only has .catch(…) or .then(ok, fail) hung on it: a query ' +
-    "can then run after its transaction has ended, even in another clinic's (R-32). Await it or " +
-    'return it (D-077).',
+    'Nothing waits for a promise that only has .catch(…), .then(ok, fail) or .finally(…) hung on ' +
+    "it: a query can then run after its transaction has ended, even in another clinic's (R-32). " +
+    'Await it or return it (D-077).',
 };
 
 export default defineConfig([

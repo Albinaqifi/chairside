@@ -37,13 +37,14 @@
 import ts from 'typescript';
 import { importsValue, sourceText } from './import-paths.mjs';
 
-/** Next.js's <Form>, by every path the package publishes it under (next/form.d.ts re-exports it). */
-const NEXT_FORM = new Set([
-  'next/form',
-  'next/form.js',
-  'next/dist/client/form',
-  'next/dist/client/form.js',
-]);
+/**
+ * Next.js's <Form>, by every path the package publishes it under, with or without `.js`: next/form
+ * (its .d.ts re-exports dist/client/form, the Pages Router's), dist/client/app-dir/form (the App
+ * Router's, which a build puts in place of next/form), dist/api/form (a re-export of
+ * dist/client/form, which an ESM build puts in its place), and their untyped copies under
+ * dist/esm/. Not dist/client/form-shared: it holds helpers, not the component.
+ */
+const NEXT_FORM = /^next\/(?:form|dist\/(?:esm\/)?(?:api|client|client\/app-dir)\/form)(?:\.js)?$/;
 
 /** The props that send a button's or input's form elsewhere, in lower case as HTML reads them. */
 const SUBMITTER_PROPS = new Set(['formaction', 'formmethod']);
@@ -281,7 +282,8 @@ const formsPost = {
 
     /** next/form loaded by an import, a re-export, or import() with a written path (D-081). */
     function checkImport(node) {
-      if (NEXT_FORM.has(sourceText(node.source)) && importsValue(node)) {
+      const source = sourceText(node.source);
+      if (source !== null && NEXT_FORM.test(source) && importsValue(node)) {
         context.report({ node, messageId: 'nextForm' });
       }
     }

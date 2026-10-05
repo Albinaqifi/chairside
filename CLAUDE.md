@@ -136,9 +136,9 @@ there and reports the comment itself (`noInlineConfig`, D-077).
    queries included (`no-floating-promises`; `no-misused-promises`, so no
    `items.forEach(async …)`), and only Errors are thrown or rejected (`only-throw-error`,
    `prefer-promise-reject-errors`: a refusal is returned, never thrown). In the `.ts` and `.mts`
-   files, a statement that only hangs `.catch(…)` or `.then(ok, fail)` on a promise is reported:
-   await it or return it. `src/` holds no `.js`, `.jsx`, `.mjs`, `.cjs` or `.cts` files, which
-   these rules would not see (a test fails) (R-32, D-073, D-074, D-077).
+   files, a statement that only hangs `.catch(…)`, `.then(ok, fail)` or `.finally(…)` on a promise
+   is reported: await it or return it. `src/` holds no `.js`, `.jsx`, `.mjs`, `.cjs` or `.cts`
+   files, which these rules would not see (a test fails) (R-32, D-073, D-074, D-077).
 
 ### Code conventions
 

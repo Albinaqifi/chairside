@@ -20,7 +20,7 @@ const MISUSED = '@typescript-eslint/no-misused-promises';
 const THROWN = '@typescript-eslint/only-throw-error';
 const FORMS = 'chairside/forms-post';
 const REJECTED = '@typescript-eslint/prefer-promise-reject-errors';
-// (f) for a .catch(…) or .then(ok, fail) statement that nothing waits for is a syntax rule too.
+// (f) for a .catch(…), .then(ok, fail) or .finally(…) statement nobody awaits is a syntax rule too.
 const UNAWAITED = 'no-restricted-syntax';
 // What eslint-rules/lint-snippets.mjs calls a lint comment that noInlineConfig ignores in src/.
 const INLINE_CONFIG = 'inline config';
@@ -1234,6 +1234,74 @@ const cases: Case[] = [
     code: 'export const a = Date.now(); export function forget(p: Promise<void>) { p.catch(() => {}); }',
     expected: [CLOCK, UNAWAITED],
   },
+  // no-floating-promises follows a .finally(…) back to the promise it hangs on, so a .finally(…)
+  // after .catch(…) or .then(ok, fail) passes it: the statement is reported by its last call.
+  {
+    name: 'f: tx.insert(…).catch(…).finally(…) as a statement in a module',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function mark(tx: TenantTransaction, id: string) { tx.insert(marks).values({ id }).catch(() => {}).finally(() => {}); }`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: tx.insert(…).then(ok, fail).finally(…) as a statement in a module',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function mark(tx: TenantTransaction, id: string) { tx.insert(marks).values({ id }).then(() => {}, () => {}).finally(() => {}); }`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: tx.insert(…).catch(…).finally(…) as a statement in an action file',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} ${TABLE} ${TX} export const mark = staffAction(spec, async ({ tx }: { tx: TenantTransaction }) => { tx.insert(marks).values({ id: 'x' }).catch(() => {}).finally(() => {}); });`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: tx.insert(…).then(ok, fail).finally(…) as a statement in an action file',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} ${TABLE} ${TX} export const mark = staffAction(spec, async ({ tx }: { tx: TenantTransaction }) => { tx.insert(marks).values({ id: 'x' }).then(() => {}, () => {}).finally(() => {}); });`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: "f: p.catch(…)['finally'](…) as a statement",
+    file: 'src/lib/forget.ts',
+    code: "export function forget(p: Promise<void>) { p.catch(() => {})['finally'](() => {}); }",
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: p.catch(…)[`finally`](…) as a statement',
+    file: 'src/lib/forget.ts',
+    code: 'export function forget(p: Promise<void>) { p.catch(() => {})[`finally`](() => {}); }',
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: p?.catch(…).finally(…) as a statement',
+    file: IN_MODULE,
+    code: 'export function forget(p: Promise<void> | undefined) { p?.catch(() => {}).finally(() => {}); }',
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: p.catch(…).finally?.(…) as a statement',
+    file: 'src/lib/forget.ts',
+    code: 'export function forget(p: Promise<void>) { p.catch(() => {}).finally?.(() => {}); }',
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: a .finally(…) statement on a promise nobody handles gets both reports',
+    file: 'src/lib/forget.ts',
+    code: 'export function forget(p: Promise<void>) { p.finally(() => {}); }',
+    expected: [FLOATING, UNAWAITED],
+  },
+  {
+    name: 'f: the same .catch(…).finally(…) awaited passes',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function mark(tx: TenantTransaction, id: string) { await tx.insert(marks).values({ id }).catch(() => {}).finally(() => {}); }`,
+    expected: [],
+  },
+  {
+    name: 'f: the same .then(ok, fail).finally(…) returned passes',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} ${TABLE} ${TX} export const mark = staffAction(spec, async ({ tx }: { tx: TenantTransaction }) => { return tx.insert(marks).values({ id: 'x' }).then(() => {}, () => {}).finally(() => {}); });`,
+    expected: [],
+  },
 
   // (g) A form never puts its fields in the URL (D-076). Type-aware.
   {
@@ -1711,6 +1779,13 @@ const cases: Case[] = [
     "import Form from 'next/form.js'; export { Form };",
     "import Form from 'next/dist/client/form'; export { Form };",
     "import Form from 'next/dist/client/form.js'; export { Form };",
+    // What next/form becomes in a build: dist/api/form re-exports dist/client/form, and App Router
+    // code gets dist/client/app-dir/form. Both have types; the dist/esm/ copies do not.
+    "import Form from 'next/dist/api/form'; export { Form };",
+    "import Form from 'next/dist/api/form.js'; export { Form };",
+    "import Form from 'next/dist/client/app-dir/form'; export { Form };",
+    "import Form from 'next/dist/client/app-dir/form.js'; export { Form };",
+    "import Form from 'next/dist/esm/client/app-dir/form'; export { Form };",
   ].map((code) => ({
     name: `g: next/form loaded: ${code}`,
     file: STAFF_FORM,
@@ -1722,6 +1797,8 @@ const cases: Case[] = [
     "import { type FormProps } from 'next/form'; export type P = FormProps;",
     "export type { FormProps } from 'next/form';",
     'import Link from \'next/link\'; export function Nav() { return <Link href="/patients">Patients</Link>; }',
+    // The helpers both <Form> components share, not a component.
+    "import { checkFormActionUrl } from 'next/dist/client/form-shared'; export const check = checkFormActionUrl;",
   ].map((code) => ({
     name: `g: passes: ${code.split(';')[0]}`,
     file: STAFF_FORM,
