@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -19,6 +19,11 @@ const FLOATING = '@typescript-eslint/no-floating-promises';
 const MISUSED = '@typescript-eslint/no-misused-promises';
 const THROWN = '@typescript-eslint/only-throw-error';
 const FORMS = 'chairside/forms-post';
+const REJECTED = '@typescript-eslint/prefer-promise-reject-errors';
+// (f) for a .catch(…), .then(ok, fail) or .finally(…) statement nobody awaits is a syntax rule too.
+const UNAWAITED = 'no-restricted-syntax';
+// What eslint-rules/lint-snippets.mjs calls a lint comment that noInlineConfig ignores in src/.
+const INLINE_CONFIG = 'inline config';
 const ARCHITECTURE_RULES = [
   CLOCK,
   FRAMEWORK,
@@ -29,6 +34,8 @@ const ARCHITECTURE_RULES = [
   MISUSED,
   THROWN,
   FORMS,
+  REJECTED,
+  INLINE_CONFIG,
 ];
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -64,6 +71,12 @@ const TX = "import type { TenantTransaction } from '@/db/tenant';";
 const STAFF_FORM = 'src/app/(staff)/patients/search-form.tsx';
 /** Wraps JSX in a component, so a snippet is only the form. */
 const form = (jsx: string, before = '') => `${before} export function Search() { return ${jsx}; }`;
+/** New files in two of the places allowed to hold withTenant or the database client (D-077). */
+const IN_AUTH = 'src/modules/auth/handles.ts';
+const IN_DB = 'src/db/handles.ts';
+/** A function action, so the form passes and only its button or input is checked. */
+const SAVE = 'declare const save: (formData: FormData) => Promise<void>;';
+const PROPS = "import type { ComponentProps } from 'react';";
 
 const cases: Case[] = [
   // (a) No reading the clock inside src/modules.
@@ -621,6 +634,55 @@ const cases: Case[] = [
     code: "export async function GET() { return new Response('ok'); }",
     expected: [SERVER_ACTIONS],
   },
+  // E00-T10: routes only in src/app, and no 'use server' file anywhere else (D-077).
+  {
+    name: 'd: a Pages Router API route in src/pages/api',
+    file: 'src/pages/api/x.ts',
+    code: "import type { NextApiRequest, NextApiResponse } from 'next'; export default function handler(req: NextApiRequest, res: NextApiResponse) { res.status(200).json({ ok: true }); }",
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: a Pages Router page in src/pages',
+    file: 'src/pages/x.tsx',
+    code: 'export default function Page() { return <p>x</p>; }',
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: a file deeper in src/pages',
+    file: 'src/pages/patients/[id].tsx',
+    code: 'export default function Page() { return <p>x</p>; }',
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: a 'use server' file outside src/",
+    file: 'lib/actions.ts',
+    code: `${USE_SERVER} export async function save() {}`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: a 'use server' .mjs file outside src/",
+    file: 'scripts/actions.mjs',
+    code: `${USE_SERVER} export async function save() {}`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: an inline 'use server' function outside src/",
+    file: 'lib/save.ts',
+    code: "export async function save() { 'use server'; }",
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: 'd: a file outside src/ without a server action passes',
+    file: 'lib/helpers.ts',
+    code: 'export const twice = (n: number) => n * 2;',
+    expected: [],
+  },
+  {
+    name: 'd: a folder named pages inside src/app passes (an App Router path)',
+    file: 'src/app/(staff)/pages/page.tsx',
+    code: 'export default function Page() { return <p>pages</p>; }',
+    expected: [],
+  },
 
   // (e) Only the files that open transactions reach the database (D-062, D-071).
   {
@@ -743,6 +805,252 @@ const cases: Case[] = [
     code: "import { getDb } from '@/db/client'; import { withTenant } from '@/db/tenant'; export const a = [getDb, withTenant];",
     expected: [],
   },
+  // E00-T10: the places allowed to hold a handle never pass it on (D-077).
+  {
+    name: 'e: withTenant re-exported from src/modules/auth',
+    file: IN_AUTH,
+    code: "export { withTenant } from '@/db/tenant';",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: getDb re-exported from src/modules/auth',
+    file: IN_AUTH,
+    code: "export { getDb } from '@/db/client';",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: export * of the tenant file in src/db',
+    file: IN_DB,
+    code: "export * from './tenant';",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: export * of the client file in src/db',
+    file: IN_DB,
+    code: "export * from './client';",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: export * as a namespace of the client file in src/db',
+    file: IN_DB,
+    code: "export * as db from './client';",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: an imported withTenant exported again under another name, in src/modules/auth',
+    file: IN_AUTH,
+    code: "import { withTenant } from '@/db/tenant'; export { withTenant as open };",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: withTenant imported under another name and exported, in src/db',
+    file: IN_DB,
+    code: "import { withTenant as open } from './tenant'; export { open };",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: the tenant file imported as a namespace and exported, in src/modules/auth',
+    file: IN_AUTH,
+    code: "import * as tenant from '@/db/tenant'; export { tenant };",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: an imported getDb exported, in src/db',
+    file: IN_DB,
+    code: "import { getDb } from './client'; export { getDb };",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: withTenant re-exported as the default, in src/modules/auth',
+    file: IN_AUTH,
+    code: "export { withTenant as default } from '@/db/tenant';",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: withTenant re-exported from the wrappers' file",
+    file: 'src/app/_lib/actions.ts',
+    code: "export { withTenant } from '@/db/tenant';",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: export * of the tenant file from the wrappers' file",
+    file: 'src/app/_lib/actions.ts',
+    code: "export * from '@/db/tenant';",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: connect re-exported in src/db',
+    file: IN_DB,
+    code: "export { connect } from './client';",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: anything else from the client file re-exported in src/db',
+    file: IN_DB,
+    code: "export { CONNECTION_TIMEOUT_MS } from './client';",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: export type { TenantTransaction } from the tenant file passes, in src/modules/auth',
+    file: IN_AUTH,
+    code: "export type { TenantTransaction } from '@/db/tenant';",
+    expected: [],
+  },
+  {
+    name: 'e: an inline type re-export of TenantTransaction passes, in src/db',
+    file: IN_DB,
+    code: "export { type TenantTransaction } from './tenant';",
+    expected: [],
+  },
+  {
+    name: 'e: a type-only import of TenantTransaction exported again passes, in src/modules/auth',
+    file: IN_AUTH,
+    code: `${TX} export type { TenantTransaction };`,
+    expected: [],
+  },
+  {
+    name: 'e: export type * of the client file passes, in src/db',
+    file: IN_DB,
+    code: "export type * from './client';",
+    expected: [],
+  },
+  {
+    name: 'e: a re-export of something else from the tenant file passes, in src/db',
+    file: IN_DB,
+    code: "export { LOCK_TIMEOUT_MS } from './tenant';",
+    expected: [],
+  },
+  {
+    name: "e: the auth module's index, as it is, passes",
+    ...asItIs('src/modules/auth/index.ts'),
+    expected: [],
+  },
+  {
+    name: 'e: the login audit, as it is, passes',
+    ...asItIs('src/modules/auth/login-audit.ts'),
+    expected: [],
+  },
+  {
+    name: 'e: the memberships file, as it is, passes',
+    ...asItIs('src/modules/auth/memberships.ts'),
+    expected: [],
+  },
+  {
+    name: 'e: the auth library file, as it is, passes',
+    ...asItIs('src/modules/auth/better-auth.ts'),
+    expected: [],
+  },
+  ...['client', 'tenant', 'migrate', 'reset'].map((name) => ({
+    name: `e: src/db/${name}.ts, as it is, passes`,
+    ...asItIs(`src/db/${name}.ts`),
+    expected: [],
+  })),
+
+  // E00-T10: database drivers, and the files that open connections of their own, only in src/db.
+  ...[
+    "import pg from 'pg'; export const pool = new pg.Pool();",
+    "import PgBoss from 'pg-boss'; export { PgBoss };",
+    "import { drizzle } from 'drizzle-orm/node-postgres'; export { drizzle };",
+    "import { migrate } from 'drizzle-orm/node-postgres/migrator'; export { migrate };",
+    "import { drizzle } from 'drizzle-orm/postgres-js'; export { drizzle };",
+    "import { resetDatabase } from '@/db/reset'; export { resetDatabase };",
+    "import { runMigrations } from '@/db/migrate'; export { runMigrations };",
+  ].map((code) => ({
+    name: `e: a driver in a module: ${code.split(';')[0]}`,
+    file: IN_MODULE,
+    code,
+    expected: [DATABASE],
+  })),
+  {
+    name: "e: 'pg' in a page",
+    file: STAFF_PAGE,
+    code: "import pg from 'pg'; export const pool = new pg.Pool();",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: 'pg' in src/modules/auth",
+    file: IN_AUTH,
+    code: "import pg from 'pg'; export const pool = new pg.Pool();",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: 'pg' in the wrappers' file",
+    file: 'src/app/_lib/actions.ts',
+    code: "import pg from 'pg'; export const pool = new pg.Pool();",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: '@/db/reset' by a relative path in a module",
+    file: IN_MODULE,
+    code: "import { resetDatabase } from '../../db/reset.ts'; export { resetDatabase };",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: 'pg' imported for its side effects only",
+    file: IN_MODULE,
+    code: "import 'pg'; export const a = 1;",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: 'pg' with a dynamic import",
+    file: IN_MODULE,
+    code: "export const load = () => import('pg');",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: 'pg' re-exported",
+    file: IN_MODULE,
+    code: "export * from 'pg';",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: 'pg' through require()",
+    file: 'src/modules/scheduling/slots.cjs',
+    code: "const pg = require('pg'); module.exports = pg;",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: a path of 'pg' itself",
+    file: IN_MODULE,
+    code: "import Client from 'pg/lib/client'; export { Client };",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: a path inside 'drizzle-orm/pg-core' (only drizzle-orm/pg-core itself is allowed)",
+    file: IN_MODULE,
+    code: "import { PgSession } from 'drizzle-orm/pg-core/session'; export { PgSession };",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: 'pg' in src/db passes",
+    file: IN_DB,
+    code: "import pg from 'pg'; export const pool = new pg.Pool();",
+    expected: [],
+  },
+  {
+    name: "e: a type-only import of 'pg' in a module passes",
+    file: IN_MODULE,
+    code: "import type { PoolClient } from 'pg'; export type Client = PoolClient;",
+    expected: [],
+  },
+  {
+    name: "e: an inline type import of 'pg' in a module passes",
+    file: IN_MODULE,
+    code: "import { type PoolClient } from 'pg'; export type Client = PoolClient;",
+    expected: [],
+  },
+  {
+    name: "e: a driver's import('…') used as a type in a module passes",
+    file: IN_MODULE,
+    code: "export type Db = import('drizzle-orm/node-postgres').NodePgDatabase;",
+    expected: [],
+  },
+  {
+    name: "e: 'drizzle-orm' and 'drizzle-orm/pg-core' in a module pass",
+    file: IN_MODULE,
+    code: "import { sql } from 'drizzle-orm'; import { pgTable } from 'drizzle-orm/pg-core'; export const a = [sql, pgTable];",
+    expected: [],
+  },
 
   // (f) Every promise is awaited and only errors are thrown (R-32, D-073). Type-aware.
   {
@@ -815,6 +1123,183 @@ const cases: Case[] = [
     name: 'f: throwing what withoutQueryValues() returns (unknown) passes',
     file: IN_MODULE,
     code: "import { withoutQueryValues } from '@/lib/query-errors'; export async function load(read: () => Promise<void>) { try { await read(); } catch (error) { throw withoutQueryValues(error); } }",
+    expected: [],
+  },
+  // E00-T10: only errors are rejected, and nothing hangs a handler on a promise and walks away.
+  {
+    name: 'f: return Promise.reject({ cause: e })',
+    file: IN_MODULE,
+    code: 'export async function load(read: () => Promise<void>) { try { await read(); } catch (e) { return Promise.reject({ cause: e }); } }',
+    expected: [REJECTED],
+  },
+  {
+    name: 'f: reject({ code }) in a new Promise',
+    file: IN_MODULE,
+    code: "export function wait(ok: boolean) { return new Promise<void>((resolve, reject) => { if (ok) resolve(); else reject({ code: 'not_ok' }); }); }",
+    expected: [REJECTED],
+  },
+  {
+    name: 'f: rejecting with a caught error passes',
+    file: IN_MODULE,
+    code: 'export async function load(read: () => Promise<void>) { try { await read(); } catch (error) { return Promise.reject(error); } }',
+    expected: [],
+  },
+  {
+    name: 'f: rejecting with what withoutQueryValues() returns passes',
+    file: IN_MODULE,
+    code: "import { withoutQueryValues } from '@/lib/query-errors'; export async function load(read: () => Promise<void>) { try { await read(); } catch (error) { return Promise.reject(withoutQueryValues(error)); } }",
+    expected: [],
+  },
+  {
+    name: 'f: rejecting with a new Error passes',
+    file: IN_MODULE,
+    code: "export function wait(ok: boolean) { return new Promise<void>((resolve, reject) => { if (ok) resolve(); else reject(new Error('not ok')); }); }",
+    expected: [],
+  },
+  {
+    name: 'f: tx.insert(…).catch(() => {}) as a statement in a module',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function mark(tx: TenantTransaction, id: string) { tx.insert(marks).values({ id }).catch(() => {}); }`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: tx.insert(…).then(ok, fail) as a statement in a module',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function mark(tx: TenantTransaction, id: string) { tx.insert(marks).values({ id }).then(() => {}, () => {}); }`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: tx.insert(…).catch(() => {}) as a statement in an action file',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} ${TABLE} ${TX} export const mark = staffAction(spec, async ({ tx }: { tx: TenantTransaction }) => { tx.insert(marks).values({ id: 'x' }).catch(() => {}); });`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: tx.insert(…).then(ok, fail) as a statement in an action file',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} ${TABLE} ${TX} export const mark = staffAction(spec, async ({ tx }: { tx: TenantTransaction }) => { tx.insert(marks).values({ id: 'x' }).then(() => {}, () => {}); });`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: p?.catch(…) as a statement',
+    file: IN_MODULE,
+    code: 'export function forget(p: Promise<void> | undefined) { p?.catch(() => {}); }',
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: p.catch?.(…) as a statement',
+    file: 'src/lib/forget.ts',
+    code: 'export function forget(p: Promise<void>) { p.catch?.(() => {}); }',
+    expected: [UNAWAITED],
+  },
+  {
+    name: "f: p['catch'](…) as a statement",
+    file: 'src/lib/forget.ts',
+    code: "export function forget(p: Promise<void>) { p['catch'](() => {}); }",
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: a .then(ok, fail) statement in a .mts file',
+    file: 'src/lib/forget.mts',
+    code: 'export function forget(p: Promise<void>) { p.then(() => {}, () => {}); }',
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: the same .catch(…) awaited passes',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function mark(tx: TenantTransaction, id: string) { await tx.insert(marks).values({ id }).catch(() => {}); }`,
+    expected: [],
+  },
+  {
+    name: 'f: the same .then(ok, fail) returned passes',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} ${TABLE} ${TX} export const mark = staffAction(spec, async ({ tx }: { tx: TenantTransaction }) => { return tx.insert(marks).values({ id: 'x' }).then(() => {}, () => {}); });`,
+    expected: [],
+  },
+  {
+    name: 'f: a .then(ok, fail) statement in a client .tsx component passes',
+    file: 'src/app/(staff)/save-button.tsx',
+    code: '\'use client\'; export function SaveButton({ save }: { save: () => Promise<void> }) { return <button type="button" onClick={() => { save().then(() => {}, () => {}); }}>Save</button>; }',
+    expected: [],
+  },
+  {
+    name: 'f: a one-argument .then(…) statement is still no-floating-promises alone',
+    file: IN_MODULE,
+    code: 'export function forget(p: Promise<void>) { p.then(() => {}); }',
+    expected: [FLOATING],
+  },
+  {
+    name: 'f: Date.now() in a module is still reported next to a .catch(…) statement',
+    file: IN_MODULE,
+    code: 'export const a = Date.now(); export function forget(p: Promise<void>) { p.catch(() => {}); }',
+    expected: [CLOCK, UNAWAITED],
+  },
+  // no-floating-promises follows a .finally(…) back to the promise it hangs on, so a .finally(…)
+  // after .catch(…) or .then(ok, fail) passes it: the statement is reported by its last call.
+  {
+    name: 'f: tx.insert(…).catch(…).finally(…) as a statement in a module',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function mark(tx: TenantTransaction, id: string) { tx.insert(marks).values({ id }).catch(() => {}).finally(() => {}); }`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: tx.insert(…).then(ok, fail).finally(…) as a statement in a module',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function mark(tx: TenantTransaction, id: string) { tx.insert(marks).values({ id }).then(() => {}, () => {}).finally(() => {}); }`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: tx.insert(…).catch(…).finally(…) as a statement in an action file',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} ${TABLE} ${TX} export const mark = staffAction(spec, async ({ tx }: { tx: TenantTransaction }) => { tx.insert(marks).values({ id: 'x' }).catch(() => {}).finally(() => {}); });`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: tx.insert(…).then(ok, fail).finally(…) as a statement in an action file',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} ${TABLE} ${TX} export const mark = staffAction(spec, async ({ tx }: { tx: TenantTransaction }) => { tx.insert(marks).values({ id: 'x' }).then(() => {}, () => {}).finally(() => {}); });`,
+    expected: [UNAWAITED],
+  },
+  {
+    name: "f: p.catch(…)['finally'](…) as a statement",
+    file: 'src/lib/forget.ts',
+    code: "export function forget(p: Promise<void>) { p.catch(() => {})['finally'](() => {}); }",
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: p.catch(…)[`finally`](…) as a statement',
+    file: 'src/lib/forget.ts',
+    code: 'export function forget(p: Promise<void>) { p.catch(() => {})[`finally`](() => {}); }',
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: p?.catch(…).finally(…) as a statement',
+    file: IN_MODULE,
+    code: 'export function forget(p: Promise<void> | undefined) { p?.catch(() => {}).finally(() => {}); }',
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: p.catch(…).finally?.(…) as a statement',
+    file: 'src/lib/forget.ts',
+    code: 'export function forget(p: Promise<void>) { p.catch(() => {}).finally?.(() => {}); }',
+    expected: [UNAWAITED],
+  },
+  {
+    name: 'f: a .finally(…) statement on a promise nobody handles gets both reports',
+    file: 'src/lib/forget.ts',
+    code: 'export function forget(p: Promise<void>) { p.finally(() => {}); }',
+    expected: [FLOATING, UNAWAITED],
+  },
+  {
+    name: 'f: the same .catch(…).finally(…) awaited passes',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX} export async function mark(tx: TenantTransaction, id: string) { await tx.insert(marks).values({ id }).catch(() => {}).finally(() => {}); }`,
+    expected: [],
+  },
+  {
+    name: 'f: the same .then(ok, fail).finally(…) returned passes',
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} ${TABLE} ${TX} export const mark = staffAction(spec, async ({ tx }: { tx: TenantTransaction }) => { return tx.insert(marks).values({ id: 'x' }).then(() => {}, () => {}).finally(() => {}); });`,
     expected: [],
   },
 
@@ -1059,6 +1544,365 @@ const cases: Case[] = [
     code: 'export function Search<A extends \'/patients\' | \'/staff\'>({ action }: { action: A }) { return <form method="post" action={action}><input name="q" /></form>; }',
     expected: [],
   },
+  // E00-T10: a button's or input's own URL (D-081).
+  {
+    name: 'g: <button formAction="/patients"> in a form whose action is a function',
+    file: STAFF_FORM,
+    code: form('<form action={save}><button formAction="/patients">Search</button></form>', SAVE),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: <input type="submit" formAction="/patients">',
+    file: STAFF_FORM,
+    code: form('<form action={save}><input type="submit" formAction="/patients" /></form>', SAVE),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a formAction URL in a string variable without formMethod',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formAction={url}>Search</button></form>',
+      `${SAVE} const url = '/patients';`,
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: formAction="" with formMethod="post"',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formAction="" formMethod="post">Search</button></form>',
+      SAVE,
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: "g: a formAction typed ComponentProps<'button'>['formAction'] with formMethod=\"post\"",
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formAction={go} formMethod="post">Search</button></form>',
+      `${SAVE} ${PROPS} declare const go: ComponentProps<'button'>['formAction'];`,
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a formAction typed any with formMethod="post"',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formAction={go} formMethod="post">Search</button></form>',
+      `${SAVE} declare const go: any;`,
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a formAction URL with formMethod as an expression: one report per attribute',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formAction="/patients" formMethod={method}>Search</button></form>',
+      `${SAVE} const method = 'post';`,
+    ),
+    expected: [FORMS, FORMS],
+  },
+  {
+    name: 'g: formaction written in lower case',
+    file: STAFF_FORM,
+    code: form('<form action={save}><button formaction="/patients">Search</button></form>', SAVE),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a formAction function passes',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formAction={remove}>Remove</button></form>',
+      `${SAVE} declare const remove: (formData: FormData) => Promise<void>;`,
+    ),
+    expected: [],
+  },
+  {
+    name: 'g: a formAction function-or-undefined passes',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formAction={remove}>Remove</button></form>',
+      `${SAVE} declare const remove: ((formData: FormData) => Promise<void>) | undefined;`,
+    ),
+    expected: [],
+  },
+  {
+    name: 'g: formAction={undefined} passes',
+    file: STAFF_FORM,
+    code: form('<form action={save}><button formAction={undefined}>Save</button></form>', SAVE),
+    expected: [],
+  },
+  {
+    name: 'g: a formAction without a value passes (the form is checked on its own)',
+    file: STAFF_FORM,
+    code: form('<form action={save}><button formAction>Save</button></form>', SAVE),
+    expected: [],
+  },
+  {
+    name: 'g: a formAction URL with formMethod="post" passes',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formAction="/patients" formMethod="post">Search</button></form>',
+      SAVE,
+    ),
+    expected: [],
+  },
+  {
+    name: 'g: a formAction URL with formMethod="POST" passes',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><input type="submit" formAction="/patients" formMethod="POST" /></form>',
+      SAVE,
+    ),
+    expected: [],
+  },
+  {
+    name: 'g: a formAction URL in a string variable with formMethod="post" passes',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formAction={url} formMethod="post">Search</button></form>',
+      `${SAVE} const url = '/patients';`,
+    ),
+    expected: [],
+  },
+  // E00-T10: a spread onto a button or input that could carry formAction or formMethod (D-081).
+  {
+    name: "g: a spread onto <button> typed ComponentProps<'button'>",
+    file: STAFF_FORM,
+    code: `${PROPS} export function Button(props: ComponentProps<'button'>) { return <button {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: "g: a spread onto <button> typed Omit<ComponentProps<'button'>, 'formAction'>",
+    file: STAFF_FORM,
+    code: `${PROPS} export function Button(props: Omit<ComponentProps<'button'>, 'formAction'>) { return <button {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread onto <button> typed any',
+    file: STAFF_FORM,
+    code: 'export function Button(props: any) { return <button {...props} />; }',
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread onto <button> typed unknown',
+    file: STAFF_FORM,
+    code: 'declare const props: unknown; export function Button() { return <button {...props} />; }',
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread onto <button> typed Record<string, string>',
+    file: STAFF_FORM,
+    code: 'export function Button(props: Record<string, string>) { return <button {...props} />; }',
+    expected: [FORMS],
+  },
+  {
+    name: "g: a spread onto <button> typed as a type parameter constrained by ComponentProps<'button'>",
+    file: STAFF_FORM,
+    code: `${PROPS} export function Button<P extends ComponentProps<'button'>>(props: P) { return <button {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread onto <button> typed as a type parameter without a constraint',
+    file: STAFF_FORM,
+    code: 'export function Button<P,>(props: P) { return <button {...props} />; }',
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread onto <button> typed as a type parameter constrained by object',
+    file: STAFF_FORM,
+    code: 'export function Button<P extends object>(props: P & { label: string }) { return <button {...props} />; }',
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread onto <button> whose type has formMethod only, before the other props',
+    file: STAFF_FORM,
+    code: 'declare const props: { formMethod?: string }; export function Button() { return <button {...props} type="submit" />; }',
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread onto <button> whose type has formaction in lower case',
+    file: STAFF_FORM,
+    code: 'declare const props: { formaction: string }; export function Button() { return <button {...props} />; }',
+    expected: [FORMS],
+  },
+  {
+    name: "g: a spread onto <input> typed ComponentProps<'input'>",
+    file: STAFF_FORM,
+    code: `${PROPS} export function Field(props: ComponentProps<'input'>) { return <input {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: "g: a spread typed Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'> passes",
+    file: STAFF_FORM,
+    code: `${PROPS} export function Button(props: Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'>) { return <button {...props} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: a button component of that type with a function formAction written after the spread passes',
+    file: STAFF_FORM,
+    code: `${PROPS} type ButtonProps = Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'> & { formAction?: (formData: FormData) => void | Promise<void> }; export function Button({ formAction, ...rest }: ButtonProps) { return <button {...rest} formAction={formAction} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: {...{ disabled: pending }} passes',
+    file: STAFF_FORM,
+    code: 'export function Button({ pending }: { pending: boolean }) { return <button {...{ disabled: pending }}>Save</button>; }',
+    expected: [],
+  },
+  {
+    name: "g: an input spread of a form library's name, onChange, onBlur and ref passes",
+    file: STAFF_FORM,
+    code: 'declare const field: { name: string; onChange: (event: unknown) => void; onBlur: (event: unknown) => void; ref: (element: HTMLInputElement | null) => void }; export function Field() { return <input {...field} />; }',
+    expected: [],
+  },
+  // E00-T10: next/form, whose <Form> sends a URL action as a GET (D-081).
+  {
+    name: "g: import Form from 'next/form' in a page",
+    file: STAFF_PAGE,
+    code: 'import Form from \'next/form\'; export default function Page() { return <Form action="/patients"><input name="q" /></Form>; }',
+    expected: [FORMS],
+  },
+  {
+    name: "g: import Form from 'next/form' in a client component",
+    file: STAFF_FORM,
+    code: '\'use client\'; import Form from \'next/form\'; export function Search() { return <Form action="/patients"><input name="q" /></Form>; }',
+    expected: [FORMS],
+  },
+  ...[
+    "import { default as F } from 'next/form'; export { F };",
+    "import Form, { type FormProps } from 'next/form'; export { Form }; export type P = FormProps;",
+    "export { default } from 'next/form';",
+    "export * from 'next/form';",
+    "export const load = () => import('next/form');",
+    'export const load = () => import(`next/form`);',
+    "import Form from 'next/form.js'; export { Form };",
+    "import Form from 'next/dist/client/form'; export { Form };",
+    "import Form from 'next/dist/client/form.js'; export { Form };",
+    // What next/form becomes in a build: dist/api/form re-exports dist/client/form, and App Router
+    // code gets dist/client/app-dir/form. Both have types; the dist/esm/ copies do not.
+    "import Form from 'next/dist/api/form'; export { Form };",
+    "import Form from 'next/dist/api/form.js'; export { Form };",
+    "import Form from 'next/dist/client/app-dir/form'; export { Form };",
+    "import Form from 'next/dist/client/app-dir/form.js'; export { Form };",
+    "import Form from 'next/dist/esm/client/app-dir/form'; export { Form };",
+  ].map((code) => ({
+    name: `g: next/form loaded: ${code}`,
+    file: STAFF_FORM,
+    code,
+    expected: [FORMS],
+  })),
+  ...[
+    "import type { FormProps } from 'next/form'; export type P = FormProps;",
+    "import { type FormProps } from 'next/form'; export type P = FormProps;",
+    "export type { FormProps } from 'next/form';",
+    'import Link from \'next/link\'; export function Nav() { return <Link href="/patients">Patients</Link>; }',
+    // The helpers both <Form> components share, not a component.
+    "import { checkFormActionUrl } from 'next/dist/client/form-shared'; export const check = checkFormActionUrl;",
+  ].map((code) => ({
+    name: `g: passes: ${code.split(';')[0]}`,
+    file: STAFF_FORM,
+    code,
+    expected: [],
+  })),
+  // E00-T10 test: shapes a later edit to the rule could let through while every case above passes.
+  {
+    // HTML reads formmethod=" post" as get, as it does method=" post ": no trimming.
+    name: 'g: formMethod=" post" next to a formAction URL, which HTML reads as get',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formAction="/patients" formMethod=" post">Search</button></form>',
+      SAVE,
+    ),
+    expected: [FORMS, FORMS],
+  },
+  {
+    // An index signature whose key is a pattern holds formAction too, not only a string index.
+    name: 'g: a spread typed with a template-literal index signature',
+    file: STAFF_FORM,
+    code: 'export function Button(props: Record<`form${string}`, string>) { return <button {...props} />; }',
+    expected: [FORMS],
+  },
+  {
+    // The rule covers .ts files too: a .ts file that passed <Form> on would give every .tsx file a
+    // way to it that names no next/form path.
+    name: 'g: next/form re-exported from a .ts file',
+    file: 'src/ui/form.ts',
+    code: "export { default as Form } from 'next/form';",
+    expected: [FORMS],
+  },
+  ...[
+    // The two untyped copies under dist/esm/ that no case above names.
+    "import Form from 'next/dist/esm/api/form'; export { Form };",
+    "import Form from 'next/dist/esm/client/form.js'; export { Form };",
+  ].map((code) => ({
+    name: `g: next/form loaded: ${code}`,
+    file: STAFF_FORM,
+    code,
+    expected: [FORMS],
+  })),
+
+  // (h) No lint comment switches a guard off in src/ (D-077): ESLint ignores it and reports it.
+  {
+    name: "h: '// eslint-disable-next-line chairside/server-actions' switches nothing off",
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER}\n// eslint-disable-next-line chairside/server-actions\nexport async function save() {}`,
+    expected: [INLINE_CONFIG, SERVER_ACTIONS],
+  },
+  {
+    name: "h: '/* eslint-disable */' switches off no server-actions report",
+    file: STAFF_ACTIONS,
+    code: `/* eslint-disable */\n${USE_SERVER}\nexport async function save() {}`,
+    expected: [INLINE_CONFIG, SERVER_ACTIONS],
+  },
+  {
+    name: "h: '// eslint-disable-next-line chairside/database-access' switches nothing off",
+    file: IN_MODULE,
+    code: "// eslint-disable-next-line chairside/database-access\nimport { getDb } from '@/db/client';\nexport const db = getDb;",
+    expected: [INLINE_CONFIG, DATABASE],
+  },
+  {
+    name: "h: '/* eslint-disable chairside/database-access */' for the whole file switches nothing off",
+    file: IN_MODULE,
+    code: "/* eslint-disable chairside/database-access */\nimport { getDb } from '@/db/client';\nexport const db = getDb;",
+    expected: [INLINE_CONFIG, DATABASE],
+  },
+  {
+    name: 'h: an eslint-disable-next-line comment does not switch the clock rule off',
+    file: IN_MODULE,
+    code: '// eslint-disable-next-line no-restricted-syntax\nexport const a = Date.now();',
+    expected: [INLINE_CONFIG, CLOCK],
+  },
+  {
+    name: 'h: a file-wide eslint-disable comment does not switch the clock rule off',
+    file: IN_MODULE,
+    code: '/* eslint-disable */\nexport const a = Date.now();',
+    expected: [INLINE_CONFIG, CLOCK],
+  },
+  {
+    name: 'h: an eslint-disable-next-line comment does not switch no-floating-promises off',
+    file: IN_MODULE,
+    code: `${TABLE} ${TX}\nexport async function mark(tx: TenantTransaction, id: string) {\n// eslint-disable-next-line @typescript-eslint/no-floating-promises\ntx.insert(marks).values({ id });\n}`,
+    expected: [INLINE_CONFIG, FLOATING],
+  },
+  {
+    name: 'h: a file-wide eslint-disable comment does not switch no-floating-promises off',
+    file: IN_MODULE,
+    code: `/* eslint-disable @typescript-eslint/no-floating-promises */\n${TABLE} ${TX}\nexport async function mark(tx: TenantTransaction, id: string) { tx.insert(marks).values({ id }); }`,
+    expected: [INLINE_CONFIG, FLOATING],
+  },
+  {
+    name: 'h: an eslint-disable-line comment switches nothing off',
+    file: IN_MODULE,
+    code: 'export const a = Date.now(); // eslint-disable-line',
+    expected: [CLOCK, INLINE_CONFIG],
+  },
+  {
+    name: "h: a comment that sets a rule's severity switches nothing off",
+    file: IN_MODULE,
+    code: "/* eslint no-restricted-syntax: 'off' */\nexport const a = Date.now();",
+    expected: [INLINE_CONFIG, CLOCK],
+  },
 ];
 
 let reported: string[][] = [];
@@ -1079,5 +1923,18 @@ describe('architecture lint rules', () => {
     expect(messages.filter((message) => message.startsWith('parse error'))).toEqual([]);
     const architectureRules = messages.filter((rule) => ARCHITECTURE_RULES.includes(rule));
     expect(architectureRules).toEqual(expected);
+  });
+});
+
+describe('script files in src/', () => {
+  // tsconfig.json includes .ts, .tsx and .mts files, and the type-aware rules (TYPED_FILES in
+  // eslint.config.mjs) see only those: a .js, .jsx, .mjs, .cjs or .cts file in src/ would pass
+  // no-floating-promises, only-throw-error and the form rule unchecked (D-074, D-077).
+  it('are all TypeScript files the type-aware rules see', () => {
+    const unchecked = readdirSync(path.join(ROOT, 'src'), { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && /\.(js|jsx|mjs|cjs|cts)$/.test(entry.name))
+      .map((entry) => path.relative(ROOT, path.join(entry.parentPath, entry.name)))
+      .map((file) => file.split(path.sep).join('/'));
+    expect(unchecked).toEqual([]);
   });
 });

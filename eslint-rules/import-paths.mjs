@@ -20,12 +20,41 @@ export function isInside(absolutePath, folder) {
 }
 
 /** The text of an import source: a string, or a template literal without `${}` in it. */
-function sourceText(node) {
+export function sourceText(node) {
   if (node?.type === 'Literal' && typeof node.value === 'string') return node.value;
   if (node?.type === 'TemplateLiteral' && node.expressions.length === 0) {
     return node.quasis[0].value.cooked;
   }
   return null;
+}
+
+/**
+ * True if an import or export statement loads the other file's code, not only its types.
+ * `import type …`, `import { type a }`, `export type … from`, `export { type a } from` and
+ * `import('…')` used as a type load nothing; `import '…'`, `import()` and `require()` do.
+ */
+export function importsValue(node) {
+  switch (node.type) {
+    case 'ImportDeclaration':
+      return (
+        node.importKind !== 'type' &&
+        (node.specifiers.length === 0 ||
+          node.specifiers.some((s) => s.type !== 'ImportSpecifier' || s.importKind !== 'type'))
+      );
+    case 'ExportNamedDeclaration':
+      return (
+        node.exportKind !== 'type' &&
+        (node.specifiers.length === 0 || node.specifiers.some((s) => s.exportKind !== 'type'))
+      );
+    case 'ExportAllDeclaration':
+      return node.exportKind !== 'type';
+    case 'TSImportEqualsDeclaration':
+      return node.importKind !== 'type';
+    case 'TSImportType':
+      return false;
+    default: // import(), require()
+      return true;
+  }
 }
 
 /**
