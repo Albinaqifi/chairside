@@ -5,8 +5,9 @@ holds health data, built by one developer with AI agents.
 
 **Status:** the project skeleton and database foundation (E00-T01), login with clinic
 membership (E00-T02), the action wrappers with the audit log (E00-T03), the lint rules that
-guard them with the login audit (E00-T08), and CI on GitHub (E00-T06a) exist. What is done and
-what comes next is on the board, `docs/progress/board.md`.
+guard them with the login audit (E00-T08), CI on GitHub (E00-T06a), and a login form that never
+puts the password in the URL (E00-T09) exist. What is done and what comes next is on the board,
+`docs/progress/board.md`.
 
 ## Start of every session (in this order)
 
@@ -101,8 +102,8 @@ src/modules/<name>/   All business logic. index.ts = public API, schema.ts = its
 src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts.
 src/lib/              Small shared pieces: clock, ids, logger, personal-fields.
 tests/integration/    Tests against real PostgreSQL, including the tenant meta-test.
-eslint-rules/         Our lint rules (module boundaries, server actions, database access) and the
-                      tests of all architecture rules.
+eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
+                      the tests of all architecture rules.
 ```
 
 Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tests/e2e` (E00-T06b), `src/worker` (E00-T07).
@@ -157,6 +158,12 @@ Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tes
   ```
   Other pages use `currentStaff()` (`src/app/_lib/auth.ts`). Login and logout are the auth
   library's routes (`authClient`). Never read the session cookie or a password (D-063).
+- Forms: a form posts to a URL named in its `action`, or takes a function as its action; never
+  only `onSubmit`, which leaves the browser to send a GET with every field in the URL whenever the
+  handler does not run (D-076). Write `method="post"` and the `action` out, after any spread; a
+  button or input has no `formMethod`, or `formMethod="post"`. Lint checks every `<form>` in the
+  `.tsx` files of `src/` (`chairside/forms-post`, type-aware, D-080; cases in
+  `eslint-rules/architecture.test.ts`).
 - Logs: `logger` from `src/lib/logger.ts`, ids and codes only. It drops the fields listed in
   `src/lib/personal-fields.ts` as a safety net, not as permission to log personal data. Errors
   leave `withTenant` without query values (D-070): keep a caught error as `cause`, never copy its

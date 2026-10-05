@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import { useState, useSyncExternalStore, type FormEvent } from 'react';
 import { authClient } from '@/app/_lib/auth-client';
 
 // Plain styling until the design system exists (E00-T04).
@@ -16,8 +16,29 @@ export function loginErrorMessage(status: number | undefined): string {
   return 'Login did not work. Try again.';
 }
 
+/** Whether the form runs in the browser never changes once it does: nothing to subscribe to. */
+function subscribeToNothing() {
+  return () => undefined;
+}
+
+/**
+ * Signs in through the auth library (D-063), and never puts the email and password in the URL
+ * (D-076):
+ * - The form posts to /login. With its script running, onSubmit stops the browser's own submission.
+ *   Sent any other way (a script calling form.submit()), the fields go in the request body, and
+ *   Next.js answers with the login page without reading them.
+ * - The button is disabled in the server's HTML and enabled once the form runs in the browser, so
+ *   nothing is sent before the script has run, or at all without JavaScript: a disabled button
+ *   stops Enter from submitting the form too.
+ */
 export function LoginForm() {
   const router = useRouter();
+  // false in the server's HTML and while the page hydrates, true once the form runs in the browser.
+  const inBrowser = useSyncExternalStore(
+    subscribeToNothing,
+    () => true,
+    () => false,
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -40,7 +61,15 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} style={{ display: 'grid', gap: '0.75rem' }}>
+    <form
+      method="post"
+      action="/login"
+      onSubmit={(event) => void submit(event)}
+      style={{ display: 'grid', gap: '0.75rem' }}
+    >
+      <noscript>
+        JavaScript is needed to log in. Turn it on in your browser, then reload the page.
+      </noscript>
       <label>
         Email
         <br />
@@ -52,7 +81,7 @@ export function LoginForm() {
         <input name="password" type="password" autoComplete="current-password" required />
       </label>
       {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={pending}>
+      <button type="submit" disabled={!inBrowser || pending}>
         {pending ? 'Logging in…' : 'Log in'}
       </button>
     </form>

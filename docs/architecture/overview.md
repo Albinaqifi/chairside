@@ -87,8 +87,8 @@ tests/
   integration/               tests against real Postgres
   e2e/                       Playwright
   evals/                     AI output evaluations
-eslint-rules/                our lint rules (module boundaries, server actions, database access);
-                             tests of all architecture rules
+eslint-rules/                our lint rules (module boundaries, server actions, database access,
+                             forms); tests of all architecture rules
 .github/workflows/           ci.yml: CI on every pull request, every push to main, weekly (E00-T06a)
 docs/  design/
 ```

@@ -18,6 +18,7 @@ const DATABASE = 'chairside/database-access';
 const FLOATING = '@typescript-eslint/no-floating-promises';
 const MISUSED = '@typescript-eslint/no-misused-promises';
 const THROWN = '@typescript-eslint/only-throw-error';
+const FORMS = 'chairside/forms-post';
 const ARCHITECTURE_RULES = [
   CLOCK,
   FRAMEWORK,
@@ -27,6 +28,7 @@ const ARCHITECTURE_RULES = [
   FLOATING,
   MISUSED,
   THROWN,
+  FORMS,
 ];
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -58,6 +60,10 @@ const ARGS = 'declare const spec: never; declare const handler: never;';
 const TABLE =
   "import { pgTable, uuid } from 'drizzle-orm/pg-core'; const marks = pgTable('marks', { id: uuid('id') });";
 const TX = "import type { TenantTransaction } from '@/db/tenant';";
+/** A component file with a form in it. */
+const STAFF_FORM = 'src/app/(staff)/patients/search-form.tsx';
+/** Wraps JSX in a component, so a snippet is only the form. */
+const form = (jsx: string, before = '') => `${before} export function Search() { return ${jsx}; }`;
 
 const cases: Case[] = [
   // (a) No reading the clock inside src/modules.
@@ -809,6 +815,248 @@ const cases: Case[] = [
     name: 'f: throwing what withoutQueryValues() returns (unknown) passes',
     file: IN_MODULE,
     code: "import { withoutQueryValues } from '@/lib/query-errors'; export async function load(read: () => Promise<void>) { try { await read(); } catch (error) { throw withoutQueryValues(error); } }",
+    expected: [],
+  },
+
+  // (g) A form never puts its fields in the URL (D-076). Type-aware.
+  {
+    name: 'g: a form with only onSubmit',
+    file: STAFF_FORM,
+    code: form(
+      '<form onSubmit={find}><input name="q" /></form>',
+      'declare const find: () => void;',
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: method="get"',
+    file: STAFF_FORM,
+    code: form('<form method="get" action="/patients"><input name="q" /></form>'),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: an action URL without method="post"',
+    file: STAFF_FORM,
+    code: form('<form action="/patients"><input name="q" /></form>'),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: an action URL in a string variable without method="post"',
+    file: STAFF_FORM,
+    code: form('<form action={url}><input name="q" /></form>', "const url = '/patients';"),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: method="post" without an action',
+    file: STAFF_FORM,
+    code: form('<form method="post"><input name="q" /></form>'),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: action=""',
+    file: STAFF_FORM,
+    code: form('<form method="post" action=""><input name="q" /></form>'),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: an action typed as a string-or-function union',
+    file: STAFF_FORM,
+    code: form(
+      '<form method="post" action={action}><input name="q" /></form>',
+      'declare const action: string | ((formData: FormData) => void);',
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: "g: an action typed with React's own type for it, a union like the one above",
+    file: STAFF_FORM,
+    code: form(
+      '<form method="post" action={action}><input name="q" /></form>',
+      "declare const action: import('react').ComponentProps<'form'>['action'];",
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a button with formMethod="get"',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formMethod="get">Search</button></form>',
+      'declare const save: (formData: FormData) => Promise<void>;',
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: the login form, as it is, passes',
+    ...asItIs('src/app/(auth)/login/login-form.tsx'),
+    expected: [],
+  },
+  {
+    name: 'g: the clinic picker, as it is, passes',
+    ...asItIs('src/app/(auth)/choose-clinic/page.tsx'),
+    expected: [],
+  },
+  {
+    name: 'g: a form whose action is a function passes',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><input name="q" /></form>',
+      'declare const save: (formData: FormData) => Promise<void>;',
+    ),
+    expected: [],
+  },
+  {
+    name: 'g: method="post" and an action URL in a string variable pass',
+    file: STAFF_FORM,
+    code: form(
+      '<form method="post" action={url}><input name="q" /></form>',
+      "const url = '/patients';",
+    ),
+    expected: [],
+  },
+  {
+    name: 'g: method="POST" in capitals passes',
+    file: STAFF_FORM,
+    code: form('<form method="POST" action="/patients"><input name="q" /></form>'),
+    expected: [],
+  },
+  {
+    name: 'g: method as an expression',
+    file: STAFF_FORM,
+    code: form(
+      '<form method={method} action="/patients"><input name="q" /></form>',
+      "const method = 'post';",
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: an action typed any',
+    file: STAFF_FORM,
+    code: form(
+      '<form method="post" action={action}><input name="q" /></form>',
+      'declare const action: any;',
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: an action typed unknown',
+    file: STAFF_FORM,
+    code: form(
+      '<form method="post" action={action}><input name="q" /></form>',
+      'declare const action: unknown;',
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: an action that may be undefined',
+    file: STAFF_FORM,
+    code: form(
+      '<form method="post" action={action}><input name="q" /></form>',
+      'declare const action: string | undefined;',
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: an action of only spaces',
+    file: STAFF_FORM,
+    code: form('<form method="post" action=" "><input name="q" /></form>'),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: an empty template literal as the action',
+    file: STAFF_FORM,
+    code: form('<form method="post" action={``}><input name="q" /></form>'),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread gives the form its props, and no action is written',
+    file: STAFF_FORM,
+    code: form(
+      '<form {...props}><input name="q" /></form>',
+      "declare const props: import('react').ComponentProps<'form'>;",
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread after the action, which could replace it',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save} {...props}><input name="q" /></form>',
+      "declare const save: (formData: FormData) => Promise<void>; declare const props: import('react').ComponentProps<'form'>;",
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread after method="post", which could replace it',
+    file: STAFF_FORM,
+    code: form(
+      '<form action="/patients" method="post" {...props}><input name="q" /></form>',
+      "declare const props: import('react').ComponentProps<'form'>;",
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread before a function action passes',
+    file: STAFF_FORM,
+    code: form(
+      '<form {...props} action={save}><input name="q" /></form>',
+      "declare const save: (formData: FormData) => Promise<void>; declare const props: import('react').ComponentProps<'form'>;",
+    ),
+    expected: [],
+  },
+  {
+    name: 'g: an input with formMethod="get"',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><input type="submit" formMethod="get" /></form>',
+      'declare const save: (formData: FormData) => Promise<void>;',
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a button with formMethod as an expression',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><button formMethod={method}>Search</button></form>',
+      "declare const save: (formData: FormData) => Promise<void>; const method = 'post';",
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a button with formMethod="post" passes',
+    file: STAFF_FORM,
+    code: form(
+      '<form method="post" action="/patients"><button formMethod="post">Search</button></form>',
+    ),
+    expected: [],
+  },
+  {
+    name: 'g: an action without a value, which React drops',
+    file: STAFF_FORM,
+    code: form('<form method="post" action><input name="q" /></form>'),
+    expected: [FORMS],
+  },
+  {
+    name: "g: method={'post'}, an expression",
+    file: STAFF_FORM,
+    code: form('<form method={\'post\'} action="/patients"><input name="q" /></form>'),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: method=" post ", which HTML reads as get',
+    file: STAFF_FORM,
+    code: form('<form method=" post " action="/patients"><input name="q" /></form>'),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: an action typed as a type parameter that may be a string or a function',
+    file: STAFF_FORM,
+    code: 'export function Search<A extends string | (() => void)>({ action }: { action: A }) { return <form method="post" action={action}><input name="q" /></form>; }',
+    expected: [FORMS],
+  },
+  {
+    name: 'g: an action typed as a type parameter that is a URL passes',
+    file: STAFF_FORM,
+    code: 'export function Search<A extends \'/patients\' | \'/staff\'>({ action }: { action: A }) { return <form method="post" action={action}><input name="q" /></form>; }',
     expected: [],
   },
 ];

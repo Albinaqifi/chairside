@@ -1150,3 +1150,30 @@ architecture), `changed` (differs from the original files), `process`.
   the check: compare its minutes and tokens per role with the four runs above.
 - **Revisit if:** a role misses something it would have found in a section it no longer reads
   (then widen that role's list, not the rule); or the board grows past about 15 KB again.
+
+### D-080 · The form lint as built: what passes, spreads, an action that may be missing, where it runs (E00-T09)
+- **Origin:** process, E00-T09. Builder choices inside D-076; the owner reviews them with the task.
+- **What:**
+  - **Where.** `chairside/forms-post` (`eslint-rules/forms-post.mjs`) runs on the files the other
+    type-aware rules cover (`TYPED_FILES`: the `.ts`, `.tsx` and `.mts` files of `src/`). It reads
+    JSX elements written as HTML tags: `<form>`, and `<button>` and `<input>` for `formMethod`.
+    Attribute and tag names are compared in any letter case, as HTML reads them. Without type
+    information it throws rather than guess.
+  - **What passes.** A form whose `action` is a function: every part of its type can be called (a
+    type parameter counts as its constraint). Its `method` is then not checked: React sends such a
+    form itself, with a method and encoding of its own. Or a form with `method="post"` written as
+    a string, in any letter case but exactly that word (HTML reads `" post "` as GET), and an
+    `action` that is a non-empty string: written (`"…"`, `{'…'}`, a template without `${}`) or
+    typed as one (a literal, `string`, a template type). An action of only spaces is empty.
+  - **Reported beyond the task's list**, as the same leak: an `action` whose type may be
+    `undefined` or `null` (an optional prop: React then drops it, and the form goes to its page's
+    own URL); `<form action>` with no value (React drops a boolean action); a spread after
+    `action`, or after `method` when the action is a URL, since in JSX the last prop wins. A spread
+    before them passes. `method={'post'}` is reported, as the task says of any expression.
+  - **Not checked:** a form made with `createElement('form', …)`, and a `.jsx` file in `src/` (no
+    types; none exists, D-074).
+- **Why:** the rule's job is that no form can put its fields in the URL; a value that may be
+  missing, or a prop that a later spread may replace, is exactly such a form. Each shape has a case
+  in `eslint-rules/architecture.test.ts`.
+- **Revisit if:** a form component in E00-T04 needs a shape the rule refuses; forms are made with
+  `createElement`; `.jsx` files appear in `src/`.
