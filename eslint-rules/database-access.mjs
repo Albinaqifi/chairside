@@ -8,16 +8,19 @@
 //   export { withTenant } from '@/db/tenant';               nowhere: the files allowed a handle
 //                                                            never pass it on (D-077)
 //   import pg from 'pg';                                     only in src/db/ (D-077)
+//   export { Pool } from 'pg';                               nowhere: src/db/ never passes a
+//                                                            driver on (D-084)
 //
 // A handle is withTenant, or anything from the client file (getDb, connect, closeDb…). Passing one
 // on is a value re-export of it: `export { … } from`, `export *` of the tenant or client file, or
-// `export { x }` of an imported handle. `export const x = withTenant`, and a function that wraps it,
-// stay review checks.
+// `export { x }` or `export default x` of an imported handle (D-084). `export const x = withTenant`,
+// and a function that wraps it, stay review checks.
 //
 // The drivers, allowed only in src/db/: pg and every pg-… package, every drizzle-orm/… path except
 // drizzle-orm/pg-core, and the scripts that open connections of their own (src/db/reset,
 // src/db/migrate). drizzle-orm itself and drizzle-orm/pg-core hold no driver: allowed everywhere.
-// Type-only imports of a driver pass.
+// Type-only imports of a driver pass. Any file may import any file of src/db/, so src/db/ passes no
+// driver on either, in the same ways as a handle (D-084).
 //
 // Every way of naming those files counts: the @/ alias or a relative path, import and export,
 // import(), require() and `import x = require()`. Tests are exempt (eslint.config.mjs).
@@ -68,6 +71,9 @@ const databaseAccess = {
       passedOn:
         'Do not pass withTenant or the database client on: re-exported here, any file could import ' +
         'it from this file without a report (D-077). Export a function that does the work instead.',
+      driverPassedOn:
+        'Do not pass a database driver on from src/db/: any file may import any file here, so it ' +
+        'would reach the driver without a report (D-084). Export a function that does the work.',
       driver:
         "Only src/db/ may import a database driver ('pg', a 'pg-…' package, a 'drizzle-orm/…' path " +
         "other than 'drizzle-orm/pg-core') or src/db/reset and src/db/migrate: they open " +
@@ -84,34 +90,41 @@ const databaseAccess = {
     /**
      * Reports at most one problem per import or export statement: a driver outside src/db/; the
      * client, or withTenant where `reachesWithTenant` says so, outside the files allowed them; in
-     * those files, a re-export that `passesOn` says hands a handle on.
+     * those files, a re-export that `passesOn` says hands a handle on, or in src/db/ a driver.
      */
     function check(node, sourceNode, reachesWithTenant, passesOn = () => false) {
       const target = importTarget(sourceNode, file);
-      if (!mayUseDrivers && isDriver(sourceNode, target) && importsValue(node)) {
+      const driver = isDriver(sourceNode, target);
+      if (!mayUseDrivers && driver && importsValue(node)) {
         context.report({ node, messageId: 'driver' });
       } else if (target === CLIENT_FILE && !inDatabaseFolder) {
         context.report({ node, messageId: 'client' });
       } else if (target === TENANT_FILE && !holdsHandles && reachesWithTenant()) {
         context.report({ node, messageId: 'withTenant' });
-      } else if (holdsHandles && passesOn(target)) {
-        context.report({ node, messageId: 'passedOn' });
+      } else if (holdsHandles && passesOn(target, driver)) {
+        context.report({ node, messageId: driver ? 'driverPassedOn' : 'passedOn' });
       }
     }
 
-    /** True if an imported name holds a handle: withTenant, the tenant file, or the client's code. */
-    function isHandle({ node: binding, parent: declaration }) {
+    /**
+     * What exporting an imported name passes on, as the message to report: a handle (withTenant,
+     * the tenant file, the client's code), or in src/db/ a driver (D-084). Null for anything else.
+     */
+    function passedOnBy(definition) {
+      if (definition?.type !== 'ImportBinding') return null;
+      const { node: binding, parent: declaration } = definition;
+      if (declaration.importKind === 'type' || binding.importKind === 'type') return null;
       const isWholeFile = declaration.type === 'TSImportEqualsDeclaration'; // import x = require()
       const sourceNode = isWholeFile ? declaration.moduleReference.expression : declaration.source;
-      if (declaration.importKind === 'type' || binding.importKind === 'type') return false;
       const target = importTarget(sourceNode, file);
-      if (target === CLIENT_FILE) return true;
-      return (
-        target === TENANT_FILE &&
-        (isWholeFile ||
-          binding.type === 'ImportNamespaceSpecifier' ||
-          (binding.type === 'ImportSpecifier' && theirName(binding.imported) === 'withTenant'))
-      );
+      const isHandle =
+        target === CLIENT_FILE ||
+        (target === TENANT_FILE &&
+          (isWholeFile ||
+            binding.type === 'ImportNamespaceSpecifier' ||
+            (binding.type === 'ImportSpecifier' && theirName(binding.imported) === 'withTenant')));
+      if (isHandle) return 'passedOn';
+      return mayUseDrivers && isDriver(sourceNode, target) ? 'driverPassedOn' : null;
     }
 
     /** `export { x }` and `export { x as y }` without `from`: x is looked up in the file. */
@@ -120,10 +133,8 @@ const databaseAccess = {
       const scope = context.sourceCode.getScope(node);
       for (const specifier of node.specifiers) {
         if (specifier.exportKind === 'type') continue;
-        const definition = scope.set.get(theirName(specifier.local))?.defs[0];
-        if (definition?.type === 'ImportBinding' && isHandle(definition)) {
-          context.report({ node: specifier, messageId: 'passedOn' });
-        }
+        const messageId = passedOnBy(scope.set.get(theirName(specifier.local))?.defs[0]);
+        if (messageId) context.report({ node: specifier, messageId });
       }
     }
 
@@ -149,8 +160,8 @@ const databaseAccess = {
           node.exportKind === 'type' ? [] : node.specifiers.filter((s) => s.exportKind !== 'type');
         const reExportsWithTenant = () =>
           values.some((specifier) => theirName(specifier.local) === 'withTenant');
-        check(node, node.source, reExportsWithTenant, (target) =>
-          target === CLIENT_FILE
+        check(node, node.source, reExportsWithTenant, (target, driver) =>
+          target === CLIENT_FILE || driver
             ? values.length > 0
             : target === TENANT_FILE && reExportsWithTenant(),
         );
@@ -161,8 +172,16 @@ const databaseAccess = {
           node,
           node.source,
           reExportsValues,
-          (target) => (target === CLIENT_FILE || target === TENANT_FILE) && reExportsValues(),
+          (target, driver) =>
+            (target === CLIENT_FILE || target === TENANT_FILE || driver) && reExportsValues(),
         );
+      },
+      // export default x: an imported name, checked as export { x as default } is (D-084).
+      ExportDefaultDeclaration(node) {
+        if (!holdsHandles || node.declaration.type !== 'Identifier') return;
+        const scope = context.sourceCode.getScope(node);
+        const messageId = passedOnBy(scope.set.get(node.declaration.name)?.defs[0]);
+        if (messageId) context.report({ node, messageId });
       },
       ImportExpression(node) {
         check(node, node.source, () => true);

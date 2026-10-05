@@ -77,6 +77,17 @@ const IN_DB = 'src/db/handles.ts';
 /** A function action, so the form passes and only its button or input is checked. */
 const SAVE = 'declare const save: (formData: FormData) => Promise<void>;';
 const PROPS = "import type { ComponentProps } from 'react';";
+/** Where E00-T04's components will live (D-084). No such file exists yet. */
+const UI_FILE = 'src/ui/button.tsx';
+/** React's types the component snippets use. */
+const REACT =
+  "import type { ComponentProps, ComponentPropsWithoutRef, ForwardRefExoticComponent, HTMLAttributes, PropsWithChildren, ReactNode, RefAttributes } from 'react';";
+/** A stand-in for Radix's Slot, which shadcn/ui's Button renders when asChild is set. */
+const SLOT =
+  'declare const Slot: (props: HTMLAttributes<HTMLElement> & { children?: ReactNode }) => ReactNode;';
+/** Button props without the two (D-081), and with both typed away, as a generic constraint (D-084). */
+const NO_SUBMIT = "Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'>";
+const NEVER_SUBMIT = `${NO_SUBMIT} & { formAction?: never; formMethod?: never }`;
 
 const cases: Case[] = [
   // (a) No reading the clock inside src/modules.
@@ -683,6 +694,31 @@ const cases: Case[] = [
     code: 'export default function Page() { return <p>pages</p>; }',
     expected: [],
   },
+  // E00-T11: a 'use server' file ends in .ts, where the .catch(…) statement check reaches (D-084).
+  {
+    name: "d: a 'use server' file that ends in .tsx, though every export in it is a wrapped action",
+    file: 'src/app/(staff)/patients/actions.tsx',
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} export const renamePatient = staffAction(spec, handler);`,
+    expected: [SERVER_ACTIONS],
+  },
+  {
+    name: "d: the same 'use server' file at actions.ts passes",
+    file: STAFF_ACTIONS,
+    code: `${USE_SERVER} ${WRAPPERS} ${ARGS} export const renamePatient = staffAction(spec, handler);`,
+    expected: [],
+  },
+  {
+    name: "d: a 'use server' .tsx file with a bare action: one report for the file, one for the export",
+    file: 'src/app/(staff)/patients/actions.tsx',
+    code: `${USE_SERVER} export async function save() {}`,
+    expected: [SERVER_ACTIONS, SERVER_ACTIONS],
+  },
+  {
+    name: "d: a 'use server' .tsx file outside src/app gets the one report for a file there",
+    file: 'src/lib/actions.tsx',
+    code: `${USE_SERVER} export async function save() {}`,
+    expected: [SERVER_ACTIONS],
+  },
 
   // (e) Only the files that open transactions reach the database (D-062, D-071).
   {
@@ -1049,6 +1085,95 @@ const cases: Case[] = [
     name: "e: 'drizzle-orm' and 'drizzle-orm/pg-core' in a module pass",
     file: IN_MODULE,
     code: "import { sql } from 'drizzle-orm'; import { pgTable } from 'drizzle-orm/pg-core'; export const a = [sql, pgTable];",
+    expected: [],
+  },
+  // E00-T11: no handle passed on by export default (D-084).
+  {
+    name: 'e: export default withTenant, imported from @/db/tenant, in src/modules/auth',
+    file: IN_AUTH,
+    code: "import { withTenant } from '@/db/tenant'; export default withTenant;",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: export default withTenant, imported from @/db/tenant, in src/db',
+    file: IN_DB,
+    code: "import { withTenant } from '@/db/tenant'; export default withTenant;",
+    expected: [DATABASE],
+  },
+  {
+    name: "e: export default withTenant, imported from @/db/tenant, in the wrappers' file",
+    file: 'src/app/_lib/actions.ts',
+    code: "import { withTenant } from '@/db/tenant'; export default withTenant;",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: export default getDb, imported from the client file, in src/db',
+    file: IN_DB,
+    code: "import { getDb } from './client'; export default getDb;",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: export default of the tenant file imported as a namespace, in src/modules/auth',
+    file: IN_AUTH,
+    code: "import * as tenant from '@/db/tenant'; export default tenant;",
+    expected: [DATABASE],
+  },
+  {
+    name: 'e: export default of a function declared in the same file passes, in src/modules/auth',
+    file: IN_AUTH,
+    code: "import { withTenant } from '@/db/tenant'; export default async function countMarks(clinicId: string) { return withTenant(clinicId, async () => 0); }",
+    expected: [],
+  },
+  {
+    name: 'e: export default of a function named in the same file passes, in src/db',
+    file: IN_DB,
+    code: 'function twice(n: number) { return n * 2; } export default twice;',
+    expected: [],
+  },
+  {
+    name: 'e: export default of something else from the tenant file passes, in src/db',
+    file: IN_DB,
+    code: "import { LOCK_TIMEOUT_MS } from './tenant'; export default LOCK_TIMEOUT_MS;",
+    expected: [],
+  },
+  // E00-T11: src/db/ passes no driver on: any file may import any file there (D-084).
+  ...[
+    "export { Pool } from 'pg';",
+    "export * from 'pg';",
+    "export * as pg from 'pg';",
+    "export { drizzle } from 'drizzle-orm/node-postgres';",
+    "export * from './reset';",
+    "export { runMigrations } from '@/db/migrate';",
+    "import { Pool } from 'pg'; export { Pool };",
+    "import * as pg from 'pg'; export { pg };",
+    "import pg from 'pg'; export default pg;",
+  ].map((code) => ({
+    name: `e: a driver passed on from a new file in src/db: ${code}`,
+    file: IN_DB,
+    code,
+    expected: [DATABASE],
+  })),
+  {
+    name: "e: export type { PoolConfig } from 'pg' passes, in src/db",
+    file: IN_DB,
+    code: "export type { PoolConfig } from 'pg';",
+    expected: [],
+  },
+  {
+    name: "e: an inline type re-export of 'pg' passes, in src/db",
+    file: IN_DB,
+    code: "export { type PoolConfig } from 'pg';",
+    expected: [],
+  },
+  {
+    name: "e: a Pool imported from 'pg' and used only inside the file passes, in src/db",
+    file: IN_DB,
+    code: "import { Pool } from 'pg'; const pool = new Pool(); export async function ping() { await pool.query('select 1'); }",
+    expected: [],
+  },
+  {
+    name: 'e: src/db/required-env.ts, as it is, passes',
+    ...asItIs('src/db/required-env.ts'),
     expected: [],
   },
 
@@ -1841,6 +1966,212 @@ const cases: Case[] = [
     code,
     expected: [FORMS],
   })),
+  // E00-T11: a component is checked as a button is: it may hand its props to one (D-084).
+  {
+    name: "g: shadcn/ui's Button: <Comp {...props} /> with ComponentProps<'button'> & { asChild?: boolean }",
+    file: UI_FILE,
+    code: `${REACT} ${SLOT} export function Button({ asChild = false, ...props }: ComponentProps<'button'> & { asChild?: boolean }) { const Comp = asChild ? Slot : 'button'; return <Comp data-slot="button" {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: 'g: <Root {...props} /> with props typed ComponentProps<typeof Root>, Root taking button props',
+    file: 'src/ui/checkbox.tsx',
+    code: `${REACT} declare const Root: ForwardRefExoticComponent<ComponentPropsWithoutRef<'button'> & RefAttributes<HTMLButtonElement>>; export function Checkbox(props: ComponentProps<typeof Root>) { return <Root {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: 'g: <CheckboxPrimitive.Root {...props} />, a component written as a member expression',
+    file: 'src/ui/checkbox.tsx',
+    code: `${REACT} declare const CheckboxPrimitive: { Root: ForwardRefExoticComponent<ComponentPropsWithoutRef<'button'> & RefAttributes<HTMLButtonElement>> }; export function Checkbox(props: ComponentProps<typeof CheckboxPrimitive.Root>) { return <CheckboxPrimitive.Root {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: 'g: <Button type="submit" formAction="/patients">, Button taking ComponentProps<\'button\'>',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><Button type="submit" formAction="/patients">Search</Button></form>',
+      `${SAVE} ${REACT} declare function Button(props: ComponentProps<'button'>): ReactNode;`,
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: <Button formMethod="get">, Button taking ComponentProps<\'button\'>',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><Button formMethod="get">Search</Button></form>',
+      `${SAVE} ${REACT} declare function Button(props: ComponentProps<'button'>): ReactNode;`,
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: "g: <Btn {...extra} />, Btn's props without the two, extra typed { type: 'submit'; formAction: string }",
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><Btn {...extra} /></form>',
+      `${SAVE} ${REACT} declare function Btn(props: ${NO_SUBMIT}): ReactNode; declare const extra: { type: 'submit'; formAction: string };`,
+    ),
+    expected: [FORMS],
+  },
+  {
+    // The E00-T10 tester's caller: an inferred type argument gets no excess-property check.
+    name: 'g: <Button formAction="/patients"> on a generic Button whose constraint omits the two',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><Button type="submit" formAction="/patients">Search</Button></form>',
+      `${SAVE} ${REACT} declare function Button<P extends ${NO_SUBMIT}>(props: P): ReactNode;`,
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: "g: shadcn/ui's Button with Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'> passes",
+    file: UI_FILE,
+    code: `${REACT} ${SLOT} export function Button({ asChild = false, ...props }: ${NO_SUBMIT} & { asChild?: boolean }) { const Comp = asChild ? Slot : 'button'; return <Comp data-slot="button" {...props} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: <Button formAction={save}> with a function passes',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><Button formAction={save}>Save</Button></form>',
+      `${SAVE} ${REACT} declare function Button(props: ${NO_SUBMIT} & { formAction?: (formData: FormData) => void | Promise<void> }): ReactNode;`,
+    ),
+    expected: [],
+  },
+  {
+    name: "g: <Input {...field} /> with a form library's name, onChange, onBlur and ref passes",
+    file: STAFF_FORM,
+    code: `${REACT} declare function Input(props: ComponentProps<'input'>): ReactNode; declare const field: { name: string; onChange: (event: unknown) => void; onBlur: (event: unknown) => void; ref: (element: HTMLInputElement | null) => void }; export function Field() { return <Input {...field} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: <Input {...{ disabled: pending }} /> passes',
+    file: STAFF_FORM,
+    code: `${REACT} declare function Input(props: ComponentProps<'input'>): ReactNode; export function Field({ pending }: { pending: boolean }) { return <Input {...{ disabled: pending }} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: <Link {...props} /> with ComponentProps<typeof Link> from next/link passes',
+    file: 'src/ui/nav-link.tsx',
+    code: `${REACT} import Link from 'next/link'; export function NavLink(props: ComponentProps<typeof Link>) { return <Link {...props} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: <Box {...props} /> with PropsWithChildren<{ title: string }> passes',
+    file: 'src/ui/panel.tsx',
+    code: `${REACT} declare function Box(props: PropsWithChildren<{ title: string }>): ReactNode; export function Panel(props: PropsWithChildren<{ title: string }>) { return <Box {...props} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: a spread onto <div> passes: other HTML elements have neither prop',
+    file: UI_FILE,
+    code: 'export function Card(props: Record<string, string>) { return <div {...props} />; }',
+    expected: [],
+  },
+  // E00-T11: a type parameter may hold more than its constraint, so a spread of a type built from
+  // one passes only when the constraint types formAction and formMethod as undefined or never.
+  {
+    name: "g: a spread onto <button> of props: P with P extends Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'>",
+    file: UI_FILE,
+    code: `${REACT} export function Button<P extends ${NO_SUBMIT}>(props: P) { return <button {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread onto <button> of props: P with P extends PropsWithChildren',
+    file: UI_FILE,
+    code: `${REACT} export function Button<P extends PropsWithChildren>(props: P) { return <button {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread onto <button> of Partial<P> with P extends object',
+    file: UI_FILE,
+    code: 'export function Button<P extends object>(props: Partial<P>) { return <button {...props} />; }',
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread onto <button> of Pick<P, K> with P extends object',
+    file: UI_FILE,
+    code: 'export function Button<P extends object, K extends keyof P>(props: Pick<P, K>) { return <button {...props} />; }',
+    expected: [FORMS],
+  },
+  {
+    name: "g: <Comp {...props} /> with props: P and P extends Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'>",
+    file: UI_FILE,
+    code: `${REACT} ${SLOT} export function Button<P extends ${NO_SUBMIT}>(props: P) { const Comp = Slot; return <Comp {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a generic shadcn/ui Button whose constraint omits the two: <Comp {...props} /> of the rest',
+    file: UI_FILE,
+    code: `${REACT} ${SLOT} export function Button<P extends ${NO_SUBMIT}>({ asChild = false, ...props }: P & { asChild?: boolean }) { const Comp = asChild ? Slot : 'button'; return <Comp {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: "g: a spread onto <button> of Omit<P, 'children'> with P extends ComponentProps<'button'>",
+    file: UI_FILE,
+    code: `${REACT} export function Button<P extends ComponentProps<'button'>>(props: Omit<P, 'children'>) { return <button {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    // The constraint itself must type both away: P alone could still hold a formAction URL.
+    name: "g: a spread of P & { formAction?: never; formMethod?: never } with P extends ComponentProps<'button'>",
+    file: UI_FILE,
+    code: `${REACT} export function Button<P extends ComponentProps<'button'>>(props: P & { formAction?: never; formMethod?: never }) { return <button {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread of P whose constraint types the two as never but adds formaction in lower case',
+    file: UI_FILE,
+    code: `${REACT} export function Button<P extends ${NEVER_SUBMIT} & { formaction?: string }>(props: P) { return <button {...props} />; }`,
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread of a mapped type written out over P, with P extends object',
+    file: UI_FILE,
+    code: 'export function Button<P extends object>(props: { [K in keyof P]: P[K] }) { return <button {...props} />; }',
+    expected: [FORMS],
+  },
+  {
+    name: 'g: a spread onto <button> of props: P with P extends Omit<…> & { formAction?: never; formMethod?: never } passes',
+    file: UI_FILE,
+    code: `${REACT} export function Button<P extends ${NEVER_SUBMIT}>(props: P) { return <button {...props} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: a spread onto <button> of Partial<P> with that constraint passes',
+    file: UI_FILE,
+    code: `${REACT} export function Button<P extends ${NEVER_SUBMIT}>(props: Partial<P>) { return <button {...props} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: a generic shadcn/ui Button with that constraint passes: <Comp {...props} /> of the rest',
+    file: UI_FILE,
+    code: `${REACT} ${SLOT} export function Button<P extends ${NEVER_SUBMIT}>({ asChild = false, ...props }: P & { asChild?: boolean }) { const Comp = asChild ? Slot : 'button'; return <Comp {...props} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: a spread of P & { label: string } with that constraint passes',
+    file: UI_FILE,
+    code: `${REACT} export function Button<P extends ${NEVER_SUBMIT}>(props: P & { label: string }) { return <button {...props} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: a spread of a mapped type written out over P with that constraint passes',
+    file: UI_FILE,
+    code: `${REACT} export function Button<P extends ${NEVER_SUBMIT}>(props: { [K in keyof P]: P[K] }) { return <button {...props} />; }`,
+    expected: [],
+  },
+  {
+    name: 'g: a spread typed { formAction?: undefined; disabled: boolean } passes',
+    file: UI_FILE,
+    code: 'declare const props: { formAction?: undefined; disabled: boolean }; export function Button() { return <button {...props} />; }',
+    expected: [],
+  },
+  {
+    name: 'g: a spread typed { formAction?: never; formMethod?: never; disabled?: boolean } passes',
+    file: UI_FILE,
+    code: 'declare const props: { formAction?: never; formMethod?: never; disabled?: boolean }; export function Button() { return <button {...props} />; }',
+    expected: [],
+  },
 
   // (h) No lint comment switches a guard off in src/ (D-077): ESLint ignores it and reports it.
   {
@@ -1902,6 +2233,26 @@ const cases: Case[] = [
     file: IN_MODULE,
     code: "/* eslint no-restricted-syntax: 'off' */\nexport const a = Date.now();",
     expected: [INLINE_CONFIG, CLOCK],
+  },
+  // E00-T11: outside src/ too, where chairside/server-actions runs as well (D-084).
+  {
+    name: "h: '/* eslint-disable */' in a 'use server' file outside src/ switches nothing off",
+    file: 'lib/actions.ts',
+    code: `/* eslint-disable */\n${USE_SERVER}\nexport async function save() {}`,
+    expected: [INLINE_CONFIG, SERVER_ACTIONS],
+  },
+  {
+    name: "h: '// eslint-disable-next-line chairside/server-actions' outside src/ switches nothing off",
+    file: 'lib/actions.ts',
+    code: `// eslint-disable-next-line chairside/server-actions\n${USE_SERVER}\nexport async function save() {}`,
+    expected: [INLINE_CONFIG, SERVER_ACTIONS],
+  },
+  {
+    // The comment would silence a real report: with it in force, lint would report nothing.
+    name: 'h: a lint comment in a script outside src/ switches nothing off either',
+    file: 'scripts/probe.mjs',
+    code: '// eslint-disable-next-line @typescript-eslint/no-unused-vars\nconst unused = 1;',
+    expected: [INLINE_CONFIG],
   },
 ];
 

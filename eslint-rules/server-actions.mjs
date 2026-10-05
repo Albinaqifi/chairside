@@ -14,6 +14,9 @@
 //   imported under its own name from src/app/_lib/actions.ts;
 // - a 'use server' file anywhere else, in src/ or outside it (a module cannot import Next.js, but
 //   the directive is not an import);
+// - a 'use server' file that ends in .tsx: lint checks the .catch(…), .then(ok, fail) and
+//   .finally(…) statements of the .ts and .mts files only (D-082), so a handler's `tx` there would
+//   go without that check (D-084);
 // - a 'use server' directive inside a function, anywhere;
 // - a route handler (route.ts) in src/app that is not on ROUTE_HANDLERS below;
 // - any file in src/pages/: Next.js serves the Pages Router there next to src/app, outside the
@@ -81,6 +84,10 @@ const serverActions = {
       fileOutsideApp:
         "No 'use server' file outside src/app: server actions are made by the action wrappers in " +
         'src/app (D-073). A module provides functions for them to call.',
+      tsxFile:
+        "A 'use server' file ends in .ts, not .tsx: lint checks a `.catch(…)`, `.then(ok, fail)` " +
+        "or `.finally(…)` statement in .ts and .mts files only, so a handler's query here could " +
+        'run after its transaction has ended unseen (R-32). A server action needs no JSX (D-084).',
       inlineFunction:
         "No 'use server' inside a function: a server action is exported from a 'use server' file " +
         'and made by an action wrapper (D-071, D-073).',
@@ -187,6 +194,9 @@ const serverActions = {
         if (!inApp) {
           context.report({ node: directive, messageId: 'fileOutsideApp' });
           return;
+        }
+        if (path.extname(file) === '.tsx') {
+          context.report({ node: directive, messageId: 'tsxFile' });
         }
         for (const statement of program.body) checkExport(statement);
       },

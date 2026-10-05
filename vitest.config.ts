@@ -14,6 +14,9 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   test: {
+    // A case name made from a field (it.each with '$name') is printed whole, not cut to 40
+    // characters, so a red CI step names the case that failed (D-084). The projects inherit it.
+    taskTitleValueFormatTruncate: Number.MAX_SAFE_INTEGER,
     projects: [
       {
         extends: true,

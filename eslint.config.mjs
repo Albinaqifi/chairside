@@ -80,9 +80,11 @@ export default defineConfig([
     rules: { 'chairside/server-actions': 'error' },
   },
   {
-    // (h) No lint comment switches a guard off in src/: ESLint ignores every eslint-disable and
-    // /* eslint … */ comment there and reports it as a warning, which --max-warnings=0 fails (D-077).
-    files: [`src/**/${SCRIPT_FILES}`],
+    // (h) No lint comment switches a guard off: ESLint ignores every eslint-disable and
+    // /* eslint … */ comment and reports it as a warning, which --max-warnings=0 fails (D-077). Every
+    // script file in the repository, as (d) is, so not even a 'use server' file outside src/ can
+    // switch chairside/server-actions off (D-084).
+    files: [`**/${SCRIPT_FILES}`],
     linterOptions: { noInlineConfig: true },
   },
   {
@@ -127,8 +129,9 @@ export default defineConfig([
   {
     // (g) A form never puts its fields in the URL: its action is a function, or it posts to a URL
     // (D-076); so does a button's or input's formAction, no spread onto one may carry formAction or
-    // formMethod, and next/form is not imported (D-081). Telling a function from a URL in
-    // action={…} needs the types, so the same files as (f).
+    // formMethod, and next/form is not imported (D-081). A component is checked as a button is, and
+    // a spread of a type parameter passes only when its constraint types both props away (D-084).
+    // Telling a function from a URL in action={…} needs the types, so the same files as (f).
     files: [TYPED_FILES],
     plugins: { chairside },
     rules: { 'chairside/forms-post': 'error' },

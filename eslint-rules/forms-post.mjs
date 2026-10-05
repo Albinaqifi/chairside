@@ -19,6 +19,8 @@
 //                                                GET, when the form's action is a function)
 //   <button {...props}>                          reported when the type of props may hold
 //                                                formAction or formMethod (D-081)
+//   <Button formAction="/x">, <Comp {...props}>  a component is checked as a button is: it may hand
+//                                                its props to one (D-084)
 //   import Form from 'next/form';                reported: its <Form> sends a URL action as a GET
 //
 // A form passes when its `action` is a function, or when it has a literal method="post" (any letter
@@ -31,9 +33,15 @@
 // be missing passes: without one, the element sends the form the way the form says, and the form
 // is checked on its own. A URL needs formMethod="post" written on the same element. A spread onto
 // a button or input is reported, wherever it sits, when its type may hold either prop: any part of
-// the type has a property of that name (any letter case), has an index signature, or is any,
-// unknown or object; a generic type counts as its constraint. A component that spreads its props
-// types them as Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'> (D-081).
+// the type has a property of that name (any letter case) not typed only undefined or never, has an
+// index signature, or is any, unknown or object. A part built from a type parameter (P, P['x'], or
+// a mapped type over one: Partial<P>, Pick<P, K>, Omit<P, K>) may hold more than its constraint, as
+// a caller's inferred type argument gets no excess-property check: it passes only when it types
+// both props as undefined or never. Every element written as a component (<Button>, <Comp>,
+// <Primitive.Root>) is checked as a button or input is; other HTML elements have neither prop. A
+// component that spreads its props types them as Omit<ComponentProps<'button'>, 'formAction' |
+// 'formMethod'> (D-081); a generic one adds & { formAction?: never; formMethod?: never } to its
+// constraint (D-084).
 import ts from 'typescript';
 import { importsValue, sourceText } from './import-paths.mjs';
 
@@ -49,11 +57,20 @@ const NEXT_FORM = /^next\/(?:form|dist\/(?:esm\/)?(?:api|client|client\/app-dir)
 /** The props that send a button's or input's form elsewhere, in lower case as HTML reads them. */
 const SUBMITTER_PROPS = new Set(['formaction', 'formmethod']);
 
+/** The same two as React's types name them: a generic spread must type both away (D-084). */
+const SUBMITTER_PROP_NAMES = ['formAction', 'formMethod'];
+
 /** The parts of a prop's type that leave the prop out: React drops undefined and null. */
 const MISSING = ts.TypeFlags.Undefined | ts.TypeFlags.Null | ts.TypeFlags.Void;
 
 /** Types that say nothing about the properties a value holds: any, unknown and object. */
 const HOLDS_ANYTHING = ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.NonPrimitive;
+
+/** A prop typed only these carries nothing: a spread cannot give it a value (D-084). */
+const NOTHING = ts.TypeFlags.Undefined | ts.TypeFlags.Never;
+
+/** Types that are a type parameter or are made from one: P, P['x'], keyof P, a conditional type. */
+const GENERIC = ts.TypeFlags.InstantiableNonPrimitive | ts.TypeFlags.Index;
 
 /** A JSX attribute's name in lower case, as HTML reads it, or null for a spread or `a:b`. */
 function attributeName(attribute) {
@@ -66,6 +83,18 @@ function attributeName(attribute) {
 function tagName(opening) {
   const name = opening.name;
   return name.type === 'JSXIdentifier' && /^[a-z]/.test(name.name) ? name.name.toLowerCase() : null;
+}
+
+/**
+ * True for an element written as a component (<Button>, <Comp>, <Primitive.Root>): it may hand its
+ * props to a button or input, so it is checked as one is (D-084). Not an HTML tag, nor <a:b>.
+ */
+function isComponent(opening) {
+  const name = opening.name;
+  return (
+    name.type === 'JSXMemberExpression' ||
+    (name.type === 'JSXIdentifier' && !/^[a-z]/.test(name.name))
+  );
 }
 
 /** True for method="post" or formMethod="post" written as a string, in any letter case. */
@@ -135,7 +164,9 @@ const formsPost = {
       submitterSpread:
         "This spread's type may hold `formAction` or `formMethod`, which send the form elsewhere " +
         "or as a GET. Type the props without them, as Omit<ComponentProps<'button'>, " +
-        "'formAction' | 'formMethod'>, and write a function formAction out if needed (D-081).",
+        "'formAction' | 'formMethod'>, and write a function formAction out if needed (D-081). A " +
+        'type parameter may hold more than its constraint: add ' +
+        '& { formAction?: never; formMethod?: never } to the constraint (D-084).',
       nextForm:
         'Do not use next/form: its <Form> sends a URL action as a GET with every field in the URL, ' +
         'and with a function action it adds nothing to <form>. Use <form> (D-081).',
@@ -180,26 +211,94 @@ const formsPost = {
       return { kind: 'unclear', type: checker.typeToString(type) };
     }
 
+    /** True for a type that holds a type parameter: P, P['x'], or an alias given one (Partial<P>). */
+    function holdsTypeParameter(type) {
+      if (type.flags & GENERIC) return true;
+      if (type.isUnionOrIntersection()) return type.types.some(holdsTypeParameter);
+      return type.aliasTypeArguments?.some(holdsTypeParameter) ?? false;
+    }
+
     /**
-     * True if a spread of this type may give a button or input a formAction or formMethod: a part
-     * of it is any, unknown or object, has an index signature, or has a property of either name in
-     * any letter case. Each part of an intersection is read too; a generic type counts as its
-     * constraint, and one without a constraint may hold anything. `object` is how a generic
-     * component says "any props" (`P extends object`), so it counts as unknown does.
+     * True for a mapped type whose keys come from a type parameter: an alias given one (Partial<P>,
+     * Pick<P, K>, Omit<P, K>, and the rest of a generic destructuring, which is an Omit), or one
+     * written out, { [K in keyof P]: P[K] }, whose own declaration names its keys. An instantiation
+     * without an alias is not seen: its declaration is the generic one it was made from.
+     */
+    function isMappedOverTypeParameter(type) {
+      if (!(type.flags & ts.TypeFlags.Object) || !(type.objectFlags & ts.ObjectFlags.Mapped)) {
+        return false;
+      }
+      if (type.aliasTypeArguments?.some(holdsTypeParameter)) return true;
+      if (type.objectFlags & ts.ObjectFlags.Instantiated) return false;
+      const declaration = type.symbol?.declarations?.[0];
+      const keys =
+        declaration && ts.isMappedTypeNode(declaration)
+          ? declaration.typeParameter.constraint
+          : null;
+      return keys != null && holdsTypeParameter(checker.getTypeFromTypeNode(keys));
+    }
+
+    /**
+     * True if a prop is typed only undefined or never: a spread cannot give it a value (D-084). A
+     * type read through a type parameter, P['formAction'] as Partial<P> types it, counts as the
+     * constraint's.
+     */
+    function carriesNothing(property) {
+      const declared = checker.getTypeOfSymbol(property);
+      const type = holdsTypeParameter(declared)
+        ? checker.getBaseConstraintOfType(declared)
+        : declared;
+      if (!type) return false;
+      return (type.isUnion() ? type.types : [type]).every((part) => (part.flags & NOTHING) !== 0);
+    }
+
+    /** True if a type has both formAction and formMethod, each typed only undefined or never. */
+    function blocksBoth(type) {
+      return SUBMITTER_PROP_NAMES.every((name) => {
+        const property = checker.getPropertyOfType(type, name);
+        return property !== undefined && carriesNothing(property);
+      });
+    }
+
+    /**
+     * True if a type, read as it is, may hold a formAction or formMethod: it is any, unknown or
+     * object, has an index signature, or has a property of either name in any letter case that is
+     * not typed only undefined or never. `object` is how a generic component says "any props"
+     * (`P extends object`), so it counts as unknown does (D-082).
+     */
+    function holdsSubmitterProps(type) {
+      if (type.flags & HOLDS_ANYTHING) return true;
+      if (checker.getIndexInfosOfType(type).length > 0) return true;
+      return checker
+        .getPropertiesOfType(type)
+        .some(
+          (property) =>
+            SUBMITTER_PROPS.has(property.getName().toLowerCase()) && !carriesNothing(property),
+        );
+    }
+
+    /**
+     * True if a spread of this type may give an element a formAction or formMethod. Read part by
+     * part, through unions and intersections. A part built from a type parameter may hold more than
+     * its constraint, as a caller's inferred type argument gets no excess-property check (D-084):
+     * P, P['x'] or a conditional type passes only when its base constraint types both props as
+     * undefined or never and holds no other way to them, and one without a constraint may hold
+     * anything; a mapped type over a type parameter (Partial<P>) is read the same way, through its
+     * own properties. Any other part is read as it is.
      */
     function mayCarrySubmitterProps(type) {
-      return constituents(type).some((part) => {
-        if (part.isIntersection()) return part.types.some(mayCarrySubmitterProps);
-        if (part.flags & HOLDS_ANYTHING) return true;
-        if (part.flags & ts.TypeFlags.Instantiable) {
-          const constraint = checker.getBaseConstraintOfType(part);
-          return !constraint || constraint === part || mayCarrySubmitterProps(constraint);
-        }
-        if (checker.getIndexInfosOfType(part).length > 0) return true;
-        return checker
-          .getPropertiesOfType(part)
-          .some((property) => SUBMITTER_PROPS.has(property.getName().toLowerCase()));
-      });
+      if (type.isUnionOrIntersection()) return type.types.some(mayCarrySubmitterProps);
+      if (type.flags & ts.TypeFlags.InstantiableNonPrimitive) {
+        const constraint = checker.getBaseConstraintOfType(type);
+        return (
+          !constraint ||
+          constraint === type ||
+          !blocksBoth(constraint) ||
+          mayCarrySubmitterProps(constraint)
+        );
+      }
+      if (isMappedOverTypeParameter(type)) return !blocksBoth(type) || holdsSubmitterProps(type);
+      return holdsSubmitterProps(type);
     }
 
     function checkForm(opening) {
@@ -261,7 +360,10 @@ const formsPost = {
       }
     }
 
-    /** A button or input can submit its form with a method, or to a URL, of its own. */
+    /**
+     * A button or input can submit its form with a method, or to a URL, of its own; a component can
+     * hand either to one (D-084).
+     */
     function checkSubmitter(opening) {
       const attributes = opening.attributes;
       const formMethod = attributes.findLast((a) => attributeName(a) === 'formmethod');
@@ -292,7 +394,9 @@ const formsPost = {
       JSXOpeningElement(opening) {
         const tag = tagName(opening);
         if (tag === 'form') checkForm(opening);
-        else if (tag === 'button' || tag === 'input') checkSubmitter(opening);
+        else if (tag === 'button' || tag === 'input' || isComponent(opening)) {
+          checkSubmitter(opening);
+        }
       },
       ImportDeclaration: checkImport,
       ExportNamedDeclaration: checkImport,

@@ -1414,3 +1414,67 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a component must pass a function `formAction` through a spread (then check the
   props' types, as D-081's "Revisit if" says); a library component has a prop named `formAction` or
   `formMethod` that is not a form's; a lint comment is needed outside `src/`.
+
+### D-085 · The lint guards as built in E00-T11: what counts as a component and as built from a type parameter, `export default`, and what stays a review check
+- **Origin:** process, E00-T11. Builder choices inside D-084; the owner reviews them with the task.
+  D-084 stays as it is.
+- **What:**
+  - **Components.** An element is a component when its name is a member expression (`<X.Root>`) or
+    does not start with a lower-case letter (`<Button>`, `<Comp>`). `<a:b>` and custom elements
+    (`<my-button>`) are HTML and stay unchecked, as `<div>` does. A component gets exactly the
+    checks a `<button>` gets: a written `formMethod` and `formAction` in any letter case, then every
+    spread.
+  - **Built from a type parameter.** Two kinds of spread type are read strictly. A type parameter,
+    an indexed access on one (`P['x']`) or a conditional type passes only when its base constraint
+    has both `formAction` and `formMethod`, each typed only `undefined` or `never`, and also passes
+    the ordinary spread check: a constraint that holds `object`, an index signature or a
+    `formaction` in another letter case is still reported. A mapped type whose keys come from a
+    type parameter passes only when its own properties, read through the constraint, do the same:
+    an alias given one (`Partial<P>`, `Pick<P, K>`, `Omit<P, K>`, `Readonly<P>`, and the rest of a
+    generic destructuring, which TypeScript types as `Omit<P, …>`), or a mapped type written out
+    over one (`{ [K in keyof P]: P[K] }`), read from its own declaration. E00-T11's Out of scope let
+    the written-out kind stay a review check if the public type-checker API could not see it; it
+    can (`type.symbol.declarations`, `getTypeFromTypeNode`), so it is checked. An alias given a type
+    parameter that is not a mapped type (`type Labeled<T> = { label: string; value: T }`) has fixed
+    keys and is read as it is. An intersection is read part by part, as before (D-082).
+  - **Stricter than the minimum, on purpose.** `P & { formAction?: never; formMethod?: never }` is
+    reported when `P`'s own constraint does not type both away (D-084 asks it of the constraint).
+    `Pick<P, K>` with a generic `K`, and `Omit<P, 'formAction' | 'formMethod'>`, are reported even
+    with a safe `P`: TypeScript lists no property for lint to read. A generic component puts the two
+    `never`s in its constraint, as D-084's example does.
+  - **A prop typed only `undefined` or `never` does not count,** in every spread check, generic or
+    not; `null` and `void` still count (D-084 names the two).
+  - **`export default`.** `export default x` of an imported name is checked as
+    `export { x as default }` is: a handle in the three places that hold one, and in `src/db/` a
+    driver too. D-084 names `export { x }` of a driver; `export default x` is the same export spelled
+    another way, and would have been the one spelling left. Only a name is checked: a cast or a
+    call after `export default` is a value built in code, a review check as
+    `export const x = withTenant` is.
+  - **A driver passed on** gets its own message (`driverPassedOn`). A re-export without a value
+    name (`export {} from 'pg'`, `export { type PoolConfig } from 'pg'`) passes nothing on.
+  - **`'use server'` files.** Only `.tsx` is reported, as D-084 says: an `.mts` file is under the
+    statement check, and the other script extensions cannot be in `src/` (D-077's test). A
+    `'use server'` `.tsx` file outside `src/app` gets the one report such a file gets there.
+  - **Lint comments.** Block (h) of `eslint.config.mjs` covers every script file in the
+    repository: the config files, `eslint-rules/`, `tests/` and `design/unpacked/unpack.mjs` too.
+    None holds a lint comment today.
+  - **Whole case names.** `taskTitleValueFormatTruncate: Number.MAX_SAFE_INTEGER` at the root of
+    `vitest.config.ts`, which both projects inherit (`extends: true`). Vitest cuts a `$name` string
+    longer than the limit (`0` would cut every name), so the limit is a number no name reaches. It
+    applies to every `it.each` title in the project.
+- **Why:** each is the smallest reading of D-084 that makes E00-T11's acceptance true while all 316
+  earlier cases of `architecture.test.ts` pass unchanged and `pnpm lint` passes on the tree.
+  Reading only mapped types strictly keeps fixed-key generic aliases out, which would otherwise be
+  reported for nothing; reading the written-out mapped type closes a shape the task allowed to
+  leave open, for a few lines.
+- **Not checked (review checks):** a spread of a property read on a type parameter
+  (`{...props.inner}` with `P extends { inner: … }`): TypeScript types `props.inner` by the
+  constraint, so lint sees no type parameter, yet a caller may give `inner` a `formAction`; a
+  mapped type that reaches the spread already instantiated without an alias (a generic function's
+  return type `{ [K in keyof T]: T[K] }` given `P`), whose declaration is the generic one; casts
+  and other types written away; a component called without JSX (`createElement`, D-081);
+  `export =`, which TypeScript refuses in this ECMAScript-module project.
+- **Revisit if:** E00-T04 needs a generic component whose constraint types `formAction` as a
+  function (the strict reading reports it; then check the props' types, D-081's "Revisit if"); a
+  shape reported on purpose above turns out to be one E00-T04 needs; a library component's props
+  carry an index signature (every spread onto it is then reported).
