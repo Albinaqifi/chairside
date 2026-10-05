@@ -6,12 +6,12 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `Tested` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.) Things noticed outside a task: `discovered.md`, next to this file.
 
-_Last updated: 2026-10-05 — architect: E00-T09 Done (PR #15 merged by the owner at `6980b40`); the first CI run on `main` after the merge is green (run 37285185478). E00-T10 stays Ready: the two form-lint gaps from E00-T09's review and test are folded into it (D-081; owner: review the spread choice). Branch `plan/E00-T09-done`; the owner merges it before E00-T10 starts._
+_Last updated: 2026-10-05 — builder: E00-T10 Built (D-082); the review starts on a green CI run of its pull request. Before: architect: E00-T09 Done (PR #15 merged by the owner at `6980b40`); the first CI run on `main` after the merge is green (run 37285185478). E00-T10 stays Ready: the two form-lint gaps from E00-T09's review and test are folded into it (D-081; owner: review the spread choice). Branch `plan/E00-T09-done`; the owner merges it before E00-T10 starts._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T10` (`/pipeline E00-T10`; Ready, D-077, D-081), once the owner has merged the planning branch `plan/E00-T09-done`: the builder branches from `main`
+- **Next task to start:** `E00-T10` is Built and goes to review once CI is green on its pull request, then test (`handoffs/E00-T10.md`). Then E00-T04 and E00-T05, which an architect refines first
 - **Owner review, before E00-T10 starts (D-081):** a spread onto `<button>` or `<input>` is refused when its type could carry `formAction` or `formMethod`; E00-T04's button and input components then type their props with `Omit<…, 'formAction' | 'formMethod'>`. Say so if it should go another way
 - **Owner action for CI (D-075):** add a payment method and a small GitHub Actions budget (for example $10 a month); after two weeks of runs, decide on GitHub Pro (R-34). Optional: in the repository's Settings → Actions, require actions pinned to a full commit SHA and allow only GitHub's and pnpm's actions
 - **Owner decisions from the E00-T02 test, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list. Finding 6 is decided (D-069)
@@ -43,7 +43,7 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | **Done** | Merged by the owner (PR #9). Lint rules `chairside/server-actions`, `chairside/database-access` and three type-aware ones; login rows; an action after the session ended reaches its wrapper (D-074). Review suggestions and tester notes on the Discovered list. See `handoffs/E00-T08.md` |
 | E00-T06a | CI: every pull request and `main` checked on GitHub | builder | normal | **Done** | Merged by the owner (PR #11). `.github/workflows/ci.yml` checks every pull request, every push to `main` and every Monday; the pipeline skill and `builder.md` wait for green (D-075, D-078). Review suggestions and tester notes in `discovered.md`. See `handoffs/E00-T06a.md` |
 | E00-T09 | The login form never puts the password in the URL | builder | critical | **Done** | Merged by the owner (PR #15). The form posts to `/login`, its button is disabled until the script runs, a `<noscript>` line; lint `chairside/forms-post` for every form (D-076, D-080). The review suggestion and the tester's `next/form` line → E00-T10 (D-081). See `handoffs/E00-T09.md` |
-| E00-T10 | Close the gaps in the lint guards | builder | critical | **Ready** | From E00-T08's review (suggestions 3, 4), test (notes 2–4) and builder (`.js` files) (D-077), and E00-T09's review (suggestion 1) and test (`next/form`) (D-081). See `handoffs/E00-T10.md` |
+| E00-T10 | Close the gaps in the lint guards | builder | critical | **Built** | Builder 2026-10-05, branch `task/E00-T10-lint-gaps`. Re-exports and drivers, lint comments, rejections and `.catch` statements, `src/pages`, `.js` files, `formAction`, spreads and `next/form` (D-077, D-081, D-082). Owner: two questions in the handoff. See `handoffs/E00-T10.md` |
 | E00-T04 | App shell and design system | builder | normal | Planned | After E00-T09 and E00-T10. Too big for one session as written (D-075): split when it is refined |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | After E00-T10 (D-075). Refined before it starts |
 | E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); after E00-T04 and E00-T05 |

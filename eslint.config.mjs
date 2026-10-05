@@ -42,6 +42,22 @@ const FRAMEWORK_SOURCE =
 const date = (path) =>
   `:matches([${path}name='Date'], [${path}property.name='Date'], [${path}property.value='Date'])`;
 
+// A method call by the method's name, also written p['catch'](…) or p[`catch`](…).
+const method = (name) =>
+  `:matches([callee.property.name='${name}'], [callee.property.value='${name}'], [callee.property.quasis.0.value.cooked='${name}'])`;
+
+// (f) A statement that only hangs .catch(…) or a two-argument .then(…) on a promise, also through
+// p?.catch(…). no-floating-promises counts such a promise as handled, yet nothing waits for it
+// (R-32, D-077). Used twice below: in the modules' list, and for the other TypeScript files.
+const unawaitedCall = `CallExpression:matches(${method('catch')}, ${method('then')}[arguments.length>=2])`;
+const unawaitedPromise = {
+  selector: `ExpressionStatement > ${unawaitedCall}, ExpressionStatement > ChainExpression > ${unawaitedCall}`,
+  message:
+    'Nothing waits for a promise that only has .catch(…) or .then(ok, fail) hung on it: a query ' +
+    "can then run after its transaction has ended, even in another clinic's (R-32). Await it or " +
+    'return it (D-077).',
+};
+
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -51,10 +67,21 @@ export default defineConfig([
     rules: {
       // (b) Modules are imported only through their index.ts.
       'chairside/module-boundaries': 'error',
-      // (d) Every server action is made by an action wrapper; no other route in without a reason
-      // (D-071, D-073).
-      'chairside/server-actions': 'error',
     },
+  },
+  {
+    // (d) Every server action is made by an action wrapper; no other route in without a reason
+    // (D-071, D-073). Every script file in the repository, so that a 'use server' file outside
+    // src/ is reported too, and so is any file in src/pages/ (D-077).
+    files: [`**/${SCRIPT_FILES}`],
+    plugins: { chairside },
+    rules: { 'chairside/server-actions': 'error' },
+  },
+  {
+    // (h) No lint comment switches a guard off in src/: ESLint ignores every eslint-disable and
+    // /* eslint … */ comment there and reports it as a warning, which --max-warnings=0 fails (D-077).
+    files: [`src/**/${SCRIPT_FILES}`],
+    linterOptions: { noInlineConfig: true },
   },
   {
     // (e) Only the files that open transactions reach the database (D-062, D-071). Tests are
@@ -79,11 +106,27 @@ export default defineConfig([
       // A thrown value that is not an Error hides a failed query from withoutQueryValues()
       // (src/lib/query-errors.ts); a refusal is returned, never thrown.
       '@typescript-eslint/only-throw-error': 'error',
+      // The same for a rejection: Promise.reject(…) and a new Promise's reject(…) take Errors. A
+      // caught error (unknown) passes, as only-throw-error lets it be thrown again (D-077).
+      '@typescript-eslint/prefer-promise-reject-errors': [
+        'error',
+        { allowThrowingAny: true, allowThrowingUnknown: true },
+      ],
     },
   },
   {
+    // (f) The TypeScript files outside the modules; the modules' list below holds the same check.
+    // A second no-restricted-syntax block that matched a module file would replace that whole
+    // list, so this one leaves the modules out. A client .tsx file may keep .then(ok, fail).
+    files: ['src/**/*.{ts,mts}'],
+    ignores: ['src/modules/**'],
+    rules: { 'no-restricted-syntax': ['error', unawaitedPromise] },
+  },
+  {
     // (g) A form never puts its fields in the URL: its action is a function, or it posts to a URL
-    // (D-076). Telling a function from a URL in action={…} needs the types, so the same files as (f).
+    // (D-076); so does a button's or input's formAction, no spread onto one may carry formAction or
+    // formMethod, and next/form is not imported (D-081). Telling a function from a URL in
+    // action={…} needs the types, so the same files as (f).
     files: [TYPED_FILES],
     plugins: { chairside },
     rules: { 'chairside/forms-post': 'error' },
@@ -159,6 +202,8 @@ export default defineConfig([
           selector: `TSImportType[source.value=${FRAMEWORK_SOURCE}]`,
           message: frameworkMessage,
         },
+        // (f) A promise nobody waits for, as in the block for the other TypeScript files above.
+        unawaitedPromise,
       ],
       // (c) No Next.js or React inside modules.
       'no-restricted-imports': [

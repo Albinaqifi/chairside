@@ -12,10 +12,13 @@
 // - in a 'use server' file under src/app, every value export except
 //   `export const name = staffAction(…)` (or staffRead, userAction), called directly, the wrapper
 //   imported under its own name from src/app/_lib/actions.ts;
-// - a 'use server' file anywhere else in src/ (a module cannot import Next.js, but the directive is
-//   not an import);
-// - a 'use server' directive inside a function, anywhere in src/;
-// - a route handler (route.ts) in src/app that is not on ROUTE_HANDLERS below.
+// - a 'use server' file anywhere else, in src/ or outside it (a module cannot import Next.js, but
+//   the directive is not an import);
+// - a 'use server' directive inside a function, anywhere;
+// - a route handler (route.ts) in src/app that is not on ROUTE_HANDLERS below;
+// - any file in src/pages/: Next.js serves the Pages Router there next to src/app, outside the
+//   wrappers and ROUTE_HANDLERS (D-077). A folder named pages inside src/app is an App Router path.
+// The rule runs on every script file in the repository (eslint.config.mjs).
 import path from 'node:path';
 import { importTarget, isInside, repoPath } from './import-paths.mjs';
 
@@ -84,11 +87,15 @@ const serverActions = {
       unlistedRouteHandler:
         'Route handlers are reached without the action wrappers. Add this one to ROUTE_HANDLERS in ' +
         'eslint-rules/server-actions.mjs, with the reason, or use a server action (D-071).',
+      pagesRouter:
+        'Next.js serves every file in src/pages/ (the Pages Router) outside the action wrappers and ' +
+        'ROUTE_HANDLERS. Pages, routes and actions belong in src/app (D-077).',
     },
   },
   create(context) {
     const file = context.filename;
     const inApp = isInside(file, 'src/app');
+    const inPages = isInside(file, 'src/pages');
 
     /** True for the one accepted shape: `name = wrapper(…)`, the wrapper imported as itself. */
     function isWrapperCall(declarator) {
@@ -170,6 +177,7 @@ const serverActions = {
 
     return {
       Program(program) {
+        if (inPages) context.report({ node: program, messageId: 'pagesRouter' });
         if (inApp && ROUTE_FILE.test(path.basename(file))) {
           const listed = ROUTE_HANDLERS.some((handler) => handler.file === repoPath(file));
           if (!listed) context.report({ node: program, messageId: 'unlistedRouteHandler' });

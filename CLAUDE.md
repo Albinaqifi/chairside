@@ -5,9 +5,9 @@ holds health data, built by one developer with AI agents.
 
 **Status:** the project skeleton and database foundation (E00-T01), login with clinic
 membership (E00-T02), the action wrappers with the audit log (E00-T03), the lint rules that
-guard them with the login audit (E00-T08), CI on GitHub (E00-T06a), and a login form that never
-puts the password in the URL (E00-T09) exist. What is done and what comes next is on the board,
-`docs/progress/board.md`.
+guard them with the login audit (E00-T08, their known gaps closed in E00-T10), CI on GitHub
+(E00-T06a), and a login form that never puts the password in the URL (E00-T09) exist. What is
+done and what comes next is on the board, `docs/progress/board.md`.
 
 ## Start of every session (in this order)
 
@@ -110,6 +110,9 @@ Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tes
 
 ### Module rules (lint enforces them; `eslint-rules/architecture.test.ts` proves it)
 
+No lint comment switches a rule off in `src/`: ESLint ignores `eslint-disable` and `/* eslint … */`
+there and reports the comment itself (`noInlineConfig`, D-077).
+
 1. A module's tables are private. Other modules call its functions, never query its tables.
 2. Import another module only through its `index.ts`: `@/modules/patients`. One exception: a
    `schema.ts` may import another module's `schema.ts` to declare foreign keys (D-058).
@@ -119,15 +122,23 @@ Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tes
 5. Every server action is `export const name = staffAction(…)` (or `staffRead`, `userAction`) in
    a `'use server'` file in `src/app`, the wrapper imported from `@/app/_lib/actions` under its own
    name. Such a file exports nothing else but types, and never a `.forPage`. No inline
-   `'use server'`, no `'use server'` file outside `src/app`. A route handler (`route.ts`) needs a
-   line with its reason in `ROUTE_HANDLERS` in `eslint-rules/server-actions.mjs` (D-071, D-073).
+   `'use server'`, no `'use server'` file outside `src/app`, in `src/` or anywhere else in the
+   repository. A route handler (`route.ts`) needs a line with its reason in `ROUTE_HANDLERS` in
+   `eslint-rules/server-actions.mjs`. No `src/pages/`: Next.js would serve the Pages Router there,
+   outside the wrappers (D-071, D-073, D-077).
 6. `@/db/client` only in `src/db/` and `src/modules/auth/`; `withTenant` only in
    `src/app/_lib/actions.ts`, `src/db/` and `src/modules/auth/`; `import type { TenantTransaction }`
-   anywhere. Tests are exempt (D-062, D-071).
+   anywhere. Those three places never re-export `withTenant` or anything from the client file.
+   Database drivers only in `src/db/`: `pg`, `pg-…` packages, every `drizzle-orm/…` path but
+   `drizzle-orm/pg-core`, and `src/db/reset` and `src/db/migrate`; `drizzle-orm` and
+   `drizzle-orm/pg-core` anywhere, type-only imports too. Tests are exempt (D-062, D-071, D-077).
 7. Type-aware, for the `.ts`, `.tsx` and `.mts` files in `src/`: every promise is awaited, Drizzle
    queries included (`no-floating-promises`; `no-misused-promises`, so no
-   `items.forEach(async …)`), and only Errors are thrown (`only-throw-error`: a refusal is
-   returned, never thrown) (R-32, D-073, D-074).
+   `items.forEach(async …)`), and only Errors are thrown or rejected (`only-throw-error`,
+   `prefer-promise-reject-errors`: a refusal is returned, never thrown). In the `.ts` and `.mts`
+   files, a statement that only hangs `.catch(…)` or `.then(ok, fail)` on a promise is reported:
+   await it or return it. `src/` holds no `.js`, `.jsx`, `.mjs`, `.cjs` or `.cts` files, which
+   these rules would not see (a test fails) (R-32, D-073, D-074, D-077).
 
 ### Code conventions
 
@@ -161,8 +172,13 @@ Create a folder only when it has content. Coming later: `src/ui` (E00-T04), `tes
 - Forms: a form posts to a URL named in its `action`, or takes a function as its action; never
   only `onSubmit`, which leaves the browser to send a GET with every field in the URL whenever the
   handler does not run (D-076). Write `method="post"` and the `action` out, after any spread; a
-  button or input has no `formMethod`, or `formMethod="post"`. Lint checks every `<form>` in the
-  `.tsx` files of `src/` (`chairside/forms-post`, type-aware, D-080; cases in
+  button or input has no `formMethod`, or `formMethod="post"`. A button's or input's `formAction`
+  follows a form's rule: a function, or a URL with `formMethod="post"` on the same element. A
+  component that spreads its props onto a `<button>` or `<input>` types them without `formAction`
+  and `formMethod` (`Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'>`) and writes a
+  function `formAction` out if it needs one (D-081). `next/form` is not used: its `<Form>` sends a
+  URL action as a GET. Lint checks every `<form>`, `<button>` and `<input>` in the `.tsx` files of
+  `src/` (`chairside/forms-post`, type-aware, D-080, D-081; cases in
   `eslint-rules/architecture.test.ts`).
 - Logs: `logger` from `src/lib/logger.ts`, ids and codes only. It drops the fields listed in
   `src/lib/personal-fields.ts` as a safety net, not as permission to log personal data. Errors

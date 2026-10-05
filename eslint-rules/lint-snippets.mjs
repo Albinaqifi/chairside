@@ -1,10 +1,14 @@
 // Test helper for architecture.test.ts. Lints code snippets with the project's ESLint config in
 // a plain Node process: inside Vitest, ESLint's first run takes about a minute instead of a
 // second. Reads [{ code, file }] as JSON on stdin; writes, per snippet, the rule ids reported
-// (`parse error: …` for a snippet that could not be parsed).
+// (`parse error: …` for a snippet that could not be parsed, INLINE_CONFIG for a lint comment).
 import fs from 'node:fs';
 import { ESLint } from 'eslint';
 import { TYPED_FILES } from '../eslint.config.mjs';
+
+// ESLint reports a lint comment that noInlineConfig ignores (in src/) as a warning without a rule
+// id. architecture.test.ts expects it under this label.
+const INLINE_CONFIG = 'inline config';
 
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
@@ -35,9 +39,12 @@ const eslint = new ESLint({
 const output = [];
 for (const { code, file } of snippets) {
   const [result] = await eslint.lintText(code, { filePath: file });
-  // A snippet that cannot be parsed reports no rule at all: name the error, so a test sees it.
+  // A snippet that cannot be parsed reports no rule at all, only a fatal message: name the error,
+  // so a test sees it. Any other message without a rule id gets the fixed label.
   output.push(
-    result.messages.map((message) => message.ruleId ?? `parse error: ${message.message}`),
+    result.messages.map((message) =>
+      message.fatal ? `parse error: ${message.message}` : (message.ruleId ?? INLINE_CONFIG),
+    ),
   );
   // A snippet at a file that exists takes that file's place in the TypeScript project. Put the
   // file's own text back, so a later snippet that imports the file sees the real one.
