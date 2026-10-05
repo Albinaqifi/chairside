@@ -6,13 +6,13 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `Tested` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.) Things noticed outside a task: `discovered.md`, next to this file.
 
-_Last updated: 2026-10-05 — reviewer: E00-T11 delta review at `808c7ec` approved (CI run 37327727140 in progress, its unit tests green with the tester's two cases; no required changes, no suggestions); stays Tested, the owner's review and merge of PR #20 on a green run are next. Before: tester: E00-T11 Tested at `92d2db2` (CI run 37322342647 green; no findings; 2 cases added to `architecture.test.ts`; for the owner: the `{...props.inner}` gap also passes as a destructured prop; 1 line on the Discovered list); the delta review of the added cases, then the owner's review and merge. Before: reviewer: E00-T11 Reviewed at `503c37c` (CI run 37318553002 green): no required changes, two suggestions on the Discovered list._
+_Last updated: 2026-10-05 — architect: E00-T11 Done (PR #20 merged at `d122881`; CI run 37329773795 on `main` green); its blind spots stay review checks (owner, D-086); E00-T04 split in four (D-086), E00-T04a Ready. Before: reviewer: E00-T11 delta review at `808c7ec` approved; the owner's merge of PR #20 on a green run was next._
 
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T11` is Tested (no findings) and its delta review approved (`handoffs/E00-T11.md`); the owner reviews and merges PR #20 on a green run, with the builder's question and the tester's points in the handoff. Then E00-T04 and E00-T05, which an architect refines first (E00-T04 is split then)
-- **Owner review, before E00-T11 starts (D-084):** the form lint checks every component, not only `<button>` and `<input>`, and a generic spread passes only when its constraint types `formAction` and `formMethod` as `never`. So E00-T04's shadcn/ui Button, and its Radix parts that render a button, type their props with `Omit<…, 'formAction' | 'formMethod'>`. Three leftovers stay review checks (names built in code, `next/form` spelled another way, `c && p.catch(…)`); the fourth, a mapped type written out, turned out visible to lint and is checked (D-085). Say so if any should go another way
+- **Next task to start:** `E00-T04a` is Ready (`handoffs/E00-T04a.md`): `/pipeline E00-T04a`, once the owner has merged the pull request of `plan/E00-T11-done` and, by the owner's choice, the process change planned on 2026-10-05. E00-T04b … E00-T04d follow, each refined in the Done pass of the part before (`/architect E00-T04a` after its merge); E00-T05 fits in at any point, refined first (`/architect E00-T05`)
+- **Owner review, before E00-T04a starts (D-086):** E00-T04 is split in four tasks, all before E01; its automated accessibility check moves to E00-T06b, where you choose its tool; the fonts come from files kept in the repository. Say so if any should go another way. Not blocking: the demo's two fonts have no Cyrillic letters (question in `handoffs/E00-T04a.md`)
 - **Owner action for CI (D-075):** add a payment method and a small GitHub Actions budget (for example $10 a month); after two weeks of runs, decide on GitHub Pro (R-34). Optional: in the repository's Settings → Actions, require actions pinned to a full commit SHA and allow only GitHub's and pnpm's actions
 - **Owner decisions from the E00-T02 test, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list. Finding 6 is decided (D-069)
 - **Owner action, start now (long lead time):** create the Meta Business account, begin
@@ -21,8 +21,8 @@ _Last updated: 2026-10-05 — reviewer: E00-T11 delta review at `808c7ec` approv
 
 ## Next (in order)
 
-1. E00-T11
-2. E00-T04, E00-T05 (any order) → E00-T06b → E00-T07
+1. E00-T04a
+2. E00-T04b → E00-T04c → E00-T04d, and E00-T05 in any order with them → E00-T06b → E00-T07
 3. E01 from T01
 
 ## Blocked
@@ -33,7 +33,7 @@ _Last updated: 2026-10-05 — reviewer: E00-T11 delta review at `808c7ec` approv
 
 ## E00 · Foundation (M0)
 
-Fully specified. A task becomes Ready when its dependencies are Done, except E00-T04 (to be split) and E00-T06b (an outline), which an architect refines first.
+Fully specified. A task becomes Ready when its dependencies are Done, except E00-T06b (an outline), which an architect refines first, and each part of E00-T04 after the first, refined in the Done pass of the part before (D-086).
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
@@ -44,10 +44,14 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T06a | CI: every pull request and `main` checked on GitHub | builder | normal | **Done** | Merged by the owner (PR #11). `.github/workflows/ci.yml` checks every pull request, every push to `main` and every Monday; the pipeline skill and `builder.md` wait for green (D-075, D-078). Review suggestions and tester notes in `discovered.md`. See `handoffs/E00-T06a.md` |
 | E00-T09 | The login form never puts the password in the URL | builder | critical | **Done** | Merged by the owner (PR #15). The form posts to `/login`, its button is disabled until the script runs, a `<noscript>` line; lint `chairside/forms-post` for every form (D-076, D-080). The review suggestion and the tester's `next/form` line → E00-T10 (D-081). See `handoffs/E00-T09.md` |
 | E00-T10 | Close the gaps in the lint guards | builder | critical | **Done** | Merged by the owner (PR #17). Re-exports and drivers, lint comments, rejections and `.catch`/`.finally` statements, `src/pages`, script files in `src/`, `formAction`, spreads and `next/form` (D-077, D-081, D-082). Its leftovers → E00-T11 (D-084); four struck. See `handoffs/E00-T10.md` |
-| E00-T11 | Components in the form lint, and the gaps E00-T10 left | builder | critical | **Tested** | Builder 2026-10-05, branch `task/E00-T11-form-lint-components`, PR #20. Components and generic spreads in the form lint, `export default` of a handle, drivers passed on from `src/db/`, `'use server'` `.tsx` files, lint comments everywhere, whole case names (D-084, D-085). Reviewed at `503c37c`: no required changes, 2 suggestions (Discovered). Tested at `92d2db2`: no findings, 2 cases added, 1 line (Discovered). Delta review at `808c7ec`: approved. Owner: one question in the handoff. See `handoffs/E00-T11.md` |
-| E00-T04 | App shell and design system | builder | normal | Planned | After E00-T11 (D-084). Too big for one session as written (D-075): split when it is refined |
-| E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | After E00-T11 in the queue (D-084). Refined before it starts |
-| E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); after E00-T04 and E00-T05 |
+| E00-T11 | Components in the form lint, and the gaps E00-T10 left | builder | critical | **Done** | Merged by the owner (PR #20). Components and generic spreads in the form lint, `export default` of a handle, drivers passed on from `src/db/`, `'use server'` `.tsx` files, lint comments everywhere, whole case names (D-084, D-085). Its blind spots stay review checks (owner, D-086); two comments → E00-T04a; `CLAUDE.md` rule 7 and R-32 corrected. See `handoffs/E00-T11.md` |
+| E00-T04 | App shell and design system | builder | normal | split (D-086) | Into E00-T04a … E00-T04d, the next four rows |
+| E00-T04a | Tokens, fonts, texts and the login page | builder | normal | Ready | From E00-T04's split (D-086). Tailwind tokens, local fonts, next-intl, Button, Input, Label, the login page and the clinic picker, text and accessibility lint. See `handoffs/E00-T04a.md` |
+| E00-T04b | The staff shell: sidebar, navigation by role, placeholder pages | builder | normal | Planned | After E00-T04a, refined in its Done pass (D-086) |
+| E00-T04c | The form pattern, the toast and the components page | builder | normal | Planned | After E00-T04b, refined in its Done pass (D-086) |
+| E00-T04d | The other components: fields, tabs, drawer and dialog | builder | normal | Planned | After E00-T04c, refined in its Done pass (D-086) |
+| E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | In any order with the parts of E00-T04 (D-086). Refined before it starts |
+| E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); after E00-T04a … E00-T04d and E00-T05; takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086) |
 | E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | Planned | Owner: hosting accounts (Q-07). After E00-T05, E00-T06b and E00-T09 |
 
 ## E01 · Scheduling (M1)
@@ -188,3 +192,4 @@ Outline. Needs E07-T00.
 - E00-T06a · CI: every pull request and `main` checked on GitHub · merged 2026-10-04 (PR #11)
 - E00-T09 · The login form never puts the password in the URL · merged 2026-10-05 (PR #15)
 - E00-T10 · Close the gaps in the lint guards · merged 2026-10-05 (PR #17)
+- E00-T11 · Components in the form lint, and the gaps E00-T10 left · merged 2026-10-05 (PR #20)

@@ -1478,3 +1478,67 @@ architecture), `changed` (differs from the original files), `process`.
   function (the strict reading reports it; then check the props' types, D-081's "Revisit if"); a
   shape reported on purpose above turns out to be one E00-T04 needs; a library component's props
   carry an index signature (every spread onto it is then reported).
+
+### D-086 · E00-T11 Done: its leftovers stay review checks, E00-T04 is split in four, and the automated accessibility check moves to E00-T06b
+- **Origin:** process, E00-T11's Done pass on 2026-10-05 (PR #20 merged, `handoffs/E00-T11.md`)
+  and E00-T04's Ready pass on the same branch. **Owner, 2026-10-05:** no new lint task for
+  E00-T11's leftovers: they stay review checks (the other choice was a task E00-T12 before
+  E00-T04). Also the owner's: this pass runs before the process change planned the same day, which
+  comes before `/pipeline E00-T04a`. The rest is the architect's.
+- **What:**
+  - **E00-T11's leftovers.** The form lint's known blind spots stay review checks, as D-085 left
+    them: a spread of a value read off a type parameter's props, written `props.inner`,
+    `props['inner']` or as a destructured prop; a mapped type that reaches a spread already
+    instantiated; a spread typed as the empty type (`Record<never, never>`, `NonNullable<unknown>`).
+    So does `export default t.withTenant` through a namespace import: it is the
+    `export const x = withTenant` check (D-082). D-085's strict choices stay (the builder's
+    question): a harmless generic shape that lint reports is rewritten into one it reads (D-084's
+    constraint); one that E00-T04 cannot rewrite is D-085's "Revisit if", and the builder stops
+    (agent rule 4). E00-T04's parts name these checks for their reviewers. The two comments in
+    `eslint-rules/` that still say "in src/" go to E00-T04a, which edits that folder.
+    `CLAUDE.md` module rule 7 and R-32 said every action handler is under the `.catch` statement
+    check; a handler written in a `.tsx` file and passed to the wrapper is not, and both now say so
+    (E00-T11 review).
+  - **E00-T04 in four parts,** each depending on the one before; E00-T05 still runs in any order
+    with them. D-075 estimated E00-T04 at about 1,160 changed lines; the 13 shadcn/ui components it
+    names come to about 960 lines as published, before restyling.
+    - **E00-T04a**, tokens, fonts, texts and the login page: Tailwind's theme with every token,
+      the two fonts, next-intl with every existing string moved, Button, Input and Label, the
+      login page and the clinic picker restyled, a favicon, lint for text in JSX and for
+      accessibility.
+    - **E00-T04b**, the staff shell: the sidebar, navigation by permission, the placeholder
+      pages, the card, the badge and the empty state.
+    - **E00-T04c**, the form pattern: a form that calls a wrapped action with its page's clinic
+      id and shows the answer, submit disabled while it runs, the toast, and `/dev/components`.
+    - **E00-T04d**, the other components: textarea, select, checkbox, toggle, tabs, the
+      right-side drawer and the dialog.
+
+    A part after the first is refined in the Done pass of the part before, against what was built.
+    E01-T02, E01-T04 and E01-T08 depend on all four.
+  - **Accessibility.** The automated check of "keyboard-usable and labelled" moves to E00-T06b,
+    which brings a real browser: it runs on `/dev/components` and on the pages J1 visits, as
+    `test-strategy.md` already plans automated accessibility checks in the journey runs. Its tool is
+    a library, chosen with the owner when E00-T06b is refined (agent rule 4). Until then lint
+    checks what it can see (`jsx-a11y`'s recommended rules, from E00-T04a), and each part's tester
+    goes through its pages with the keyboard in a browser.
+  - **E00-T04a's choices.** The fonts come from files in the repository through `next/font/local`:
+    no font host is asked at build or at run time (`next/font/google` downloads at build time).
+    Text in JSX is checked by lint (`react/jsx-no-literals`); text in `aria-label`, `placeholder`,
+    `title` and `alt`, by review. Both lint plugins come with `eslint-config-next`: no new package.
+    The token names of `design-reference.md` are the only ones: the copied components' own names
+    are rewritten to them, never kept as aliases, because `accent` and `muted` mean other things in
+    shadcn/ui. The packages shadcn/ui's components install (`radix-ui`,
+    `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`) are D-009's; the builder
+    records their versions. Screenshots are files next to the note, without a person's name or
+    email.
+- **Why:** one session per part (Definition of Ready), and each part needs the one before: the
+  shell needs the tokens and the texts, a form needs the shell's clinic id, the components page
+  shows the form. A browser-level accessibility check needs a browser. The leftovers: no product
+  code on `main` has those shapes, and the components E00-T04 copies are not generic.
+- **Not decided:** Figtree and Newsreader cover Latin only (fontsource lists `latin` and
+  `latin-ext`, Newsreader also `vietnamese`), so Cyrillic text, a patient's name written in
+  Macedonian for one, shows in the fallback font. Fonts are the owner's design choice: a question
+  in `handoffs/E00-T04a.md`, to settle before the translation pass (D-053).
+- **Revisit if:** a part does not fit one session when it is refined (split it again); a blind
+  spot above turns up in product code (then it is work); the owner changes the order of E00 and
+  E01.

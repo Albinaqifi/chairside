@@ -5,7 +5,7 @@ One file per epic. Each epic delivers one roadmap milestone (`docs/product/roadm
 
 | Epic | Milestone | Outcome | Tasks | Detail level |
 |---|---|---|---|---|
-| [E00 Foundation](E00-foundation.md) | M0 | A running, deployed, empty app with login and tenant isolation | 11 | Fully specified (E00-T04 and E00-T06b are refined first) |
+| [E00 Foundation](E00-foundation.md) | M0 | A running, deployed, empty app with login and tenant isolation | 15 | Fully specified (E00-T06b is refined first, and each part of E00-T04 after the first against the part before, D-086) |
 | [E01 Scheduling](E01-scheduling.md) | M1 | The front desk can run a day | 11 | Fully specified |
 | [E02 Reminder loop](E02-reminder-loop.md) | M2 | Reminder → patient confirms → calendar updates (fake channel) | 14 | Fully specified |
 | [E03 Real channels](E03-real-channels.md) | M3 | WhatsApp and email for real, delivery status, replies, opt-out, caps; SMS designed for later | 11 | Outline |

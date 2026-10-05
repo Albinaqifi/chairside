@@ -6,11 +6,13 @@ clinics cannot see each other's data, and every change is checked automatically.
 **Why first:** everything else stands on tenant isolation, login and the action wrapper.
 Getting them right once, with tests, is cheaper than fixing them under features.
 
-Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → (T04, T05 in any order) → T06b → T07. T08
-is the second half of T03 (split in D-071), so it sits right after T03 in this file. T06 is split in
-two (D-075): CI (T06a) comes first, Playwright and journey J1 (T06b) after T04 and T05. T09 and T10
-come from E00-T08's review and test (D-076, D-077), T11 from E00-T10's (D-084). The tasks sit in
-this file in that order.
+Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → (T04a → T04b → T04c → T04d, and T05 in
+any order with them) → T06b → T07. T08 is the second half of T03 (split in D-071), so it sits right
+after T03 in this file. T06 is split in two (D-075): CI (T06a) comes first, Playwright and journey
+J1 (T06b) after T04 and T05. T09 and T10 come from E00-T08's review and test (D-076, D-077), T11
+from E00-T10's (D-084). T04 is split in four (D-086): tokens, fonts, texts and the login page
+(T04a), the staff shell (T04b), the form pattern (T04c), the other components (T04d). The tasks sit
+in this file in that order.
 
 ---
 
@@ -710,56 +712,235 @@ note).
 
 ---
 
-### E00-T04 · App shell and design system
+### E00-T04a · Tokens, fonts, texts and the login page
 
 - **Role:** builder · **Risk:** normal · **Depends on:** E00-T02, E00-T03, E00-T09, E00-T10, E00-T11
-- **Read:** `design-ref` (all) · `scope` (Navigation and roles) · `security` (Part 1, section 2) ·
-  D-009, D-015, D-069, D-076, D-081, D-084 · demo lines 13–58 (page styles, sidebar)
+- **Read:** `design-ref` (Design tokens; Wording style; Screens the demo does not have) · demo
+  lines 13–22 (page styles) and 26–29 (the logo mark and the wordmark) · `security` (Part 1,
+  sections 2 and 8) · D-009, D-015, D-053, D-076, D-084, D-086 · the architect section of
+  `handoffs/E00-T04a.md`
 
-**Why.** Every screen is built from the same tokens and components, so the app looks like
-the design and agents do not invent styles per screen.
+**Why.** Every screen is built from the same tokens, fonts and texts, so the app looks like the
+design and agents do not invent styles or words per screen. The first of E00-T04's four parts
+(D-086): the base every later screen uses, shown on the two pages a person sees before a clinic is
+chosen.
 
 **Do.**
-- Tailwind theme with the tokens from `design-reference.md` (colours, fonts, radii, sizes).
-  Fonts bundled with the app, not loaded from a third party at runtime.
-- shadcn/ui base components restyled to the tokens: button (primary, secondary, quiet),
-  input, select, textarea, toggle, checkbox, tabs, badge/pill, card, drawer (right side),
-  toast, dialog, empty state. A component that renders a button or input, itself or through a
-  Radix part, types its props without `formAction` and `formMethod` (`Omit<…>`), shadcn/ui's
-  Button included; lint reports it otherwise (D-081, D-084).
-- Staff layout: sidebar with navigation as in the demo (items the user's role may see),
-  clinic name, signed-in user with logout. Pages for each nav item as "coming soon" placeholders.
-- Restyle the login page. Keep what E00-T09 made: the form posts to `/login`, its button is
-  disabled until the script runs, and the line for browsers without JavaScript stays (its text
-  moves to the message file). E00-T09's unit test keeps every check it makes; it may only gain
-  what rendering with translations needs, such as a provider or a mock (D-076).
-- Translations set up (next-intl): every visible string comes from the message file; English
-  only. No second language and no language switcher are built (D-053): the message file is
-  what makes the owner's later translation pass cheap.
-- A hidden `/dev/components` page (non-production only) showing every component, for visual checks.
-- One way for a form to call a wrapped action (E00-T03) and show its typed errors: `forbidden`,
-  `invalid_input` next to the fields, `clinic_changed` with a reload (D-069), and a general
-  failure for `internal`. The staff layout gives client components the clinic id the page was
-  rendered for, so every form sends it. A form takes the action as `action={…}`: lint refuses a
-  form with only `onSubmit` (D-076).
-- **Docs:** `CLAUDE.md` says that a page outside `(staff)` starts from `currentStaff()` or
-  `requireUser()` too, or is public on purpose and says so in a comment: the proxy lets a
-  signed-out POST that looks like a server action through (`security` section 2; board,
-  Discovered, E00-T08 review suggestion 2). The login page, public on purpose, gets that comment.
+- **Tokens.** Tailwind CSS (D-009) with every token of `design-reference.md` defined once, in the
+  global stylesheet's theme, under its names there: the colours in `oklch`, the status colours of
+  the demo's `RED` and `ST` (lines 1376–1385), the two fonts, the base size and line height, the
+  radii, the entry animation. The page takes its background, text colour, font and size from them, as the
+  demo's page styles do (lines 13–22). A colour, font or radius is written nowhere else. A token
+  the design reference lacks (an error red, a focus ring) is added to the theme, derived from one
+  it has, and named in the handoff note.
+- **Fonts.** Figtree and Newsreader from font files in the repository, with their licence (SIL
+  Open Font License) next to them, loaded with `next/font/local`: no request to a font host at
+  build or at run time (D-009, D-086).
+- **Texts.** next-intl (D-015), English only and with no locale in the URL (D-053): one message
+  file. Every visible string of the existing pages moves into it: the login page and form (its
+  error messages too), the clinic picker, the staff layout's header, the Today placeholder, the
+  logout button, the page titles and the role names (a page reads a role's name from the message
+  file: `src/modules/auth` cannot import next-intl, module rule 3). Lint fails on text written in
+  JSX under `src/app` and `src/ui` (`react/jsx-no-literals`, from the React plugin that
+  `eslint-config-next` loads). Text in `aria-label`, `placeholder`, `title` and `alt`, and in a
+  page's `metadata`, is a review check, named in `CLAUDE.md`.
+- **Accessibility lint.** The recommended rules of `jsx-a11y` (a plugin `eslint-config-next`
+  loads) for `src/app` and `src/ui`. A rule that refuses an accessible shadcn/ui pattern is
+  switched off for those files in `eslint.config.mjs`, with its reason in a comment and a line in
+  the handoff note; never by a comment in code (D-077).
+- **Base components** in `src/ui/`: Button (primary, secondary, quiet), Input and Label, copied
+  from shadcn/ui (D-009) and restyled to the tokens. Button and Input type their props without
+  `formAction` and `formMethod` (`Omit<…>`, D-084): shadcn/ui's Button as published takes React's
+  full button props, which lint refuses.
+- **The login page and the clinic picker** restyled with them, in the demo's look: the logo mark
+  and the wordmark (demo lines 26–29) above a card. The demo has no login screen: propose the
+  layout in the handoff note (`design-ref`, "Screens the demo does not have"). Keep everything
+  E00-T09 made: the form posts to `/login`, its button is disabled until the script runs, and the
+  line for browsers without JavaScript stays (its text moves to the message file). E00-T09's unit
+  test keeps every check it makes; it may only gain what rendering with translations needs, such as
+  a provider or a mock (D-076).
+- **A favicon** made from the logo mark, so no page logs a 404 for `/favicon.ico` (Discovered,
+  E00-T09).
+- **Cases and two comments.** Cases in `eslint-rules/architecture.test.ts` for the text rule and
+  the accessibility rules. The two comments that still say lint comments are ignored "in src/"
+  (`eslint-rules/lint-snippets.mjs` line 9, `architecture.test.ts` line 25) say "in every script
+  file" (Discovered, E00-T11 review; D-086).
+- **Docs.** `CLAUDE.md`: `src/ui` in the folder structure (no longer "coming later"); the message
+  file and the two text checks; that a component takes colours, fonts and radii only from the
+  theme; and that a page outside `(staff)` starts from `currentStaff()` or `requireUser()`, or is
+  public on purpose and says so in a comment, because the proxy lets a signed-out POST that looks
+  like a server action through (`security` section 2; D-075). The login page, public on purpose,
+  gets that comment.
 
-**Out of scope.** Any real screen content. Dark mode. Patient-page layout (E02).
+**Out of scope.** The sidebar and the staff pages (E00-T04b). Forms that call an action, the toast
+and the components page (E00-T04c). The other components (E00-T04d). Dark mode. Patient pages
+(E02). A second language or a language switcher (D-053).
 
 **Acceptance.**
-- [ ] Sidebar and login visually match the demo (side-by-side screenshots in the handoff note).
-- [ ] No colour, font or radius is hard-coded in a component: all come from tokens.
-- [ ] No request goes to a third-party host when loading any page (checked in browser dev tools).
-- [ ] Navigation shows only what the role may see (front desk has no Automations, Settings).
-- [ ] No hard-coded user-visible strings in components (lint rule or documented check).
-- [ ] Layout works at 1280 px wide and on a tablet in landscape (1024 px).
-- [ ] Components are keyboard-usable and labelled (automated accessibility check passes on `/dev/components`).
-- [ ] A form on `/dev/components` shows each typed error of the action wrapper in its standard way,
-      and a form shown for one clinic, sent after another tab switched clinic, shows the reload message.
+- [ ] The login page and the clinic picker use the tokens, the fonts and the logo mark:
+      screenshots of both at 1280 and 1024 px wide, with the demo's sidebar header at the same
+      zoom, are files in `docs/progress/handoffs/E00-T04a/`, linked from the builder's section,
+      and show no person's name or email.
+- [ ] No colour, font family or radius is written outside the global stylesheet: a search of
+      `src/` for `oklch(`, `rgb(`, `hsl(`, hex colour codes, `font-family`, and arbitrary colour,
+      font and radius classes (`bg-[`, `text-[#`, `font-[`, `rounded-[` and their kin) finds them
+      only there (the command and its result in the note).
+- [ ] Loading `/login` and `/choose-clinic` from a production build sends no request to another
+      host, and the browser console shows no error, a 404 for the favicon included (in the note).
+- [ ] Lint fails on `<p>Hello</p>` and on `<p>{'Hello'}</p>` in a `.tsx` file under `src/app` and
+      under `src/ui`, on a `<label>` tied to no control and on a `<div onClick>` there;
+      `<p>{t('hello')}</p>` passes (cases in `architecture.test.ts`). `pnpm lint` passes on the
+      code as it is.
+- [ ] Every visible string of the two pages, the staff header, the Today placeholder and the logout
+      button comes from the message file: a text changed there shows on the page (one shown in the
+      note).
+- [ ] E00-T09's unit test passes with every check it made (its diff adds only a provider or a
+      mock). In a browser: with JavaScript off, the login form sends nothing and no URL holds a
+      field (as in `handoffs/E00-T09.md`); with it on, a wrong password shows the message file's
+      text and a right one signs in.
+- [ ] Lint refuses `<Button formAction="/patients">` and `<Button formMethod="get">` with the
+      real Button (a scratch file, removed after).
+- [ ] `pnpm check` and `pnpm build` pass.
 
+---
+
+### E00-T04b · The staff shell: sidebar, navigation by role, placeholder pages
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04a
+- **Read:** `design-ref` (Design tokens: layout; Sidebar, demo lines 24–58, logic 2085–2088) ·
+  `scope` (Navigation and roles) · `security` (Part 1, section 2) · D-021, D-051, D-086 · the
+  architect section of `handoffs/E00-T04b.md`
+
+**Why.** Every staff screen lives in the same frame, and the sidebar offers each person only what
+their role may use. The second of E00-T04's four parts (D-086).
+
+**Do.**
+- **The staff layout** as in the demo (lines 24–58): the sidebar, 228 px, with the logo and the
+  wordmark, the clinic's name, the main navigation (Today, Calendar, In the chair, Patients,
+  Automations) and the second group (Import patients, Settings), the current page marked; the
+  signed-in person's name and role, "Switch clinic" when they belong to more than one clinic, and
+  logout. The demo's "Patient's phone" and its "Signed in as" switcher are not built (`scope`).
+  The content area's padding and width from the design reference; the layout works at 1280 and
+  1024 px wide.
+- **Navigation by permission.** One list says what each item needs, read with `can()` from
+  `@/modules/auth`: Today, every member; Calendar, `calendar.manage`; Patients, `patients.manage`;
+  In the chair, `visit.record`; Automations, `automations.manage` or `aftercare.approve`; Import
+  patients, `import.run`; Settings, `settings.manage`. Hiding an item is not the check: each real
+  page checks its own permission when it is built (`security` section 2).
+- **Placeholder pages** for every item but Today: each starts from `currentStaff()` and shows its
+  title and a "coming soon" empty state. Their paths never start with `login` and hold no dot, as
+  the proxy skips such paths (`src/proxy.ts`; Discovered, E00-T02 test). The Today page is
+  restyled in the same frame.
+- **Components** in `src/ui/`, from shadcn/ui and restyled: Card, Badge (the pill, in the status
+  colours) and an empty state.
+- **Docs.** `CLAUDE.md`, next to `src/proxy.ts`: a staff path never starts with `login` and holds
+  no dot.
+
+**Out of scope.** Counts next to the navigation items (the demo's "1,146", "2 to review"): with the
+tasks that own them. Any screen content. The form pattern and the other components (E00-T04c,
+E00-T04d). A phone layout (the staff app is desktop-first, and a tablet in landscape).
+
+**Acceptance.**
+- [ ] The staff layout matches the demo's sidebar: screenshots at 1280 and 1024 px wide, next to
+      the demo's sidebar at the same zoom, are files in `docs/progress/handoffs/E00-T04b/`, with a
+      signed-in person whose name is a role word, never a person's name or an email.
+- [ ] A unit test lists the navigation of each role: front desk sees Today, Calendar, In the chair
+      and Patients, and Import patients only with the extra permission; a hygienist sees the same
+      without Import; a dentist also sees Automations; an owner sees Today, Calendar, Patients,
+      Automations, Import patients and Settings, and In the chair only when linked to a provider.
+- [ ] The current page is marked, and the navigation and logout work with the keyboard alone
+      (tester, in a browser).
+- [ ] Every placeholder page sends a signed-out person to the login page, and a person whose clinic
+      is not settled to the clinic picker, as Today does.
+- [ ] Lint, the token search and the check for requests to other hosts pass on every staff page,
+      as in E00-T04a.
+- [ ] `pnpm check` and `pnpm build` pass.
+
+---
+
+### E00-T04c · The form pattern, the toast and the components page
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04b
+- **Read:** `design-ref` (Toast, demo lines 1364–1366, logic 1615; Wording style) · `security`
+  (Part 1, sections 2 and 8) · D-069, D-072, D-076, D-084, D-086 · the architect section of
+  `handoffs/E00-T04c.md`
+
+**Why.** Every screen that changes data sends its form to a wrapped action and shows the answer in
+one way, so no screen invents its own error handling and none loses the clinic check. The third of
+E00-T04's four parts (D-086).
+
+**Do.**
+- **The clinic id.** The staff layout gives client components the clinic id the page was rendered
+  for, so every form sends it (D-069).
+- **The form pattern.** One way for a form to call a wrapped action (E00-T03) and show its typed
+  errors: `invalid_input` next to its fields, `forbidden` as a message, `clinic_changed` with a
+  reload (D-069), and a general failure for `internal` and a handler's own refusal. The form takes
+  the action as `action={…}` (D-076); `useActionState` does not take the wrappers' call shape as it
+  is (D-072, "Revisit if"), and how the pattern bridges that is the builder's, recorded in a
+  decision entry. The submit button is disabled while the action runs, so a double click sends one
+  request (Discovered, E00-T03 test). A field shows its label, its control and its error, tied
+  together for screen readers.
+- **The toast**, shadcn/ui's (D-009), restyled (demo lines 1364–1366), for an action that is done
+  or failed. There is no dark mode, so the theme package the published wrapper imports is not
+  added.
+- **`/dev/components`**, outside production only: every component of `src/ui/`, and a demo form
+  whose action gives each answer on request, for visual and keyboard checks.
+- **Docs.** `CLAUDE.md`: how a form calls an action, with a short example, as for the wrappers.
+
+**Out of scope.** The other components (E00-T04d). Real screens. Create actions that tell a second
+submit from a first: E01-T02 and E01-T05 (Discovered, E00-T03 test).
+
+**Acceptance.**
+- [ ] On `/dev/components` the demo form shows each answer in its standard way: field errors at
+      their fields, `forbidden`, the general failure, a refusal, and a toast when it is done; a form
+      shown for one clinic and sent after another tab switched clinic shows the reload message
+      (tester, in a browser).
+- [ ] A double click on submit sends one request (tester, the browser's network log).
+- [ ] What the form shows for each wrapper code and for a refusal is unit-tested.
+- [ ] `/dev/components` answers 404 in a production build.
+- [ ] Every field on `/dev/components` has a label tied to its control, and the page works with the
+      keyboard alone (tester, in a browser).
+- [ ] Lint, the token search and the check for requests to other hosts pass, as in E00-T04a.
+- [ ] `pnpm check` and `pnpm build` pass.
+
+---
+
+### E00-T04d · The other components: fields, tabs, drawer and dialog
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04c
+- **Read:** `design-ref` (Design tokens: shape and layout; the drawer's frame, demo lines
+  1192–1196) · D-009, D-084, D-085 ("Not checked"), D-086 · the architect section of
+  `handoffs/E00-T04d.md`
+
+**Why.** E01's screens are built from these: the booking and appointment drawers, the settings
+tabs, a confirming dialog, the fields of every form. The last of E00-T04's four parts (D-086).
+
+**Do.**
+- From shadcn/ui (D-009), restyled to the tokens, in `src/ui/`: textarea, select, checkbox, toggle
+  (an on/off switch), tabs, the drawer from the right (420 px, and 500 px for the aftercare
+  review), the dialog. Each that renders a button or an input, itself or through a Radix part,
+  types its props without `formAction` and `formMethod` (`Omit<…>`, D-084): the published ones take
+  Radix's full props, which lint refuses.
+- The text they carry (a close button's label, a select's empty choice) comes from the message
+  file.
+- Each one on `/dev/components`, and in the demo form where it is a field (with its label and
+  error, E00-T04c).
+
+**Out of scope.** What goes inside a drawer (E01-T05, E01-T06, E06-T08). A date picker or the
+calendar grid (our own, D-009; E01-T04).
+
+**Acceptance.**
+- [ ] Each component on `/dev/components` uses the tokens, the drawer at 420 and 500 px from the
+      right with the entry animation: screenshots are files in `docs/progress/handoffs/E00-T04d/`.
+- [ ] With the keyboard alone: tabs move with the arrow keys; the dialog and the drawer keep focus
+      inside, close with Escape and give focus back; the select, the checkbox and the toggle work
+      with the keyboard (tester, in a browser).
+- [ ] Every field has a label tied to its control; the dialog and the drawer each have a title that
+      a screen reader reads.
+- [ ] Lint refuses `formAction="/patients"` on each component that renders a button or an input (a
+      scratch file, removed after). Lint, the token search and the check for requests to other
+      hosts pass, as in E00-T04a.
+- [ ] `pnpm check` and `pnpm build` pass.
 ---
 
 ### E00-T05 · Seed data and the clinic provisioning script
@@ -800,13 +981,15 @@ a way to create a real clinic (there is no sign-up page).
 
 ### E00-T06b · Playwright and the first end-to-end journey (J1)
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04, E00-T05, E00-T06a, E00-T09
-- **Read:** `test-strategy` (The levels; End-to-end journeys) · D-012, D-014, D-075, D-076 · the
-  handoff notes of E00-T04, E00-T05 and E00-T06a
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04a … E00-T04d, E00-T05, E00-T06a,
+  E00-T09
+- **Read:** `test-strategy` (The levels; End-to-end journeys) · D-012, D-014, D-075, D-076, D-086 ·
+  the handoff notes of E00-T04a … E00-T04d, E00-T05 and E00-T06a
 
 **Why.** A few journeys through a real browser prove that the pieces are wired together: login,
-session, layout, logout. Split from E00-T06 (D-075): it needs the seeded users (E00-T05) and the
-Today page of the app shell (E00-T04). It is refined against what they built, once they are done.
+session, layout, logout. Split from E00-T06 (D-075): it needs the seeded users (E00-T05), the Today
+page of the app shell (E00-T04b) and, for the accessibility check, the components page (E00-T04c,
+E00-T04d). It is refined against what they built, once they are done.
 
 **Do.**
 - Playwright (named in D-012; its exact version gets a decision entry at refinement), set up
@@ -819,6 +1002,11 @@ Today page of the app shell (E00-T04). It is refined against what they built, on
   staging or production. `NODE_ENV` cannot be its guard: `next build` writes `production` into the
   build the tests run against (D-075). Sized when this task is refined; if it does not fit, it gets
   its own task before the first journey that needs it.
+- An automated accessibility check (labels, contrast, keyboard) in the same runs, on
+  `/dev/components` and on every page J1 visits (`test-strategy.md`; moved here from E00-T04,
+  D-086). Its tool is a library, chosen with the owner when this task is refined (agent rule 4).
+  `/dev/components` is hidden in a production build (E00-T04c): this task decides how the check
+  reaches it, with the clock control's guard in mind.
 - A CI job for the journeys, after the build. Traces only on failure, kept briefly, synthetic data
   only.
 - `CLAUDE.md`: how to run the journeys locally.
@@ -828,6 +1016,8 @@ Today page of the app shell (E00-T04). It is refined against what they built, on
 **Acceptance.**
 - [ ] J1 passes in CI and locally on Windows.
 - [ ] J1 fails when login or logout is broken (tester).
+- [ ] The accessibility check passes on `/dev/components` and on J1's pages, and fails on a field
+      without a label (tester).
 - [ ] The clock control cannot be enabled on staging or production (test).
 - [ ] A run leaves the development database untouched.
 - [ ] A full CI run still takes under 10 minutes.

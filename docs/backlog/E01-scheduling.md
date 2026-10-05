@@ -44,7 +44,7 @@ booking and cross-clinic links impossible.
 
 ### E01-T02 · Patients: list, search, create, edit
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01, E00-T04
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01, E00-T04a … E00-T04d
 - **Read:** `scope` (Patients list and profile) · `design-ref` (demo lines 316–347; logic 1849–1858) · `data-model` (`patients`) · D-033, D-040
 
 **Why.** Staff must find a patient in seconds by name or phone.
@@ -98,7 +98,7 @@ booking and cross-clinic links impossible.
 
 ### E01-T04 · Calendar: day view
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01, E00-T04
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01, E00-T04a … E00-T04d
 - **Read:** `scope` (Calendar) · `design-ref` (demo lines 215–283; logic 1812–1834; status colours 1377–1385; provider colours) · D-018, D-019, D-041
 
 **Why.** The calendar is where the front desk lives.
@@ -200,7 +200,7 @@ Day / Week toggle.
 
 ### E01-T08 · Settings: clinic details, opening hours, closed days
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01, E00-T04
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01, E00-T04a … E00-T04d
 - **Read:** `scope` (Settings) · `design-ref` (demo lines 746–778; logic 1912–1919) · `data-model` (`clinics`, `clinic_hours`, `closed_days`)
 
 **Do.**
