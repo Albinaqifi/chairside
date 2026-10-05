@@ -1347,3 +1347,70 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a pass needs instructions the skill cannot know (then a prompt for that pass
   only, on top of the skill); or the skill's reading list makes the architect miss a leftover
   (then widen step 3's list, not the rule).
+
+### D-084 · E00-T11: the form lint checks components and generic types, and the gaps from E00-T10's review and test are closed
+- **Origin:** process, E00-T10's Done pass on 2026-10-05: E00-T10's nine Discovered lines (builder,
+  review, test) and the builder's two questions for the owner (`handoffs/E00-T10.md`). **Owner,
+  2026-10-05:** one more lint task before E00-T04, E00-T11, with every item below. The other choices
+  put to the owner were the form part only, the form part folded into E00-T04, or no lint change.
+  How each check goes is the architect's; the owner reviews it with the task. D-077, D-081 and D-082
+  stay as they are.
+- **What:**
+  - **Components.** `chairside/forms-post` checks every element written as a component (`<Button>`,
+    `<Comp>`, `<Primitive.Root>`) as it checks `<button>` and `<input>`: a written `formMethod` and
+    `formAction` (D-081), and a spread whose type may carry either. Other lower-case HTML elements
+    stay unchecked: they have neither prop.
+  - **Generic types.** A spread whose type is a type parameter, or is built from one (`Partial<P>`,
+    `Pick<P, K>`, `Omit<P, K>`, `P & { … }`), passes only when the constraint types both `formAction`
+    and `formMethod` as `undefined` or `never`. In every spread check, a property typed only
+    `undefined` or `never` carries nothing and does not count. `object`, `any`, `unknown` and an
+    index signature count as before (D-082): the builder's first question, answered by keeping what
+    the merge took.
+  - **A handle by `export default`.** `chairside/database-access` reports `export default` of an
+    imported handle in the files that hold one, as it reports `export { withTenant as default }`.
+  - **A driver passed on.** In `src/db/`, a value re-export of a driver is reported (`export … from`,
+    `export *`, and `export { x }` of an imported driver), as a handle's is: any file may import any
+    file of `src/db/`.
+  - **`'use server'` in `.tsx`.** `chairside/server-actions` reports a `'use server'` file that ends
+    in `.tsx`. Outside the modules the `.catch`/`.then(ok, fail)`/`.finally` statement check covers
+    `.ts` and `.mts` files only (D-082), so an action handler's `tx` there would go without it.
+  - **Lint comments everywhere.** `noInlineConfig` covers every script file in the repository, not
+    only `src/`, so a lint comment cannot switch `chairside/server-actions` off in a `'use server'`
+    file outside `src/` either. No lint comment exists outside `src/` today.
+  - **Whole case names.** Vitest names each case of `architecture.test.ts` in full
+    (`taskTitleValueFormatTruncate`), so a red CI step names the case that failed.
+  - **Struck, review checks as before:** names built in code (`import('p' + 'g')`, `p[k](…)`),
+    deliberate as casts are (D-077, D-082); `next/form` by a path spelled another way (D-082);
+    `c && p.catch(…)`, `p.catch(…), 0` and `c ? p.catch(…) : null` as statements, which
+    `@typescript-eslint/no-unused-expressions` reports today and only a deliberate change of its
+    options in `eslint.config.mjs` would let through; a mapped type written out over a type parameter
+    (`{ [K in keyof P]: P[K] }`), if the type checker cannot tell it from a plain object.
+- **Why:**
+  - *Components.* D-081 assumed that the design system's button spreads its props onto a written
+    `<button>`. shadcn/ui's Button (D-009; its published source, which E00-T04 copies) renders
+    `<Comp {...props} />`, where `Comp` is Radix's `Slot` or `'button'` and the props are React's
+    full button props; Radix's checkbox and switch are buttons whose props arrive through a spread
+    onto a component. Lint sees none of these. Probed on `main` at `f3b45ab` with stand-ins: that
+    Button passes lint, and so does a caller's `<Button type="submit" formAction="/patients">` in a
+    form whose action is a function, which React leaves to the browser: a GET with every field in
+    the URL (D-081). Checking every component also catches a caller's spread of an object that holds
+    `formAction` (E00-T10, builder): TypeScript checks no extra props on a spread.
+  - *Generic types.* An inferred type argument gets no excess-property check, so with
+    `P extends Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'>` a caller may write
+    `formAction="/patients"` (E00-T10, tester). Reading a type parameter as its constraint (D-081)
+    answers what a component asks for, not what a caller may give it.
+  - *The rest.* Each is a way past a guard that a reviewer may not notice, small, and in the files
+    the first two touch. The owner chose to close them in the same run rather than keep them as
+    review checks.
+  - A prototype of the first two items in the architect's scratch space (never committed) added
+    about 40 lines to `forms-post.mjs`. With it, and with block (h) of `eslint.config.mjs` widened to
+    every script file, all 316 cases of `architecture.test.ts` passed unchanged, `pnpm lint` passed
+    on the tree, and twelve probe shapes came out as E00-T11's acceptance says.
+- **Consequences:** E00-T04 depends on E00-T11. Its components that render a button or input,
+  directly or through a Radix part, type their props without `formAction` and `formMethod`
+  (`Omit<…>`), shadcn/ui's Button included; a generic one also types both as `never` in its
+  constraint. E00-T05 does not need E00-T11 but follows it in the queue: E00-T11 is Ready, and
+  E00-T05 is refined first.
+- **Revisit if:** a component must pass a function `formAction` through a spread (then check the
+  props' types, as D-081's "Revisit if" says); a library component has a prop named `formAction` or
+  `formMethod` that is not a form's; a lint comment is needed outside `src/`.

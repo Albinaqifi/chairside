@@ -6,10 +6,11 @@ clinics cannot see each other's data, and every change is checked automatically.
 **Why first:** everything else stands on tenant isolation, login and the action wrapper.
 Getting them right once, with tests, is cheaper than fixing them under features.
 
-Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → (T04, T05 in any order) → T06b → T07. T08 is
-the second half of T03 (split in D-071), so it sits right after T03 in this file. T06 is split in
+Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → (T04, T05 in any order) → T06b → T07. T08
+is the second half of T03 (split in D-071), so it sits right after T03 in this file. T06 is split in
 two (D-075): CI (T06a) comes first, Playwright and journey J1 (T06b) after T04 and T05. T09 and T10
-come from E00-T08's review and test (D-076, D-077). The tasks sit in this file in that order.
+come from E00-T08's review and test (D-076, D-077), T11 from E00-T10's (D-084). The tasks sit in
+this file in that order.
 
 ---
 
@@ -617,11 +618,103 @@ fields (review checks, D-081); any change to the login form.
 
 ---
 
+### E00-T11 · Components in the form lint, and the gaps E00-T10 left
+
+- **Role:** builder · **Risk:** critical · **Depends on:** E00-T10
+- **Read:** D-076, D-077, D-081, D-082, D-084 · in `handoffs/E00-T10.md`: the builder's "Not done /
+  known gaps" and the tester's "For the owner" · the architect section of `handoffs/E00-T11.md`
+
+**Why.** E00-T10's review and test found more ways past the lint guards (D-084). The one that
+matters next: the form rule checks only a written `<button>` and `<input>`. shadcn/ui's Button,
+which E00-T04 copies, renders `<Comp {...props} />` with React's full button props, so a caller's
+`<Button type="submit" formAction="/patients">` in a form whose action is a function sends a GET
+with every field in the URL, and lint says nothing (probed, architect section). A generic component
+and a caller's spread get past it too. Five smaller gaps sit in the same files. The owner chose to
+close them all in one task before E00-T04 (D-084).
+
+**Do.** Cases for each in `eslint-rules/architecture.test.ts`; every earlier case passes unchanged,
+and `pnpm lint` passes on the code as it is.
+- **Components in the form rule.** `chairside/forms-post` checks every element written as a
+  component (`<Button>`, `<Comp>`, `<Primitive.Root>`) as it checks `<button>` and `<input>`: a
+  written `formMethod` and `formAction` (D-081), and a spread whose type may carry either prop.
+  Other lower-case HTML elements stay unchecked.
+- **Generic types.** A spread whose type is a type parameter, or is built from one (`Partial<P>`,
+  `Pick<P, K>`, `Omit<P, K>`, `P & { … }`), passes only when the constraint types both `formAction`
+  and `formMethod` as `undefined` or `never`, as
+  `P extends Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'> & { formAction?: never; formMethod?: never }`
+  does. In every spread check, a property typed only `undefined` or `never` does not count. `object`,
+  `any`, `unknown` and index signatures count as before (D-082).
+- **No handle passed on by `export default`.** `chairside/database-access` reports `export default`
+  of an imported handle in the files that hold handles (`src/db/`, `src/modules/auth/`, the
+  wrappers' file), as it reports `export { withTenant as default }`.
+- **No driver passed on.** In `src/db/`, the same rule reports a value re-export of a driver:
+  `export … from` and `export *` of a driver, and `export { x }` of an imported driver. Type-only
+  re-exports pass.
+- **`'use server'` files are `.ts` files.** `chairside/server-actions` reports a `'use server'` file
+  that ends in `.tsx`.
+- **No inline switch anywhere.** Block (h) of `eslint.config.mjs` (`noInlineConfig`) covers every
+  script file in the repository, not only `src/`.
+- **Whole case names.** `vitest.config.ts` sets `taskTitleValueFormatTruncate` so that a test report
+  names every case of `architecture.test.ts` in full.
+- **Docs:** in `CLAUDE.md`, the sentence on lint comments above the module rules, module rules 5 to
+  7 and the Forms line say what is now covered, and how a generic component types its constraint
+  (D-084). R-32 in `docs/log/risks.md` gets an appended line for the `.tsx` item. Your own choices go
+  in a decision entry, as D-082 did for E00-T10.
+
+**Out of scope.** The design-system components (E00-T04) and the login form. What D-082 and D-084
+keep as review checks: `export const x = withTenant`, a function that wraps it or returns the
+client; `void`; a `.catch(…)` statement in a `.tsx` file that is not a `'use server'` file;
+`require('next/form')`, `createElement`, `next/form` by a path spelled another way; names built in
+code; `c && p.catch(…)` and its kin; a mapped type written out over a type parameter
+(`{ [K in keyof P]: P[K] }`) if the type checker cannot tell it from a plain object (say so in the
+note).
+
+**Acceptance.**
+- [ ] Lint fails on a component whose props are typed `ComponentProps<'button'> & { asChild?: boolean }`
+      and that renders `const Comp = asChild ? Slot : 'button'` as `<Comp {...props} />`
+      (shadcn/ui's Button); on `<Root {...props} />` with `props` typed `ComponentProps<typeof Root>`
+      where `Root` takes button props; on `<Button type="submit" formAction="/patients">` and on
+      `<Button formMethod="get">` where `Button` takes `ComponentProps<'button'>`; and on
+      `<Btn {...extra} />` where `Btn`'s props omit both and `extra` is
+      `{ type: 'submit'; formAction: string }`. Passing: the same `Comp` component with its props
+      typed `Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'>`; `<Button formAction={save}>`
+      with a function; `<Input {...field} />` with a form library's `{ name, onChange, onBlur, ref }`;
+      `<Input {...{ disabled: pending }} />`; `<Link {...props} />` with
+      `ComponentProps<typeof Link>` from `next/link`; `<Box {...props} />` with
+      `PropsWithChildren<{ title: string }>`.
+- [ ] Lint fails on a spread onto `<button>` of `props: P` with
+      `P extends Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'>` (E00-T10's tester case)
+      and with `P extends PropsWithChildren`; of `Partial<P>` and of `Pick<P, K>` with
+      `P extends object`; and on `<Comp {...props} />` with `props: P` and the same `Omit<…>`
+      constraint. Passing: `props: P` and `Partial<P>` with
+      `P extends Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'> & { formAction?: never; formMethod?: never }`;
+      a spread typed `{ formAction?: undefined; disabled: boolean }`.
+- [ ] Lint fails on `export default withTenant`, with `withTenant` imported from `@/db/tenant`, in
+      `src/modules/auth/`, in `src/db/` and in `src/app/_lib/actions.ts`, and on
+      `export default getDb`, with `getDb` imported from the client file, in `src/db/`.
+      `export default` of a function declared in the same file passes.
+- [ ] In a new file in `src/db/`, lint fails on `export { Pool } from 'pg'`, `export * from 'pg'`,
+      `export { drizzle } from 'drizzle-orm/node-postgres'`, `export * from './reset'`, and
+      `import { Pool } from 'pg'; export { Pool };`. `export type { PoolConfig } from 'pg'`, a `Pool`
+      imported from `pg` and used only inside the file, and the real files of `src/db/` pass.
+- [ ] Lint fails on a `'use server'` file at `src/app/(staff)/patients/actions.tsx`, also when every
+      export in it is a wrapped action; the same file at `actions.ts` passes.
+- [ ] In a `'use server'` file outside `src/`, `/* eslint-disable */` and
+      `// eslint-disable-next-line chairside/server-actions` switch nothing off, and lint reports the
+      comment itself.
+- [ ] `pnpm exec vitest run eslint-rules/architecture.test.ts --reporter=verbose` names every case
+      in full: the two cases `g: an action typed as a type parameter …`, which E00-T10's reports cut
+      to the same 40 characters, print different names (shown in the handoff note).
+- [ ] For each fix, taking it out again fails its cases (listed in the handoff note).
+- [ ] `pnpm check` passes.
+
+---
+
 ### E00-T04 · App shell and design system
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T02, E00-T03, E00-T09, E00-T10
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T02, E00-T03, E00-T09, E00-T10, E00-T11
 - **Read:** `design-ref` (all) · `scope` (Navigation and roles) · `security` (Part 1, section 2) ·
-  D-009, D-015, D-069, D-076 · demo lines 13–58 (page styles, sidebar)
+  D-009, D-015, D-069, D-076, D-081, D-084 · demo lines 13–58 (page styles, sidebar)
 
 **Why.** Every screen is built from the same tokens and components, so the app looks like
 the design and agents do not invent styles per screen.
@@ -631,7 +724,9 @@ the design and agents do not invent styles per screen.
   Fonts bundled with the app, not loaded from a third party at runtime.
 - shadcn/ui base components restyled to the tokens: button (primary, secondary, quiet),
   input, select, textarea, toggle, checkbox, tabs, badge/pill, card, drawer (right side),
-  toast, dialog, empty state.
+  toast, dialog, empty state. A component that renders a button or input, itself or through a
+  Radix part, types its props without `formAction` and `formMethod` (`Omit<…>`), shadcn/ui's
+  Button included; lint reports it otherwise (D-081, D-084).
 - Staff layout: sidebar with navigation as in the demo (items the user's role may see),
   clinic name, signed-in user with logout. Pages for each nav item as "coming soon" placeholders.
 - Restyle the login page. Keep what E00-T09 made: the form posts to `/login`, its button is
