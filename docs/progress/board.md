@@ -6,24 +6,24 @@ finish. Keep notes to one short line; details go in the handoff note.
 States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `Tested` → `Done`, or `Blocked`.
 (See `docs/process/workflow.md`.) Things noticed outside a task: `discovered.md`, next to this file.
 
-_Last updated: 2026-10-05 — architect: E00-T11 Done (PR #20 merged at `d122881`; CI run 37329773795 on `main` green); its blind spots stay review checks (owner, D-086); E00-T04 split in four (D-086), E00-T04a Ready. Before: reviewer: E00-T11 delta review at `808c7ec` approved; the owner's merge of PR #20 on a green run was next._
-
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T04a` is Ready (`handoffs/E00-T04a.md`): `/pipeline E00-T04a`, once the owner has merged the pull request of `plan/E00-T11-done` and, by the owner's choice, the process change planned on 2026-10-05. E00-T04b … E00-T04d follow, each refined in the Done pass of the part before (`/architect E00-T04a` after its merge); E00-T05 fits in at any point, refined first (`/architect E00-T05`)
-- **Owner review, before E00-T04a starts (D-086):** E00-T04 is split in four tasks, all before E01; its automated accessibility check moves to E00-T06b, where you choose its tool; the fonts come from files kept in the repository. Say so if any should go another way. Not blocking: the demo's two fonts have no Cyrillic letters (question in `handoffs/E00-T04a.md`)
-- **Owner action for CI (D-075):** add a payment method and a small GitHub Actions budget (for example $10 a month); after two weeks of runs, decide on GitHub Pro (R-34). Optional: in the repository's Settings → Actions, require actions pinned to a full commit SHA and allow only GitHub's and pnpm's actions
-- **Owner decisions from the E00-T02 test, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list. Finding 6 is decided (D-069)
-- **Owner action, start now (long lead time):** create the Meta Business account, begin
-  business verification, obtain one WhatsApp sending number for the product (D-055, D-056, risk R-28).
-- **Waiting on the owner:** copy the two `BETTER_AUTH_` lines from `.env.example` into `.env` (E00-T02), and after E00-T06a its `NEXT_TELEMETRY_DISABLED` line. Q-07 and Q-09 are open with working assumptions.
+- **Next task to start:** `E00-T04a` is Ready (`handoffs/E00-T04a.md`): `/pipeline E00-T04a`
+- **Decisions it waits on:** none. Nothing blocks E00-T04a
 
 ## Next (in order)
 
 1. E00-T04a
-2. E00-T04b → E00-T04c → E00-T04d, and E00-T05 in any order with them → E00-T06b → E00-T07
-3. E01 from T01
+2. E00-T04b
+3. E00-T05
+4. E01-T01
+5. E00-T04c
+6. E00-T04d
+7. E01-T02
+8. E00-T06b
+9. E00-T07
+10. The rest of E01, in the epic's own order (D-087)
 
 ## Blocked
 
@@ -33,11 +33,11 @@ _Last updated: 2026-10-05 — architect: E00-T11 Done (PR #20 merged at `d122881
 
 ## E00 · Foundation (M0)
 
-Fully specified. A task becomes Ready when its dependencies are Done, except E00-T06b (an outline), which an architect refines first, and each part of E00-T04 after the first, refined in the Done pass of the part before (D-086).
+Fully specified. A task becomes Ready when its dependencies are Done, except E00-T06b (an outline), which an architect refines first, and each part of E00-T04 after the first, refined in the Done pass of the task before it in the order (D-086, D-087).
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
-| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Reviewed** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). Owner: the builder's 5 questions, then Done. See `handoffs/E00-T01.md` |
+| E00-T01 | Create the project: skeleton, conventions, database foundation | builder | critical | **Done** | Merged early (PR #1), reviewed after: no required changes, 4 suggestions (Discovered). The owner accepted the builder's 5 answers (D-087). See `handoffs/E00-T01.md` |
 | E00-T02 | Login, sessions and clinic membership | builder | critical | **Done** | Merged by the owner (PR #5). Tester finding 6 → D-069, finding 2's page side → D-070; findings 5 and 7 on the Discovered list. See `handoffs/E00-T02.md` |
 | E00-T03 | Action wrappers, permission checks, audit log | builder | critical | **Done** | Merged by the owner (PR #7). `staffAction`, `staffRead`, `userAction` in `src/app/_lib/actions.ts`; `audit.record()`; D-070 at the source; D-072. Review suggestions and tester notes on the Discovered list. See `handoffs/E00-T03.md` |
 | E00-T08 | Guards around the action wrappers, and the login audit | builder | critical | **Done** | Merged by the owner (PR #9). Lint rules `chairside/server-actions`, `chairside/database-access` and three type-aware ones; login rows; an action after the session ended reaches its wrapper (D-074). Review suggestions and tester notes on the Discovered list. See `handoffs/E00-T08.md` |
@@ -48,10 +48,10 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T04 | App shell and design system | builder | normal | split (D-086) | Into E00-T04a … E00-T04d, the next four rows |
 | E00-T04a | Tokens, fonts, texts and the login page | builder | normal | Ready | From E00-T04's split (D-086). Tailwind tokens, local fonts, next-intl, Button, Input, Label, the login page and the clinic picker, text and accessibility lint. See `handoffs/E00-T04a.md` |
 | E00-T04b | The staff shell: sidebar, navigation by role, placeholder pages | builder | normal | Planned | After E00-T04a, refined in its Done pass (D-086) |
-| E00-T04c | The form pattern, the toast and the components page | builder | normal | Planned | After E00-T04b, refined in its Done pass (D-086) |
+| E00-T04c | The form pattern, the toast and the components page | builder | normal | Planned | After E01-T01 in the order (D-087), refined in its Done pass; depends on E00-T04b (D-086) |
 | E00-T04d | The other components: fields, tabs, drawer and dialog | builder | normal | Planned | After E00-T04c, refined in its Done pass (D-086) |
-| E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | In any order with the parts of E00-T04 (D-086). Refined before it starts |
-| E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); after E00-T04a … E00-T04d and E00-T05; takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086) |
+| E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | After E00-T04b, before E01-T01 (D-087). Refined before it starts |
+| E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); needs E00-T04a … E00-T04d and E00-T05, comes after E01-T02 (D-087); takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086) |
 | E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | Planned | Owner: hosting accounts (Q-07). After E00-T05, E00-T06b and E00-T09 |
 
 ## E01 · Scheduling (M1)
@@ -186,6 +186,7 @@ Outline. Needs E07-T00.
 
 ## Done
 
+- E00-T01 · Create the project: skeleton, conventions, database foundation · merged 2026-10-03 (PR #1)
 - E00-T02 · Login, sessions and clinic membership · merged 2026-10-03 (PR #5)
 - E00-T03 · Action wrappers, permission checks and audit log · merged 2026-10-04 (PR #7)
 - E00-T08 · Guards around the action wrappers, and the login audit · merged 2026-10-04 (PR #9)
@@ -193,3 +194,9 @@ Outline. Needs E07-T00.
 - E00-T09 · The login form never puts the password in the URL · merged 2026-10-05 (PR #15)
 - E00-T10 · Close the gaps in the lint guards · merged 2026-10-05 (PR #17)
 - E00-T11 · Components in the form lint, and the gaps E00-T10 left · merged 2026-10-05 (PR #20)
+
+## Owner actions (standing)
+
+- **GitHub Actions budget (D-075):** when the free minutes run out, add a payment method and a small budget (for example $10 a month), then decide on GitHub Pro (R-34). Optional: in the repository's Settings → Actions, require actions pinned to a full commit SHA and allow only GitHub's and pnpm's actions
+- **Meta Business account, start now (long lead time):** create it, begin business verification, obtain one WhatsApp sending number for the product (D-055, D-056, R-28)
+- **E00-T02 test findings 5 and 7, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list

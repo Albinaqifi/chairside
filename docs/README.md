@@ -8,7 +8,7 @@ Each document has one job. Read only what your task points you to.
 |---|---|
 | [intent.md](intent.md) | Why this product exists, for whom, goals, constraints, non-goals. Owner-only edits. |
 | [process/agent-rules.md](process/agent-rules.md) | The working rules every agent follows. |
-| [progress/board.md](progress/board.md) | Status of every task. The single place status lives. |
+| [progress/board.md](progress/board.md) | Status of every task. The single place status lives. Also the owner's standing actions. |
 
 ## Product
 
@@ -33,7 +33,7 @@ Each document has one job. Read only what your task points you to.
 | File | Job |
 |---|---|
 | [process/workflow.md](process/workflow.md) | How a task moves from planned to done. Roles, the pipeline, Definition of Ready, Definition of Done, handoffs. |
-| [process/test-strategy.md](process/test-strategy.md) | What is tested how, AI evals, and the areas the owner reviews personally. |
+| [process/test-strategy.md](process/test-strategy.md) | What is tested how, AI evals, and the areas that get a second review (the critical review), which define a critical task. |
 | [process/templates/](process/templates/) | Templates for tasks and handoff notes. |
 
 ## Work
@@ -43,7 +43,7 @@ Each document has one job. Read only what your task points you to.
 | [backlog/README.md](backlog/README.md) | Epic index and the task format. One file per epic next to it. |
 | [progress/board.md](progress/board.md) | Status board. |
 | [progress/handoffs/](progress/handoffs/) | One note per task, appended by each role that worked on it. |
-| [progress/discovered.md](progress/discovered.md) | Things agents noticed outside their task, one line each. Not read at the start of a session; the architect or owner turns lines into tasks. |
+| [progress/discovered.md](progress/discovered.md) | Things agents noticed outside their task, one line each, weighed by agent rule 15. Not read at the start of a session; the architect turns `data` and `message` lines into work. |
 
 ## Logs (append-only)
 
@@ -70,4 +70,4 @@ Each document has one job. Read only what your task points you to.
 | Architect | intent, the architecture docs, decisions, open questions, the epic being refined |
 | Builder | intent, rules, the task, the docs the task lists, `CLAUDE.md` conventions |
 | Tester | intent, rules, the task, test-strategy, the builder's sections of the handoff note |
-| Reviewer | intent, rules, the task, security-privacy, the diff, the builder's sections of the note (delta review: its own section and those after it) |
+| Reviewer | intent, rules, the task, security-privacy, the diff, the builder's sections of the note (delta review: its own section and those after it; critical review: the first reviewer's "For the critical review" lines, test-strategy's table, security-privacy, data-model and the tests, and its own earlier critical reviews) |

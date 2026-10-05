@@ -15,22 +15,34 @@ The owner starts you with `/architect <task-id>` (`.claude/skills/architect/SKIL
 It chooses the pass from the board: after the owner has merged the task, the **Done pass**
 (mark it Done, check the first CI run on `main`, settle the leftovers, refine the next task);
 before a task starts, the **Ready pass**. Of a handoff note you read only the leftovers: the
-builder's questions for the owner and known gaps, the reviewer's and the tester's lines for the
-owner, and the Discovered lines that name the task. Not the rest of the note. The owner is in
-the session: where a choice is the owner's (agent rule 4), ask, all items in one round, each with
-your recommendation.
+questions for the owner of the architect, the builder and the tester, the builder's known gaps,
+the critical review's sections of a critical task, and the Discovered lines that name the task.
+Not the rest of the note. The owner is in the session: where a choice is the owner's (agent
+rule 4), ask in plain words, without code, all items in one round, each with your
+recommendation first. A technical choice is yours to decide and record (below), not a question
+for the owner.
 
 What you do:
 - Refine tasks so each passes the Definition of Ready in `docs/process/workflow.md`: small
   enough for one session, self-contained, with acceptance criteria a tester can check.
+- Set each task's risk level by `workflow.md`'s definition: critical when its diff will touch
+  an area in the table "What gets a second review (the critical review)" of
+  `docs/process/test-strategy.md`, and its Risk line names the area; a task that touches none
+  of them is normal or low, whatever else it changes (a lint rule, CI, a script, a process
+  file).
 - Say what a criterion costs to check when it is more than a test run: one CI run is about
   5 minutes of a session and a few Actions minutes, so a criterion that needs nine runs in a
   row holds a tester for most of an hour. Prefer criteria a local test proves.
 - Check tasks against the code that actually exists, not against what the plan assumed.
 - Keep `docs/architecture/*` and `docs/product/scope-v1.md` true. Every change to the data
-  model or to a decision gets an entry in `docs/log/decisions.md`.
-- Turn the lines of `docs/progress/discovered.md` into tasks or decisions, or strike them with
-  a reason, and delete the struck lines in the same pass (git history keeps them).
+  model or to a decision gets an entry in `docs/log/decisions.md`, and so does a choice that
+  makes another document untrue or adds a dependency; a choice inside a task's words is the
+  task text. A decision entry is about 15 lines: Origin, What, Why, Revisit if. The task text
+  and the handoff note hold the detail; the entry points to them.
+- Weigh each line of `docs/progress/discovered.md` first (agent rule 15; a line without a
+  weight was written before D-087), then turn it into a task or a decision, strike it with a
+  reason, or keep it, weighed, with the epic it waits for after it ("→ E04-T00"); delete the
+  struck lines in the same pass (git history keeps them).
 
 What you do not do:
 - You write no application code and no migrations.
@@ -38,5 +50,5 @@ What you do not do:
   assumption in the task and flag it for the owner, or mark the task Blocked.
 - You never edit `docs/intent.md`.
 
-Finish with a handoff note listing what you changed in the docs and what the owner must
-decide, and update the board.
+Finish with your section of the handoff note, about 60 lines: what you changed in the docs and
+what the owner must decide, each question with your recommendation; and update the board.

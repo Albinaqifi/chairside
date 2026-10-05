@@ -112,11 +112,30 @@ summary that hides it.
 1. Append your section to `docs/progress/handoffs/<task-id>.md` (template in `docs/process/templates/`).
 2. Update the task's row on `docs/progress/board.md`.
 3. Commit on the task branch with the task id in the message, and push the branch. The
-   builder opens the pull request if there is none yet (`gh pr create`). Never merge, never
-   push to `main`, never force-push.
+   builder opens the pull request if there is none yet (`gh pr create`). Never merge a task
+   pull request; the architect merges its own documents-only planning pull request (D-087),
+   and every other pull request is the owner's to merge. Never push to `main`, never
+   force-push.
 4. Stop. Do not start the next task in the same session.
 *Why:* the next agent has none of your context. The note, the board and the pull request are
 all it gets.
+
+## What matters most
+
+**15. Weigh what you find.** Look as hard as the rules say, and write down everything you
+notice. But every finding, suggestion and Discovered line says what it protects, in one word at
+the start of its text (a Discovered line: `date · task · weight · what you saw`): `data`
+(patient data safety, tenant isolation, login), `message` (the right message to the right
+patient at the right time, and nothing sent by mistake), `speed` (front-desk speed), `slice` (a
+thin slice that works end to end), or `none`. That is the order of `docs/intent.md`, and the
+order of the work: `data` and `message` are always work; `speed` and `slice` are work when a task
+on the Next list needs them; `none` is kept as a note for reviewers and is not built. The lint
+guards are finished (D-087): a new way past one is a review check, weighed `none`, not a task,
+unless product code on `main` would hit it today. A finding against the task's own acceptance
+criteria or these rules goes back to the builder whatever its weight: the weights order what is
+left over (suggestions, Discovered lines, the architect's leftovers).
+*Why:* care spread evenly is care spent on the wrong things. A guard against a mistake nobody
+has made costs as much as one that protects a patient, and the hours come from the same place.
 
 ---
 
@@ -132,12 +151,19 @@ what a test expects (rule 8).
 **Reviewer.** You read the diff with fresh eyes against the task, these rules,
 `security-privacy.md` and the conventions. You look hardest at rule 7. You do not rewrite:
 you approve, or list required changes. You confirm the docs were updated (rule 11). When a
-task comes back after your full review, you read only the commits since then.
+task comes back after your full review, you read only the commits since then. A critical task
+also gets the critical review: a second, independent review by a fresh reviewer, after the
+tester and the delta review check, that starts from the tests (`.claude/agents/reviewer.md`).
 
 **Tester.** You come after the review. You start from the acceptance criteria and the handoff
 note, not from the code. Try to break it: wrong role, other clinic, double click, bad input,
 wrong time zone. You may add tests. You do not fix product code: you report, and the task
 goes back to a builder.
+
+**Owner.** Decides what rule 4 lists, asked in plain words with a recommendation first.
+Merges every task pull request on green and on the pipeline's "ready to merge". Uses the
+product: the milestone check, the receptionist trial (Q-09), a screen's "Try it" steps. Does
+not review code: the reviewer, the tester and, for a critical task, the critical review do.
 
 ---
 
@@ -149,4 +175,6 @@ goes back to a builder.
 - [ ] No real or personal data anywhere I wrote
 - [ ] New tables have `clinic_id` + policy; no direct provider, AI or clock calls
 - [ ] Docs updated if behaviour or schema differs from them
-- [ ] Handoff note written, board updated, branch pushed, nothing merged by me
+- [ ] Every finding, suggestion and Discovered line I wrote starts with its weight (rule 15)
+- [ ] Handoff note written, board updated, branch pushed; nothing merged by me (the architect:
+      only its own documents-only planning pull request)

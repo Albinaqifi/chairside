@@ -32,6 +32,8 @@ Template and guidance: `docs/process/templates/task.md`.
 
 - **Role:** who does it. `owner` tasks need Albin (accounts, money, legal, decisions).
 - **Risk:** `low`, `normal`, `critical`. Decides how much checking it gets (`workflow.md`).
+  Critical = the diff touches an area of `test-strategy.md`'s table "What gets a second review
+  (the critical review)"; the task names the area (D-087).
 - **Read:** the only documents the agent needs besides the always-read ones.
   `scope` = `docs/product/scope-v1.md`, `design-ref` = `docs/product/design-reference.md`,
   `data-model`, `messaging`, `security`, `overview` = the files in `docs/architecture/`,

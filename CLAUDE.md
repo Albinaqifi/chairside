@@ -3,11 +3,7 @@
 Scheduling app for dental clinics with automated patient communication. Multi-clinic,
 holds health data, built by one developer with AI agents.
 
-**Status:** the project skeleton and database foundation (E00-T01), login with clinic
-membership (E00-T02), the action wrappers with the audit log (E00-T03), the lint rules that
-guard them with the login audit (E00-T08, their known gaps closed in E00-T10 and E00-T11), CI
-on GitHub (E00-T06a), and a login form that never puts the password in the URL (E00-T09) exist.
-What is done and what comes next is on the board, `docs/progress/board.md`.
+**Status:** on the board, `docs/progress/board.md`.
 
 ## Start of every session (in this order)
 
@@ -46,7 +42,7 @@ Stack and reasons: `docs/architecture/overview.md`. First-time setup: `README.md
 
 | Command | What it does |
 |---|---|
-| `pnpm check` | **Everything a task must pass:** format, lint, types, unit and integration tests. Needs the database: `docker compose up -d --wait`. |
+| `pnpm check` | **Everything a task must pass:** format, lint, types, unit and integration tests; before it hands off, the builder also runs `pnpm build` (CI builds too). Needs the database: `docker compose up -d --wait`. |
 | `pnpm dev` | The app at http://localhost:3000. |
 | `pnpm test` | Unit tests (`src/**/*.test.ts`, `eslint-rules/`). No database. |
 | `pnpm test:integration` | Tests against real PostgreSQL (`tests/integration/`). First rebuilds the separate `<db>_test` database from the migrations. |
@@ -62,18 +58,12 @@ Every script must work on Windows (the owner's OS): no bash-only syntax in `pack
 
 ### CI
 
-`.github/workflows/ci.yml` runs on every pull request to `main`, every push to `main` and every
-Monday on `main`: Ubuntu, a fresh checkout, `.env` copied from `.env.example`, the database from
-`docker compose` (D-075). It runs each command of `pnpm check` as its own step with `TZ=UTC`, then
-`pnpm build`, then `pnpm test` and `pnpm test:integration` again with `TZ=Pacific/Auckland` (the
-Auckland steps: a test that passes in one zone only depends on the server's time zone), then
-`pnpm audit --prod` (an advisory in a production dependency turns the run red) and the full
-`pnpm audit` (printed only). Every check runs even after an earlier one failed; a failed setup step
-ends the run. GitHub does not block a merge on red: the pipeline goes on only on green, and the
-owner merges only on green (R-34). The step names are the pipeline's input: a red `Setup: …` step
-or `pnpm audit --prod` stops it for the owner, any other red `pnpm …` step is a fix round (D-078).
-
-Each level on your machine, with the database up:
+`.github/workflows/ci.yml` (D-075) runs the `pnpm check` steps, `pnpm build`, the tests again with
+`TZ=Pacific/Auckland`, and `pnpm audit`: on every pull request to `main`, every push to `main` and
+every Monday. A pull request that changes only files under `docs/`, Markdown files under
+`.claude/`, `CLAUDE.md` or `README.md` gets no run; the architect merges its own such planning pull
+request (D-087). The owner merges every other pull request, only on green (R-34). Each level on
+your machine, with the database up:
 
 | Level | Command |
 |---|---|
@@ -84,8 +74,8 @@ Each level on your machine, with the database up:
 | The dependency check | `pnpm audit --prod` (must pass) · `pnpm audit` (everything; read it). Never `--fix`, `--ignore` or `--ignore-unfixable`: they write `pnpm-workspace.yaml` |
 
 Not Git Bash for the Auckland steps (the agents' Bash tool): it drops `TZ=Pacific/Auckland` before
-Node starts, and Node then runs in the machine's own zone without an error (`TZ=UTC` gets through).
-The zone Node really has: `node -e "console.log(Intl.DateTimeFormat().resolvedOptions().timeZone)"`.
+Node starts, silently (`TZ=UTC` gets through). Check the zone Node has with
+`node -e "console.log(Intl.DateTimeFormat().resolvedOptions().timeZone)"`.
 
 ### Folder structure
 
@@ -110,9 +100,9 @@ Create a folder only when it has content. Coming later: `src/ui` (E00-T04a), `te
 
 ### Module rules (lint enforces them; `eslint-rules/architecture.test.ts` proves it)
 
-No lint comment switches a rule off, in `src/` or anywhere else in the repository: ESLint ignores
-`eslint-disable` and `/* eslint … */` in every script file and reports the comment itself
-(`noInlineConfig`, D-077, D-084).
+No lint comment switches a rule off, anywhere in the repository (`noInlineConfig`, D-077, D-084).
+The lint guards are finished (D-087): a new way past one is a review check, weighed `none`, not a
+task, unless product code on `main` would hit it today.
 
 1. A module's tables are private. Other modules call its functions, never query its tables.
 2. Import another module only through its `index.ts`: `@/modules/patients`. One exception: a
@@ -120,31 +110,18 @@ No lint comment switches a rule off, in `src/` or anywhere else in the repositor
 3. No Next.js or React in `src/modules`, so the worker and tests can use every module.
 4. No reading the clock in `src/modules` (`Date.now()`, `new Date()`, `DateTime.now()`…).
    Take `now: Date` as a parameter, or a `Clock` from `src/lib/clock.ts`; tests use `fakeClock`.
-5. Every server action is `export const name = staffAction(…)` (or `staffRead`, `userAction`) in
-   a `'use server'` file in `src/app`, the wrapper imported from `@/app/_lib/actions` under its own
-   name. Such a file ends in `.ts`, not `.tsx`, and exports nothing else but types, and never a
-   `.forPage`. No inline `'use server'`, no `'use server'` file outside `src/app`, in `src/` or
-   anywhere else in the repository. A route handler (`route.ts`) needs a line with its reason in
-   `ROUTE_HANDLERS` in `eslint-rules/server-actions.mjs`. No `src/pages/`: Next.js would serve the
-   Pages Router there, outside the wrappers (D-071, D-073, D-077, D-084).
-6. `@/db/client` only in `src/db/` and `src/modules/auth/`; `withTenant` only in
-   `src/app/_lib/actions.ts`, `src/db/` and `src/modules/auth/`; `import type { TenantTransaction }`
-   anywhere. Those three places never pass `withTenant` or anything from the client file on: no
-   `export … from`, `export *`, `export { x }` or `export default x` of it. Database drivers only
-   in `src/db/`: `pg`, `pg-…` packages, every `drizzle-orm/…` path but `drizzle-orm/pg-core`, and
-   `src/db/reset` and `src/db/migrate`; `drizzle-orm` and `drizzle-orm/pg-core` anywhere, type-only
-   imports too. `src/db/` passes no driver on in those ways either: any file may import any file
-   there. Tests are exempt (D-062, D-071, D-077, D-084).
-7. Type-aware, for the `.ts`, `.tsx` and `.mts` files in `src/`: every promise is awaited, Drizzle
-   queries included (`no-floating-promises`; `no-misused-promises`, so no
-   `items.forEach(async …)`), and only Errors are thrown or rejected (`only-throw-error`,
-   `prefer-promise-reject-errors`: a refusal is returned, never thrown). In the `.ts` and `.mts`
-   files, a statement that only hangs `.catch(…)`, `.then(ok, fail)` or `.finally(…)` on a promise
-   is reported: await it or return it. A `'use server'` file is a `.ts` file (rule 5), so a
-   handler written in it is under that check. A handler written in a `.tsx` file and passed to the
-   wrapper is not, and neither is a client `.tsx` file: reviewers check where a handler is written
-   (D-086). `src/` holds no `.js`, `.jsx`, `.mjs`, `.cjs` or `.cts` files, which these rules would
-   not see (a test fails) (R-32, D-073, D-074, D-077, D-084).
+5. A server action is `export const name = staffAction(…)` (or `staffRead`, `userAction`) in a
+   `'use server'` `.ts` file in `src/app` that exports nothing else but types; a route handler needs
+   its reason in `ROUTE_HANDLERS` (`eslint-rules/server-actions.mjs`, D-071, D-073, D-077, D-084).
+6. `@/db/client` only in `src/db/` and `src/modules/auth/` (the auth library's global tables and
+   `clinics_for_user()`, D-062), `withTenant` also in `src/app/_lib/actions.ts`, database drivers
+   only in `src/db/`; none of them is passed on from there. `import type { TenantTransaction }`
+   anywhere; tests are exempt (`eslint-rules/database-access.mjs`, D-071, D-077, D-084).
+7. Type-aware, in `src/`: every promise is awaited (Drizzle queries too) and only Errors are thrown
+   or rejected (a refusal is returned, never thrown). In `.ts` and `.mts` files a statement that
+   only hangs `.catch(…)`, `.then(ok, fail)` or `.finally(…)` on a promise is reported; in a `.tsx`
+   file it is not, so reviewers check where a handler is written (D-086). `src/` holds no `.js`,
+   `.jsx`, `.mjs`, `.cjs` or `.cts` files: a test fails (R-32, D-073, D-074, D-077, D-084).
 
 ### Code conventions
 
@@ -155,9 +132,7 @@ No lint comment switches a rule off, in `src/` or anywhere else in the repositor
 - Database: only inside `withTenant(clinicId, async (tx) => …)` from `src/db/tenant.ts`, opened
   once at the edge (action wrapper, job handler). Module functions take that `tx` as a parameter;
   a `withTenant` inside another is refused with an error (D-060). Waiting for a pooled connection
-  or a lock fails after 5 s. Never set `app.clinic_id`. Never import `src/db/client.ts` elsewhere,
-  with one exception: `src/modules/auth/` uses `getDb()` for the auth library's global tables and
-  for the cross-clinic function `clinics_for_user()` (D-062).
+  or a lock fails after 5 s. Never set `app.clinic_id`.
 - After each `withTenant` the connection is reset (`DISCARD ALL`) before it goes back to the pool,
   or closed if the reset fails (D-061): nothing set on a connection outlives its transaction. So
   no named prepared statements (`.prepare('name')`): pg would reuse ones the reset removed.
@@ -175,25 +150,17 @@ No lint comment switches a rule off, in `src/` or anywhere else in the repositor
   ```
   Other pages use `currentStaff()` (`src/app/_lib/auth.ts`). Login and logout are the auth
   library's routes (`authClient`). Never read the session cookie or a password (D-063).
-- Forms: a form posts to a URL named in its `action`, or takes a function as its action; never
-  only `onSubmit`, which leaves the browser to send a GET with every field in the URL whenever the
-  handler does not run (D-076). Write `method="post"` and the `action` out, after any spread; a
-  button or input has no `formMethod`, or `formMethod="post"`. A button's or input's `formAction`
-  follows a form's rule: a function, or a URL with `formMethod="post"` on the same element. A
-  component that spreads its props onto a `<button>`, an `<input>` or another component
-  (shadcn/ui's `<Comp>`, a Radix part that renders a button) types them without `formAction` and
-  `formMethod` (`Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'>`) and writes a
-  function `formAction` out if it needs one (D-081). A generic one also types both as `never` in
-  its constraint, `P extends Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'> &
-  { formAction?: never; formMethod?: never }`: a caller's inferred type argument gets no
-  excess-property check (D-084). `next/form` is not used: its `<Form>` sends a URL action as a GET.
-  Lint checks every `<form>`, `<button>` and `<input>`, and every element written as a component
-  (`<Button>`, `<Comp>`, `<X.Root>`), in `src/` (`chairside/forms-post`, type-aware, D-080, D-081,
-  D-084; cases in `eslint-rules/architecture.test.ts`).
-- Logs: `logger` from `src/lib/logger.ts`, ids and codes only. It drops the fields listed in
-  `src/lib/personal-fields.ts` as a safety net, not as permission to log personal data. Errors
-  leave `withTenant` without query values (D-070): keep a caught error as `cause`, never copy its
-  message into a new error or a string.
+- Forms: a form posts to a URL (`method="post"` and `action` written out, after any spread) or takes
+  a function as its action, and so does a button's or input's `formAction`. Never only `onSubmit`:
+  whenever the handler does not run, the browser sends a GET with every field in the URL (D-076). A
+  component that spreads its props onto a button, an input or another component types them without
+  `formAction` and `formMethod`; `next/form` is not used. Lint (`chairside/forms-post`) checks every
+  form, button, input and component in `src/`; its test lists the shapes (D-080, D-081, D-084).
+- Logs: `logger` from `src/lib/logger.ts`, ids and codes only. Errors and values go in fields or
+  arguments, never inside the message text: the logger cannot clean text. It drops the fields
+  listed in `src/lib/personal-fields.ts` as a safety net, not as permission to log personal data.
+  Errors leave `withTenant` without query values (D-070): keep a caught error as `cause`, never
+  copy its message into a new error or a string.
 - Files Node runs directly (`src/db/migrate.ts`, `src/db/reset.ts`): import only packages and
   relative `.ts` files, never `@/`.
 - Next.js 16 differs from older versions: read `node_modules/next/dist/docs/` before writing

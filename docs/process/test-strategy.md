@@ -2,8 +2,9 @@
 
 Written from the quality lead's seat. The bugs that matter most here are **silent**: nothing
 crashes, a patient simply does not get a reminder, or gets someone else's. So the strategy is:
-make the dangerous logic easy to test, test it very hard, and put a human on the few places
-where a mistake is unacceptable.
+make the dangerous logic easy to test, test it very hard, and put a second, independent review
+on the few places where a mistake is unacceptable (and, before real patient data, a human one:
+Q-19).
 
 ## Principles
 
@@ -154,10 +155,13 @@ the prompt version so two versions can be compared.
 Unit and end-to-end tests use a **fake AI** that returns fixed, valid output. Evals are the
 only tests that call the real model.
 
-## What the owner reviews personally
+## What gets a second review (the critical review)
 
-Agents test and review everything. These areas additionally get the owner's own eyes on the
-diff, because a mistake is unacceptable or cannot be undone:
+Agents test and review everything. The areas below additionally get a second, independent review
+by a fresh reviewer that starts from the tests, because a mistake is unacceptable or cannot be
+undone. This table, but for its last row, is the definition of a critical task (`workflow.md`,
+D-087). The last row is known only while a task runs: an agent that would change or remove a test
+stops and asks the owner (agent rules 4 and 8), whatever the task's level.
 
 | Area | Why |
 |---|---|
@@ -173,8 +177,11 @@ diff, because a mistake is unacceptable or cannot be undone:
 | Anything touching production configuration or secrets | — |
 | Every test that an agent proposes to change or remove | Rule 8. |
 
-Your QA background is most valuable in exactly these places: read the tests first and ask
-"what case is missing?" before reading the code.
+The critical review comes after the tester and the delta review check. It reads the tests first
+and asks "what case is missing?" before it reads the code (`.claude/agents/reviewer.md`).
+
+The owner does not read these diffs. The owner's check is by use: the milestone demo, the
+receptionist trial, the "Try it" steps in a note. Before real patient data: Q-19.
 
 ## Before a release
 
@@ -184,3 +191,5 @@ Your QA background is most valuable in exactly these places: read the tests firs
 - Manual smoke on staging with a real phone: reminder WhatsApp message and email arrive, links work.
 - Migrations rehearsed against a copy of the staging database.
 - For the first release: the full go-live gate in `security-privacy.md`.
+- Before real patient data: a human security review of the critical areas (Q-19), or the risk
+  accepted in writing (R-35).

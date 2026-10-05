@@ -6,13 +6,15 @@ clinics cannot see each other's data, and every change is checked automatically.
 **Why first:** everything else stands on tenant isolation, login and the action wrapper.
 Getting them right once, with tests, is cheaper than fixing them under features.
 
-Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → (T04a → T04b → T04c → T04d, and T05 in
-any order with them) → T06b → T07. T08 is the second half of T03 (split in D-071), so it sits right
-after T03 in this file. T06 is split in two (D-075): CI (T06a) comes first, Playwright and journey
-J1 (T06b) after T04 and T05. T09 and T10 come from E00-T08's review and test (D-076, D-077), T11
-from E00-T10's (D-084). T04 is split in four (D-086): tokens, fonts, texts and the login page
-(T04a), the staff shell (T04b), the form pattern (T04c), the other components (T04d). The tasks sit
-in this file in that order.
+Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → T04a → T04b → T05 → E01-T01 → T04c →
+T04d → E01-T02 → T06b → T07, then the rest of E01 (D-087). T08 is the second half of T03 (split in
+D-071), so it sits right after T03 in this file. T06 is split in two (D-075): CI (T06a) comes
+first, Playwright and journey J1 (T06b) after T04 and T05. T09 and T10 come from E00-T08's review
+and test (D-076, D-077), T11 from E00-T10's (D-084). T04 is split in four (D-086): tokens, fonts,
+texts and the login page (T04a), the staff shell (T04b), the form pattern (T04c), the other
+components (T04d). E01-T01 and E01-T02 come before T06b and T07, so a receptionist sees a patient
+list before Playwright and staging exist; T04c and T04d come before E01-T02, which depends on them
+(D-087). The tasks sit in this file in the order before D-087, with T05 after T04d.
 
 ---
 

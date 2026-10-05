@@ -1,7 +1,8 @@
 # Messaging
 
 How messages are planned and sent. This is the heart of the product and its riskiest part.
-Changes to anything described here are **critical** tasks and get owner review.
+Changes to anything described here are **critical** tasks and get the critical review
+(`docs/process/workflow.md`, D-087).
 
 ## Two stages, always
 

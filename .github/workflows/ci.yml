@@ -1,4 +1,5 @@
-# CI (E00-T06a, D-075): every pull request to main, every push to main, and once a week on main.
+# CI (E00-T06a, D-075): every pull request to main, unless it changes only documents (D-087), every
+# push to main, and once a week on main.
 # What it runs, and how to run each step on your own machine: CLAUDE.md, "CI".
 #
 # The pipeline (.claude/skills/pipeline/SKILL.md) reads the step names: a red step named
@@ -9,6 +10,10 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # A pull request that changes only these gets no run (D-087). Only Markdown under .claude/:
+    # Prettier checks .claude/settings.json. A push to main and the weekly run have no filter, so
+    # every merge is still checked on main.
+    paths-ignore: ['docs/**', '.claude/**/*.md', 'CLAUDE.md', 'README.md']
   push:
     branches: [main]
   schedule:

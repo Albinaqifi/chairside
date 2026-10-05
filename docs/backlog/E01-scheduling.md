@@ -6,7 +6,9 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 **Why now:** appointments are what every message is about. And booking speed is the first
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
-Order: T01 → T02, T04, T08, T09 (parallel-safe) → T03, T05 → T06 → T07, T10 → T11.
+Order: T01 → T02, T04, T08, T09 (parallel-safe) → T03, T05 → T06 → T07, T10 → T11. With E00
+(D-087): E00-T05 → T01 → E00-T04c → E00-T04d → T02 → E00-T06b → E00-T07 → T04, T08, T09 and the
+rest, so a receptionist sees a patient list before Playwright and staging exist.
 
 ---
 
