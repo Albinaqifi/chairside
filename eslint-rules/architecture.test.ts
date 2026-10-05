@@ -1985,6 +1985,26 @@ const cases: Case[] = [
     code: `${REACT} declare const CheckboxPrimitive: { Root: ForwardRefExoticComponent<ComponentPropsWithoutRef<'button'> & RefAttributes<HTMLButtonElement>> }; export function Checkbox(props: ComponentProps<typeof CheckboxPrimitive.Root>) { return <CheckboxPrimitive.Root {...props} />; }`,
     expected: [FORMS],
   },
+  // E00-T11 tester: D-085's component is any name that does not start with a lower-case letter, and
+  // any member expression, as React and TypeScript read them: not only a capitalised name.
+  {
+    name: 'g: <_Button type="submit" formAction="/patients">, a component whose name starts with _',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><_Button type="submit" formAction="/patients">Search</_Button></form>',
+      `${SAVE} ${REACT} declare function _Button(props: ComponentProps<'button'>): ReactNode;`,
+    ),
+    expected: [FORMS],
+  },
+  {
+    name: 'g: <motion.button formMethod="get">, a member expression in lower case',
+    file: STAFF_FORM,
+    code: form(
+      '<form action={save}><motion.button formMethod="get">Search</motion.button></form>',
+      `${SAVE} ${REACT} declare const motion: { button: (props: ComponentProps<'button'>) => ReactNode };`,
+    ),
+    expected: [FORMS],
+  },
   {
     name: 'g: <Button type="submit" formAction="/patients">, Button taking ComponentProps<\'button\'>',
     file: STAFF_FORM,
