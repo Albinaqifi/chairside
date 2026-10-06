@@ -7,15 +7,15 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
 Order: T01 → T02, T04, T08, T09 (parallel-safe) → T03, T05 → T06 → T07, T10 → T11. With E00
-(D-087): E00-T05 → T01 → E00-T04c → E00-T04d → T02 → E00-T06b → E00-T07 → T04, T08, T09 and the
-rest, so a receptionist sees a patient list before Playwright and staging exist.
+(D-087, D-090): E00-T05a → T01 → E00-T04c → E00-T04d → T02 → E00-T06b → E00-T05b → E00-T07 → T04,
+T08, T09 and the rest, so a receptionist sees a patient list before Playwright and staging exist.
 
 ---
 
 ### E01-T01 · Schema: providers, treatment types, patients, appointments, hours
 
-- **Role:** builder · **Risk:** critical · **Depends on:** E00-T03, E00-T05
-- **Read:** `data-model` (Conventions; sections 1 and 2 incl. "No double booking" and the state machine) · D-018, D-019, D-020, D-033, D-040
+- **Role:** builder · **Risk:** critical · **Depends on:** E00-T03, E00-T05a
+- **Read:** `data-model` (Conventions; sections 1 and 2 incl. "No double booking" and the state machine) · D-018, D-019, D-020, D-033, D-040, D-062, D-063 · demo lines 1369–1404 (the sample clinic's providers and patients; their emails and phones are not copied: E00-T05a's fake-data rules)
 
 **Why.** The tables the whole scheduling epic uses, with the constraints that make double
 booking and cross-clinic links impossible.
@@ -31,8 +31,14 @@ booking and cross-clinic links impossible.
   1518) with lengths, about 40 invented patients (some without phone, one with a guardian,
   two siblings sharing a phone, one archived), and a week of appointments in mixed statuses
   around "today". The second clinic gets a few rows too.
+- **The provider link** (E00-T04b review suggestion 2, `slice`): `memberships.provider_id`
+  (`data-model.md`, D-062) with its foreign key `(clinic_id, provider_id)`, and the person's
+  provider read in one place. `allowed()` (`src/app/_lib/actions.ts`) and `membershipExtras()`
+  (`src/app/(staff)/navigation.ts`) both say `providerKind: null` today; both take it from there,
+  and so do T04 (a dentist opens on their own column) and T10 (a dentist sees their own patients).
+  The seed links its dentist and hygienist to providers.
 
-**Out of scope.** Any function or screen. Message, consent and task tables (E02).
+**Out of scope.** Any other function, and any screen. Message, consent and task tables (E02).
 
 **Acceptance.**
 - [ ] Meta-test and isolation tests pass with the new tables.
@@ -40,6 +46,9 @@ booking and cross-clinic links impossible.
       allowed when one is cancelled or no-show; allowed with `overlap_ok`; an appointment
       cannot reference another clinic's patient or provider.
 - [ ] `db:reset` seeds the data described above, deterministically.
+- [ ] A person linked to a provider gets that provider's kind in both the sidebar and the action
+      wrapper's permission check: an owner linked to a dentist sees In the chair, unlinked does not
+      (tests).
 - [ ] `data-model.md` matches the migrations exactly (any difference is fixed in the doc and logged).
 
 ---

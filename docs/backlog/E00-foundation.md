@@ -6,15 +6,17 @@ clinics cannot see each other's data, and every change is checked automatically.
 **Why first:** everything else stands on tenant isolation, login and the action wrapper.
 Getting them right once, with tests, is cheaper than fixing them under features.
 
-Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → T04a → T04b → T05 → E01-T01 → T04c →
-T04d → E01-T02 → T06b → T07, then the rest of E01 (D-087). T08 is the second half of T03 (split in
-D-071), so it sits right after T03 in this file. T06 is split in two (D-075): CI (T06a) comes
-first, Playwright and journey J1 (T06b) after T04 and T05. T09 and T10 come from E00-T08's review
-and test (D-076, D-077), T11 from E00-T10's (D-084). T04 is split in four (D-086): tokens, fonts,
-texts and the login page (T04a), the staff shell (T04b), the form pattern (T04c), the other
-components (T04d). E01-T01 and E01-T02 come before T06b and T07, so a receptionist sees a patient
-list before Playwright and staging exist; T04c and T04d come before E01-T02, which depends on them
-(D-087). The tasks sit in this file in the order before D-087, with T05 after T04d.
+Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → T04a → T04b → T05a → E01-T01 → T04c →
+T04d → E01-T02 → T06b → T05b → T07, then the rest of E01 (D-087, D-090). T08 is the second half of
+T03 (split in D-071), so it sits right after T03 in this file. T06 is split in two (D-075): CI
+(T06a) comes first, Playwright and journey J1 (T06b) after T04 and T05a. T09 and T10 come from
+E00-T08's review and test (D-076, D-077), T11 from E00-T10's (D-084). T04 is split in four
+(D-086): tokens, fonts, texts and the login page (T04a), the staff shell (T04b), the form pattern
+(T04c), the other components (T04d). T05 is split in two (D-090): the seed (T05a), and
+`clinic:create` (T05b), which staging needs. E01-T01 and E01-T02 come before T06b and T07, so a
+receptionist sees a patient list before Playwright and staging exist; T04c and T04d come before
+E01-T02, which depends on them (D-087). The tasks sit in this file in the order before D-087, with
+T05a and T05b after T04d.
 
 ---
 
@@ -888,8 +890,13 @@ one way, so no screen invents its own error handling and none loses the clinic c
 E00-T04's four parts (D-086).
 
 **Do.**
-- **The clinic id.** The staff layout gives client components the clinic id the page was rendered
-  for, so every form sends it (D-069).
+- **The clinic id.** Every form sends the clinic its frame shows (D-069): the staff layout hands
+  the id it rendered with to the forms below it, and no page passes one of its own. A layout does
+  not render again when a sidebar link opens another page, so after a switch in another tab the
+  sidebar can still name clinic A above a page rendered for clinic B; a form there gets
+  `clinic_changed` and never runs in B. A page rendered for another clinic than its frame's
+  refreshes the frame (`router.refresh()`), so the name catches up (E00-T04b review suggestion 1,
+  `data`).
 - **The form pattern.** One way for a form to call a wrapped action (E00-T03) and show its typed
   errors: `invalid_input` next to its fields, `forbidden` as a message, `clinic_changed` with a
   reload (D-069), and a general failure for `internal` and a handler's own refusal. The form takes
@@ -907,7 +914,8 @@ E00-T04's four parts (D-086).
   added.
 - **`/dev/components`**, outside production only: every component of `src/ui/`, and a demo form
   whose action gives each answer on request, for visual and keyboard checks.
-- **Docs.** `CLAUDE.md`: how a form calls an action, with a short example, as for the wrappers.
+- **Docs.** `CLAUDE.md`: how a form calls an action, with a short example, as for the wrappers,
+  and that its clinic id comes from the frame.
 
 **Out of scope.** The other components (E00-T04d). Real screens. Create actions that tell a second
 submit from a first: E01-T02 and E01-T05 (Discovered, E00-T03 test).
@@ -917,6 +925,10 @@ submit from a first: E01-T02 and E01-T05 (Discovered, E00-T03 test).
       their fields, `forbidden`, the general failure, a refusal, and a toast when it is done; a form
       shown for one clinic and sent after another tab switched clinic shows the reload message
       (tester, in a browser).
+- [ ] Two tabs: after the second switches clinic, a sidebar link clicked in the first opens a page
+      under a sidebar that names the clinic now chosen, and a form whose frame still names the old
+      clinic gets the reload message, with nothing written (tester, in a browser; a unit test that
+      a form sends the clinic id of the frame it is in).
 - [ ] A double click on submit sends one request (tester, the browser's network log).
 - [ ] With the request failed at the network, the demo form shows the general failure, the login
       form shows `login.errors.failed`, and the logout button a failure message; each button works
@@ -968,51 +980,121 @@ calendar grid (our own, D-009; E01-T04).
 - [ ] `pnpm check` and `pnpm build` pass.
 ---
 
-### E00-T05 · Seed data and the clinic provisioning script
+### E00-T05a · Seed data: two clinics and a login for every role
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T02, E00-T03 (`clinic:create` writes
-  its audit row through `audit.record()`)
-- **Read:** `security` (Part 1, section 9) · D-042, D-044 · demo lines 1369–1404 (sample clinic)
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T02, E00-T04b (the sidebar its logins
+  are checked against)
+- **Read:** `security` (Part 1, section 9) · `overview` (Environments) · D-044, D-049, D-062,
+  D-063, D-090 · the architect section of `handoffs/E00-T05a.md`
 
-**Why.** Agents and tests need realistic data that is obviously fake, and the operator needs
-a way to create a real clinic (there is no sign-up page).
+**Why.** Agents, testers and the owner need ready logins for every role, in two clinics, obviously
+fake, from one command; every later schema task adds its rows to the same seed. The first half of
+E00-T05 (D-090); `clinic:create`, the operator's script, is E00-T05b.
 
 **Do.**
-- A deterministic seed generator: two clinics ("Harbour Street Dental" modelled on the demo,
-  and a second clinic used by isolation tests), both configured for North Macedonia (D-049:
-  `Europe/Skopje`, country MK, currency MKD), one user per role, structured so each later
-  schema task adds its own seed function.
-- Fake-data rules in one place: names from a fixed invented list, phones from test ranges,
-  emails at `@example.test`. A test fails if seed output contains anything else.
-  Invented names come in both Cyrillic and Latin script. There is no known reserved test
-  range for `+389`: use one fixed, documented block of made-up numbers; the non-production
-  allow-list (D-044) is what guarantees nothing is ever sent to them.
-- `pnpm db:seed` and `pnpm db:reset` (migrate + seed).
-- `pnpm clinic:create`: an operator script that creates a clinic and its first owner
-  (name, time zone, locale, currency, country, owner email), prints a one-time setup link,
-  and writes an audit row.
+- **The seed** in `src/db/seed/` (`overview.md`), run with tsx (D-090): a function that takes the
+  database it seeds, so `pnpm db:seed`, `pnpm db:reset` and E00-T06b's end-to-end database each
+  call it. Before it connects, it refuses what `db:reset` refuses: a database that is not on this
+  machine, and `NODE_ENV=production`.
+- **Two clinics** set up for North Macedonia (D-049: `Europe/Skopje`, `MK`, `MKD`; locale `en`,
+  D-053): "Harbour Street Dental" (demo line 30), and a second one whose name is in Cyrillic, for
+  checks across two clinics. Each has a phone from the seed's number block, an email at
+  `@example.test` and an invented address.
+- **Logins** in Harbour Street Dental, one per role: owner, dentist, hygienist, front desk, and a
+  second front desk with the `import` permission. The owner also owns the second clinic (Switch
+  clinic); one front desk belongs to the second clinic only. Each person's name is a role word (as
+  in E00-T04b's screenshots), each email at `@example.test`, and one development password serves
+  them all, written in `README.md`. People are made with `createStaffUser()` (D-063); clinics and
+  memberships as the migration role, since the app role cannot write them (Discovered, E00-T02).
+- **Fixed ids**, written out in one place, so later seeds and tests can name the seeded clinics and
+  people. `pnpm db:reset` gives the same rows every time, apart from password hashes and the times
+  rows were written; `pnpm db:seed` on a database that already holds the seed adds nothing and ends
+  without an error.
+- **The fake-data rules** in one place, for this seed and every later one: invented first and last
+  names in Latin and in Cyrillic (D-049; E01-T01's patients take them), phones from one fixed,
+  written-down block of made-up `+389` numbers (no test range is reserved for `+389`; D-044's
+  allow-list is what keeps anything from being sent to them), emails at `@example.test`. A unit
+  test reads every row each seed file writes, so a later seed is checked without a new test, and
+  fails on any other name, phone or email domain.
+- **Later seeds:** each schema task adds its own seed file, run after the ones before it, without
+  changing them (E01-T01 next: providers, patients, appointments).
+- `pnpm db:seed`; `pnpm db:reset` migrates, then seeds. `resetDatabase()` stays as the integration
+  tests use it: migrations only.
+- **Docs.** `README.md`: the seed and its logins by role, in place of the pointer to
+  `handoffs/E00-T02.md`. `CLAUDE.md`: the Commands table, and next to "Files Node runs directly",
+  that the seed runs with tsx and may import `@/` (D-090). The comments in `better-auth.ts` and
+  `users.ts` that name E00-T05. Handoff notes name a seeded login by its role ("the seeded front
+  desk"), never its email (Discovered, E00-T02 review).
 
-**Out of scope.** Patients, appointments and other domain seed (each schema task adds its own).
+**Out of scope.** `clinic:create` (E00-T05b). Providers, patients, appointments and every other
+domain row (each schema task brings its own; E01-T01 next). A seed on staging (E00-T07 decides).
+Audit rows for seeded data.
 
 **Acceptance.**
-- [ ] `pnpm db:reset` produces the same data every time.
-- [ ] Logging in as each seeded role works.
-- [ ] The fake-data test fails when a non-test phone range or real-looking email domain is used.
-- [ ] `clinic:create` creates a clinic the owner can log in to; running it twice with the
-      same owner email does not create duplicates or crash.
-- [ ] The script refuses to run against production without an explicit flag.
+- [ ] `pnpm db:reset` twice gives the same clinics, people, memberships and ids, apart from password
+      hashes and the times rows were written (tester, comparing the two); `pnpm db:seed` once more
+      adds nothing and ends without an error.
+- [ ] Each seeded login signs in with the development password and finds its clinics and role (an
+      integration test signs in as each), and sees its role's sidebar, E00-T04b's lists (tester, in
+      a browser).
+- [ ] The owner sees Switch clinic and both clinics, the second one's name in Cyrillic; the second
+      clinic's front desk sees only that clinic (tester, in a browser).
+- [ ] The fake-data test fails when a seeded phone leaves the block, an email ends in another
+      domain, or a name is not in the invented lists (tester: one change of each, each restored).
+- [ ] `pnpm db:seed` refuses a database that is not on this machine, and `NODE_ENV=production`,
+      before it connects (test).
+- [ ] `resetDatabase()`, which builds the integration tests' database, still applies the
+      migrations only.
+- [ ] `pnpm check` and `pnpm build` pass.
+
+---
+
+### E00-T05b · `clinic:create`: the operator's script for a new clinic
+
+- **Role:** builder · **Risk:** critical (login: the first owner's account and their way in;
+  production configuration: a hosted database) · **Depends on:** E00-T03 (`audit.record()`),
+  E00-T05a (tsx, the fake-data rules)
+- **Read:** `security` (Part 1, sections 2 and 7) · `overview` (Environments) · D-042, D-062,
+  D-063, D-090 · the architect section of `handoffs/E00-T05b.md`
+
+**Why.** There is no sign-up page (D-042): the operator creates each real clinic and its first
+owner with a script, first on staging (E00-T07), later in production. The second half of E00-T05
+(D-090), refined in E00-T06b's Done pass, the task before it in the order.
+
+**Do.**
+- `pnpm clinic:create`: creates a clinic (name, time zone, locale, currency, country) and its first
+  owner (email, name) with the role `owner`, and writes an audit row through `audit.record()`.
+- The first owner's way in: a one-time setup link the script prints, with which they choose a
+  password. What the link opens is decided with the owner when this task is refined (login, agent
+  rule 4); E04-T02's invites and password reset need the same kind of link.
+- Settled when this task is refined: the database role it writes clinics and memberships with on a
+  hosted database (the app role cannot: the migration role, a grant or a function), and where it
+  runs, since production credentials never reach a development machine (`overview.md`) and the
+  host's image holds no development packages such as tsx (D-090).
+- Running it twice with the same owner email creates no duplicate and does not crash.
+- It refuses a database that is not on this machine without an explicit flag.
+- `docs/runbook.md` (E00-T07 starts it): how to create a clinic.
+
+**Out of scope.** Inviting other staff (E04-T02). An admin screen (D-042). The seed (E00-T05a).
+
+**Acceptance.**
+- [ ] `clinic:create` creates a clinic whose owner signs in after following the setup link.
+- [ ] Running it twice with the same owner email creates no duplicate and ends with a clear message.
+- [ ] Without the explicit flag it refuses a database that is not on this machine (test).
+- [ ] Its audit row names the clinic and the action; no email or name reaches the logs.
+- [ ] `pnpm check` and `pnpm build` pass.
 
 ---
 
 ### E00-T06b · Playwright and the first end-to-end journey (J1)
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04a … E00-T04d, E00-T05, E00-T06a,
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04a … E00-T04d, E00-T05a, E00-T06a,
   E00-T09
 - **Read:** `test-strategy` (The levels; End-to-end journeys) · D-012, D-014, D-075, D-076, D-086 ·
-  the handoff notes of E00-T04a … E00-T04d, E00-T05 and E00-T06a
+  the handoff notes of E00-T04a … E00-T04d, E00-T05a and E00-T06a
 
 **Why.** A few journeys through a real browser prove that the pieces are wired together: login,
-session, layout, logout. Split from E00-T06 (D-075): it needs the seeded users (E00-T05), the Today
+session, layout, logout. Split from E00-T06 (D-075): it needs the seeded users (E00-T05a), the Today
 page of the app shell (E00-T04b) and, for the accessibility check, the components page (E00-T04c,
 E00-T04d). It is refined against what they built, once they are done.
 
@@ -1051,7 +1133,7 @@ E00-T04d). It is refined against what they built, once they are done.
 
 ### E00-T07 · Staging: web, worker and database deployed
 
-- **Role:** builder + owner · **Risk:** critical · **Depends on:** E00-T05, E00-T06b, E00-T09 · **Needs:** Q-07 (working assumption accepted for staging)
+- **Role:** builder + owner · **Risk:** critical · **Depends on:** E00-T05b, E00-T06b, E00-T09 · **Needs:** Q-07 (working assumption accepted for staging)
 - **Read:** `overview` (The shape; Environments; Things that keep it running) · `security` (Part 1, section 7) · D-005, D-007, D-013, D-075, D-077
 
 **Why.** A walking skeleton in a real environment exposes deployment problems while the app is
@@ -1080,7 +1162,8 @@ secret store (agents never see them); run `clinic:create` on staging.
 **Out of scope.** Production environment (E07). Custom domain (Q-03). Any real job besides the heartbeat.
 
 **Acceptance.**
-- [ ] Staging URL serves the login page over HTTPS; a seeded staging user can log in.
+- [ ] Staging URL serves the login page over HTTPS; the owner of a clinic `clinic:create` made there
+      can log in (the seed runs on this machine only, D-090).
 - [ ] The worker runs as its own process and the heartbeat job fires on schedule.
 - [ ] `/api/health` turns unhealthy when the worker is stopped (demonstrated).
 - [ ] A deliberate test error appears in Sentry with no personal fields in it.

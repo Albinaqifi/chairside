@@ -9,18 +9,18 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T04b` is Ready (`handoffs/E00-T04b.md`): `/pipeline E00-T04b`
-- **Decisions it waits on:** none. The fonts are chosen (owner, D-089)
+- **Next task to start:** `E00-T05a` is Ready (`handoffs/E00-T05a.md`): `/pipeline E00-T05a`
+- **Decisions it waits on:** none. tsx is approved (owner, D-090)
 
 ## Next (in order)
 
-1. E00-T04b
-2. E00-T05
-3. E01-T01
-4. E00-T04c
-5. E00-T04d
-6. E01-T02
-7. E00-T06b
+1. E00-T05a
+2. E01-T01
+3. E00-T04c
+4. E00-T04d
+5. E01-T02
+6. E00-T06b
+7. E00-T05b
 8. E00-T07
 9. The rest of E01, in the epic's own order (D-087)
 
@@ -32,7 +32,7 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 
 ## E00 · Foundation (M0)
 
-Fully specified. A task becomes Ready when its dependencies are Done, except E00-T06b (an outline), which an architect refines first, and each part of E00-T04 after the first, refined in the Done pass of the task before it in the order (D-086, D-087).
+Fully specified. A task becomes Ready when its dependencies are Done, except E00-T06b (an outline), which an architect refines first, and each part of E00-T04 after the first and E00-T05b, refined in the Done pass of the task before it in the order (D-086, D-087, D-090).
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
@@ -46,12 +46,14 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T11 | Components in the form lint, and the gaps E00-T10 left | builder | critical | **Done** | Merged by the owner (PR #20). Components and generic spreads in the form lint, `export default` of a handle, drivers passed on from `src/db/`, `'use server'` `.tsx` files, lint comments everywhere, whole case names (D-084, D-085). Its blind spots stay review checks (owner, D-086); two comments → E00-T04a; `CLAUDE.md` rule 7 and R-32 corrected. See `handoffs/E00-T11.md` |
 | E00-T04 | App shell and design system | builder | normal | split (D-086) | Into E00-T04a … E00-T04d, the next four rows |
 | E00-T04a | Tokens, fonts, texts and the login page | builder | normal | **Done** | Merged by the owner (PR #23). Tokens in `globals.css`, local fonts, next-intl, Button, Input, Label, both pages restyled, favicon, text and accessibility lint (D-088). Fonts with Cyrillic → E00-T04b (owner, D-089); other leftovers → E00-T04b, E00-T04c, E01-T02, E01-T04, `CLAUDE.md`; six struck. See `handoffs/E00-T04a.md` |
-| E00-T04b | The staff shell: sidebar, navigation by role, placeholder pages | builder | normal | Tested | From E00-T04's split (D-086), refined in E00-T04a's Done pass; also switches the fonts to Onest and Source Serif 4 (owner, D-089). Tester: no findings, one test added, one `none` note (Discovered). Delta review of the added test at `b2c1d00`: approved. See `handoffs/E00-T04b.md` |
+| E00-T04b | The staff shell: sidebar, navigation by role, placeholder pages | builder | normal | **Done** | Merged by the owner (PR #25). The staff layout, the sidebar by permission, Today and six placeholder pages, Card, Badge, the empty state, Onest and Source Serif 4 (D-089). Leftovers → E00-T04c (the clinic a form sends), E01-T01 (the provider link); five struck. See `handoffs/E00-T04b.md` |
 | E00-T04c | The form pattern, the toast and the components page | builder | normal | Planned | After E01-T01 in the order (D-087), refined in its Done pass; depends on E00-T04b (D-086) |
 | E00-T04d | The other components: fields, tabs, drawer and dialog | builder | normal | Planned | After E00-T04c, refined in its Done pass (D-086) |
-| E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | After E00-T04b, before E01-T01 (D-087). Refined before it starts |
-| E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); needs E00-T04a … E00-T04d and E00-T05, comes after E01-T02 (D-087); takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086) |
-| E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | Planned | Owner: hosting accounts (Q-07). After E00-T05, E00-T06b and E00-T09 |
+| E00-T05 | Seed data and clinic provisioning script | builder | normal | split (D-090) | Into E00-T05a and E00-T05b, the next two rows |
+| E00-T05a | Seed data: two clinics and a login for every role | builder | normal | Ready | From E00-T05's split (D-090), refined in E00-T04b's Done pass; runs with tsx (owner, D-090); takes two Discovered lines of E00-T02. See `handoffs/E00-T05a.md` |
+| E00-T05b | `clinic:create`: the operator's script for a new clinic | builder | critical | Planned | After E00-T06b, before E00-T07 (D-090); refined in E00-T06b's Done pass, where the owner decides what its setup link opens |
+| E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); needs E00-T04a … E00-T04d and E00-T05a, comes after E01-T02 (D-087); takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086) |
+| E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | Planned | Owner: hosting accounts (Q-07). After E00-T05b, E00-T06b and E00-T09 |
 
 ## E01 · Scheduling (M1)
 
@@ -59,7 +61,7 @@ Fully specified.
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
-| E01-T01 | Schema: providers, treatment types, patients, appointments, hours | builder | critical | Planned | |
+| E01-T01 | Schema: providers, treatment types, patients, appointments, hours | builder | critical | Planned | Refined in E00-T05a's Done pass; takes the provider link (E00-T04b review) |
 | E01-T02 | Patients: list, search, create, edit | builder | normal | Planned | |
 | E01-T03 | Patient profile | builder | normal | Planned | |
 | E01-T04 | Calendar: day view | builder | normal | Planned | |
@@ -194,6 +196,7 @@ Outline. Needs E07-T00.
 - E00-T10 · Close the gaps in the lint guards · merged 2026-10-05 (PR #17)
 - E00-T11 · Components in the form lint, and the gaps E00-T10 left · merged 2026-10-05 (PR #20)
 - E00-T04a · Tokens, fonts, texts and the login page · merged 2026-10-06 (PR #23)
+- E00-T04b · The staff shell: sidebar, navigation by role, placeholder pages · merged 2026-10-06 (PR #25)
 
 ## Owner actions (standing)
 
