@@ -9,20 +9,19 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E01-T01a` is Tested (PR #29) and its critical review approved: the owner merges it (`handoffs/E01-T01a.md`)
-- **Decisions it waits on:** none. Q-15's assumption is accepted (owner, 2026-10-06)
+- **Next task to start:** `E01-T01b` is Ready: `/pipeline E01-T01b` (`handoffs/E01-T01b.md`)
+- **Decisions it waits on:** none. The owner allowed its one change to E00-T05a's seed test (2026-10-06)
 
 ## Next (in order)
 
-1. E01-T01a
-2. E01-T01b
-3. E00-T04c
-4. E00-T04d
-5. E01-T02
-6. E00-T06b
-7. E00-T05b
-8. E00-T07
-9. The rest of E01, in the epic's own order (D-087)
+1. E01-T01b
+2. E00-T04c
+3. E00-T04d
+4. E01-T02
+5. E00-T06b
+6. E00-T05b
+7. E00-T07
+8. The rest of E01, in the epic's own order (D-087)
 
 ## Blocked
 
@@ -62,8 +61,8 @@ Fully specified.
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
 | E01-T01 | Schema: providers, treatment types, patients, appointments, hours | builder | critical | split (D-091) | Into E01-T01a and E01-T01b, the next two rows |
-| E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | Tested | Split from E01-T01 (D-091) in E00-T05a's Done pass; takes the provider link (E00-T04b review); Q-15's assumption accepted by the owner. Migration 0002, the provider kind through `clinics_for_user()`. PR #29. Review: no required changes, 2 suggestions (Discovered). Tester: no findings, 11 cases added (review suggestion 2 among them), 2 notes (Discovered). Delta review of the added cases at `0c315db`: approved, 1 `none` suggestion (Discovered). Critical review at `db74cec`: approved, 2 `data` suggestions (Discovered). See `handoffs/E01-T01a.md` |
-| E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | Planned | Refined (D-091); Ready once E01-T01a is Done, checked in its Done pass. See `handoffs/E01-T01b.md` |
+| E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | **Done** | Merged by the owner (PR #29). Seven scheduling tables with their policies and the no-double-booking constraint (migration 0002); the provider kind through `clinics_for_user()`. Leftovers → E01-T02, E01-T04, E01-T05, E01-T10, E02-T01; the appointments indexes → E07-T00; one done by its tester, five struck. See `handoffs/E01-T01a.md` |
+| E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | Ready | Refined (D-091), checked against E01-T01a's code in its Done pass: the day as a parameter, times without a library, database cases in `seed.test.ts`, whose two expected summaries gain the new file (owner, 2026-10-06). See `handoffs/E01-T01b.md` |
 | E01-T02 | Patients: list, search, create, edit | builder | normal | Planned | |
 | E01-T03 | Patient profile | builder | normal | Planned | |
 | E01-T04 | Calendar: day view | builder | normal | Planned | |
@@ -200,6 +199,7 @@ Outline. Needs E07-T00.
 - E00-T04a · Tokens, fonts, texts and the login page · merged 2026-10-06 (PR #23)
 - E00-T04b · The staff shell: sidebar, navigation by role, placeholder pages · merged 2026-10-06 (PR #25)
 - E00-T05a · Seed data: two clinics and a login for every role · merged 2026-10-06 (PR #27)
+- E01-T01a · Schema: providers, treatment types, patients, appointments, hours · merged 2026-10-06 (PR #29)
 
 ## Owner actions (standing)
 
