@@ -25,7 +25,11 @@ Detail level: **Planned**. T00 refines the rest.
 
 **Do.** Check each task against what E02 actually built and against the chosen provider's
 current documentation. Tighten acceptance criteria, split anything too big, name the exact
-files and functions to extend. Move tasks to Ready.
+files and functions to extend. Move tasks to Ready. Put the non-production allow-list (T05)
+before, or with, the first real adapter (T02, T03): the seed's phones are a real North
+Macedonian mobile range (`+389 70 00x xxx`, `src/db/seed/fake-data.ts`), so no real adapter may
+run against a database that holds the seed before it exists (`message`, E00-T05a review
+suggestion 1).
 
 **Acceptance.** - [ ] Every task passes the Definition of Ready. - [ ] Board updated.
 

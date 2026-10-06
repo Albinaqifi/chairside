@@ -6,56 +6,123 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 **Why now:** appointments are what every message is about. And booking speed is the first
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
-Order: T01 → T02, T04, T08, T09 (parallel-safe) → T03, T05 → T06 → T07, T10 → T11. With E00
-(D-087, D-090): E00-T05a → T01 → E00-T04c → E00-T04d → T02 → E00-T06b → E00-T05b → E00-T07 → T04,
-T08, T09 and the rest, so a receptionist sees a patient list before Playwright and staging exist.
+Order: T01a → T01b → T02, T04, T08, T09 (parallel-safe) → T03, T05 → T06 → T07, T10 → T11. With
+E00 (D-087, D-090, D-091): E00-T05a → T01a → T01b → E00-T04c → E00-T04d → T02 → E00-T06b → E00-T05b
+→ E00-T07 → T04, T08, T09 and the rest, so a receptionist sees a patient list before Playwright and
+staging exist. T01 is split in two (D-091): the schema and the provider link (T01a), the seed (T01b).
 
 ---
 
-### E01-T01 · Schema: providers, treatment types, patients, appointments, hours
+### E01-T01a · Schema: providers, treatment types, patients, appointments, hours
 
-- **Role:** builder · **Risk:** critical · **Depends on:** E00-T03, E00-T05a
-- **Read:** `data-model` (Conventions; sections 1 and 2 incl. "No double booking" and the state machine) · D-018, D-019, D-020, D-033, D-040, D-062, D-063 · demo lines 1369–1404 (the sample clinic's providers and patients; their emails and phones are not copied: E00-T05a's fake-data rules)
+- **Role:** builder · **Risk:** critical (migrations and policies; the permission check) · **Depends on:** E00-T03, E00-T05a
+- **Read:** `data-model` (Conventions; sections 1 and 2 incl. "No double booking" and the state machine) · D-018, D-019, D-020, D-033, D-040, D-043, D-062, D-063, D-091 · Q-15 · the architect section of `handoffs/E01-T01a.md`
 
 **Why.** The tables the whole scheduling epic uses, with the constraints that make double
-booking and cross-clinic links impossible.
+booking and cross-clinic links impossible, and the link that gives a person their provider's
+permissions. The first half of E01-T01 (D-091); the seed's rows are E01-T01b.
 
 **Do.**
 - Migrations for `providers`, `provider_breaks`, `treatment_types`, `patients`,
-  `appointments`, `clinic_hours`, `closed_days`, exactly as in `data-model.md`, each with
-  `clinic_id`, policy, composite foreign keys.
-- The exclusion constraint on appointments, including the `overlap_ok` exemption.
-- Trigram index for patient search by name and phone.
+  `appointments`, `clinic_hours`, `closed_days`, as in `data-model.md`, each with `clinic_id`,
+  policy, composite foreign keys and a check for each list of values (D-018's statuses among
+  them). Grants: select, insert and update; delete only on `provider_breaks`, `clinic_hours` and
+  `closed_days`. Patients and appointments are archived, cancelled or anonymised, providers and
+  treatment types made inactive: never deleted.
+- **Columns:** `patients.import_job_id` comes with `import_jobs` (E04-T01) and
+  `appointments.source_message_id` with `messages` (E02-T01), not now (D-091).
+  `appointments.created_by` is the user who booked it (`users.id`), as `audit_log.actor_id` is.
+  `patients.language` is a two-letter code, checked by its form, not a list (`en` in development,
+  D-053). The guardian follows D-033 (Q-15: the owner accepted building on it, 2026-10-06).
+- The exclusion constraint on appointments, with the `overlap_ok` exemption. A time range holds
+  its start, not its end, so back-to-back visits do not overlap.
+- `pg_trgm`, and the trigram indexes E01-T02's search uses: the full name
+  (`first_name || ' ' || last_name`) and `phone_e164`.
 - Drizzle schemas in the owning modules (`scheduling`, `patients`, `tenancy`).
-- Seed: the demo clinic's three providers with lunch breaks, the treatment list (demo line
-  1518) with lengths, about 40 invented patients (some without phone, one with a guardian,
-  two siblings sharing a phone, one archived), and a week of appointments in mixed statuses
-  around "today". The second clinic gets a few rows too.
-- **The provider link** (E00-T04b review suggestion 2, `slice`): `memberships.provider_id`
-  (`data-model.md`, D-062) with its foreign key `(clinic_id, provider_id)`, and the person's
-  provider read in one place. `allowed()` (`src/app/_lib/actions.ts`) and `membershipExtras()`
-  (`src/app/(staff)/navigation.ts`) both say `providerKind: null` today; both take it from there,
-  and so do T04 (a dentist opens on their own column) and T10 (a dentist sees their own patients).
-  The seed links its dentist and hygienist to providers.
+- **The provider link** (E00-T04b review suggestion 2, `slice`): `memberships.provider_id` with
+  its foreign key `(clinic_id, provider_id)`. `clinics_for_user()` also returns the linked
+  provider's kind (D-091), so `ClinicChoice` carries it; `allowed()` (`src/app/_lib/actions.ts`)
+  and `membershipExtras()` (`src/app/(staff)/navigation.ts`), which say `providerKind: null`
+  today, both read it there, and so will T04 (a dentist opens on their own column) and T10 (a
+  dentist sees their own patients).
 
-**Out of scope.** Any other function, and any screen. Message, consent and task tables (E02).
+**Out of scope.** The seed's rows (E01-T01b). Any other function, and any screen. Message,
+consent and task tables (E02). What making a linked provider inactive does (E01-T09).
 
 **Acceptance.**
-- [ ] Meta-test and isolation tests pass with the new tables.
-- [ ] Integration tests prove: two overlapping appointments for one provider are refused;
-      allowed when one is cancelled or no-show; allowed with `overlap_ok`; an appointment
-      cannot reference another clinic's patient or provider.
-- [ ] `db:reset` seeds the data described above, deterministically.
-- [ ] A person linked to a provider gets that provider's kind in both the sidebar and the action
-      wrapper's permission check: an owner linked to a dentist sees In the chair, unlinked does not
+- [ ] The meta-test passes with the new tables, and inside clinic A no new table shows, changes or
+      takes a row of clinic B (integration tests).
+- [ ] Integration tests prove: two overlapping appointments for one provider are refused; back to
+      back is allowed; overlap is allowed for two providers, when one is cancelled or no-show, and
+      with `overlap_ok`; restoring a cancelled appointment into an overlap is refused.
+- [ ] An appointment cannot reference another clinic's patient, provider or treatment type; a
+      break or a membership cannot reference another clinic's provider (integration tests).
+- [ ] A value outside each list (statuses, source, kind and the rest) is refused by the database
       (tests).
+- [ ] A person linked to a provider gets that provider's kind in both the sidebar and the action
+      wrapper's permission check: an owner linked to a dentist sees In the chair and may run a
+      `visit.record` action, unlinked does not (tests). `clinics_for_user()` still returns only
+      that user's active memberships, each with its own provider's kind or none (integration test).
 - [ ] `data-model.md` matches the migrations exactly (any difference is fixed in the doc and logged).
+- [ ] `pnpm check` and `pnpm build` pass.
+
+---
+
+### E01-T01b · The scheduling seed: providers, patients and a week of appointments
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a
+- **Read:** `data-model` (section 2) · D-033, D-040, D-044, D-049, D-090, D-091 · demo lines 1369–1404 (the sample clinic's providers and patients; their emails and phones are not copied: the fake-data rules) and 1518 (treatments) · the architect section of `handoffs/E01-T01b.md`
+
+**Why.** Every scheduling screen after it (T02's patients, T04's calendar, T10's Today) needs a
+clinic that looks like a working week, from one command. The second half of E01-T01 (D-091).
+
+**Do.**
+- **A seed file** after E00-T05a's, which stays as it is. Harbour Street Dental: the demo's three
+  providers (two dentists, one hygienist) with chairs, hues and a lunch break each; open Monday to
+  Friday, 08:00 to 18:00; a closed day after the seeded week; the demo's ten treatment types with
+  their lengths; about 40 patients (some without a phone, one with a guardian, two siblings
+  sharing a phone, one archived); a week of appointments. The second clinic: one provider, a few
+  patients and appointments.
+- **The week:** Monday to Friday of the week the seed runs in (of the next week on a Saturday or
+  Sunday), in the clinic's time zone; statuses that fit the day: past days completed, no-show or
+  cancelled, the day itself mixed, later days booked, confirmed or cancelled. The seed reads the
+  clock once, where `pnpm db:seed` starts, and passes the day on, so a test can fix it. No two
+  appointments of one provider overlap unless one has `overlap_ok`.
+- **The links:** the seeded dentist's and hygienist's memberships (E00-T05a's) point at their
+  providers. The seed only inserts today, so this is a new step that sets a link where none is set;
+  the owner stays unlinked.
+- **The fake-data rules:** names from the invented lists, in both scripts (D-049); treatment names
+  and providers' short names join new invented lists in `fake-data.ts`: extend a list, never narrow
+  the check (E00-T05a review suggestion 2). Phones from the block, emails at `example.test`,
+  `language` `en` (D-053).
+- **Fixed ids** in `seeded.ts`'s form, one per row, each used once across every seed file: a
+  repeated id drops a row without a word, and an id with a 0 version or variant digit is refused by
+  `z.uuid()` (E00-T05a tester note 2).
+- `README.md`: what the seed holds now.
+
+**Out of scope.** Tables and the provider link (E01-T01a). Linking the seeded owner. Messages and
+every later row (each schema task brings its own). Any screen.
+
+**Acceptance.**
+- [ ] `pnpm db:reset` twice on one day gives the same rows and ids, apart from password hashes,
+      each password row's own id and the times rows were written (tester, comparing the two);
+      `pnpm db:seed` once more adds nothing and ends without an error.
+- [ ] Seeded for a fixed weekday, the week is that day's, holds every status and at least one
+      appointment that day, and the database refuses none of it; seeded for a Sunday, it is the
+      next week (integration test).
+- [ ] The patients include one without a phone, one archived, one with a guardian, two sharing a
+      phone, and names in both scripts (a test reads the seed file).
+- [ ] `clinics_for_user()` gives the seeded dentist and hygienist their providers' kinds, the
+      seeded owner none (integration test).
+- [ ] The fake-data test reads the new file, and fails on a treatment name or a provider's short
+      name that is not in the lists (tester: one change of each, each restored).
+- [ ] `pnpm check` and `pnpm build` pass.
 
 ---
 
 ### E01-T02 · Patients: list, search, create, edit
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01, E00-T04a … E00-T04d
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04d
 - **Read:** `scope` (Patients list and profile) · `design-ref` (demo lines 316–347; logic 1849–1858) · `data-model` (`patients`) · D-015, D-033, D-040
 
 **Why.** Staff must find a patient in seconds by name or phone.
@@ -63,7 +130,8 @@ booking and cross-clinic links impossible.
 **Do.**
 - `patients` module functions: search (name or phone fragment), create, update, change
   status. Phone normalised to E.164 using the clinic's default country; email lower-cased;
-  invalid values rejected with a clear message.
+  invalid values rejected with a clear message. The search is written on the expressions
+  E01-T01a's trigram indexes hold (the full name, `phone_e164`), so it uses them.
 - Patients list screen: search box, rows (name, age and phone, last visit, next visit),
   filter "All" (other filters arrive with their epics), empty state, link to import (placeholder).
 - Create / edit form: first name, last name, date of birth, phone, email, language, guardian
@@ -114,7 +182,7 @@ booking and cross-clinic links impossible.
 
 ### E01-T04 · Calendar: day view
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01, E00-T04a … E00-T04d
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04d
 - **Read:** `scope` (Calendar) · `design-ref` (demo lines 215–283; logic 1812–1834; status colours 1377–1385; provider colours) · D-018, D-019, D-041
 
 **Why.** The calendar is where the front desk lives.
@@ -221,7 +289,7 @@ Day / Week toggle.
 
 ### E01-T08 · Settings: clinic details, opening hours, closed days
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01, E00-T04a … E00-T04d
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04d
 - **Read:** `scope` (Settings) · `design-ref` (demo lines 746–778; logic 1912–1919) · `data-model` (`clinics`, `clinic_hours`, `closed_days`)
 
 **Do.**

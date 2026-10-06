@@ -26,11 +26,12 @@ a burst of booking confirmations. Move tasks to Ready.
 ---
 
 ### E04-T01 · Schema: invites and import staging
-- **Role:** builder · **Risk:** critical · **Depends on:** E01-T01
-- **Read:** `data-model` (sections 1 and 4) · D-008
+- **Role:** builder · **Risk:** critical · **Depends on:** E01-T01a
+- **Read:** `data-model` (sections 1 and 4) · D-008, D-091
 
 **Do.** Migrations for `staff_invites`, `import_jobs`, `import_rows` with policies. A size
-limit on `file_bytes` (10 MB).
+limit on `file_bytes` (10 MB). `patients.import_job_id` with its foreign key
+`(clinic_id, import_job_id)`, which waited for `import_jobs` (D-091).
 
 **Acceptance.** - [ ] Meta-test and isolation tests pass. - [ ] `data-model.md` matches. - [ ] Oversized file is refused by the database as well as the app.
 

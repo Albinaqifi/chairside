@@ -27,7 +27,7 @@ Version 1 is the first release a real clinic can use with real patients.
 | M6 | **Aftercare with AI** | E06 | Mark a visit done → draft from the clinic's template or from AI → dentist approves → patient gets SMS, email and a page. | M2, M1 |
 | M7 | **Pilot readiness** | E07 | The go-live gate passes: restore drill done, canary running, audit viewer, retention, security pass, runbook. | everything |
 
-M0 and M1 overlap (D-087): E01-T01 and E01-T02 come before E00-T06b and E00-T07, so a
+M0 and M1 overlap (D-087): E01-T01a, E01-T01b and E01-T02 come before E00-T06b and E00-T07, so a
 receptionist sees patients before staging exists. M0's staging URL comes after E01-T02.
 
 M4 can run in parallel with M2/M3 if two agents work at once: it touches different modules.
