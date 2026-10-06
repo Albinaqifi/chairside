@@ -9,21 +9,20 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T04a` is Ready (`handoffs/E00-T04a.md`): `/pipeline E00-T04a`
-- **Decisions it waits on:** none. Nothing blocks E00-T04a
+- **Next task to start:** `E00-T04b` is Ready (`handoffs/E00-T04b.md`): `/pipeline E00-T04b`
+- **Decisions it waits on:** none. The fonts are chosen (owner, D-089)
 
 ## Next (in order)
 
-1. E00-T04a
-2. E00-T04b
-3. E00-T05
-4. E01-T01
-5. E00-T04c
-6. E00-T04d
-7. E01-T02
-8. E00-T06b
-9. E00-T07
-10. The rest of E01, in the epic's own order (D-087)
+1. E00-T04b
+2. E00-T05
+3. E01-T01
+4. E00-T04c
+5. E00-T04d
+6. E01-T02
+7. E00-T06b
+8. E00-T07
+9. The rest of E01, in the epic's own order (D-087)
 
 ## Blocked
 
@@ -46,8 +45,8 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T10 | Close the gaps in the lint guards | builder | critical | **Done** | Merged by the owner (PR #17). Re-exports and drivers, lint comments, rejections and `.catch`/`.finally` statements, `src/pages`, script files in `src/`, `formAction`, spreads and `next/form` (D-077, D-081, D-082). Its leftovers → E00-T11 (D-084); four struck. See `handoffs/E00-T10.md` |
 | E00-T11 | Components in the form lint, and the gaps E00-T10 left | builder | critical | **Done** | Merged by the owner (PR #20). Components and generic spreads in the form lint, `export default` of a handle, drivers passed on from `src/db/`, `'use server'` `.tsx` files, lint comments everywhere, whole case names (D-084, D-085). Its blind spots stay review checks (owner, D-086); two comments → E00-T04a; `CLAUDE.md` rule 7 and R-32 corrected. See `handoffs/E00-T11.md` |
 | E00-T04 | App shell and design system | builder | normal | split (D-086) | Into E00-T04a … E00-T04d, the next four rows |
-| E00-T04a | Tokens, fonts, texts and the login page | builder | normal | **Tested** | From E00-T04's split (D-086). Tokens in `globals.css`, local fonts, next-intl, Button, Input, Label, both pages restyled, favicon, text and accessibility lint; packages D-088. PR #23. Review: no required changes, 3 suggestions (Discovered). Test: no findings, 3 notes (Discovered). See `handoffs/E00-T04a.md` |
-| E00-T04b | The staff shell: sidebar, navigation by role, placeholder pages | builder | normal | Planned | After E00-T04a, refined in its Done pass (D-086) |
+| E00-T04a | Tokens, fonts, texts and the login page | builder | normal | **Done** | Merged by the owner (PR #23). Tokens in `globals.css`, local fonts, next-intl, Button, Input, Label, both pages restyled, favicon, text and accessibility lint (D-088). Fonts with Cyrillic → E00-T04b (owner, D-089); other leftovers → E00-T04b, E00-T04c, E01-T02, E01-T04, `CLAUDE.md`; six struck. See `handoffs/E00-T04a.md` |
+| E00-T04b | The staff shell: sidebar, navigation by role, placeholder pages | builder | normal | Ready | From E00-T04's split (D-086), refined in E00-T04a's Done pass; also switches the fonts to Onest and Source Serif 4 (owner, D-089). See `handoffs/E00-T04b.md` |
 | E00-T04c | The form pattern, the toast and the components page | builder | normal | Planned | After E01-T01 in the order (D-087), refined in its Done pass; depends on E00-T04b (D-086) |
 | E00-T04d | The other components: fields, tabs, drawer and dialog | builder | normal | Planned | After E00-T04c, refined in its Done pass (D-086) |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | Planned | After E00-T04b, before E01-T01 (D-087). Refined before it starts |
@@ -194,6 +193,7 @@ Outline. Needs E07-T00.
 - E00-T09 · The login form never puts the password in the URL · merged 2026-10-05 (PR #15)
 - E00-T10 · Close the gaps in the lint guards · merged 2026-10-05 (PR #17)
 - E00-T11 · Components in the form lint, and the gaps E00-T10 left · merged 2026-10-05 (PR #20)
+- E00-T04a · Tokens, fonts, texts and the login page · merged 2026-10-06 (PR #23)
 
 ## Owner actions (standing)
 

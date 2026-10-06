@@ -1612,3 +1612,21 @@ architecture), `changed` (differs from the original files), `process`.
     list: not taken.
 - **Revisit if:** next-intl drops the extractor's tools from its dependencies (remove the two
   `allowBuilds` lines); a radix-ui release after 1.7.0 has been out a few weeks (move to it).
+
+### D-089 · Onest and Source Serif 4 replace Figtree and Newsreader, so Cyrillic shows in the app's own fonts
+- **Origin:** **Owner, 2026-10-06,** in E00-T04a's Done pass (`handoffs/E00-T04a.md`): the font
+  question D-086 left open ("Not decided"), answered "switch now", then "Onest + Source Serif 4"
+  after three pairs were shown at real size in the sidebar and the Today heading (the design's,
+  Onest + Source Serif 4, Manrope + Literata).
+- **What:** the interface font is Onest and the heading font Source Serif 4, in place of the
+  demo's Figtree and Newsreader. Sizes, weights and colours stay as `design-reference.md` has them.
+  Both are SIL Open Font License 1.1 and cover Latin, Albanian's ë and ç, and Cyrillic with
+  Macedonian's letters (fontsource lists `cyrillic` for both; Figtree only `latin` and
+  `latin-ext`). They come as files in the repository, as D-086 says, the designers' own: Onest
+  2.001's `Onest[wght].woff2` (github.com/simpals/onest, 84 KB) and Source Serif 4's variable
+  roman woff2 (github.com/adobe-fonts/source-serif, 429 KB), the one file with weight 500, which the
+  wordmark uses: the static files have no Medium. No package. The switch is in E00-T04b.
+- **Why:** the first market is North Macedonia (D-049). A name written in Cyrillic showed in the
+  computer's fallback font, unlike the text around it, headings most of all.
+- **Revisit if:** a letter a clinic uses does not show in these fonts; or the heading font's
+  first load is felt (429 KB, fetched once, then cached): then a subset of Latin and Cyrillic.

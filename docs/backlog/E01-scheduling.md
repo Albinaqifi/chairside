@@ -47,7 +47,7 @@ booking and cross-clinic links impossible.
 ### E01-T02 · Patients: list, search, create, edit
 
 - **Role:** builder · **Risk:** normal · **Depends on:** E01-T01, E00-T04a … E00-T04d
-- **Read:** `scope` (Patients list and profile) · `design-ref` (demo lines 316–347; logic 1849–1858) · `data-model` (`patients`) · D-033, D-040
+- **Read:** `scope` (Patients list and profile) · `design-ref` (demo lines 316–347; logic 1849–1858) · `data-model` (`patients`) · D-015, D-033, D-040
 
 **Why.** Staff must find a patient in seconds by name or phone.
 
@@ -61,6 +61,10 @@ booking and cross-clinic links impossible.
   name, notes (labelled "not a clinical record"), status.
 - On create, warn about likely duplicates (same name + date of birth, or same name + same
   contact). A shared phone alone is not a warning.
+- Dates and times are shown in the clinic's time zone (`clinics.timezone`, D-015), set once for
+  every staff page so later screens reuse it. `src/i18n/request.ts` sets none today: next-intl then
+  warns and uses the computer's zone, so the server and the browser can show one visit at different
+  times (Discovered, E00-T04a).
 
 **Out of scope.** Profile page (T03). Consent switches (E02). Care plan, treatment plan columns.
 
@@ -72,6 +76,7 @@ booking and cross-clinic links impossible.
 - [ ] Two siblings with the same phone can be created without a duplicate warning.
 - [ ] Every create and edit writes an audit row without personal values in it.
 - [ ] A user of the second clinic cannot find or open the first clinic's patients.
+- [ ] A visit's date and time show in the clinic's time zone whatever the computer's zone (test).
 
 ---
 
@@ -111,6 +116,11 @@ booking and cross-clinic links impossible.
   time, provider breaks shown hatched, a "now" line on today.
 - Block styling by status as in the demo (confirmed normal, booked/no reply tagged, arrived
   outlined, completed faded, cancelled and no-show struck through).
+- Provider colours in the theme: the four tints of `design-ref` "Provider colours" as formulas over
+  a hue set on the element from `providers.color_hue`, such as
+  `--color-provider-tint: oklch(0.95 0.03 var(--provider-hue))`, in an `@theme inline` block. In a
+  plain `@theme` block the variable is resolved on `:root`, where no hue is set, and gives no colour
+  (E00-T04a review).
 - Previous / Today / Next, provider filter chips (at least one always on), a dentist opens on their own column.
 - Data loaded for the visible day in the clinic's time zone; refreshes every 30 seconds and on window focus.
 - Clicking a block or an empty slot calls a handler (the drawers arrive in T05 and T06).
