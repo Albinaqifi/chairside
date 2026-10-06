@@ -8,8 +8,9 @@ export interface NewStaffUser {
 
 /**
  * Creates a person who can sign in with email and password. There is no self sign-up: the seed
- * and the operator script (E00-T05) and invites (E04) call this. The library hashes the password
- * and sets the timestamps. Fails if the email is taken or the password is too short to sign in with.
+ * (E00-T05a), the operator script (E00-T05b) and invites (E04) call this. The library hashes the
+ * password and sets the timestamps. Fails if the email is taken or the password is too short to
+ * sign in with.
  */
 export async function createStaffUser(input: NewStaffUser): Promise<{ id: string }> {
   const ctx = await getAuth().$context;

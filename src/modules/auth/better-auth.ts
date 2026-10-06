@@ -107,8 +107,9 @@ function createAuth() {
     ),
     emailAndPassword: {
       enabled: true,
-      // No self sign-up: clinics are set up by hand (intent.md). Users come from the seed, the
-      // operator script (E00-T05) and invites (E04), all through createStaffUser().
+      // No self sign-up: clinics are set up by hand (intent.md). Users come from the seed
+      // (E00-T05a), the operator script (E00-T05b) and invites (E04), all through
+      // createStaffUser().
       disableSignUp: true,
       revokeSessionsOnPasswordReset: true,
     },

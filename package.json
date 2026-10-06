@@ -19,7 +19,8 @@
     "test:integration": "vitest run --project integration",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=.env src/db/migrate.ts",
-    "db:reset": "node --env-file-if-exists=.env src/db/reset.ts",
+    "db:reset": "node --env-file-if-exists=.env src/db/reset.ts && pnpm db:seed",
+    "db:seed": "tsx --env-file-if-exists=.env src/db/seed/index.ts",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration"
   },
   "dependencies": {
@@ -48,6 +49,7 @@
     "eslint-config-next": "16.3.8",
     "prettier": "^3.9.9",
     "tailwindcss": "^4.3.3",
+    "tsx": "4.23.15",
     "typescript": "~5.9.3",
     "vitest": "^5.0.3"
   }

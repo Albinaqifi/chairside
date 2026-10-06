@@ -9,8 +9,8 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T05a` is Ready (`handoffs/E00-T05a.md`): `/pipeline E00-T05a`
-- **Decisions it waits on:** none. tsx is approved (owner, D-090)
+- **Next task to start:** `E00-T05a` is Blocked, built but for one owner question (`handoffs/E00-T05a.md`, builder question 1)
+- **Decisions it waits on:** seeded people's ids (see Blocked). tsx is approved (owner, D-090)
 
 ## Next (in order)
 
@@ -28,6 +28,7 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 
 | Task | Blocked by | Who must act |
 |---|---|---|
+| E00-T05a | Seeded people's ids: may `createStaffUser()` take an optional fixed id (recommended), or are people named by email? (`handoffs/E00-T05a.md`, builder question 1) | Owner |
 | E03-T02 … T09 | Q-08 providers (decided in E03-T01) and Meta business verification | Owner + architect |
 
 ## E00 · Foundation (M0)
@@ -50,7 +51,7 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T04c | The form pattern, the toast and the components page | builder | normal | Planned | After E01-T01 in the order (D-087), refined in its Done pass; depends on E00-T04b (D-086) |
 | E00-T04d | The other components: fields, tabs, drawer and dialog | builder | normal | Planned | After E00-T04c, refined in its Done pass (D-086) |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | split (D-090) | Into E00-T05a and E00-T05b, the next two rows |
-| E00-T05a | Seed data: two clinics and a login for every role | builder | normal | Ready | From E00-T05's split (D-090), refined in E00-T04b's Done pass; runs with tsx (owner, D-090); takes two Discovered lines of E00-T02. See `handoffs/E00-T05a.md` |
+| E00-T05a | Seed data: two clinics and a login for every role | builder | normal | **Blocked** | Built and checked but for one owner question: seeded people's ids vs "do not change `createStaffUser()`" (builder question 1). See `handoffs/E00-T05a.md` |
 | E00-T05b | `clinic:create`: the operator's script for a new clinic | builder | critical | Planned | After E00-T06b, before E00-T07 (D-090); refined in E00-T06b's Done pass, where the owner decides what its setup link opens |
 | E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); needs E00-T04a … E00-T04d and E00-T05a, comes after E01-T02 (D-087); takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086) |
 | E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | Planned | Owner: hosting accounts (Q-07). After E00-T05b, E00-T06b and E00-T09 |

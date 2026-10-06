@@ -43,7 +43,8 @@ command that differs is copying the settings file (step 3).
    ```
    It listens on port 5433 of this machine, so it does not clash with a PostgreSQL you may
    already have on 5432.
-5. Build the database from the migrations:
+5. Build the database from the migrations and fill it with the seed: two invented clinics and a
+   login for every role (next section):
    ```
    pnpm db:reset
    ```
@@ -51,8 +52,26 @@ command that differs is copying the settings file (step 3).
    ```
    pnpm dev
    ```
-   Open http://localhost:3000. You see the login page. Staff accounts come from the seed
-   (E00-T05); until it exists, `docs/progress/handoffs/E00-T02.md` says how to create one by hand.
+   Open http://localhost:3000. You see the login page. Sign in with one of the seeded logins.
+
+## Seeded logins
+
+`pnpm db:reset` (or `pnpm db:seed` on its own) makes these logins. Every one of them has the same
+development password: **`local-staff-password`**.
+
+| Who | Email | Clinics |
+|---|---|---|
+| Owner | `owner@example.test` | Harbour Street Dental and Забна клиника Сончоглед: sees Switch clinic |
+| Dentist | `dentist@example.test` | Harbour Street Dental |
+| Hygienist | `hygienist@example.test` | Harbour Street Dental |
+| Front desk | `front-desk@example.test` | Harbour Street Dental |
+| Front desk who may import patients | `front-desk-import@example.test` | Harbour Street Dental |
+| Front desk of the second clinic | `front-desk-soncogled@example.test` | Забна клиника Сончоглед only |
+
+Everything the seed writes is invented: names from fixed lists, phones from one made-up block of
+`+389` numbers, emails at `example.test` (`src/db/seed/fake-data.ts`). The seed refuses every
+database that is not on this machine, and `NODE_ENV=production`, so these logins exist only here.
+In notes and tasks, name a seeded login by its role ("the seeded front desk"), not by its email.
 
 ## Everyday commands
 
@@ -62,7 +81,8 @@ command that differs is copying the settings file (step 3).
 | `pnpm check` | Runs every check a change must pass: formatting, lint, types, unit tests and database tests. The database must be running. |
 | `pnpm test` | Unit tests only (fast, no database). |
 | `pnpm test:integration` | Tests against the real database. They use their own database (`chairside_test`), so your local data is not touched. |
-| `pnpm db:reset` | Deletes the local database and builds it again from the migrations. |
+| `pnpm db:reset` | Deletes the local database, builds it again from the migrations and fills it with the seed. |
+| `pnpm db:seed` | Adds the seed to the local database. A second run adds nothing. |
 | `pnpm format` | Fixes code formatting. |
 | `docker compose stop` | Stops the database. Your data stays until the next `db:reset`. |
 

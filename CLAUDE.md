@@ -49,7 +49,8 @@ Stack and reasons: `docs/architecture/overview.md`. First-time setup: `README.md
 | `pnpm exec vitest run <file>` | One test file. |
 | `pnpm lint` · `pnpm typecheck` | ESLint (a warning fails too) · `next typegen` + `tsc`. |
 | `pnpm format` · `pnpm format:check` | Prettier: fix · check only. Markdown and `docs/` are not formatted. |
-| `pnpm db:reset` | Rebuild the local database from nothing: roles, database, every migration. Refuses any non-local host, and URLs that do not all name the same host and port. |
+| `pnpm db:reset` | Rebuild the local database from nothing: roles, database, every migration, then the seed. Refuses any non-local host, and URLs that do not all name the same host and port. |
+| `pnpm db:seed` | Add the seed (`src/db/seed/`): two invented clinics and a login for every role, listed in `README.md`. The same guard as `db:reset`; a second run adds nothing. |
 | `pnpm db:migrate` | Apply pending migrations as the migration role. |
 | `pnpm db:generate --name <what>` | Generate a migration from changed `schema.ts` files. |
 | `pnpm build` · `pnpm start` | Production build · run it. |
@@ -91,7 +92,7 @@ src/proxy.ts          Moves the session forward and renews its cookie (D-067); n
                       Not the permission check: pages and actions still call currentStaff().
                       It skips paths that start with `login` or hold a dot: a staff path never does.
 src/modules/<name>/   All business logic. index.ts = public API, schema.ts = its tables.
-src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts.
+src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts, the seed (seed/).
 src/i18n/             next-intl's request configuration and the message file, en.json.
 src/lib/              Small shared pieces: clock, ids, logger, personal-fields.
 src/ui/               shadcn/ui components restyled to the tokens, the logo, the fonts, cn().
@@ -181,7 +182,8 @@ task, unless product code on `main` would hit it today.
   Errors leave `withTenant` without query values (D-070): keep a caught error as `cause`, never
   copy its message into a new error or a string.
 - Files Node runs directly (`src/db/migrate.ts`, `src/db/reset.ts`): import only packages and
-  relative `.ts` files, never `@/`.
+  relative `.ts` files, never `@/`. The seed (`src/db/seed/`) runs with tsx and may import `@/`
+  (D-090).
 - Next.js 16 differs from older versions: read `node_modules/next/dist/docs/` before writing
   Next.js code. `AGENTS.md` holds the block `next dev` checks for; leave it.
 
