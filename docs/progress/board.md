@@ -62,7 +62,7 @@ Fully specified.
 |---|---|---|---|---|---|
 | E01-T01 | Schema: providers, treatment types, patients, appointments, hours | builder | critical | split (D-091) | Into E01-T01a and E01-T01b, the next two rows |
 | E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | **Done** | Merged by the owner (PR #29). Seven scheduling tables with their policies and the no-double-booking constraint (migration 0002); the provider kind through `clinics_for_user()`. Leftovers → E01-T02, E01-T04, E01-T05, E01-T10, E02-T01; the appointments indexes → E07-T00; one done by its tester, five struck. See `handoffs/E01-T01a.md` |
-| E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | Ready | Refined (D-091), checked against E01-T01a's code in its Done pass: the day as a parameter, times without a library, database cases in `seed.test.ts`, whose two expected summaries gain the new file (owner, 2026-10-06). See `handoffs/E01-T01b.md` |
+| E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | **Tested** | Second seed file: three providers, 40 patients, 76 appointments for the seed's week, the second clinic's few; the day a parameter; dentist and hygienist linked. Review: no required changes, 1 `none` suggestion. Test: no findings, 2 `none` lines (Discovered). See `handoffs/E01-T01b.md` |
 | E01-T02 | Patients: list, search, create, edit | builder | normal | Planned | |
 | E01-T03 | Patient profile | builder | normal | Planned | |
 | E01-T04 | Calendar: day view | builder | normal | Planned | |

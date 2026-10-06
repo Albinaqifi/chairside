@@ -50,7 +50,7 @@ Stack and reasons: `docs/architecture/overview.md`. First-time setup: `README.md
 | `pnpm lint` · `pnpm typecheck` | ESLint (a warning fails too) · `next typegen` + `tsc`. |
 | `pnpm format` · `pnpm format:check` | Prettier: fix · check only. Markdown and `docs/` are not formatted. |
 | `pnpm db:reset` | Rebuild the local database from nothing: roles, database, every migration, then the seed. Refuses any non-local host, and URLs that do not all name the same host and port. |
-| `pnpm db:seed` | Add the seed (`src/db/seed/`): two invented clinics and a login for every role, listed in `README.md`. The same guard as `db:reset`; a second run adds nothing. |
+| `pnpm db:seed` | Add the seed (`src/db/seed/`): two invented clinics, a login for every role and a week of appointments, listed in `README.md`. The same guard as `db:reset`; a second run adds nothing. |
 | `pnpm db:migrate` | Apply pending migrations as the migration role. |
 | `pnpm db:generate --name <what>` | Generate a migration from changed `schema.ts` files. |
 | `pnpm build` · `pnpm start` | Production build · run it. |

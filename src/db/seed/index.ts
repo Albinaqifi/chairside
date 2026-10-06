@@ -6,17 +6,28 @@
 // every database that is not on this machine, before it connects.
 import pg from 'pg';
 import { closeDb } from '@/db/client';
+import { systemClock, type Clock } from '@/lib/clock';
 import { withoutQueryValues } from '@/lib/query-errors';
 import { createStaffUser } from '@/modules/auth';
 import { checkLocalTargets, connectionTarget, type LocalDatabaseUrls } from '../reset';
 import { requiredEnv } from '../required-env';
-import { SEED_FILES, type SeedFile, type SeedPerson, type SeedRow } from './seed-files';
-import { SEED_PASSWORD } from './seeded';
+import { dayInZone, isCalendarDay, type CalendarDay } from './seed-day';
+import {
+  SEED_FILES,
+  type SeedFile,
+  type SeedPerson,
+  type SeedProviderLink,
+  type SeedRow,
+} from './seed-files';
+import { SEED_PASSWORD, SEEDED_TIME_ZONE } from './seeded';
 
 /** The database the seed writes to: its own rows as the migration role, people as the app. */
 export type SeedUrls = Pick<LocalDatabaseUrls, 'migratorUrl' | 'appUrl'>;
 
-/** What one seed file added, by table, and people. Zero everywhere when it was there already. */
+/**
+ * What one seed file added, by table, people and provider links. Zero everywhere when it was there
+ * already.
+ */
 export interface SeedSummary {
   title: string;
   added: Record<string, number>;
@@ -43,31 +54,52 @@ export function checkSeedTargets({ migratorUrl, appUrl }: SeedUrls): void {
 }
 
 /**
+ * The seed's day (E01-T01b): the seeded clinics' date the rows that depend on a day are made for,
+ * `YYYY-MM-DD`. The day given, or else the date it is in the seeded clinics' time zone when the
+ * clock is read, once. Anything that is not a date of the calendar is refused.
+ */
+export function seedDayOf(day: CalendarDay | undefined, clock: Clock = systemClock): CalendarDay {
+  const seedDay = day ?? dayInZone(clock.now(), SEEDED_TIME_ZONE);
+  if (!isCalendarDay(seedDay)) {
+    throw new RangeError('seedDatabase: day must be a date of the calendar, as YYYY-MM-DD.');
+  }
+  return seedDay;
+}
+
+/**
  * Writes every seed file, in order, into the database `urls` names, after checkSeedTargets(). A
  * row or a person whose id is there already is left as it is: on a database that holds the seed,
  * it adds nothing. The pool createStaffUser() used stays open for the caller, who ends it with
- * closeDb().
+ * closeDb(). The rows that depend on a day are made for `day`, or for today (seedDayOf).
  */
-export async function seedDatabase(urls: SeedUrls): Promise<SeedSummary[]> {
+export async function seedDatabase(urls: SeedUrls, day?: CalendarDay): Promise<SeedSummary[]> {
   checkSeedTargets(urls);
+  const seedDay = seedDayOf(day);
   const migrator = new pg.Client({ connectionString: urls.migratorUrl });
   await migrator.connect();
   try {
     const summaries: SeedSummary[] = [];
-    for (const file of SEED_FILES) summaries.push(await writeSeedFile(migrator, file));
+    for (const file of SEED_FILES) summaries.push(await writeSeedFile(migrator, file, seedDay));
     return summaries;
   } finally {
     await migrator.end();
   }
 }
 
-/** Writes one seed file: its tables, then its people with their memberships. */
-async function writeSeedFile(migrator: pg.Client, file: SeedFile): Promise<SeedSummary> {
+/**
+ * Writes one seed file: its tables, then those made for the day, then its people with their
+ * memberships, and last its links from memberships to providers.
+ */
+async function writeSeedFile(
+  migrator: pg.Client,
+  file: SeedFile,
+  day: CalendarDay,
+): Promise<SeedSummary> {
   const added: Record<string, number> = {};
   const count = (what: string, rows: number) => {
     added[what] = (added[what] ?? 0) + rows;
   };
-  for (const { table, rows } of file.tables ?? []) {
+  for (const { table, rows } of [...(file.tables ?? []), ...(file.dayTables?.(day) ?? [])]) {
     for (const row of rows) count(table, await insertRow(migrator, table, row));
   }
   for (const person of file.people ?? []) {
@@ -82,6 +114,9 @@ async function writeSeedFile(migrator: pg.Client, file: SeedFile): Promise<SeedS
       };
       count('memberships', await insertRow(migrator, 'memberships', row));
     }
+  }
+  for (const link of file.providerLinks ?? []) {
+    count('provider links', await linkProvider(migrator, link));
   }
   return { title: file.title, added };
 }
@@ -100,6 +135,24 @@ async function insertRow(migrator: pg.Client, table: string, row: SeedRow): Prom
     `insert into ${pg.escapeIdentifier(table)} (${names}) values (${placeholders})
      on conflict (id) do nothing`,
     Object.values(row),
+  );
+  return rowCount ?? 0;
+}
+
+/**
+ * Links the membership to its provider, the person's calendar column (E01-T01b), as the migration
+ * role: the app role may not change memberships. Only where no link is set, to this provider or
+ * another: the seed adds, it never changes what is there. Returns 1 when it set the link, else 0.
+ */
+async function linkProvider(
+  migrator: pg.Client,
+  { membershipId, providerId }: SeedProviderLink,
+): Promise<number> {
+  const { rowCount } = await query(
+    migrator,
+    `update memberships set provider_id = $2, updated_at = now()
+      where id = $1 and provider_id is null`,
+    [membershipId, providerId],
   );
   return rowCount ?? 0;
 }

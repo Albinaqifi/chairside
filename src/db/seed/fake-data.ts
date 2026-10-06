@@ -34,6 +34,32 @@ export const STAFF_NAMES = ['Owner', 'Dentist', 'Hygienist', 'Front desk'] as co
 export const CLINIC_NAMES = ['Harbour Street Dental', 'Забна клиника Сончоглед'] as const;
 
 /**
+ * Providers' short names, as a calendar column's head shows them (E01-T01b, the demo's "Dr. Okafor"
+ * at line 1370): a title or an initial before a last name of the lists. A provider's full `name` is
+ * a first and a last name of the lists.
+ */
+export const PROVIDER_SHORT_NAMES = [
+  'Dr. Planinska',
+  'Dr. Kodra',
+  'M. Lumi',
+  'Д-р Ќошкова',
+] as const;
+
+/** Treatment names: the demo's catalogue (line 1518). Words, not anyone's name. */
+export const TREATMENT_NAMES = [
+  'Checkup',
+  'Cleaning',
+  'Filling',
+  'Crown prep',
+  'Crown fit',
+  'Root canal',
+  'Extraction',
+  'Consultation',
+  'Emergency',
+  'Whitening',
+] as const;
+
+/**
  * The made-up phone numbers every seed takes its phones from: the prefix and four more digits, in
  * E.164 form (+389 70 00x xxx). No test range is reserved for +389, so a number here may be
  * someone's: outside production, messages go only to an allow-list of test contacts (D-044), which
@@ -73,13 +99,16 @@ const lastNames: readonly string[] = [...LAST_NAMES.latin, ...LAST_NAMES.cyrilli
 const wholeNames: readonly string[] = [
   ...STAFF_NAMES,
   ...CLINIC_NAMES,
+  ...PROVIDER_SHORT_NAMES,
+  ...TREATMENT_NAMES,
   ...firstNames,
   ...lastNames,
 ];
 
 /**
- * True for a name from the lists: a staff or clinic name, a first or a last name, or a first name
- * and a last name in the same letters ("Ana Kodra", "Ана Каменов").
+ * True for a name from the lists: a staff, clinic or treatment name, a provider's short name, a
+ * first or a last name, or a first name and a last name in the same letters ("Ana Kodra",
+ * "Ана Каменов").
  */
 export function isFakeName(value: string): boolean {
   if (wholeNames.includes(value)) return true;
