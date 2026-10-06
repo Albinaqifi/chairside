@@ -160,7 +160,9 @@ task, unless product code on `main` would hit it today.
   (`useTranslations`, or `getTranslations` in an async page; a page's title through
   `generateMetadata`). Lint fails on text written in JSX in `src/app` and `src/ui`. Text in
   `aria-label`, `placeholder`, `title` or `alt`, in a page's `metadata`, or reached through a
-  variable or a condition (`{c ? 'a' : 'b'}`) is a review check. A module gives a key (a role), never
+  variable or a condition (`{c ? 'a' : 'b'}`) is a review check. `jsx-a11y`'s rules run there too,
+  but take a `<label>` whose text is `{t(…)}` for one holding a control: that a label names its
+  control (`htmlFor`, the control's `id`) is a review check. A module gives a key (a role), never
   the text: it cannot import next-intl (module rule 3).
 - Styles: a component takes colours, fonts and radii only from the theme in `src/app/globals.css`
   (`bg-primary`, `font-serif`, `rounded-card`); Tailwind's own palette, font families, text sizes

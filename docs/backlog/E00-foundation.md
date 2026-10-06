@@ -809,53 +809,69 @@ and the components page (E00-T04c). The other components (E00-T04d). Dark mode. 
 ### E00-T04b · The staff shell: sidebar, navigation by role, placeholder pages
 
 - **Role:** builder · **Risk:** normal · **Depends on:** E00-T04a
-- **Read:** `design-ref` (Design tokens: layout; Sidebar, demo lines 24–58, logic 2085–2088) ·
-  `scope` (Navigation and roles) · `security` (Part 1, section 2) · D-021, D-051, D-086 · the
-  architect section of `handoffs/E00-T04b.md`
+- **Read:** `design-ref` (Design tokens: fonts and layout; Sidebar, demo lines 24–58, logic 1778
+  and 2085–2088) · `scope` (Navigation and roles) · `security` (Part 1, section 2) · D-021, D-051,
+  D-086, D-089 · the architect section of `handoffs/E00-T04b.md`
 
 **Why.** Every staff screen lives in the same frame, and the sidebar offers each person only what
-their role may use. The second of E00-T04's four parts (D-086).
+their role may use. The second of E00-T04's four parts (D-086). It also brings the fonts that cover
+Cyrillic (D-089), before more screens are built and photographed in the old ones.
 
 **Do.**
-- **The staff layout** as in the demo (lines 24–58): the sidebar, 228 px, with the logo and the
-  wordmark, the clinic's name, the main navigation (Today, Calendar, In the chair, Patients,
-  Automations) and the second group (Import patients, Settings), the current page marked; the
-  signed-in person's name and role, "Switch clinic" when they belong to more than one clinic, and
-  logout. The demo's "Patient's phone" and its "Signed in as" switcher are not built (`scope`).
-  The content area's padding and width from the design reference; the layout works at 1280 and
-  1024 px wide.
-- **Navigation by permission.** One list says what each item needs, read with `can()` from
-  `@/modules/auth`: Today, every member; Calendar, `calendar.manage`; Patients, `patients.manage`;
-  In the chair, `visit.record`; Automations, `automations.manage` or `aftercare.approve`; Import
-  patients, `import.run`; Settings, `settings.manage`. Hiding an item is not the check: each real
-  page checks its own permission when it is built (`security` section 2).
-- **Placeholder pages** for every item but Today: each starts from `currentStaff()` and shows its
-  title and a "coming soon" empty state. Their paths never start with `login` and hold no dot, as
-  the proxy skips such paths (`src/proxy.ts`; Discovered, E00-T02 test). The Today page is
-  restyled in the same frame.
+- **The staff layout** as in the demo (lines 24–58): the sidebar, 228 px, with the logo mark and
+  the wordmark (`src/ui/logo.tsx`), the clinic's name, the main navigation (Today, Calendar, In the
+  chair, Patients, Automations) and the second group (Import patients, Settings); the signed-in
+  person's name and role, "Switch clinic" when they belong to more than one clinic, and logout. The
+  items are links; the current one has the demo's active look (logic line 1778) and
+  `aria-current="page"`. The demo's "Patient's phone" and its "Signed in as" switcher are not built
+  (`scope`). The clinic's name wraps inside the sidebar however long it is. The content area's
+  padding and width from the design reference; the layout works at 1280 and 1024 px wide.
+- **Navigation by permission.** One list says each item's path and what it needs, read with
+  `can()` from `@/modules/auth`: Today `/`, every member; Calendar `/calendar`, `calendar.manage`;
+  In the chair `/visit`, `visit.record`; Patients `/patients`, `patients.manage`; Automations
+  `/automations`, `automations.manage` or `aftercare.approve`; Import patients `/import`,
+  `import.run`; Settings `/settings`, `settings.manage`. No membership is linked to a provider until
+  E01-T01, so `providerKind` is null, as in `allowed()` (`src/app/_lib/actions.ts`). Hiding an item
+  is not the check: each real page checks its own permission when it is built (`security` section
+  2). Front desk and hygienists may read aftercare drafts and the library (`scope`, D-051); where
+  they read them is E06's, which may widen Automations.
+- **Placeholder pages** at those paths: each starts from `currentStaff()` and shows its title and a
+  "coming soon" empty state. The Today page is restyled in the same frame.
 - **Components** in `src/ui/`, from shadcn/ui and restyled: Card, Badge (the pill, in the status
-  colours) and an empty state.
+  colours) and an empty state. Card replaces the card written out in `(auth)/layout.tsx`.
+- **Fonts (D-089).** Onest and Source Serif 4 replace Figtree and Newsreader: the designers' files
+  (Onest 2.001's `Onest[wght].woff2`; Source Serif 4's variable roman woff2), unchanged, with their
+  licences, loaded as today. The old files and licences go.
+- **Tokens.** What the sidebar needs and the theme lacks (the navigation's text colours and its
+  hover tint, demo line 33 and logic line 1778) is added to the theme, derived and marked "added". A
+  text size, radius, tracking or animation token is also named in `src/ui/cn.ts`, and the
+  stylesheet's header says so.
 - **Docs.** `CLAUDE.md`, next to `src/proxy.ts`: a staff path never starts with `login` and holds
-  no dot.
+  no dot (the proxy skips such paths; Discovered, E00-T02 test).
 
 **Out of scope.** Counts next to the navigation items (the demo's "1,146", "2 to review"): with the
-tasks that own them. Any screen content. The form pattern and the other components (E00-T04c,
-E00-T04d). A phone layout (the staff app is desktop-first, and a tablet in landscape).
+tasks that own them. Any screen content. A permission check on a placeholder page: each real page
+brings its own. A not-found page, and long clinic names on the clinic picker (E00-T04a's test
+notes 3 and 2, struck). The form pattern and the other components (E00-T04c, E00-T04d). A phone
+layout (the staff app is desktop-first, and a tablet in landscape).
 
 **Acceptance.**
 - [ ] The staff layout matches the demo's sidebar: screenshots at 1280 and 1024 px wide, next to
       the demo's sidebar at the same zoom, are files in `docs/progress/handoffs/E00-T04b/`, with a
-      signed-in person whose name is a role word, never a person's name or an email.
+      signed-in person whose name is a role word, never a person's name or an email. One more shows
+      a clinic whose name is written in Cyrillic, in the same fonts as the Latin text around it.
 - [ ] A unit test lists the navigation of each role: front desk sees Today, Calendar, In the chair
       and Patients, and Import patients only with the extra permission; a hygienist sees the same
       without Import; a dentist also sees Automations; an owner sees Today, Calendar, Patients,
       Automations, Import patients and Settings, and In the chair only when linked to a provider.
-- [ ] The current page is marked, and the navigation and logout work with the keyboard alone
-      (tester, in a browser).
+- [ ] The current page is marked (`aria-current="page"`), and the navigation and logout work with
+      the keyboard alone, each with a visible focus (tester, in a browser).
 - [ ] Every placeholder page sends a signed-out person to the login page, and a person whose clinic
       is not settled to the clinic picker, as Today does.
-- [ ] Lint, the token search and the check for requests to other hosts pass on every staff page,
-      as in E00-T04a.
+- [ ] No Figtree or Newsreader file is left in the repository; Onest and Source Serif 4 are in
+      `src/ui/fonts/` with their licences.
+- [ ] Lint, the token search and the check for requests to other hosts pass on every staff page and
+      on `/login`, as in E00-T04a.
 - [ ] `pnpm check` and `pnpm build` pass.
 
 ---
@@ -882,6 +898,10 @@ E00-T04's four parts (D-086).
   decision entry. The submit button is disabled while the action runs, so a double click sends one
   request (Discovered, E00-T03 test). A field shows its label, its control and its error, tied
   together for screen readers.
+- **A call that fails at the network** (the server restarting, the connection gone: the call's
+  promise rejects) shows the general failure and enables the button again. The login form and the
+  logout button do the same: today both stay disabled with no message, and only a reload helps
+  (E00-T04a test note 1). The login form's part changes what the form shows, not how login works.
 - **The toast**, shadcn/ui's (D-009), restyled (demo lines 1364–1366), for an action that is done
   or failed. There is no dark mode, so the theme package the published wrapper imports is not
   added.
@@ -898,6 +918,9 @@ submit from a first: E01-T02 and E01-T05 (Discovered, E00-T03 test).
       shown for one clinic and sent after another tab switched clinic shows the reload message
       (tester, in a browser).
 - [ ] A double click on submit sends one request (tester, the browser's network log).
+- [ ] With the request failed at the network, the demo form shows the general failure, the login
+      form shows `login.errors.failed`, and the logout button a failure message; each button works
+      again (tester, in a browser).
 - [ ] What the form shows for each wrapper code and for a refusal is unit-tested.
 - [ ] `/dev/components` answers 404 in a production build.
 - [ ] Every field on `/dev/components` has a label tied to its control, and the page works with the

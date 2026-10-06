@@ -81,7 +81,8 @@ Take these from the demo and define them once (Tailwind theme / CSS variables) i
 Never hard-code a colour in a component. They are in `src/app/globals.css`, with the few this list
 lacks (text on primary, links, focus, errors, small text) marked there.
 
-**Fonts.** UI: `Figtree`. Headings and big numbers: `Newsreader` (serif, weight 400–500).
+**Fonts.** UI: `Onest`. Headings and big numbers: `Source Serif 4` (serif, weight 400–500).
+They replace the demo's Figtree and Newsreader, which have no Cyrillic letters (D-089).
 Both are open-licensed; bundle them with the app (D-009).
 
 **Base size.** 14 px text, line height 1.45. Page headings 28–34 px serif. Section headings 16 px, weight 600.
