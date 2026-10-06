@@ -264,3 +264,45 @@ describe('one person, a link in one clinic and none in another', () => {
     expect(await redirectOf(recordVisit(clinicD, { visitId: newId() }))).toBe('/choose-clinic');
   });
 });
+
+describe('the kind is read again on every request (E01-T01a, tester)', () => {
+  it("a provider's kind changed, or the link removed, counts from the next request, without a new sign-in", async () => {
+    const clinic = await insertClinic(admin);
+    const provider = await insertProvider(admin, clinic, 'dentist');
+    const linked = await person([{ clinicId: clinic, role: 'owner', providerId: provider }]);
+    requestFrom(linked);
+    expect((await approveAftercare(clinic, { visitId: newId() })).ok).toBe(true);
+
+    await admin.query(`update providers set kind = 'hygienist' where id = $1`, [provider]);
+    expect(await approveAftercare(clinic, { visitId: newId() })).toEqual(forbidden);
+    expect((await recordVisit(clinic, { visitId: newId() })).ok).toBe(true);
+
+    await admin.query('update memberships set provider_id = null where user_id = $1', [linked.id]);
+    expect(await recordVisit(clinic, { visitId: newId() })).toEqual(forbidden);
+    expect(await sidebarLinks()).toEqual(OWNER_LINKS);
+  });
+});
+
+describe('clinics_for_user() keeps its guards (E01-T01a, tester)', () => {
+  // Migration 0002 drops the function and creates it again, so both guards were written anew.
+  it('runs as its owner with a fixed search_path', async () => {
+    const { rows } = await admin.query(
+      `select prosecdef as definer, proconfig as config from pg_proc
+        where oid = 'public.clinics_for_user(uuid)'::regprocedure`,
+    );
+    expect(rows).toEqual([{ definer: true, config: ['search_path=pg_catalog, public'] }]);
+  });
+
+  it('only the app role and its owner may call it, not PUBLIC', async () => {
+    const { rows } = await admin.query<{ grantee: string }>(
+      `select coalesce(r.rolname, 'PUBLIC') as grantee
+         from pg_proc p
+         cross join lateral aclexplode(p.proacl) a
+         left join pg_roles r on r.oid = a.grantee
+        where p.oid = 'public.clinics_for_user(uuid)'::regprocedure
+          and a.privilege_type = 'EXECUTE'
+        order by 1`,
+    );
+    expect(rows.map((row) => row.grantee)).toEqual(['chairside_app', 'chairside_migrator']);
+  });
+});

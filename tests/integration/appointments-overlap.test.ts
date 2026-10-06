@@ -172,3 +172,21 @@ describe('no double booking (D-020)', () => {
     expect(pgErrorConstraint((two as PromiseRejectedResult).reason)).toBe(NO_DOUBLE_BOOKING);
   });
 });
+
+describe('the night the clocks go back (E01-T01a, tester)', () => {
+  // 25 October 2026 in a clinic on Central European time: 02:00 to 03:00 comes twice, first in
+  // summer time (+02:00), then in winter time (+01:00). The rule compares real moments, not the
+  // clock on the wall.
+  const summer = (time: string) => `2026-10-25T${time}:00+02:00`;
+  const winter = (time: string) => `2026-10-25T${time}:00+01:00`;
+  const at = (starts: string, ends: string) =>
+    visit(0, 0, 30, { starts_at: starts, ends_at: ends });
+
+  it('the same clock time an hour apart does not overlap; a visit across the change is checked in real time', async () => {
+    await book(at(summer('02:15'), summer('02:45')));
+    await book(at(winter('02:15'), winter('02:45'))); // the same clock time, an hour later
+    // 02:40 summer time to 02:10 winter time is 30 minutes, though the clock goes back.
+    await refused(book(at(summer('02:40'), winter('02:10')))); // over the end of the first
+    await book(at(summer('02:50'), winter('02:10'))); // between the two
+  });
+});

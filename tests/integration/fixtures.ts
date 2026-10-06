@@ -84,6 +84,7 @@ export const PG = {
   invalidCursorName: '34000', // the cursor does not exist (any more)
   uniqueViolation: '23505',
   checkViolation: '23514',
+  notNullViolation: '23502',
   foreignKeyViolation: '23503',
   exclusionViolation: '23P01',
 } as const;

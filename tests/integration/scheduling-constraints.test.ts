@@ -338,6 +338,32 @@ describe('values of the wrong form or out of range are refused too', () => {
   });
 });
 
+describe('null and the longest phone number (E01-T01a, tester)', () => {
+  // A check lets null through; only "not null" refuses it. A null status or overlap_ok would also
+  // leave the appointment out of appointments_no_double_booking, whose WHERE is then null.
+  it.each([
+    { table: 'appointments', column: 'status' },
+    { table: 'appointments', column: 'source' },
+    { table: 'appointments', column: 'overlap_ok' },
+    { table: 'providers', column: 'kind' },
+    { table: 'patients', column: 'status' },
+    { table: 'patients', column: 'whatsapp_status' },
+  ] as const)('$column of $table refuses null', async ({ table, column }) => {
+    await expectPgError(insert(table, rowOfA(table, { [column]: null })), PG.notNullViolation);
+  });
+
+  it('a phone number has at most 15 digits, as E.164 says', async () => {
+    const fifteen = `${fakePhone(1)}0000`; // the seed's made-up block, made longer
+    expect(fifteen).toMatch(/^\+\d{15}$/);
+    await insert('patients', rowOfA('patients', { phone_e164: fifteen }));
+    await expectPgError(
+      insert('patients', rowOfA('patients', { phone_e164: `${fifteen}0` })),
+      PG.checkViolation,
+      'patients_phone_e164_check',
+    );
+  });
+});
+
 describe('opening hours and closed days', () => {
   it('hold one row per weekday and one per date in a clinic, and the same again in another', async () => {
     const [one, other] = [await insertClinic(admin), await insertClinic(admin)];
