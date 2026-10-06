@@ -1630,3 +1630,26 @@ architecture), `changed` (differs from the original files), `process`.
   computer's fallback font, unlike the text around it, headings most of all.
 - **Revisit if:** a letter a clinic uses does not show in these fonts; or the heading font's
   first load is felt (429 KB, fetched once, then cached): then a subset of Latin and Cyrillic.
+
+### D-090 · E00-T05 split in two: the seed now, `clinic:create` before staging; the seed runs with tsx
+- **Origin:** E00-T05's refinement in E00-T04b's Done pass, 2026-10-06 (`handoffs/E00-T05a.md`).
+  tsx: **Owner, 2026-10-06** (agent rule 4, a package).
+- **What:**
+  - E00-T05 is split. **E00-T05a**, the seed (normal), keeps E00-T05's place, before E01-T01.
+    **E00-T05b**, `clinic:create` (critical: the first owner's login, a hosted database), comes
+    after E00-T06b and before E00-T07, which needs it. The order: E00-T04b → E00-T05a → E01-T01 →
+    E00-T04c → E00-T04d → E01-T02 → E00-T06b → E00-T05b → E00-T07 → the rest of E01. This
+    replaces E00-T05's place in D-087's order.
+  - `tsx` is a development dependency, at the version the lockfile already holds through
+    drizzle-kit and vitest (4.23.15), so nothing new is installed. The seed runs with it and may
+    import `@/`: it makes its logins with `createStaffUser()`, as D-063 says, which plain Node
+    cannot load (`@/` and extensionless imports). `migrate.ts` and `reset.ts` stay plain Node.
+  - The seed runs on this machine only, behind `db:reset`'s guard: its logins share one
+    development password, written in `README.md`.
+- **Why:** E00-T05 held two tasks of different risk and timing. E01-T01 needs the seed next; only
+  staging needs `clinic:create`, whose setup link and database role are login and hosting
+  questions, asked when it is refined. A seed that hashed its own passwords would make logins a
+  second way, against D-063.
+- **Revisit if:** staging needs the seed (E00-T07 decides; its password then comes from the host's
+  secret store), or a script must run where development packages are not installed (E00-T05b in
+  production: credentials never reach a development machine, `overview.md`).
