@@ -21,6 +21,20 @@ export function loginError(status: number | undefined): LoginError {
   return 'failed';
 }
 
+/**
+ * Signs in through the auth library and says why it failed, or null when it did not. A call that
+ * fails at the network (the server restarting, the connection gone: the promise rejects) is
+ * `failed`, so the form says so and its button works again (E00-T04c).
+ */
+export async function attemptSignIn(email: string, password: string): Promise<LoginError | null> {
+  try {
+    const { error } = await authClient.signIn.email({ email, password });
+    return error ? loginError(error.status) : null;
+  } catch {
+    return 'failed';
+  }
+}
+
 /** Whether the form runs in the browser never changes once it does: nothing to subscribe to. */
 function subscribeToNothing() {
   return () => undefined;
@@ -53,12 +67,12 @@ export function LoginForm() {
     const form = new FormData(event.currentTarget);
     setPending(true);
     setError(null);
-    const { error: failure } = await authClient.signIn.email({
-      email: String(form.get('email') ?? ''),
-      password: String(form.get('password') ?? ''),
-    });
+    const failure = await attemptSignIn(
+      String(form.get('email') ?? ''),
+      String(form.get('password') ?? ''),
+    );
     if (failure) {
-      setError(loginError(failure.status));
+      setError(failure);
       setPending(false);
       return;
     }

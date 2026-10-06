@@ -50,6 +50,96 @@
     "description": "This part of Chairside is still being built."
   },
   "logout": {
-    "button": "Log out"
+    "button": "Log out",
+    "failed": "Logging out did not work. Try again."
+  },
+  "form": {
+    "invalid": "Some fields need a look. See the notes under them, then try again.",
+    "forbidden": "Your role does not allow this. If you need it, ask your clinic's owner.",
+    "clinicChanged": "The clinic was changed in another tab, so nothing was saved. Reload the page to go on in the clinic chosen there.",
+    "reload": "Reload the page",
+    "failed": "That did not work. Try again.",
+    "fieldErrors": {
+      "missing": "Fill this in.",
+      "tooSmall": "This is too short.",
+      "tooBig": "This is too long.",
+      "invalidFormat": "This does not look right. Check it and try again.",
+      "other": "Check this field."
+    }
+  },
+  "toast": {
+    "label": "Notification",
+    "region": "Notifications ({hotkey})"
+  },
+  "devComponents": {
+    "title": "Components",
+    "intro": "Every component of the design system, and a form that gives each answer. This page exists outside production only.",
+    "buttons": {
+      "heading": "Buttons",
+      "primary": "Primary",
+      "secondary": "Secondary",
+      "quiet": "Quiet",
+      "primaryDisabled": "Primary, disabled",
+      "secondaryDisabled": "Secondary, disabled",
+      "quietDisabled": "Quiet, disabled"
+    },
+    "fields": {
+      "heading": "Fields",
+      "plain": "A field",
+      "disabled": "A disabled field",
+      "invalid": "A field with an error",
+      "invalidError": "This is how an error shows under its field."
+    },
+    "badges": {
+      "heading": "Status pills",
+      "booked": "Booked",
+      "noReply": "No reply yet",
+      "confirmed": "Confirmed",
+      "arrived": "In the chair",
+      "completed": "Done",
+      "cancelled": "Cancelled",
+      "noShow": "No-show"
+    },
+    "card": {
+      "heading": "Card",
+      "title": "A card",
+      "description": "Its description, in the muted colour.",
+      "action": "An action",
+      "content": "What the card holds.",
+      "footer": "A button in its footer"
+    },
+    "empty": {
+      "heading": "Empty state",
+      "title": "Nothing here yet",
+      "description": "An empty state says what will show here, and what to do next.",
+      "action": "Do it"
+    },
+    "logo": {
+      "heading": "Logo"
+    },
+    "toast": {
+      "heading": "Toast",
+      "show": "Show a toast",
+      "showAnother": "Show another one",
+      "first": "This is a toast. It goes away by itself.",
+      "second": "This one replaced the first."
+    },
+    "form": {
+      "heading": "The form pattern",
+      "intro": "Send it to see each answer. A short or long note, or a code that is not four digits, shows an error at its field. Sent from a tab whose clinic another tab has changed, it asks for a reload.",
+      "note": "A note, 2 to 40 characters",
+      "code": "A code of four digits",
+      "answer": "What the action answers",
+      "answers": {
+        "done": "Done, with a toast",
+        "refusal": "A refusal of its own",
+        "internal": "Something unexpected",
+        "forbidden": "Needs the owner's permission"
+      },
+      "submit": "Send",
+      "submitting": "Sending…",
+      "done": "The demo action is done.",
+      "refused": "The demo action said no, as it was asked to."
+    }
   }
 }
