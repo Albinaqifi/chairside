@@ -9,19 +9,18 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E01-T01b` is Ready: `/pipeline E01-T01b` (`handoffs/E01-T01b.md`)
-- **Decisions it waits on:** none. The owner allowed its one change to E00-T05a's seed test (2026-10-06)
+- **Next task to start:** `E00-T04c` is Ready: `/pipeline E00-T04c` (`handoffs/E00-T04c.md`)
+- **Decisions it waits on:** none
 
 ## Next (in order)
 
-1. E01-T01b
-2. E00-T04c
-3. E00-T04d
-4. E01-T02
-5. E00-T06b
-6. E00-T05b
-7. E00-T07
-8. The rest of E01, in the epic's own order (D-087)
+1. E00-T04c
+2. E00-T04d
+3. E01-T02
+4. E00-T06b
+5. E00-T05b
+6. E00-T07
+7. The rest of E01, in the epic's own order (D-087)
 
 ## Blocked
 
@@ -46,7 +45,7 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T04 | App shell and design system | builder | normal | split (D-086) | Into E00-T04a … E00-T04d, the next four rows |
 | E00-T04a | Tokens, fonts, texts and the login page | builder | normal | **Done** | Merged by the owner (PR #23). Tokens in `globals.css`, local fonts, next-intl, Button, Input, Label, both pages restyled, favicon, text and accessibility lint (D-088). Fonts with Cyrillic → E00-T04b (owner, D-089); other leftovers → E00-T04b, E00-T04c, E01-T02, E01-T04, `CLAUDE.md`; six struck. See `handoffs/E00-T04a.md` |
 | E00-T04b | The staff shell: sidebar, navigation by role, placeholder pages | builder | normal | **Done** | Merged by the owner (PR #25). The staff layout, the sidebar by permission, Today and six placeholder pages, Card, Badge, the empty state, Onest and Source Serif 4 (D-089). Leftovers → E00-T04c (the clinic a form sends), E01-T01 (the provider link); five struck. See `handoffs/E00-T04b.md` |
-| E00-T04c | The form pattern, the toast and the components page | builder | normal | Planned | After E01-T01b in the order (D-087, D-091), refined in its Done pass; depends on E00-T04b (D-086) |
+| E00-T04c | The form pattern, the toast and the components page | builder | critical | Ready | Refined in E01-T01b's Done pass. Critical for the clinic id every form sends (D-069); the toast on Radix's, already installed, so no new package. See `handoffs/E00-T04c.md` |
 | E00-T04d | The other components: fields, tabs, drawer and dialog | builder | normal | Planned | After E00-T04c, refined in its Done pass (D-086) |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | split (D-090) | Into E00-T05a and E00-T05b, the next two rows |
 | E00-T05a | Seed data: two clinics and a login for every role | builder | normal | **Done** | Merged by the owner (PR #27). `pnpm db:seed` and `db:reset` seed two clinics and a login for every role, under fixed ids (owner's answer (a)). Leftovers → E01-T01b, E03-T00 (`message`), `CLAUDE.md`, agent rule 5; six struck. See `handoffs/E00-T05a.md` |
@@ -62,7 +61,7 @@ Fully specified.
 |---|---|---|---|---|---|
 | E01-T01 | Schema: providers, treatment types, patients, appointments, hours | builder | critical | split (D-091) | Into E01-T01a and E01-T01b, the next two rows |
 | E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | **Done** | Merged by the owner (PR #29). Seven scheduling tables with their policies and the no-double-booking constraint (migration 0002); the provider kind through `clinics_for_user()`. Leftovers → E01-T02, E01-T04, E01-T05, E01-T10, E02-T01; the appointments indexes → E07-T00; one done by its tester, five struck. See `handoffs/E01-T01a.md` |
-| E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | **Tested** | Second seed file: three providers, 40 patients, 76 appointments for the seed's week, the second clinic's few; the day a parameter; dentist and hygienist linked. Review: no required changes, 1 `none` suggestion. Test: no findings, 2 `none` lines (Discovered). See `handoffs/E01-T01b.md` |
+| E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | **Done** | Merged by the owner (PR #31). `02-scheduling.ts`: three providers, 40 patients and a week of appointments for the seed's day; dentist and hygienist linked. Leftovers: the aftercare flags on the Discovered list (→ E06-T00), the fake-data check's two blind spots a review check in `security-privacy.md`; six struck. See `handoffs/E01-T01b.md` |
 | E01-T02 | Patients: list, search, create, edit | builder | normal | Planned | |
 | E01-T03 | Patient profile | builder | normal | Planned | |
 | E01-T04 | Calendar: day view | builder | normal | Planned | |
@@ -200,6 +199,7 @@ Outline. Needs E07-T00.
 - E00-T04b · The staff shell: sidebar, navigation by role, placeholder pages · merged 2026-10-06 (PR #25)
 - E00-T05a · Seed data: two clinics and a login for every role · merged 2026-10-06 (PR #27)
 - E01-T01a · Schema: providers, treatment types, patients, appointments, hours · merged 2026-10-06 (PR #29)
+- E01-T01b · The scheduling seed: providers, patients and a week of appointments · merged 2026-10-06 (PR #31)
 
 ## Owner actions (standing)
 

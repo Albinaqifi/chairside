@@ -880,10 +880,12 @@ layout (the staff app is desktop-first, and a tablet in landscape).
 
 ### E00-T04c · The form pattern, the toast and the components page
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04b
+- **Role:** builder · **Risk:** critical (the tenant and action wrappers: the clinic id every form
+  sends, D-069, and the wrappers' call shape if the bridge changes it, D-072) · **Depends on:** E00-T04b
 - **Read:** `design-ref` (Toast, demo lines 1364–1366, logic 1615; Wording style) · `security`
-  (Part 1, sections 2 and 8) · D-069, D-072, D-076, D-084, D-086 · the architect section of
-  `handoffs/E00-T04c.md`
+  (Part 1, sections 2 and 8) · D-069, D-072, D-076, D-084, D-086 · Next.js's `02-guides/forms.md`
+  and `01-getting-started/10-error-handling.md` (`node_modules/next/dist/docs/01-app/`) · the
+  architect section of `handoffs/E00-T04c.md`
 
 **Why.** Every screen that changes data sends its form to a wrapped action and shows the answer in
 one way, so no screen invents its own error handling and none loses the clinic check. The third of
@@ -909,11 +911,14 @@ E00-T04's four parts (D-086).
   promise rejects) shows the general failure and enables the button again. The login form and the
   logout button do the same: today both stay disabled with no message, and only a reload helps
   (E00-T04a test note 1). The login form's part changes what the form shows, not how login works.
-- **The toast**, shadcn/ui's (D-009), restyled (demo lines 1364–1366), for an action that is done
-  or failed. There is no dark mode, so the theme package the published wrapper imports is not
-  added.
+- **The toast**, for an action that is done or failed, as the demo's (lines 1364–1366, logic 1615):
+  one message at a time at the bottom centre, the next replacing it, gone after 3.4 s. Built on
+  Radix's Toast from `radix-ui` (D-086's, already installed; shadcn/ui's earlier toast was too) and
+  restyled. shadcn/ui's current toast needs `sonner` and `next-themes`, which D-086 does not list:
+  not taken. Its colours and radius are tokens derived from existing ones (`CLAUDE.md`, Styles).
 - **`/dev/components`**, outside production only: every component of `src/ui/`, and a demo form
-  whose action gives each answer on request, for visual and keyboard checks.
+  whose action gives each answer on request, for visual and keyboard checks. In a production build
+  the page answers 404 and its demo action refuses before its handler does anything.
 - **Docs.** `CLAUDE.md`: how a form calls an action, with a short example, as for the wrappers,
   and that its clinic id comes from the frame.
 
@@ -933,8 +938,10 @@ submit from a first: E01-T02 and E01-T05 (Discovered, E00-T03 test).
 - [ ] With the request failed at the network, the demo form shows the general failure, the login
       form shows `login.errors.failed`, and the logout button a failure message; each button works
       again (tester, in a browser).
-- [ ] What the form shows for each wrapper code and for a refusal is unit-tested.
-- [ ] `/dev/components` answers 404 in a production build.
+- [ ] What the form shows for each wrapper code, for a refusal and for a call that rejects is
+      unit-tested.
+- [ ] `/dev/components` answers 404 in a production build, and its demo action refuses there
+      before anything is written (unit test).
 - [ ] Every field on `/dev/components` has a label tied to its control, and the page works with the
       keyboard alone (tester, in a browser).
 - [ ] Lint, the token search and the check for requests to other hosts pass, as in E00-T04a.
