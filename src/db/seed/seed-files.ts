@@ -33,9 +33,11 @@ export type SeedValue = string | number | boolean | null | readonly string[];
 
 /**
  * A person who signs in with the development password (seeded.ts). Made with createStaffUser()
- * (D-063) unless a person with this email is there already.
+ * (D-063) under their fixed id, unless a person with this id is there already.
  */
 export interface SeedPerson {
+  /** Their fixed id (seeded.ts), which createStaffUser() keeps. */
+  id: string;
   email: string;
   name: string;
   memberships: readonly SeedMembership[];

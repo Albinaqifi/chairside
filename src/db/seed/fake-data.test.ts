@@ -38,7 +38,7 @@ describe('the check finds a name, phone or email that breaks the rules', () => {
         rows: [{ id: 'p1', first_name: 'Ana', last_name: 'Kodra', phone: fakePhone(7) }],
       },
     ],
-    people: [{ email: `desk@${EMAIL_DOMAIN}`, name: 'Front desk', memberships: [] }],
+    people: [{ id: 'u1', email: `desk@${EMAIL_DOMAIN}`, name: 'Front desk', memberships: [] }],
   };
   /** The file with one value changed, at a path of keys and indexes. */
   function withValue(path: (string | number)[], value: unknown): unknown {

@@ -43,6 +43,7 @@ export const clinicsAndStaff: SeedFile = {
   ],
   people: [
     {
+      id: SEEDED_PEOPLE.owner.id,
       email: SEEDED_PEOPLE.owner.email,
       name: 'Owner',
       memberships: [
@@ -61,6 +62,7 @@ export const clinicsAndStaff: SeedFile = {
       ],
     },
     {
+      id: SEEDED_PEOPLE.dentist.id,
       email: SEEDED_PEOPLE.dentist.email,
       name: 'Dentist',
       memberships: [
@@ -73,6 +75,7 @@ export const clinicsAndStaff: SeedFile = {
       ],
     },
     {
+      id: SEEDED_PEOPLE.hygienist.id,
       email: SEEDED_PEOPLE.hygienist.email,
       name: 'Hygienist',
       memberships: [
@@ -85,6 +88,7 @@ export const clinicsAndStaff: SeedFile = {
       ],
     },
     {
+      id: SEEDED_PEOPLE.frontDesk.id,
       email: SEEDED_PEOPLE.frontDesk.email,
       name: 'Front desk',
       memberships: [
@@ -97,6 +101,7 @@ export const clinicsAndStaff: SeedFile = {
       ],
     },
     {
+      id: SEEDED_PEOPLE.frontDeskImport.id,
       email: SEEDED_PEOPLE.frontDeskImport.email,
       name: 'Front desk',
       memberships: [
@@ -109,6 +114,7 @@ export const clinicsAndStaff: SeedFile = {
       ],
     },
     {
+      id: SEEDED_PEOPLE.soncogledFrontDesk.id,
       email: SEEDED_PEOPLE.soncogledFrontDesk.email,
       name: 'Front desk',
       memberships: [

@@ -4,13 +4,19 @@ export interface NewStaffUser {
   email: string;
   name: string;
   password: string;
+  /**
+   * The person's id, for the seed only (owner, handoffs/E00-T05a.md): a seeded person keeps the
+   * same id across `pnpm db:reset`, so later seeds and tests can name them. Everyone else leaves it
+   * out and gets a new id from the library (newId()).
+   */
+  id?: string;
 }
 
 /**
  * Creates a person who can sign in with email and password. There is no self sign-up: the seed
  * (E00-T05a), the operator script (E00-T05b) and invites (E04) call this. The library hashes the
- * password and sets the timestamps. Fails if the email is taken or the password is too short to
- * sign in with.
+ * password and sets the timestamps. Fails if the email or the given id is taken, or the password
+ * is too short to sign in with.
  */
 export async function createStaffUser(input: NewStaffUser): Promise<{ id: string }> {
   const ctx = await getAuth().$context;
@@ -22,6 +28,9 @@ export async function createStaffUser(input: NewStaffUser): Promise<{ id: string
   }
   const user = await ctx.internalAdapter.createUser(
     {
+      // The library keeps an id it is given: it creates users with forceAllowId, and with a
+      // generateId of our own it writes a given id as it is. Without one, it calls newId().
+      ...(input.id === undefined ? {} : { id: input.id }),
       email: input.email.trim().toLowerCase(),
       name: input.name.trim(),
       emailVerified: true, // staff accounts are created by the operator or by invite

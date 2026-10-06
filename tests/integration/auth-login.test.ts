@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeDb } from '@/db/client';
+import { newId } from '@/lib/ids';
 import { createLogger } from '@/lib/logger';
 import { createStaffUser, getAuth, SESSION_IDLE_SECONDS, SIGN_IN_RATE_LIMIT } from '@/modules/auth';
-import { migratorPool, testEmail } from './fixtures';
+import { expectPgError, migratorPool, PG, testEmail } from './fixtures';
 
 // Login through the auth library's own HTTP handler, as the browser uses it (src/app/api/auth).
 // Every value here is synthetic; the password is a marker: finding it in a log line means a leak.
@@ -135,6 +136,50 @@ describe('signing in and out', () => {
     await expect(
       createStaffUser({ email: testEmail(), name: 'Short', password: 'short' }),
     ).rejects.toThrow(/password/);
+  });
+});
+
+describe('creating a person under a given id (only the seed gives one, E00-T05a)', () => {
+  it('keeps the id, links the password to it, and the person signs in under it', async () => {
+    const id = newId();
+    const givenEmail = testEmail();
+    expect(
+      await createStaffUser({ id, email: givenEmail, name: 'Test Staff', password: PASSWORD }),
+    ).toEqual({ id });
+
+    const { rows } = await admin.query(
+      `select u.id, a.user_id, a.account_id, a.provider_id
+         from users u join accounts a on a.user_id = u.id where u.email = $1`,
+      [givenEmail],
+    );
+    expect(rows).toEqual([{ id, user_id: id, account_id: id, provider_id: 'credential' }]);
+
+    const cookie = cookiesOf(await signIn(givenEmail, PASSWORD));
+    const session = (await (await authRequest('/get-session', { cookie })).json()) as {
+      user: { id: string };
+    };
+    expect(session.user.id).toBe(id);
+  });
+
+  it('refuses an id that is taken, and leaves that person as they were', async () => {
+    const otherPassword = 'MARKER-pw-9c2e-other';
+    const otherEmail = testEmail();
+    const person = `select u.*, a.id as account_row_id, a.password
+                      from users u join accounts a on a.user_id = u.id where u.id = $1`;
+    const before = (await admin.query(person, [userId])).rows;
+    expect(before).toHaveLength(1);
+
+    await expectPgError(
+      createStaffUser({ id: userId, email: otherEmail, name: 'Taken', password: otherPassword }),
+      PG.uniqueViolation,
+    );
+
+    expect((await admin.query(person, [userId])).rows).toEqual(before);
+    const { rows: made } = await admin.query('select 1 from users where email = $1', [otherEmail]);
+    expect(made, 'no person with the refused email').toEqual([]);
+    // The person still signs in with their own password, not with the one the refused call carried.
+    expect((await signIn(email, PASSWORD)).status).toBe(200);
+    expect((await signIn(email, otherPassword)).status).toBe(401);
   });
 });
 

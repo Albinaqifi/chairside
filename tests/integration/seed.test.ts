@@ -50,6 +50,7 @@ const soncogled = (rest: Omit<Expected, 'clinicId' | 'clinicName'>): Expected =>
 const LOGINS = [
   {
     who: 'the owner',
+    id: SEEDED_PEOPLE.owner.id,
     email: SEEDED_PEOPLE.owner.email,
     name: 'Owner',
     clinics: [
@@ -59,12 +60,14 @@ const LOGINS = [
   },
   {
     who: 'the dentist',
+    id: SEEDED_PEOPLE.dentist.id,
     email: SEEDED_PEOPLE.dentist.email,
     name: 'Dentist',
     clinics: [harbourStreet({ role: 'dentist', extraPermissions: [], sidebar: SIDEBAR.dentist })],
   },
   {
     who: 'the hygienist',
+    id: SEEDED_PEOPLE.hygienist.id,
     email: SEEDED_PEOPLE.hygienist.email,
     name: 'Hygienist',
     clinics: [
@@ -73,6 +76,7 @@ const LOGINS = [
   },
   {
     who: 'the front desk',
+    id: SEEDED_PEOPLE.frontDesk.id,
     email: SEEDED_PEOPLE.frontDesk.email,
     name: 'Front desk',
     clinics: [
@@ -81,6 +85,7 @@ const LOGINS = [
   },
   {
     who: 'the front desk with the import permission',
+    id: SEEDED_PEOPLE.frontDeskImport.id,
     email: SEEDED_PEOPLE.frontDeskImport.email,
     name: 'Front desk',
     clinics: [
@@ -93,6 +98,7 @@ const LOGINS = [
   },
   {
     who: "the second clinic's front desk",
+    id: SEEDED_PEOPLE.soncogledFrontDesk.id,
     email: SEEDED_PEOPLE.soncogledFrontDesk.email,
     name: 'Front desk',
     clinics: [soncogled({ role: 'front_desk', extraPermissions: [], sidebar: SIDEBAR.frontDesk })],
@@ -175,7 +181,7 @@ describe('the seed (E00-T05a)', () => {
 
   it.each(LOGINS)(
     '$who signs in with the development password, and finds their clinics, role and sidebar',
-    async ({ email, name, clinics }) => {
+    async ({ id, email, name, clinics }) => {
       const address = freshAddress();
       const cookie = await signInCookie(email, SEED_PASSWORD, address);
       const session = await getAuth().handler(
@@ -185,6 +191,7 @@ describe('the seed (E00-T05a)', () => {
       );
       const { user } = (await session.json()) as { user: { id: string; name: string } };
       expect(user.name).toBe(name);
+      expect(user.id, 'their fixed id, the same after every reset').toBe(id);
 
       const found = (await clinicsForUser(user.id)).sort((a, b) =>
         a.clinicId.localeCompare(b.clinicId),

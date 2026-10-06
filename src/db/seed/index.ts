@@ -44,9 +44,9 @@ export function checkSeedTargets({ migratorUrl, appUrl }: SeedUrls): void {
 
 /**
  * Writes every seed file, in order, into the database `urls` names, after checkSeedTargets(). A
- * row whose id is there already, and a person whose email is, are left as they are: on a database
- * that holds the seed, it adds nothing. The pool createStaffUser() used stays open for the caller,
- * who ends it with closeDb().
+ * row or a person whose id is there already is left as it is: on a database that holds the seed,
+ * it adds nothing. The pool createStaffUser() used stays open for the caller, who ends it with
+ * closeDb().
  */
 export async function seedDatabase(urls: SeedUrls): Promise<SeedSummary[]> {
   checkSeedTargets(urls);
@@ -71,13 +71,12 @@ async function writeSeedFile(migrator: pg.Client, file: SeedFile): Promise<SeedS
     for (const row of rows) count(table, await insertRow(migrator, table, row));
   }
   for (const person of file.people ?? []) {
-    const { userId, made } = await findOrMakePerson(migrator, person);
-    count('people', made ? 1 : 0);
+    count('people', await addPerson(migrator, person));
     for (const membership of person.memberships) {
       const row = {
         id: membership.id,
         clinic_id: membership.clinicId,
-        user_id: userId,
+        user_id: person.id,
         role: membership.role,
         extra_permissions: membership.extraPermissions,
       };
@@ -106,24 +105,22 @@ async function insertRow(migrator: pg.Client, table: string, row: SeedRow): Prom
 }
 
 /**
- * The person's user id. Made with createStaffUser() (D-063), so the auth library hashes the
- * development password, unless a person with this email is there already.
+ * Makes the person under their fixed id with createStaffUser() (D-063), so the auth library hashes
+ * the development password. Returns 1 when the person was added, 0 when a person with this id was
+ * there already, who is left as they are. A database seeded before people had fixed ids holds
+ * them under other ids: createStaffUser() then fails on the taken email, and `pnpm db:reset`
+ * builds it again.
  */
-async function findOrMakePerson(
-  migrator: pg.Client,
-  person: SeedPerson,
-): Promise<{ userId: string; made: boolean }> {
-  const { rows } = await query<{ id: string }>(migrator, 'select id from users where email = $1', [
-    person.email,
-  ]);
-  const existing = rows[0];
-  if (existing) return { userId: existing.id, made: false };
-  const { id } = await createStaffUser({
+async function addPerson(migrator: pg.Client, person: SeedPerson): Promise<number> {
+  const { rowCount } = await query(migrator, 'select 1 from users where id = $1', [person.id]);
+  if (rowCount) return 0;
+  await createStaffUser({
+    id: person.id,
     email: person.email,
     name: person.name,
     password: SEED_PASSWORD,
   });
-  return { userId: id, made: true };
+  return 1;
 }
 
 /** A query whose error carries no values if it fails (D-070): the seed's are synthetic too. */
