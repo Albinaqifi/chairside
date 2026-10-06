@@ -16,6 +16,16 @@ describe('cn', () => {
     expect(cn('font-sans', 'font-serif')).toBe('font-serif');
   });
 
+  it("knows E00-T04b's sizes and tracking: captions and upper-case labels keep their colour", () => {
+    expect(cn('text-muted', 'text-caption')).toBe('text-muted text-caption');
+    expect(cn('text-overline', 'text-muted')).toBe('text-overline text-muted');
+    expect(cn('text-caption', 'text-overline')).toBe('text-overline');
+    expect(cn('text-overline', 'text-small')).toBe('text-small');
+    expect(cn('tracking-overline', 'tracking-heading')).toBe('tracking-heading');
+    expect(cn('text-nav-text', 'text-nav-current-text')).toBe('text-nav-current-text');
+    expect(cn('bg-primary-soft', 'hover:bg-nav-hover')).toBe('bg-primary-soft hover:bg-nav-hover');
+  });
+
   it('joins conditional classes as clsx does', () => {
     expect(cn('px-3', false, undefined, ['py-2', { 'w-full': true, hidden: false }])).toBe(
       'px-3 py-2 w-full',

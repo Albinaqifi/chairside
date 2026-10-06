@@ -4,7 +4,12 @@
  * The design tokens (docs/product/design-reference.md, "Design tokens"), each defined once. A
  * component takes its colours, fonts and radii only from here (CLAUDE.md): Tailwind's own colours,
  * font families, text sizes and radii are switched off, so a class outside these tokens gives no
- * style at all. Tokens the design reference lacks are marked "added"; handoffs/E00-T04a.md names them.
+ * style at all. Tokens the design reference lacks are marked "added"; the handoff note of the task
+ * that added them names them (handoffs/E00-T04a.md, handoffs/E00-T04b.md).
+ *
+ * A text size, radius, tracking or animation token added here is also named in src/ui/cn.ts:
+ * tailwind-merge knows only Tailwind's own scales, so without it cn() reads `text-<new size>` as a
+ * colour and drops the colour class next to it, with no error (src/ui/cn.test.ts).
  */
 @theme {
   --color-*: initial;
@@ -36,6 +41,13 @@
   --color-error: var(--color-red-fg);
   --color-error-bg: var(--color-red-bg);
 
+  /* Added: the sidebar's navigation (demo line 33 and logic line 1778). Its items' text, the text
+     colour's hue made lighter; the current item's text, the primary's hue made darker (on
+     primary-soft, the current item's background); the hover tint, primary-soft's hue made lighter. */
+  --color-nav-text: oklch(0.35 0.02 210);
+  --color-nav-current-text: oklch(0.25 0.05 195);
+  --color-nav-hover: oklch(0.94 0.018 190);
+
   /* Status colours, text / background / dot: the demo's ST and RED (lines 1376–1385), under the
      status names of data-model.md. The demo's "unconfirmed" (No reply yet: booked, and a reminder
      was sent) is no-reply here, its "done" is completed, its "noshow" is no-show. */
@@ -66,14 +78,19 @@
 
   /* Text sizes: the base size and its line height, section headings (weight 600) and page
      headings (serif, 28–34 px). Added: labels and small print (the demo's labels), the wordmark
-     (demo line 28), and the letter spacing of the wordmark and the 28 px headings. */
+     (demo line 28), and the letter spacing of the wordmark and the 28 px headings. Added in
+     E00-T04b: captions (the clinic's name under the logo, status pills: demo lines 30 and 134), and
+     the small upper-case labels with their letter spacing ("Signed in as", demo line 48). */
   --text-base: 14px;
   --text-base--line-height: 1.45;
   --text-section: 16px;
   --text-heading: 28px;
   --text-small: 12.5px;
+  --text-caption: 12px;
+  --text-overline: 11px;
   --text-wordmark: 22px;
   --tracking-heading: -0.01em;
+  --tracking-overline: 0.08em;
 
   /* Radii: cards 14–18 px (16, the demo's most frequent), buttons and inputs 8–10 px, pills. */
   --radius-card: 16px;
@@ -96,13 +113,13 @@
 }
 
 /*
- * Fonts: Figtree for the interface, Newsreader for headings and big numbers, with the demo's
- * fallbacks. src/ui/fonts.ts loads the files (next/font/local) and sets --font-figtree and
- * --font-newsreader on <html>; inline, so a class reads them where it is used.
+ * Fonts: Onest for the interface, Source Serif 4 for headings and big numbers (D-089), with the
+ * demo's fallbacks. src/ui/fonts.ts loads the files (next/font/local) and sets --font-onest and
+ * --font-source-serif on <html>; inline, so a class reads them where it is used.
  */
 @theme inline {
-  --font-sans: var(--font-figtree), system-ui, sans-serif;
-  --font-serif: var(--font-newsreader), serif;
+  --font-sans: var(--font-onest), system-ui, sans-serif;
+  --font-serif: var(--font-source-serif), serif;
 }
 
 /* The page, as the demo's page styles set it (lines 13–22). The font comes from --font-sans. */

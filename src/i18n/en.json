@@ -30,13 +30,24 @@
     "noClinicHeading": "No clinic yet",
     "noClinic": "Your account is not a member of any clinic. Ask your clinic's owner to add you."
   },
-  "staffHeader": {
-    "signedInAs": "{name} · {role}",
+  "shell": {
+    "pageTitle": "{page} · Chairside",
+    "navigation": "Main",
+    "signedInAs": "Signed in as",
     "switchClinic": "Switch clinic"
   },
-  "today": {
-    "heading": "Today",
-    "placeholder": "You are signed in to {clinic}. The schedule arrives with E01."
+  "nav": {
+    "today": "Today",
+    "calendar": "Calendar",
+    "visit": "In the chair",
+    "patients": "Patients",
+    "automations": "Automations",
+    "import": "Import patients",
+    "settings": "Settings"
+  },
+  "placeholder": {
+    "title": "Coming soon",
+    "description": "This part of Chairside is still being built."
   },
   "logout": {
     "button": "Log out"

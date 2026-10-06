@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Card, CardContent } from '@/ui/card';
 import { Logo } from '@/ui/logo';
 
 /**
@@ -12,9 +13,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="mb-6 flex justify-center">
         <Logo />
       </div>
-      <div className="rounded-card border border-border bg-surface p-7 motion-safe:animate-enter">
-        {children}
-      </div>
+      <Card className="py-7 motion-safe:animate-enter">
+        <CardContent className="px-7">{children}</CardContent>
+      </Card>
     </main>
   );
 }

@@ -89,6 +89,7 @@ src/app/              Next.js routes. Thin: parse input, call a module, render.
 src/proxy.ts          Moves the session forward and renews its cookie (D-067); no valid session → /login,
                       except a server action: its wrapper sends the person there (D-074).
                       Not the permission check: pages and actions still call currentStaff().
+                      It skips paths that start with `login` or hold a dot: a staff path never does.
 src/modules/<name>/   All business logic. index.ts = public API, schema.ts = its tables.
 src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts.
 src/i18n/             next-intl's request configuration and the message file, en.json.

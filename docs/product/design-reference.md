@@ -79,7 +79,8 @@ them as wording reference, not as final copy.
 
 Take these from the demo and define them once (Tailwind theme / CSS variables) in E00-T04a.
 Never hard-code a colour in a component. They are in `src/app/globals.css`, with the few this list
-lacks (text on primary, links, focus, errors, small text) marked there.
+lacks (text on primary, links, focus, errors, small text; the sidebar's navigation colours,
+captions and small upper-case labels, E00-T04b) marked there.
 
 **Fonts.** UI: `Onest`. Headings and big numbers: `Source Serif 4` (serif, weight 400–500).
 They replace the demo's Figtree and Newsreader, which have no Cyrillic letters (D-089).
