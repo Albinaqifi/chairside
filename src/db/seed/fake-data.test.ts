@@ -9,7 +9,9 @@ import {
   isFakeName,
   isFakePhone,
   LAST_NAMES,
+  PROVIDER_SHORT_NAMES,
   STAFF_NAMES,
+  TREATMENT_NAMES,
 } from './fake-data';
 import { SEED_FILES, type SeedFile } from './seed-files';
 
@@ -27,6 +29,63 @@ describe('every row each seed file writes keeps the fake-data rules', () => {
       expect(fakeDataProblems(file)).toEqual([]);
     },
   );
+});
+
+describe('every row a seed file makes for a day keeps the fake-data rules (E01-T01b)', () => {
+  // The rows that depend on the seed's day (a week of appointments) are made by a function, which
+  // the check above does not call: here they are made for each day of one week and read.
+  const WEEK = ['2026-10-19', '2026-10-21', '2026-10-23', '2026-10-24', '2026-10-25'];
+  const files = SEED_FILES.filter((file) => file.dayTables);
+
+  it('there is a seed file whose rows depend on the day', () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  it.each(files.map((file) => ({ title: file.title, file })))(
+    'seed file "$title": every name, phone and email of the rows it makes for each day',
+    ({ file }) => {
+      for (const day of WEEK) {
+        const tables = file.dayTables?.(day) ?? [];
+        expect(tables.flatMap(({ rows }) => rows).length, day).toBeGreaterThan(0);
+        expect(fakeDataProblems(tables), day).toEqual([]);
+      }
+    },
+  );
+});
+
+describe("treatment names and providers' short names (E01-T01b)", () => {
+  /** A seed file made up for this test: one treatment type and one provider. */
+  const file = (treatment: string, shortName: string): SeedFile => ({
+    title: 'a seed file made up for this test',
+    tables: [
+      { table: 'treatment_types', rows: [{ id: 't1', name: treatment }] },
+      { table: 'providers', rows: [{ id: 'p1', name: 'Ana Kodra', short_name: shortName }] },
+    ],
+  });
+
+  it('passes the listed ones, and finds one that is not listed', () => {
+    expect(fakeDataProblems(file('Root canal', 'Dr. Kodra'))).toEqual([]);
+    expect(fakeDataProblems(file('Bleaching', 'Dr. Kodra'))).toEqual([
+      'tables[0].rows[0].name: a name that is not in the invented lists',
+    ]);
+    expect(fakeDataProblems(file('Root canal', 'Dr. Someone'))).toEqual([
+      'tables[1].rows[0].short_name: a name that is not in the invented lists',
+    ]);
+  });
+
+  it('are each listed once, and in no other list', () => {
+    const all = [
+      ...FIRST_NAMES.latin,
+      ...FIRST_NAMES.cyrillic,
+      ...LAST_NAMES.latin,
+      ...LAST_NAMES.cyrillic,
+      ...STAFF_NAMES,
+      ...CLINIC_NAMES,
+      ...PROVIDER_SHORT_NAMES,
+      ...TREATMENT_NAMES,
+    ];
+    expect(new Set(all).size).toBe(all.length);
+  });
 });
 
 describe('the check finds a name, phone or email that breaks the rules', () => {

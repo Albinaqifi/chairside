@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { describeSummary, seedDatabase, type SeedUrls } from './index';
+import { fakeClock } from '@/lib/clock';
+import { describeSummary, seedDatabase, seedDayOf, type SeedUrls } from './index';
 
 // E00-T05a, acceptance 5: the seed refuses what db:reset refuses, before it connects. Its logins
 // share a password written in README.md, so it must never reach a database that is not on this
@@ -115,6 +116,25 @@ describe('the db:seed guard, before it connects', () => {
   it('lets a database on this machine through: the seed then connects as the migration role', async () => {
     await expect(seedDatabase(LOCAL)).rejects.toThrow('the seed connected');
     expect(connections[0]!.mock.calls).toHaveLength(1);
+  });
+});
+
+describe("the seed's day (E01-T01b)", () => {
+  it('is the day given, or the date it is in the seeded clinics when the clock is read', () => {
+    expect(seedDayOf('2026-10-28')).toBe('2026-10-28');
+    // 23:30 UTC on 25 October is already the 26th in Skopje, and 12:30 on the 26th in Auckland.
+    expect(seedDayOf(undefined, fakeClock('2026-10-25T23:30:00Z'))).toBe('2026-10-26');
+    expect(seedDayOf(undefined, fakeClock('2026-10-25T22:59:00Z'))).toBe('2026-10-25');
+  });
+
+  it('refuses a day that is not a date of the calendar, before the seed connects', async () => {
+    for (const day of ['2026-02-30', '28.10.2026', '']) {
+      expect(() => seedDayOf(day), day).toThrow(RangeError);
+      await expect(seedDatabase(LOCAL, day), day).rejects.toThrow(
+        'day must be a date of the calendar',
+      );
+    }
+    for (const connection of connections) expect(connection.mock.calls).toEqual([]);
   });
 });
 

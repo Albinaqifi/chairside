@@ -43,8 +43,8 @@ command that differs is copying the settings file (step 3).
    ```
    It listens on port 5433 of this machine, so it does not clash with a PostgreSQL you may
    already have on 5432.
-5. Build the database from the migrations and fill it with the seed: two invented clinics and a
-   login for every role (next section):
+5. Build the database from the migrations and fill it with the seed: two invented clinics, a
+   login for every role and a working week of appointments (next two sections):
    ```
    pnpm db:reset
    ```
@@ -72,6 +72,29 @@ Everything the seed writes is invented: names from fixed lists, phones from one 
 `+389` numbers, emails at `example.test` (`src/db/seed/fake-data.ts`). The seed refuses every
 database that is not on this machine, and `NODE_ENV=production`, so these logins exist only here.
 In notes and tasks, name a seeded login by its role ("the seeded front desk"), not by its email.
+
+## The seeded week
+
+Harbour Street Dental runs a working week (`src/db/seed/02-scheduling.ts`):
+
+- Three providers, each a calendar column with a chair, a colour and a lunch break every weekday:
+  two dentists and a hygienist. The seeded dentist and hygienist are linked to their columns; the
+  owner is not.
+- Open Monday to Friday, 08:00 to 18:00, and closed on the Monday after the week.
+- Ten treatment types with their lengths.
+- 40 patients, named in Latin and in Cyrillic letters: three without a phone, a child whose phone
+  and email are their guardian's, two siblings who share their guardian's phone, one archived.
+- 76 appointments, Monday to Friday of this week, or of next week when the seed runs on a Saturday
+  or a Sunday. Days before today are over (completed, no-show or cancelled); today's morning is over
+  or in the chair, its afternoon still to come; later days are booked, confirmed or cancelled. One
+  visit is booked over another ("book anyway").
+
+Забна клиника Сончоглед has the same hours, one dentist, five patients and ten appointments, and
+no treatment types.
+
+The week is made for the day the seed runs, in the clinics' time zone (`Europe/Skopje`). On a
+database that already holds the seed, `pnpm db:seed` adds nothing and the week stays where it was:
+run `pnpm db:reset` to move it to the current week.
 
 ## Everyday commands
 

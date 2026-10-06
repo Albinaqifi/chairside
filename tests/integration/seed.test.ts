@@ -1,9 +1,18 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { membershipExtras, navigationFor } from '@/app/(staff)/navigation';
 import { closeDb } from '@/db/client';
-import { seedDatabase, type SeedSummary } from '@/db/seed';
+import { seedDatabase, seedDayOf, type SeedSummary } from '@/db/seed';
+import { scheduling } from '@/db/seed/02-scheduling';
 import { isFakeEmail, isFakePhone } from '@/db/seed/fake-data';
-import { SEED_PASSWORD, SEEDED_CLINICS, SEEDED_MEMBERSHIPS, SEEDED_PEOPLE } from '@/db/seed/seeded';
+import { addDays, isoWeekday, seedWeek } from '@/db/seed/seed-day';
+import {
+  SEED_PASSWORD,
+  SEEDED_CLINICS,
+  SEEDED_MEMBERSHIPS,
+  SEEDED_PEOPLE,
+  SEEDED_PROVIDERS,
+  SEEDED_TIME_ZONE,
+} from '@/db/seed/seeded';
 import messages from '@/i18n/en.json';
 import { clinicsForUser, getAuth, type ExtraPermission, type Role } from '@/modules/auth';
 import { migratorPool, ORIGIN, signInCookie } from './fixtures';
@@ -151,6 +160,19 @@ describe('the seed (E00-T05a)', () => {
   it('adds two clinics, six people and seven memberships to a database without them', () => {
     expect(firstRun).toEqual([
       { title: 'clinics and staff', added: { clinics: 2, people: 6, memberships: 7 } },
+      {
+        title: 'scheduling',
+        added: {
+          providers: 4,
+          provider_breaks: 15,
+          treatment_types: 10,
+          clinic_hours: 10,
+          patients: 45,
+          closed_days: 1,
+          appointments: 86,
+          'provider links': 2,
+        },
+      },
     ]);
   });
 
@@ -219,7 +241,113 @@ describe('the seed (E00-T05a)', () => {
 
     expect(secondRun).toEqual([
       { title: 'clinics and staff', added: { clinics: 0, people: 0, memberships: 0 } },
+      {
+        title: 'scheduling',
+        added: {
+          providers: 0,
+          provider_breaks: 0,
+          treatment_types: 0,
+          clinic_hours: 0,
+          patients: 0,
+          closed_days: 0,
+          appointments: 0,
+          'provider links': 0,
+        },
+      },
     ]);
     expect(await seededRows()).toEqual(before);
+  });
+});
+
+// E01-T01b, acceptance 3: the scheduling seed file, written by the one seeding above (beforeAll),
+// with the real day. Its ids are the same whatever the day (seeded.test.ts), so its rows are found
+// by the ids it gives for any day; the statuses, which depend on the day, are checked by the unit
+// tests (src/db/seed/02-scheduling.test.ts), never here.
+describe('the scheduling seed (E01-T01b)', () => {
+  const tables = [...(scheduling.tables ?? []), ...(scheduling.dayTables?.('2026-10-19') ?? [])];
+  const appointments = tables.find(({ table }) => table === 'appointments')?.rows ?? [];
+
+  it('writes every row of its file, none refused and none dropped', async () => {
+    const added = firstRun.find(({ title }) => title === 'scheduling')?.added;
+    for (const { table, rows } of tables) {
+      const ids = rows.map((row) => row.id).sort();
+      const found = await admin.query<{ id: string }>(
+        `select id from ${table} where id = any($1)`,
+        [ids],
+      );
+      expect(found.rows.map((row) => row.id).sort(), table).toEqual(ids);
+      expect(added?.[table], `${table}: the first run's count`).toBe(rows.length);
+    }
+  });
+
+  it('links the seeded dentist and hygienist to their providers, and nobody else', async () => {
+    const { rows } = await admin.query<{ id: string; provider_id: string | null }>(
+      'select id, provider_id from memberships where id = any($1)',
+      [Object.values(SEEDED_MEMBERSHIPS)],
+    );
+    const linked = Object.fromEntries(rows.map((row) => [row.id, row.provider_id]));
+    expect(linked).toEqual({
+      ...Object.fromEntries(Object.values(SEEDED_MEMBERSHIPS).map((id) => [id, null])),
+      [SEEDED_MEMBERSHIPS.harbourStreetDentist]: SEEDED_PROVIDERS.harbourStreetDentist,
+      [SEEDED_MEMBERSHIPS.harbourStreetHygienist]: SEEDED_PROVIDERS.harbourStreetHygienist,
+    });
+  });
+
+  const { harbourStreet, soncogled: secondClinic } = SEEDED_CLINICS;
+  it.each([
+    { who: 'the dentist', id: SEEDED_PEOPLE.dentist.id, kinds: { [harbourStreet]: 'dentist' } },
+    {
+      who: 'the hygienist',
+      id: SEEDED_PEOPLE.hygienist.id,
+      kinds: { [harbourStreet]: 'hygienist' },
+    },
+    {
+      who: 'the owner',
+      id: SEEDED_PEOPLE.owner.id,
+      kinds: { [harbourStreet]: null, [secondClinic]: null },
+    },
+  ])(
+    "clinics_for_user() gives $who their provider's kind in each clinic, or none",
+    async (seeded) => {
+      const found = await clinicsForUser(seeded.id);
+      expect(
+        Object.fromEntries(found.map((choice) => [choice.clinicId, choice.providerKind])),
+      ).toEqual(seeded.kinds);
+    },
+  );
+
+  it("stores each appointment at the weekday and local time its file wrote, in the clinics' zone", async () => {
+    // The file writes `2026-10-19 08:00 Europe/Skopje`; PostgreSQL turns it into the moment.
+    const weekdayAndTime = (moment: unknown) => {
+      const [day = '', time] = String(moment).split(' ');
+      return `${isoWeekday(day)} ${time}`;
+    };
+    const { rows } = await admin.query<{ id: string; starts: string; ends: string }>(
+      `select id,
+              to_char(starts_at at time zone $2, 'ID HH24:MI') as starts,
+              to_char(ends_at at time zone $2, 'ID HH24:MI') as ends
+         from appointments where id = any($1)`,
+      [appointments.map((row) => row.id), SEEDED_TIME_ZONE],
+    );
+    expect(Object.fromEntries(rows.map((row) => [row.id, [row.starts, row.ends]]))).toEqual(
+      Object.fromEntries(
+        appointments.map((row) => [
+          row.id,
+          [weekdayAndTime(row.starts_at), weekdayAndTime(row.ends_at)],
+        ]),
+      ),
+    );
+  });
+
+  it('fills the week of the day the seed ran on, read from the clock', async () => {
+    const { rows } = await admin.query<{ day: string }>(
+      `select distinct to_char(starts_at at time zone $2, 'YYYY-MM-DD') as day
+         from appointments where id = any($1) order by 1`,
+      [appointments.map((row) => row.id), SEEDED_TIME_ZONE],
+    );
+    // The seed ran in beforeAll: today, or yesterday if midnight has passed since.
+    const today = seedDayOf(undefined);
+    const weeks = [seedWeek(today), seedWeek(addDays(today, -1))];
+    expect(weeks).toContainEqual(rows.map((row) => row.day));
   });
 });
