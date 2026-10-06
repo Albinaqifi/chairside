@@ -8,14 +8,14 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 
 ## Now
 
-- **Milestone:** M0 Foundation
-- **Next task to start:** `E00-T05a` is Tested (PR #27): the owner merges it on green, then the architect's Done pass (`handoffs/E00-T05a.md`)
-- **Decisions it waits on:** none. tsx is approved (owner, D-090)
+- **Milestone:** M0 Foundation, with M1's first tasks (D-087)
+- **Next task to start:** `E01-T01a` is Ready: `/pipeline E01-T01a`
+- **Decisions it waits on:** none. Q-15's assumption is accepted (owner, 2026-10-06)
 
 ## Next (in order)
 
-1. E00-T05a
-2. E01-T01
+1. E01-T01a
+2. E01-T01b
 3. E00-T04c
 4. E00-T04d
 5. E01-T02
@@ -47,10 +47,10 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T04 | App shell and design system | builder | normal | split (D-086) | Into E00-T04a … E00-T04d, the next four rows |
 | E00-T04a | Tokens, fonts, texts and the login page | builder | normal | **Done** | Merged by the owner (PR #23). Tokens in `globals.css`, local fonts, next-intl, Button, Input, Label, both pages restyled, favicon, text and accessibility lint (D-088). Fonts with Cyrillic → E00-T04b (owner, D-089); other leftovers → E00-T04b, E00-T04c, E01-T02, E01-T04, `CLAUDE.md`; six struck. See `handoffs/E00-T04a.md` |
 | E00-T04b | The staff shell: sidebar, navigation by role, placeholder pages | builder | normal | **Done** | Merged by the owner (PR #25). The staff layout, the sidebar by permission, Today and six placeholder pages, Card, Badge, the empty state, Onest and Source Serif 4 (D-089). Leftovers → E00-T04c (the clinic a form sends), E01-T01 (the provider link); five struck. See `handoffs/E00-T04b.md` |
-| E00-T04c | The form pattern, the toast and the components page | builder | normal | Planned | After E01-T01 in the order (D-087), refined in its Done pass; depends on E00-T04b (D-086) |
+| E00-T04c | The form pattern, the toast and the components page | builder | normal | Planned | After E01-T01b in the order (D-087, D-091), refined in its Done pass; depends on E00-T04b (D-086) |
 | E00-T04d | The other components: fields, tabs, drawer and dialog | builder | normal | Planned | After E00-T04c, refined in its Done pass (D-086) |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | split (D-090) | Into E00-T05a and E00-T05b, the next two rows |
-| E00-T05a | Seed data: two clinics and a login for every role | builder | normal | Tested | PR #27. Owner answered builder question 1 with (a): `createStaffUser()` takes an optional fixed id that only the seed passes. Tester: no findings, two `none` notes (Discovered). See `handoffs/E00-T05a.md` |
+| E00-T05a | Seed data: two clinics and a login for every role | builder | normal | **Done** | Merged by the owner (PR #27). `pnpm db:seed` and `db:reset` seed two clinics and a login for every role, under fixed ids (owner's answer (a)). Leftovers → E01-T01b, E03-T00 (`message`), `CLAUDE.md`, agent rule 5; six struck. See `handoffs/E00-T05a.md` |
 | E00-T05b | `clinic:create`: the operator's script for a new clinic | builder | critical | Planned | After E00-T06b, before E00-T07 (D-090); refined in E00-T06b's Done pass, where the owner decides what its setup link opens |
 | E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); needs E00-T04a … E00-T04d and E00-T05a, comes after E01-T02 (D-087); takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086) |
 | E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | Planned | Owner: hosting accounts (Q-07). After E00-T05b, E00-T06b and E00-T09 |
@@ -61,7 +61,9 @@ Fully specified.
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
-| E01-T01 | Schema: providers, treatment types, patients, appointments, hours | builder | critical | Planned | Refined in E00-T05a's Done pass; takes the provider link (E00-T04b review) |
+| E01-T01 | Schema: providers, treatment types, patients, appointments, hours | builder | critical | split (D-091) | Into E01-T01a and E01-T01b, the next two rows |
+| E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | Ready | Split from E01-T01 (D-091) in E00-T05a's Done pass; takes the provider link (E00-T04b review); Q-15's assumption accepted by the owner. See `handoffs/E01-T01a.md` |
+| E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | Planned | Refined (D-091); Ready once E01-T01a is Done, checked in its Done pass. See `handoffs/E01-T01b.md` |
 | E01-T02 | Patients: list, search, create, edit | builder | normal | Planned | |
 | E01-T03 | Patient profile | builder | normal | Planned | |
 | E01-T04 | Calendar: day view | builder | normal | Planned | |
@@ -100,7 +102,7 @@ Outline. WhatsApp + email (D-055). Needs E03-T00 (refinement), Q-08, Meta verifi
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
-| E03-T00 | Refine this epic | architect | low | Planned | |
+| E03-T00 | Refine this epic | architect | low | Planned | Puts the non-production allow-list before the first real adapter (E00-T05a review) |
 | E03-T01 | Choose the WhatsApp route and the email provider | architect + owner | normal | Ready | Can run any time; owner starts Meta verification in parallel |
 | E03-T02 | Email adapter and email layout | builder | critical | Planned | |
 | E03-T03 | WhatsApp adapter and template registry | builder | critical | Planned | |
@@ -197,6 +199,7 @@ Outline. Needs E07-T00.
 - E00-T11 · Components in the form lint, and the gaps E00-T10 left · merged 2026-10-05 (PR #20)
 - E00-T04a · Tokens, fonts, texts and the login page · merged 2026-10-06 (PR #23)
 - E00-T04b · The staff shell: sidebar, navigation by role, placeholder pages · merged 2026-10-06 (PR #25)
+- E00-T05a · Seed data: two clinics and a login for every role · merged 2026-10-06 (PR #27)
 
 ## Owner actions (standing)
 

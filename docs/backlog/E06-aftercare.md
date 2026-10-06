@@ -27,7 +27,7 @@ structured output and data-retention options, and record the model choice. Move 
 ---
 
 ### E06-T01 · Schema: treatment plans, visit treatments, aftercare
-- **Role:** builder · **Risk:** critical · **Depends on:** E01-T01, E02-T01
+- **Role:** builder · **Risk:** critical · **Depends on:** E01-T01a, E02-T01
 - **Read:** `data-model` (section 6) · D-017, D-036
 
 **Do.** Migrations for `treatment_plans`, `plan_items`, `visit_treatments`,

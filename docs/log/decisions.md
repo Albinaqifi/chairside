@@ -1653,3 +1653,25 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** staging needs the seed (E00-T07 decides; its password then comes from the host's
   secret store), or a script must run where development packages are not installed (E00-T05b in
   production: credentials never reach a development machine, `overview.md`).
+
+### D-091 · E01-T01 split in two: the schema and the provider link, then the seed; two columns wait for the tables they point at
+- **Origin:** E01-T01's refinement in E00-T05a's Done pass, 2026-10-06 (`handoffs/E01-T01a.md`).
+- **What:**
+  - E01-T01 is split. **E01-T01a** (critical: migrations, policies, the permission check): the
+    seven scheduling tables, their constraints and indexes, and the provider link. **E01-T01b**
+    (normal: rows on this machine only): the scheduling seed. The order: E00-T05a → E01-T01a →
+    E01-T01b → E00-T04c → E00-T04d → E01-T02 → E00-T06b → E00-T05b → E00-T07 → the rest of E01.
+    This replaces E01-T01's place in D-090's order; E00-T04c is refined in E01-T01b's Done pass.
+  - A membership's provider kind comes from `clinics_for_user()`, which returns it beside what
+    D-062 lists: every page and action already reads the user's clinics through it, before any
+    clinic is set, so the sidebar and the action wrapper need no second query.
+  - `patients.import_job_id` comes with `import_jobs` (E04-T01), `appointments.source_message_id`
+    with `messages` (E02-T01), each with its foreign key, as `memberships.provider_id` comes with
+    `providers` (D-062). `data-model.md` says so.
+- **Why:** E01-T01 held about 600 lines of product code by estimate (seven tables with their
+  policies, the provider link, 40 patients and a week of appointments), above the one-session size
+  (`workflow.md`, about 400); the seed is local data and needs no critical review. A foreign key to
+  a table that does not exist yet cannot be written, and a column without one would be the only
+  unchecked link in the schema.
+- **Revisit if:** `clinics_for_user()` must return more than a membership's own fields and its
+  provider's kind: then a read inside the tenant transaction, not a wider cross-clinic function.

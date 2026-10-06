@@ -22,7 +22,7 @@ build on the working assumption that recalls are care communication with an opt-
 ---
 
 ### E05-T01 · Schema: care plans
-- **Role:** builder · **Risk:** critical · **Depends on:** E01-T01
+- **Role:** builder · **Risk:** critical · **Depends on:** E01-T01a
 - **Read:** `data-model` (section 5) · D-031 · demo lines 1406–1412
 
 **Do.** Migrations for `care_plans`, `care_plan_treatment_types`, `patient_care_plans`.

@@ -121,7 +121,9 @@ task, unless product code on `main` would hit it today.
 6. `@/db/client` only in `src/db/` and `src/modules/auth/` (the auth library's global tables and
    `clinics_for_user()`, D-062), `withTenant` also in `src/app/_lib/actions.ts`, database drivers
    only in `src/db/`; none of them is passed on from there. `import type { TenantTransaction }`
-   anywhere; tests are exempt (`eslint-rules/database-access.mjs`, D-071, D-077, D-084).
+   anywhere; tests are exempt (`eslint-rules/database-access.mjs`, D-071, D-077, D-084). The seed
+   (`src/db/seed/`) connects as the migration role and lint does not stop an import of it:
+   reviewers check that only `src/db/` and tests import it.
 7. Type-aware, in `src/`: every promise is awaited (Drizzle queries too) and only Errors are thrown
    or rejected (a refusal is returned, never thrown). In `.ts` and `.mts` files a statement that
    only hangs `.catch(…)`, `.then(ok, fail)` or `.finally(…)` on a promise is reported; in a `.tsx`
@@ -180,7 +182,9 @@ task, unless product code on `main` would hit it today.
   arguments, never inside the message text: the logger cannot clean text. It drops the fields
   listed in `src/lib/personal-fields.ts` as a safety net, not as permission to log personal data.
   Errors leave `withTenant` without query values (D-070): keep a caught error as `cause`, never
-  copy its message into a new error or a string.
+  copy its message into a new error or a string. A Zod transform or refinement reports with
+  `ctx.addIssue`, never by throwing: a thrown error is logged with its message, and `JSON.parse`,
+  `BigInt()` and `new URL()` put their input in theirs.
 - Files Node runs directly (`src/db/migrate.ts`, `src/db/reset.ts`): import only packages and
   relative `.ts` files, never `@/`. The seed (`src/db/seed/`) runs with tsx and may import `@/`
   (D-090).

@@ -52,7 +52,8 @@ the owner yourself and wait for an answer.
 *Why:* a wrong guess in these areas is expensive or irreversible. A question costs minutes.
 
 **5. No real patient data. Ever. Anywhere but production.**
-Use the seed generator. Invented names, test phone ranges, `@example.test` emails.
+Use the seed generator. Invented names, the seed's made-up phone block (`+389` has no test
+range), `@example.test` emails.
 Never paste real data into code, tests, fixtures, prompts, commits or notes, even if the
 owner's message contains some: say so and ask for a synthetic version.
 You never have production credentials and never connect to production.

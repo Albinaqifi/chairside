@@ -16,12 +16,14 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 
 ### E02-T01 · Schema: rules, templates, messages, links, consents, tasks
 
-- **Role:** builder · **Risk:** critical · **Depends on:** E01-T01
-- **Read:** `data-model` (section 3) · `messaging` (Idempotency keys; Message states) · D-023, D-036, D-038
+- **Role:** builder · **Risk:** critical · **Depends on:** E01-T01a, E01-T01b
+- **Read:** `data-model` (section 3) · `messaging` (Idempotency keys; Message states) · D-023, D-036, D-038, D-091
 
 **Do.**
 - Migrations for `automation_rules`, `message_templates`, `messages`, `message_events`,
-  `patient_links`, `consents`, `tasks` as in `data-model.md`, with policies and composite keys.
+  `patient_links`, `consents`, `tasks` as in `data-model.md`, with policies and composite keys;
+  and `appointments.source_message_id` with its foreign key `(clinic_id, source_message_id)`,
+  which waited for `messages` (D-091).
 - `UNIQUE (clinic_id, idempotency_key)` on `messages`; index on `(status, scheduled_for)`;
   unique `token_hash` on `patient_links`.
 - Grants: the app role may insert into `consents` and `message_events` but not update or delete them.
@@ -45,7 +47,7 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 
 ### E02-T02 · Send-time calculation (pure functions)
 
-- **Role:** builder · **Risk:** critical · **Depends on:** E01-T01
+- **Role:** builder · **Risk:** critical · **Depends on:** E01-T01a
 - **Read:** `messaging` (Working out the send time; Message classes) · `test-strategy` (Message timing) · D-029
 
 **Why.** Every timing bug is silent. This logic must be pure, small and tested to exhaustion.
