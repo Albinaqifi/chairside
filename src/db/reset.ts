@@ -1,6 +1,7 @@
 // Rebuilds a LOCAL database from nothing: creates or updates the two database roles, drops and
-// recreates the database, then applies every migration. Used by `pnpm db:reset` and by the
-// integration tests. It refuses to touch a database that is not on this machine.
+// recreates the database, then applies every migration. Used by `pnpm db:reset`, which then runs
+// the seed (src/db/seed), and by the integration tests, which get the migrations only. It refuses
+// to touch a database that is not on this machine.
 // Node runs this file directly: import only packages and relative `.ts` files (see migrate.ts).
 import pg from 'pg';
 import { runMigrations } from './migrate.ts';
@@ -45,40 +46,67 @@ export function connectionTarget(url: string): ConnectionTarget {
   };
 }
 
-/**
- * The guard, run before anything connects: all three connections go to this machine and to one
- * database server on it (the same host and port), never with NODE_ENV=production, the migration
- * role and the app role use the same database, and the app connects as the role the migrations
- * grant access to. Throws if any of that is not so.
- */
-export function checkResetTargets({ adminUrl, migratorUrl, appUrl }: DatabaseUrls): {
+/** The connections a script opens to a local database: `db:reset` all three, `db:seed` two. */
+export interface LocalDatabaseUrls {
+  adminUrl?: string;
+  migratorUrl: string;
+  appUrl: string;
+}
+
+/** The guard of `pnpm db:reset`, run before anything connects: checkLocalTargets() on its three. */
+export function checkResetTargets(urls: DatabaseUrls): {
   migrator: ConnectionTarget;
   app: ConnectionTarget;
 } {
+  return checkLocalTargets('reset', urls);
+}
+
+/**
+ * The guard of the scripts that write to a local database, `pnpm db:reset` and `pnpm db:seed`
+ * (whose logins share a password written in README.md), run before anything connects: every
+ * connection goes to this machine and to one database server on it (the same host and port), never
+ * with NODE_ENV=production, the migration role and the app role use the same database, and the app
+ * connects as the role the migrations grant access to. Throws if any of that is not so; `action`
+ * names the script in the message.
+ */
+export function checkLocalTargets(
+  action: 'reset' | 'seed',
+  { adminUrl, migratorUrl, appUrl }: LocalDatabaseUrls,
+): { migrator: ConnectionTarget; app: ConnectionTarget } {
+  // In the order messages name the variables: the admin connection first, when there is one.
+  const admin =
+    adminUrl === undefined
+      ? []
+      : [{ variable: 'DATABASE_ADMIN_URL', ...connectionTarget(adminUrl) }];
+  const migrator = connectionTarget(migratorUrl);
+  const app = connectionTarget(appUrl);
   const targets = [
-    connectionTarget(adminUrl),
-    connectionTarget(migratorUrl),
-    connectionTarget(appUrl),
+    ...admin,
+    { variable: 'MIGRATION_DATABASE_URL', ...migrator },
+    { variable: 'DATABASE_URL', ...app },
   ];
-  const [, migrator, app] = targets as [ConnectionTarget, ConnectionTarget, ConnectionTarget];
   for (const { host } of targets) {
     if (!LOCAL_HOSTS.has(host)) {
-      throw new Error(`Refusing to reset a database on "${host}": only local ones.`);
+      throw new Error(`Refusing to ${action} a database on "${host}": only local ones.`);
     }
   }
   // Another server on this machine, such as a second PostgreSQL on another port, is never
-  // touched: the roles, the dropped database and the migrations must all be on the same one.
+  // touched: the roles, the dropped database, the migrations and the seed must all be on the
+  // same one.
   const servers = targets.map(
     ({ host, port }) => `${host.includes(':') ? `[${host}]` : host}:${port}`,
   );
   if (new Set(servers).size !== 1) {
+    // "A, B and C", or "B and C" without the admin connection.
+    const variables = targets.map(({ variable }) => variable);
+    const named = `${variables.slice(0, -1).join(', ')} and ${variables.slice(-1).join('')}`;
     throw new Error(
-      'Refusing to reset: DATABASE_ADMIN_URL, MIGRATION_DATABASE_URL and DATABASE_URL must name ' +
-        `the same host and port (they name ${servers.join(', ')}).`,
+      `Refusing to ${action}: ${named} must name the same host and port ` +
+        `(they name ${servers.join(', ')}).`,
     );
   }
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('Refusing to reset a database when NODE_ENV is production.');
+    throw new Error(`Refusing to ${action} a database when NODE_ENV is production.`);
   }
   if (!migrator.database || migrator.database !== app.database) {
     throw new Error('MIGRATION_DATABASE_URL and DATABASE_URL must name the same database.');

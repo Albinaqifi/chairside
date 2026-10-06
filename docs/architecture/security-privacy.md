@@ -108,7 +108,9 @@ This document has two parts: rules that code must follow, and the gate before re
 
 ### 9. Data in non-production (D-044)
 - Synthetic data only: generated names, phone numbers from ranges reserved for testing,
-  emails at `@example.test`.
+  emails at `@example.test`. No range is reserved for `+389`, so the seed takes its phones from one
+  made-up block, written down with the other fake-data rules in `src/db/seed/fake-data.ts`; the
+  allow-list below is what keeps anything from being sent to them (E00-T05a).
 - Never copy production data down, not even "anonymised by hand".
 - Outgoing messages outside production reach only an allow-list of test contacts.
 
