@@ -27,6 +27,12 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 - `UNIQUE (clinic_id, idempotency_key)` on `messages`; index on `(status, scheduled_for)`;
   unique `token_hash` on `patient_links`.
 - Grants: the app role may insert into `consents` and `message_events` but not update or delete them.
+- **The meta-test checks the composite keys** (E01-T01a critical review, `data`): a case in
+  `tests/integration/tenant-tables.test.ts` reads `pg_constraint` and fails for a foreign key from
+  one tenant table to another that does not hold `clinic_id` on both sides (`clinics` and the
+  global tables left out). A foreign key check bypasses Row-Level Security, so a single-column key
+  takes another clinic's id. Its rule is shown failing on a bad key, as the meta-test's other rules
+  are; `CLAUDE.md` ("How to add a table", step 4) says what it now checks.
 - Default rules and default templates (English) created for every clinic: by the seed and by
   `clinic:create`. Triggers in this epic: `booking_confirmation`, `appointment_reminder`.
   Default channel order `[whatsapp, email]` (D-055); WhatsApp templates carry an empty
@@ -38,6 +44,8 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 
 **Acceptance.**
 - [ ] Meta-test and isolation tests pass.
+- [ ] The meta-test fails for a foreign key between two tenant tables without `clinic_id` on both
+      sides, and passes for every table there is (tests).
 - [ ] Inserting two messages with the same key in one clinic fails; the same key in two clinics is fine.
 - [ ] The app role cannot update or delete `consents` or `message_events` (test).
 - [ ] A newly created clinic has its default rules and templates.
