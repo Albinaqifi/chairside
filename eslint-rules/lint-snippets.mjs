@@ -6,8 +6,8 @@ import fs from 'node:fs';
 import { ESLint } from 'eslint';
 import { TYPED_FILES } from '../eslint.config.mjs';
 
-// ESLint reports a lint comment that noInlineConfig ignores (in src/) as a warning without a rule
-// id. architecture.test.ts expects it under this label.
+// ESLint reports a lint comment that noInlineConfig ignores (in every script file) as a warning
+// without a rule id. architecture.test.ts expects it under this label.
 const INLINE_CONFIG = 'inline config';
 
 let input = '';

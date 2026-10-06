@@ -78,7 +78,8 @@ them as wording reference, not as final copy.
 ## Design tokens
 
 Take these from the demo and define them once (Tailwind theme / CSS variables) in E00-T04a.
-Never hard-code a colour in a component.
+Never hard-code a colour in a component. They are in `src/app/globals.css`, with the few this list
+lacks (text on primary, links, focus, errors, small text) marked there.
 
 **Fonts.** UI: `Figtree`. Headings and big numbers: `Newsreader` (serif, weight 400–500).
 Both are open-licensed; bundle them with the app (D-009).

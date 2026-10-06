@@ -3,6 +3,8 @@
 # Dependencies whose install scripts may run. None are needed: their prebuilt binaries
 # come as regular packages.
 allowBuilds:
+  '@parcel/watcher': false
+  '@swc/core': false
   esbuild: false
   sharp: false
   unrs-resolver: false

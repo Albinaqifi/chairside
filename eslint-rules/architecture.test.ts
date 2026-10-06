@@ -22,7 +22,8 @@ const FORMS = 'chairside/forms-post';
 const REJECTED = '@typescript-eslint/prefer-promise-reject-errors';
 // (f) for a .catch(…), .then(ok, fail) or .finally(…) statement nobody awaits is a syntax rule too.
 const UNAWAITED = 'no-restricted-syntax';
-// What eslint-rules/lint-snippets.mjs calls a lint comment that noInlineConfig ignores in src/.
+// What eslint-rules/lint-snippets.mjs calls a lint comment that noInlineConfig ignores in every
+// script file.
 const INLINE_CONFIG = 'inline config';
 const ARCHITECTURE_RULES = [
   CLOCK,
@@ -77,7 +78,7 @@ const IN_DB = 'src/db/handles.ts';
 /** A function action, so the form passes and only its button or input is checked. */
 const SAVE = 'declare const save: (formData: FormData) => Promise<void>;';
 const PROPS = "import type { ComponentProps } from 'react';";
-/** Where E00-T04's components will live (D-084). No such file exists yet. */
+/** E00-T04a's Button (D-084): a case's snippet takes the real file's place while it is linted. */
 const UI_FILE = 'src/ui/button.tsx';
 /** React's types the component snippets use. */
 const REACT =
@@ -2307,5 +2308,151 @@ describe('script files in src/', () => {
       .map((entry) => path.relative(ROOT, path.join(entry.parentPath, entry.name)))
       .map((file) => file.split(path.sep).join('/'));
     expect(unchecked).toEqual([]);
+  });
+});
+
+// (i) Every visible text comes from the message file, and jsx-a11y's recommended rules, in src/app
+// and src/ui (E00-T04a, D-053, D-086). A list and rules of their own: many cases above write text in
+// JSX, which the text rule reports, and their expectations name only the architecture rules.
+const TEXT = 'react/jsx-no-literals';
+const UNLABELLED = 'jsx-a11y/label-has-associated-control';
+const CLICK_WITHOUT_KEYS = 'jsx-a11y/click-events-have-key-events';
+const STATIC_INTERACTION = 'jsx-a11y/no-static-element-interactions';
+const AUTOFOCUS = 'jsx-a11y/no-autofocus';
+const isTextOrA11yRule = (rule: string) => rule === TEXT || rule.startsWith('jsx-a11y/');
+/** A component that returns `jsx`, with a translator as next-intl's t() is. */
+const view = (jsx: string) =>
+  `declare const t: (key: string) => string; export function View() { return ${jsx}; }`;
+const UI_CARD = 'src/ui/card.tsx';
+
+const textCases: Case[] = [
+  ...[STAFF_PAGE, UI_CARD].flatMap((file): Case[] => [
+    { name: `i: <p>Hello</p> in ${file}`, file, code: view('<p>Hello</p>'), expected: [TEXT] },
+    {
+      name: `i: <p>{'Hello'}</p> in ${file}`,
+      file,
+      code: view("<p>{'Hello'}</p>"),
+      expected: [TEXT],
+    },
+    {
+      // With its text from t(), the rule takes the {…} for a control it may render: a review check.
+      name: `i: a <label> tied to no control in ${file}`,
+      file,
+      code: view('<label>Email</label>'),
+      expected: [UNLABELLED, TEXT],
+    },
+    {
+      name: `i: <div onClick> in ${file}`,
+      file,
+      code: view('<div onClick={() => undefined} />'),
+      expected: [CLICK_WITHOUT_KEYS, STATIC_INTERACTION],
+    },
+    {
+      name: `i: <p>{t('hello')}</p> in ${file} passes`,
+      file,
+      code: view("<p>{t('hello')}</p>"),
+      expected: [],
+    },
+  ]),
+  {
+    name: 'i: a template literal written as text',
+    file: STAFF_PAGE,
+    code: view('<p>{`Hello`}</p>'),
+    expected: [TEXT],
+  },
+  {
+    name: 'i: text in a fragment',
+    file: UI_CARD,
+    code: view('<>Hello</>'),
+    expected: [TEXT],
+  },
+  {
+    name: "i: punctuation only, such as the header's ' · ', is text too",
+    file: STAFF_PAGE,
+    code: view("<p>{t('name')} · {t('role')}</p>"),
+    expected: [TEXT],
+  },
+  {
+    name: 'i: a space between two texts passes',
+    file: STAFF_PAGE,
+    code: view("<p>{t('name')} {t('role')}</p>"),
+    expected: [],
+  },
+  {
+    // A review check (CLAUDE.md): the rule reads no prop, so className and the like pass.
+    name: 'i: text in aria-label, placeholder, title and alt is not seen by lint',
+    file: STAFF_PAGE,
+    code: view(
+      '<div><input aria-label="Search" placeholder="Name" title="Name" /><img src="/x.png" alt="Logo" /></div>',
+    ),
+    expected: [],
+  },
+  {
+    name: 'i: a <label> around its input passes',
+    file: STAFF_PAGE,
+    code: view('<label>{t(\'email\')}<input name="email" /></label>'),
+    expected: [],
+  },
+  {
+    name: 'i: a <label htmlFor> and its input pass',
+    file: UI_CARD,
+    code: view('<><label htmlFor="email">{t(\'email\')}</label><input id="email" /></>'),
+    expected: [],
+  },
+  {
+    name: 'i: a <button onClick> passes',
+    file: UI_CARD,
+    code: view('<button type="button" onClick={() => undefined}>{t(\'go\')}</button>'),
+    expected: [],
+  },
+  {
+    name: 'i: autoFocus is reported',
+    file: STAFF_PAGE,
+    code: view('<input name="q" autoFocus />'),
+    expected: [AUTOFOCUS],
+  },
+  {
+    // Its own exception in eslint.config.mjs, block (i), with the reason there.
+    name: "i: autoFocus in the login form passes: that file's exception",
+    file: 'src/app/(auth)/login/login-form.tsx',
+    code: view('<input name="email" autoFocus />'),
+    expected: [],
+  },
+  // The pages and components as they are.
+  ...[
+    'src/app/layout.tsx',
+    'src/app/(auth)/layout.tsx',
+    'src/app/(auth)/login/page.tsx',
+    'src/app/(auth)/login/login-form.tsx',
+    'src/app/(auth)/choose-clinic/page.tsx',
+    'src/app/(staff)/layout.tsx',
+    'src/app/(staff)/page.tsx',
+    'src/app/_lib/logout-button.tsx',
+    'src/ui/button.tsx',
+    'src/ui/input.tsx',
+    'src/ui/label.tsx',
+    'src/ui/logo.tsx',
+  ].map((file) => ({ name: `i: ${file}, as it is, passes`, ...asItIs(file), expected: [] })),
+];
+
+/** Lints snippets with eslint-rules/lint-snippets.mjs, as the beforeAll above does for `cases`. */
+async function lintSnippets(list: Case[]): Promise<string[][]> {
+  const helper = fileURLToPath(new URL('./lint-snippets.mjs', import.meta.url));
+  const run = promisify(execFile)(process.execPath, [helper], { cwd: ROOT });
+  run.child.stdin?.end(JSON.stringify(list.map(({ code, file }) => ({ code, file }))));
+  return JSON.parse((await run).stdout) as string[][];
+}
+
+describe('text and accessibility lint rules', () => {
+  let textReported: string[][] = [];
+
+  beforeAll(async () => {
+    textReported = await lintSnippets(textCases);
+  }, 180_000);
+
+  it.each(textCases.map((c, index) => ({ ...c, index })))('$name', ({ index, expected }) => {
+    const messages = textReported[index] ?? [];
+    expect(messages.filter((message) => message.startsWith('parse error'))).toEqual([]);
+    expect(messages.filter(isTextOrA11yRule)).toEqual(expected);
   });
 });

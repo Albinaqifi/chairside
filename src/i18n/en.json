@@ -1,0 +1,44 @@
+{
+  "app": {
+    "name": "Chairside"
+  },
+  "roles": {
+    "owner": "Owner",
+    "dentist": "Dentist",
+    "hygienist": "Hygienist",
+    "front_desk": "Front desk"
+  },
+  "login": {
+    "title": "Log in · Chairside",
+    "heading": "Log in",
+    "intro": "Use your work email and password.",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Log in",
+    "submitting": "Logging in…",
+    "noscript": "JavaScript is needed to log in. Turn it on in your browser, then reload the page.",
+    "errors": {
+      "wrongCredentials": "Wrong email or password.",
+      "tooManyAttempts": "Too many attempts. Wait a minute, then try again.",
+      "failed": "Login did not work. Try again."
+    }
+  },
+  "chooseClinic": {
+    "title": "Choose a clinic · Chairside",
+    "heading": "Choose a clinic",
+    "intro": "Choose the clinic to work in.",
+    "noClinicHeading": "No clinic yet",
+    "noClinic": "Your account is not a member of any clinic. Ask your clinic's owner to add you."
+  },
+  "staffHeader": {
+    "signedInAs": "{name} · {role}",
+    "switchClinic": "Switch clinic"
+  },
+  "today": {
+    "heading": "Today",
+    "placeholder": "You are signed in to {clinic}. The schedule arrives with E01."
+  },
+  "logout": {
+    "button": "Log out"
+  }
+}

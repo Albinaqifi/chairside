@@ -1596,3 +1596,19 @@ architecture), `changed` (differs from the original files), `process`.
   product code (then it was weighed wrong, not parked wrong); or CI becomes a required check
   (GitHub Pro, R-34): a workflow that `paths-ignore` skips leaves a required check Pending, which
   blocks the merge, so the documents-only filter moves into the job first.
+
+### D-088 · E00-T04a's packages: Tailwind, next-intl and shadcn/ui's, at these versions
+- **Origin:** process, E00-T04a (builder). The packages are D-009's and D-015's (D-086 lists
+  shadcn/ui's); this entry records the versions, as D-086 asks, and two choices around them.
+- **What:** `tailwindcss` and `@tailwindcss/postcss` 4.3.3 (build only); `next-intl` 4.14.9;
+  `radix-ui` 1.6.7, `class-variance-authority` 0.7.1, `clsx` 2.1.1, `tailwind-merge` 3.7.0.
+  `lucide-react` waits for the first icon. No package was removed or moved to another version.
+  - next-intl 4.14 lists its message extractor's tools as dependencies, `@swc/core` and
+    `@parcel/watcher` among them; both bring prebuilt binaries as optional packages, so their
+    install scripts stay off in `pnpm-workspace.yaml`, as esbuild's and sharp's are.
+  - `radix-ui` exactly 1.6.7 (July 2026): 1.7.0 came out hours before this task, too new to trust.
+  - `cn()` is shadcn/ui's classic helper over clsx and tailwind-merge (`src/ui/cn.ts`). shadcn/ui's
+    registry now imports it from a package named `cn` (0.4.0, September 2026), which D-086 does not
+    list: not taken.
+- **Revisit if:** next-intl drops the extractor's tools from its dependencies (remove the two
+  `allowBuilds` lines); a radix-ui release after 1.7.0 has been out a few weeks (move to it).

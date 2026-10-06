@@ -19,7 +19,6 @@ export {
   PERMISSION_TABLE,
   PERMISSIONS,
   PROVIDER_KINDS,
-  ROLE_LABELS,
   ROLES,
   type ExtraPermission,
   type Grant,

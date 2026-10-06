@@ -1,0 +1,126 @@
+@import 'tailwindcss';
+
+/*
+ * The design tokens (docs/product/design-reference.md, "Design tokens"), each defined once. A
+ * component takes its colours, fonts and radii only from here (CLAUDE.md): Tailwind's own colours,
+ * font families, text sizes and radii are switched off, so a class outside these tokens gives no
+ * style at all. Tokens the design reference lacks are marked "added"; handoffs/E00-T04a.md names them.
+ */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+
+  /* Colours, in oklch as the demo writes them. */
+  --color-bg: oklch(0.985 0.004 95); /* page background (warm off-white) */
+  --color-surface: oklch(1 0 0); /* cards, inputs */
+  --color-sidebar: oklch(0.975 0.006 190);
+  --color-text: oklch(0.24 0.02 210); /* main text */
+  --color-muted: oklch(0.52 0.015 210); /* secondary text */
+  --color-border: oklch(0.92 0.006 95); /* card borders, dividers */
+  --color-border-strong: oklch(0.88 0.008 95); /* buttons, inputs */
+  --color-primary: oklch(0.47 0.085 195); /* primary buttons, brand teal */
+  --color-primary-soft: oklch(0.92 0.03 190); /* active navigation, selected */
+  --color-accent: oklch(0.55 0.1 195); /* toggles on, checkmarks, selected borders */
+  --color-panel-dark: oklch(0.3 0.045 200); /* dark results panel, selected chips */
+  --color-warn-bg: oklch(0.975 0.03 85); /* "Needs a call" panel */
+  --color-warn-border: oklch(0.9 0.05 85);
+
+  /* Added: text on primary (the demo's primary buttons), links (the demo's page styles, line 16),
+     the focus ring (accent), and errors (the demo's red, below). */
+  --color-on-primary: oklch(0.98 0.01 195);
+  --color-link: oklch(0.45 0.085 195);
+  --color-link-hover: oklch(0.35 0.085 195);
+  --color-focus: var(--color-accent);
+  --color-error: var(--color-red-fg);
+  --color-error-bg: var(--color-red-bg);
+
+  /* Status colours, text / background / dot: the demo's ST and RED (lines 1376–1385), under the
+     status names of data-model.md. The demo's "unconfirmed" (No reply yet: booked, and a reminder
+     was sent) is no-reply here, its "done" is completed, its "noshow" is no-show. */
+  --color-status-booked-fg: oklch(0.42 0.08 250);
+  --color-status-booked-bg: oklch(0.95 0.025 250);
+  --color-status-booked-dot: oklch(0.62 0.1 250);
+  --color-status-no-reply-fg: oklch(0.47 0.1 65);
+  --color-status-no-reply-bg: oklch(0.95 0.055 85);
+  --color-status-no-reply-dot: oklch(0.75 0.14 75);
+  --color-status-confirmed-fg: oklch(0.42 0.1 155);
+  --color-status-confirmed-bg: oklch(0.94 0.045 155);
+  --color-status-confirmed-dot: oklch(0.62 0.13 155);
+  --color-status-arrived-fg: oklch(0.38 0.08 195);
+  --color-status-arrived-bg: oklch(0.93 0.04 195);
+  --color-status-arrived-dot: oklch(0.55 0.1 195);
+  --color-status-completed-fg: oklch(0.45 0.01 210);
+  --color-status-completed-bg: oklch(0.95 0.004 210);
+  --color-status-completed-dot: oklch(0.72 0.01 210);
+  --color-red-fg: oklch(0.5 0.13 25);
+  --color-red-bg: oklch(0.95 0.03 25);
+  --color-red-dot: oklch(0.62 0.15 25);
+  --color-status-cancelled-fg: var(--color-red-fg);
+  --color-status-cancelled-bg: var(--color-red-bg);
+  --color-status-cancelled-dot: var(--color-red-dot);
+  --color-status-no-show-fg: var(--color-red-fg);
+  --color-status-no-show-bg: var(--color-red-bg);
+  --color-status-no-show-dot: var(--color-red-dot);
+
+  /* Text sizes: the base size and its line height, section headings (weight 600) and page
+     headings (serif, 28–34 px). Added: labels and small print (the demo's labels), the wordmark
+     (demo line 28), and the letter spacing of the wordmark and the 28 px headings. */
+  --text-base: 14px;
+  --text-base--line-height: 1.45;
+  --text-section: 16px;
+  --text-heading: 28px;
+  --text-small: 12.5px;
+  --text-wordmark: 22px;
+  --tracking-heading: -0.01em;
+
+  /* Radii: cards 14–18 px (16, the demo's most frequent), buttons and inputs 8–10 px, pills. */
+  --radius-card: 16px;
+  --radius-control: 10px;
+  --radius-pill: 99px;
+
+  /* The entry animation: a 0.3 s fade and 6 px rise (the demo's csIn). */
+  --animate-enter: enter 0.3s ease;
+
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/*
+ * Fonts: Figtree for the interface, Newsreader for headings and big numbers, with the demo's
+ * fallbacks. src/ui/fonts.ts loads the files (next/font/local) and sets --font-figtree and
+ * --font-newsreader on <html>; inline, so a class reads them where it is used.
+ */
+@theme inline {
+  --font-sans: var(--font-figtree), system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), serif;
+}
+
+/* The page, as the demo's page styles set it (lines 13–22). The font comes from --font-sans. */
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  a {
+    color: var(--color-link);
+  }
+
+  a:hover {
+    color: var(--color-link-hover);
+  }
+}

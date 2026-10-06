@@ -85,18 +85,21 @@ src/app/              Next.js routes. Thin: parse input, call a module, render.
   (staff)/            The staff app. Its layout and every page start from currentStaff().
   _lib/               Request-edge helpers: who is signed in; the action wrappers; the auth client.
   api/auth/           The auth library's routes (sign-in, sign-out, get-session). No code of ours.
+  globals.css         The design tokens (Tailwind's theme) and the page's base styles.
 src/proxy.ts          Moves the session forward and renews its cookie (D-067); no valid session → /login,
                       except a server action: its wrapper sends the person there (D-074).
                       Not the permission check: pages and actions still call currentStaff().
 src/modules/<name>/   All business logic. index.ts = public API, schema.ts = its tables.
 src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts.
+src/i18n/             next-intl's request configuration and the message file, en.json.
 src/lib/              Small shared pieces: clock, ids, logger, personal-fields.
+src/ui/               shadcn/ui components restyled to the tokens, the logo, the fonts, cn().
 tests/integration/    Tests against real PostgreSQL, including the tenant meta-test.
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 ```
 
-Create a folder only when it has content. Coming later: `src/ui` (E00-T04a), `tests/e2e` (E00-T06b), `src/worker` (E00-T07).
+Create a folder only when it has content. Coming later: `tests/e2e` (E00-T06b), `src/worker` (E00-T07).
 
 ### Module rules (lint enforces them; `eslint-rules/architecture.test.ts` proves it)
 
@@ -148,8 +151,21 @@ task, unless product code on `main` would hit it today.
       audit: { action: 'patient.renamed', entityType: 'patient', entityId: ({ input }) => input.patientId } },
     async ({ input, tx, now }) => (await patients.rename(tx, input, now)) ?? refuse('not_found'));
   ```
-  Other pages use `currentStaff()` (`src/app/_lib/auth.ts`). Login and logout are the auth
-  library's routes (`authClient`). Never read the session cookie or a password (D-063).
+  Other pages use `currentStaff()` (`src/app/_lib/auth.ts`); a page outside `(staff)` starts from
+  `currentStaff()` or `requireUser()`, or is public on purpose and says so in a comment, as the login
+  page does: the proxy lets a signed-out POST that looks like a server action through (D-074, D-075).
+  Login and logout are the auth library's routes (`authClient`). Never read the session cookie or a
+  password (D-063).
+- Texts: every visible string is in the message file, `src/i18n/en.json`, read with next-intl
+  (`useTranslations`, or `getTranslations` in an async page; a page's title through
+  `generateMetadata`). Lint fails on text written in JSX in `src/app` and `src/ui`. Text in
+  `aria-label`, `placeholder`, `title` or `alt`, in a page's `metadata`, or reached through a
+  variable or a condition (`{c ? 'a' : 'b'}`) is a review check. A module gives a key (a role), never
+  the text: it cannot import next-intl (module rule 3).
+- Styles: a component takes colours, fonts and radii only from the theme in `src/app/globals.css`
+  (`bg-primary`, `font-serif`, `rounded-card`); Tailwind's own palette, font families, text sizes
+  and radii are switched off. A token the design reference lacks is added there, derived from one it
+  has, and named in the handoff note. Components are shadcn/ui's, copied into `src/ui/` and restyled.
 - Forms: a form posts to a URL (`method="post"` and `action` written out, after any spread) or takes
   a function as its action, and so does a button's or input's `formAction`. Never only `onSubmit`:
   whenever the handler does not run, the browser sends a GET with every field in the URL (D-076). A
