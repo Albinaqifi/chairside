@@ -90,24 +90,38 @@ describe('the navigation of each role (E00-T04b, acceptance 2)', () => {
   });
 });
 
-describe('the staff layout reads the navigation with no provider link (until E01-T01)', () => {
+describe("the staff layout reads the navigation with the membership's own extras (D-091)", () => {
   const choice: ClinicChoice = {
     membershipId: '01970000-0000-7000-8000-000000000001',
     clinicId: '01970000-0000-7000-8000-000000000002',
     clinicName: 'Test clinic (synthetic)',
     role: 'owner',
     extraPermissions: ['import'],
+    providerKind: null,
   };
 
-  it("passes the membership's extra permissions on, and no provider", () => {
+  it("passes the membership's extra permissions on, and no provider when it is linked to none", () => {
     expect(membershipExtras(choice)).toEqual({ extraPermissions: ['import'], providerKind: null });
   });
 
-  it('so an owner sees no In the chair yet, and front desk with import sees Import patients', () => {
+  it('so an owner linked to no provider sees no In the chair, and front desk with import sees Import patients', () => {
     expect(seen('owner', membershipExtras(choice))).not.toContain('In the chair');
     const desk = membershipExtras({ ...choice, role: 'front_desk' });
     expect(seen('front_desk', desk)).toEqual([...FRONT_DESK, 'Import patients']);
   });
+
+  // E01-T01a: the membership is linked to a provider, and clinics_for_user() gave its kind.
+  it.each(['dentist', 'hygienist', 'other'] as const)(
+    'passes the kind of the linked provider on: an owner linked to a %s column sees In the chair',
+    (kind) => {
+      const linked: ClinicChoice = { ...choice, providerKind: kind };
+      expect(membershipExtras(linked)).toEqual({
+        extraPermissions: ['import'],
+        providerKind: kind,
+      });
+      expect(seen('owner', membershipExtras(linked))).toContain('In the chair');
+    },
+  );
 });
 
 describe('the navigation list', () => {

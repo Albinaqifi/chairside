@@ -117,7 +117,7 @@ export function can(role: Role, extras: MembershipExtras, permission: Permission
   }
 }
 
-function isProviderKind(value: unknown): value is ProviderKind {
+export function isProviderKind(value: unknown): value is ProviderKind {
   return typeof value === 'string' && (PROVIDER_KINDS as readonly string[]).includes(value);
 }
 

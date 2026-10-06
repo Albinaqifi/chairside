@@ -30,11 +30,11 @@ Legend for the "When" column: the epic that creates the table.
 |---|---|---|---|
 | `clinics` | name, timezone (IANA), locale, currency, default_country, phone, address, email, status (active / paused), settings | The tenant. `settings` holds: quiet hours (start, end, quiet weekdays), default send time, cancel cut-off hours, enabled channels, SMS sender name, email from / reply-to, frequency-cap days, daily and monthly SMS caps. Read through a typed, validated accessor, never as raw JSON. | E00 |
 | `users` and auth tables | email, name, 2FA state, sessions | Managed by Better Auth: `users`, `sessions`, `accounts`, `verifications`, `rate_limits`. **Global, no `clinic_id`** (on the meta-test allow-list, D-062). | E00 |
-| `memberships` | clinic_id, user_id, role, extra_permissions[], provider_id?, status (active / disabled) | Role: `owner`, `dentist`, `hygienist`, `front_desk`. Extra permissions: `import`, `export`. `provider_id` links a person to their calendar column (added by E01-T01a, when providers exist). One person can belong to several clinics; which clinic a session acts for is resolved from this table on every request (D-062). | E00 |
+| `memberships` | clinic_id, user_id, role, extra_permissions[], provider_id?, status (active / disabled) | Role: `owner`, `dentist`, `hygienist`, `front_desk`. Extra permissions: `import`, `export`. `provider_id` links a person to their calendar column: a provider of the same clinic (foreign key `(clinic_id, provider_id)`, added by E01-T01a), whose kind `clinics_for_user()` returns (D-091). One person can belong to several clinics; which clinic a session acts for is resolved from this table on every request (D-062). | E00 |
 | `staff_invites` | clinic_id, email, role, token_hash, expires_at, accepted_at | Only the hash of the invite token is stored. | E04 |
 | `audit_log` | clinic_id, at, actor_type (user / patient_link / system), actor_id, action, entity_type, entity_id, metadata | **Append-only**: the app's database role may insert, never update or delete. Records logins, patient record views, edits (with old → new field names, not values of health fields), exports, imports, approvals, link use. | E00 |
-| `clinic_hours` | clinic_id, weekday, opens, closes | Opening hours per weekday. Missing weekday = closed. | E01 |
-| `closed_days` | clinic_id, date, label | Holidays. Used by the calendar and by quiet-hours logic. | E01 |
+| `clinic_hours` | clinic_id, weekday, opens, closes | Opening hours per weekday: one row per weekday (unique), weekday ISO 1 = Monday … 7 = Sunday, `opens` before `closes`, both the clinic's local `time`. Missing weekday = closed. | E01 |
+| `closed_days` | clinic_id, date, label | Holidays, one row per `date` (unique). Used by the calendar and by quiet-hours logic. | E01 |
 
 ### Permissions (checked on the server for every action)
 
@@ -51,20 +51,26 @@ to a provider of kind dentist. Nobody else has it (D-051).
 
 | Table | Key fields | Notes | When |
 |---|---|---|---|
-| `providers` | clinic_id, name, short_name, kind (dentist / hygienist / other), chair_label, color_hue, active, sort_order | One calendar column each. | E01 |
-| `provider_breaks` | clinic_id, provider_id, weekday, starts, ends, label | Weekly repeating breaks (lunch). Shown hatched on the calendar. Not appointments. | E01 |
-| `treatment_types` | clinic_id, name, default_duration_min, default_price?, needs_aftercare, aftercare_priority, active | The clinic's catalogue. `aftercare_priority` picks the main treatment when a visit had several. | E01 |
-| `patients` | clinic_id, first_name, last_name, date_of_birth?, phone_e164?, email?, language, guardian_name?, notes, status (active / archived / deceased), phone_invalid_at?, email_invalid_at?, whatsapp_status (unknown / available / unavailable), whatsapp_checked_at?, import_job_id?, deleted_at?, anonymised_at? | No login. When `guardian_name` is set, the contact details are the guardian's and messages address them. `notes` is an administrative note, labelled "not a clinical record". Name and phone search uses a trigram index. `import_job_id` is added with `import_jobs` (E04-T01, D-091). | E01 |
-| `appointments` | clinic_id, patient_id, provider_id, treatment_type_id?, title, starts_at, ends_at, status, overlap_ok, source (staff / recall_link / patient_request / walk_in), source_message_id?, note, confirmed_at?, confirmed_via (link / staff)?, cancelled_at?, cancelled_by (patient / staff)?, cancel_reason?, completed_at?, created_by | `title` is the label on the calendar ("Filling 36"). `source_message_id` records which message led to the booking (for "recalls that became bookings"); it is added with `messages` (E02-T01, D-091). | E01 |
+| `providers` | clinic_id, name, short_name, kind (dentist / hygienist / other), chair_label, color_hue, active, sort_order | One calendar column each. `color_hue` is a hue in degrees, 0–359. | E01 |
+| `provider_breaks` | clinic_id, provider_id, weekday, starts, ends, label | Weekly repeating breaks (lunch). Shown hatched on the calendar. Not appointments. Weekday as in `clinic_hours`; `starts` before `ends`. | E01 |
+| `treatment_types` | clinic_id, name, default_duration_min, default_price?, needs_aftercare, aftercare_priority, active | The clinic's catalogue. `aftercare_priority` picks the main treatment when a visit had several. `default_duration_min` above 0; `default_price` in minor units, not negative (D-043). | E01 |
+| `patients` | clinic_id, first_name, last_name, date_of_birth?, phone_e164?, email?, language, guardian_name?, notes, status (active / archived / deceased), phone_invalid_at?, email_invalid_at?, whatsapp_status (unknown / available / unavailable), whatsapp_checked_at?, import_job_id?, deleted_at?, anonymised_at? | No login. When `guardian_name` is set, the contact details are the guardian's and messages address them. `notes` is an administrative note, labelled "not a clinical record". `language` is a two-letter code (ISO 639-1), checked by its form, not against a list (D-053). Name and phone search uses two trigram indexes (`pg_trgm`): on `first_name \|\| ' ' \|\| last_name` and on `phone_e164`. `import_job_id` is added with `import_jobs` (E04-T01, D-091). | E01 |
+| `appointments` | clinic_id, patient_id, provider_id, treatment_type_id?, title, starts_at, ends_at, status, overlap_ok, source (staff / recall_link / patient_request / walk_in), source_message_id?, note, confirmed_at?, confirmed_via (link / staff)?, cancelled_at?, cancelled_by (patient / staff)?, cancel_reason?, completed_at?, created_by | `title` is the label on the calendar ("Filling 36"). `starts_at` before `ends_at`. `created_by` is the user who booked it (`users.id`). `source_message_id` records which message led to the booking (for "recalls that became bookings"); it is added with `messages` (E02-T01, D-091). | E01 |
+
+Patients and appointments are archived, cancelled or anonymised, and providers and treatment types
+made inactive: the app's database role cannot delete them. Breaks, opening hours and closed days
+are deleted (E01-T01a).
 
 ### No double booking
 
 ```
-EXCLUDE USING gist (clinic_id WITH =, provider_id WITH =, tstzrange(starts_at, ends_at) WITH &&)
+ALTER TABLE appointments ADD CONSTRAINT appointments_no_double_booking
+EXCLUDE USING gist (clinic_id WITH =, provider_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&)
 WHERE (status NOT IN ('cancelled', 'no_show') AND NOT overlap_ok)
 ```
-Staff "book anyway" sets `overlap_ok = true` on that one appointment (D-020). Patient-driven
-bookings can never set it.
+A range holds its start, not its end (`'[)'`), so back-to-back visits do not overlap; `starts_at`
+before `ends_at` keeps every range non-empty. Staff "book anyway" sets `overlap_ok = true` on that
+one appointment (D-020). Patient-driven bookings can never set it.
 
 ### Appointment state machine
 

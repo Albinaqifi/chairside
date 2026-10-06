@@ -344,8 +344,9 @@ function allowed(staff: Staff, permission: ActionPermission): boolean {
   if (permission === 'every_member') return true;
   const extras = {
     extraPermissions: staff.clinic.extraPermissions,
-    // Memberships are linked to providers from E01-T01; until then nobody is.
-    providerKind: null,
+    // The kind of the provider the membership is linked to, or null, from clinics_for_user()
+    // (D-091), as the sidebar reads it (membershipExtras(), src/app/(staff)/navigation.ts).
+    providerKind: staff.clinic.providerKind,
   };
   return can(staff.clinic.role, extras, permission);
 }

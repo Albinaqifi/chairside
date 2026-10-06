@@ -62,7 +62,7 @@ Fully specified.
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
 | E01-T01 | Schema: providers, treatment types, patients, appointments, hours | builder | critical | split (D-091) | Into E01-T01a and E01-T01b, the next two rows |
-| E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | Ready | Split from E01-T01 (D-091) in E00-T05a's Done pass; takes the provider link (E00-T04b review); Q-15's assumption accepted by the owner. See `handoffs/E01-T01a.md` |
+| E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | Built | Split from E01-T01 (D-091) in E00-T05a's Done pass; takes the provider link (E00-T04b review); Q-15's assumption accepted by the owner. Migration 0002, the provider kind through `clinics_for_user()`. Branch `task/E01-T01a-scheduling-schema`. See `handoffs/E01-T01a.md` |
 | E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | Planned | Refined (D-091); Ready once E01-T01a is Done, checked in its Done pass. See `handoffs/E01-T01b.md` |
 | E01-T02 | Patients: list, search, create, edit | builder | normal | Planned | |
 | E01-T03 | Patient profile | builder | normal | Planned | |

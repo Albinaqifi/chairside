@@ -35,5 +35,5 @@ export const TENANT_ROOT_TABLES: Readonly<Record<string, string>> = {
  */
 export const CROSS_CLINIC_FUNCTIONS: Readonly<Record<string, string>> = {
   'public.clinics_for_user':
-    'Lists the clinics one user has an active membership in, for login and the clinic picker (E00-T02, D-062). Takes the user id; returns membership id, clinic id, clinic name, role and extra permissions, nothing else.',
+    'Lists the clinics one user has an active membership in, for login, the clinic picker, the sidebar and the action wrapper (E00-T02, D-062, D-091). Takes the user id; returns membership id, clinic id, clinic name, role, extra permissions and the kind of the provider the membership is linked to in its own clinic (or null), nothing else.',
 };

@@ -1,4 +1,4 @@
-import type { ExtraPermission, Role } from './permissions';
+import type { ExtraPermission, ProviderKind, Role } from './permissions';
 
 /** A clinic a user may enter: one of their active memberships, as clinics_for_user() returns it. */
 export interface ClinicChoice {
@@ -7,6 +7,11 @@ export interface ClinicChoice {
   clinicName: string;
   role: Role;
   extraPermissions: ExtraPermission[];
+  /**
+   * The kind of the provider this membership is linked to (the person's calendar column, in this
+   * clinic), or null when it is linked to none (D-091). can() reads it.
+   */
+  providerKind: ProviderKind | null;
 }
 
 /**
