@@ -146,9 +146,10 @@ export interface AuditDeclaration<In, Out> {
 }
 
 /**
- * A staff action as the browser calls it: with the id of the clinic its page was shown for, and
- * the input (a plain value, or a form's FormData). A form binds the clinic id first:
- * `action.bind(null, clinicId)`.
+ * A staff action as the browser calls it: with the id of the clinic its frame names (the staff
+ * layout's FrameClinic, D-069), and the input (a plain value, or a form's FormData). A staff form
+ * is StaffForm (./staff-form.tsx), which sends the frame's clinic id itself, never one a page
+ * passes (D-092).
  */
 export type StaffAction<In, Out, R extends string = never> = (
   clinicId: string,
@@ -171,9 +172,10 @@ export type UserAction<In, Out, R extends string = never> = (
 ) => Promise<UserActionResult<Out, R>>;
 
 /**
- * A wrapper-made action as the `action` of a plain `<form>`, which works without JavaScript too.
- * The same function: React types a form's action as returning nothing because it ignores the
- * answer. A form that shows the answer uses useActionState instead (E00-T04).
+ * A wrapper-made action as the `action` of a plain `<form>`, which works without JavaScript too
+ * (the clinic picker's userAction). The same function: React types a form's action as returning
+ * nothing because it ignores the answer. A staff form is StaffForm instead (./staff-form.tsx): it
+ * shows the answer and sends the clinic its frame names (D-092).
  */
 export function asFormAction(
   action: (formData: FormData) => Promise<unknown>,
@@ -273,7 +275,10 @@ interface StaffSpec {
   audit: AuditDeclaration<unknown, unknown> | undefined;
 }
 
-/** How the wrapper was reached: by the browser with the page's clinic id, or by a page rendering. */
+/**
+ * How the wrapper was reached: by the browser, with the clinic id its frame names (a staff form is
+ * StaffForm, which sends that id, D-092), or by a page rendering.
+ */
 type Call = { from: 'browser'; clinicId: unknown } | { from: 'page' };
 
 async function runStaff(

@@ -160,7 +160,10 @@ task, unless product code on `main` would hit it today.
   It sends the clinic its frame names (the staff layout's `FrameClinic`), never one a page passes,
   and shows the answer one way: `invalid_input` at the fields, `forbidden`, `clinic_changed` with a
   reload, the general failure (a call that rejects too), a toast when done; its button is disabled
-  while it runs. Every staff page renders `<PageClinic clinicId={staff.clinic.clinicId} />`:
+  while it runs. Every staff page renders `<PageClinic clinicId={staff.clinic.clinicId} />`. The
+  form sits in a client component that the page renders, as `DemoForm` does
+  (`src/app/(staff)/dev/components/demo-form.tsx`): a page can hand a client component a server
+  action, never another function such as `render` or `onDone` (React stops the render):
   ```tsx
   <StaffForm action={renamePatient} doneMessage={t('renamed')}
     submitLabel={t('rename')} pendingLabel={t('renaming')}>
