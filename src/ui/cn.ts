@@ -5,14 +5,15 @@ import { extendTailwindMerge } from 'tailwind-merge';
  * shadcn/ui's class helper (D-009): joins class names, and when two set the same thing, keeps the
  * later one, so a caller's className can override a component's own. tailwind-merge knows
  * Tailwind's own scales only; ours (src/app/globals.css) are named here, or it would read
- * `text-heading` as a colour and drop a `text-muted` next to it, and keep two radii.
+ * `text-heading` as a colour and drop a `text-muted` next to it, and keep two radii. A size,
+ * radius, tracking or animation added to the stylesheet is added here too.
  */
 const merge = extendTailwindMerge({
   extend: {
     theme: {
-      text: ['small', 'section', 'heading', 'wordmark'],
+      text: ['small', 'caption', 'overline', 'section', 'heading', 'wordmark'],
       radius: ['card', 'control', 'pill'],
-      tracking: ['heading'],
+      tracking: ['heading', 'overline'],
       animate: ['enter'],
     },
   },

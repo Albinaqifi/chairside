@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getTranslations } from 'next-intl/server';
-import { figtree, newsreader } from '@/ui/fonts';
+import { onest, sourceSerif } from '@/ui/fonts';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: LayoutProps<'/'>) {
   const locale = await getLocale();
   return (
-    <html lang={locale} className={`${figtree.variable} ${newsreader.variable}`}>
+    <html lang={locale} className={`${onest.variable} ${sourceSerif.variable}`}>
       <body>
         <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>

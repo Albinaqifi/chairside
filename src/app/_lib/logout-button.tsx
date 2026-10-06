@@ -6,8 +6,11 @@ import { useState } from 'react';
 import { Button } from '@/ui/button';
 import { authClient } from './auth-client';
 
-/** Ends the session (the auth library deletes it and clears the cookie), then shows the login page. */
-export function LogoutButton() {
+/**
+ * Ends the session (the auth library deletes it and clears the cookie), then shows the login page.
+ * A className restyles the quiet button where it stands, as the sidebar's last item for one.
+ */
+export function LogoutButton({ className }: { className?: string }) {
   const t = useTranslations('logout');
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -20,7 +23,13 @@ export function LogoutButton() {
   }
 
   return (
-    <Button type="button" variant="quiet" onClick={() => void logout()} disabled={pending}>
+    <Button
+      type="button"
+      variant="quiet"
+      className={className}
+      onClick={() => void logout()}
+      disabled={pending}
+    >
       {t('button')}
     </Button>
   );
