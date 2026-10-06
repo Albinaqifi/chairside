@@ -1,19 +1,24 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState, useSyncExternalStore, type FormEvent } from 'react';
 import { authClient } from '@/app/_lib/auth-client';
+import { Button } from '@/ui/button';
+import { Input } from '@/ui/input';
+import { Label } from '@/ui/label';
 
-// Plain styling until the design system exists (E00-T04).
+/** Why a sign-in attempt failed: the key of its text under login.errors in the message file. */
+export type LoginError = 'wrongCredentials' | 'tooManyAttempts' | 'failed';
 
 /**
  * What the person reads when a sign-in attempt fails. The text for a refused login is the same
  * whether the email exists or not.
  */
-export function loginErrorMessage(status: number | undefined): string {
-  if (status === 401) return 'Wrong email or password.';
-  if (status === 429) return 'Too many attempts. Wait a minute, then try again.';
-  return 'Login did not work. Try again.';
+export function loginError(status: number | undefined): LoginError {
+  if (status === 401) return 'wrongCredentials';
+  if (status === 429) return 'tooManyAttempts';
+  return 'failed';
 }
 
 /** Whether the form runs in the browser never changes once it does: nothing to subscribe to. */
@@ -32,6 +37,7 @@ function subscribeToNothing() {
  *   stops Enter from submitting the form too.
  */
 export function LoginForm() {
+  const t = useTranslations('login');
   const router = useRouter();
   // false in the server's HTML and while the page hydrates, true once the form runs in the browser.
   const inBrowser = useSyncExternalStore(
@@ -39,7 +45,7 @@ export function LoginForm() {
     () => true,
     () => false,
   );
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoginError | null>(null);
   const [pending, setPending] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -52,7 +58,7 @@ export function LoginForm() {
       password: String(form.get('password') ?? ''),
     });
     if (failure) {
-      setError(loginErrorMessage(failure.status));
+      setError(loginError(failure.status));
       setPending(false);
       return;
     }
@@ -65,25 +71,40 @@ export function LoginForm() {
       method="post"
       action="/login"
       onSubmit={(event) => void submit(event)}
-      style={{ display: 'grid', gap: '0.75rem' }}
+      className="mt-6 grid gap-4"
     >
-      <noscript>
-        JavaScript is needed to log in. Turn it on in your browser, then reload the page.
+      <noscript className="block rounded-control border border-warn-border bg-warn-bg px-3 py-2">
+        {t('noscript')}
       </noscript>
-      <label>
-        Email
-        <br />
-        <input name="email" type="email" autoComplete="username" required autoFocus />
-      </label>
-      <label>
-        Password
-        <br />
-        <input name="password" type="password" autoComplete="current-password" required />
-      </label>
-      {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={!inBrowser || pending}>
-        {pending ? 'Logging in…' : 'Log in'}
-      </button>
+      <div className="grid gap-2">
+        <Label htmlFor="login-email">{t('email')}</Label>
+        <Input
+          id="login-email"
+          name="email"
+          type="email"
+          autoComplete="username"
+          required
+          autoFocus
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="login-password">{t('password')}</Label>
+        <Input
+          id="login-password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+        />
+      </div>
+      {error && (
+        <p role="alert" className="rounded-control bg-error-bg px-3 py-2 text-error">
+          {t(`errors.${error}`)}
+        </p>
+      )}
+      <Button type="submit" disabled={!inBrowser || pending} className="mt-1 w-full">
+        {pending ? t('submitting') : t('submit')}
+      </Button>
     </form>
   );
 }

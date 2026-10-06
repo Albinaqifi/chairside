@@ -60,6 +60,15 @@ const unawaitedPromise = {
     'Await it or return it (D-077).',
 };
 
+// The accessibility plugin as eslint-config-next registers it: package.json does not list it, so
+// its recommended rules are read from there (D-086). Stop loudly if a later version drops it.
+const jsxA11y = nextVitals.find((config) => config.plugins?.['jsx-a11y'])?.plugins['jsx-a11y'];
+if (!jsxA11y?.flatConfigs?.recommended?.rules) {
+  throw new Error(
+    'eslint-config-next no longer registers eslint-plugin-jsx-a11y: block (i) of eslint.config.mjs needs it.',
+  );
+}
+
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -236,6 +245,24 @@ export default defineConfig([
         },
       ],
     },
+  },
+  {
+    // (i) Every visible text comes from the message file, src/i18n/en.json (D-015, D-053): text
+    // written in JSX is reported, and so is {'text'}. Text in props (aria-label, placeholder, title,
+    // alt), in a page's metadata, or reached through a variable or a condition ({c ? 'a' : 'b'}) is
+    // a review check (CLAUDE.md). With it, jsx-a11y's recommended accessibility rules (D-086).
+    files: [`src/{app,ui}/**/${SCRIPT_FILES}`],
+    rules: {
+      'react/jsx-no-literals': ['error', { noStrings: true, ignoreProps: true }],
+      ...jsxA11y.flatConfigs.recommended.rules,
+    },
+  },
+  {
+    // (i) The login form's email field takes the focus when the page opens, as E00-T09 left it: the
+    // front desk logs in again after every 30 minutes without activity (security-privacy.md
+    // section 2), and the page has nothing else to read first. no-autofocus is off for this file only.
+    files: ['src/app/(auth)/login/login-form.tsx'],
+    rules: { 'jsx-a11y/no-autofocus': 'off' },
   },
   globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'coverage/**']),
 ]);

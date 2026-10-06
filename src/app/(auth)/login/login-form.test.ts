@@ -8,6 +8,12 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
 }));
 
+// The form's texts come from the message file through next-intl (E00-T04a), which only the app's
+// layout provides. Here each text is its key: the checks read no words.
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+}));
+
 /**
  * The login form's HTML as the server renders it: the attributes of the form and of its submit
  * buttons and inputs, and the text of its <noscript> lines. The checks read only these, never the form's

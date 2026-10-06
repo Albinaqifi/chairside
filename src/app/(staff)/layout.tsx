@@ -1,8 +1,8 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { currentStaff } from '@/app/_lib/auth';
 import { LogoutButton } from '@/app/_lib/logout-button';
-import { ROLE_LABELS } from '@/modules/auth';
 
 /**
  * Everything under (staff) needs a signed-in user with a clinic. A layout does not re-render on
@@ -11,17 +11,23 @@ import { ROLE_LABELS } from '@/modules/auth';
  */
 export default async function StaffLayout({ children }: { children: ReactNode }) {
   const staff = await currentStaff();
+  const t = await getTranslations();
   return (
     <>
       <header
         style={{ display: 'flex', gap: '1rem', alignItems: 'center', padding: '0.75rem 1rem' }}
       >
-        <strong>Chairside</strong>
+        <strong>{t('app.name')}</strong>
         <span>{staff.clinic.clinicName}</span>
         <span style={{ marginLeft: 'auto' }}>
-          {staff.user.name} · {ROLE_LABELS[staff.clinic.role]}
+          {t('staffHeader.signedInAs', {
+            name: staff.user.name,
+            role: t(`roles.${staff.clinic.role}`),
+          })}
         </span>
-        {staff.clinicCount > 1 && <Link href="/choose-clinic">Switch clinic</Link>}
+        {staff.clinicCount > 1 && (
+          <Link href="/choose-clinic">{t('staffHeader.switchClinic')}</Link>
+        )}
         <LogoutButton />
       </header>
       <main style={{ padding: '0 1rem' }}>{children}</main>

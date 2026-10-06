@@ -5,16 +5,9 @@
  * never the check.
  */
 
+// How a role is shown to people is in the message file (src/i18n/en.json, roles), by its key here.
 export const ROLES = ['owner', 'dentist', 'hygienist', 'front_desk'] as const;
 export type Role = (typeof ROLES)[number];
-
-/** How a role is shown to people. */
-export const ROLE_LABELS: Readonly<Record<Role, string>> = {
-  owner: 'Owner',
-  dentist: 'Dentist',
-  hygienist: 'Hygienist',
-  front_desk: 'Front desk',
-};
 
 export const PERMISSIONS = [
   'calendar.manage',

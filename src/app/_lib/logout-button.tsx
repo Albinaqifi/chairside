@@ -1,11 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { Button } from '@/ui/button';
 import { authClient } from './auth-client';
 
 /** Ends the session (the auth library deletes it and clears the cookie), then shows the login page. */
 export function LogoutButton() {
+  const t = useTranslations('logout');
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -17,8 +20,8 @@ export function LogoutButton() {
   }
 
   return (
-    <button type="button" onClick={() => void logout()} disabled={pending}>
-      Log out
-    </button>
+    <Button type="button" variant="quiet" onClick={() => void logout()} disabled={pending}>
+      {t('button')}
+    </Button>
   );
 }
