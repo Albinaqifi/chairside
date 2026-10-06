@@ -111,6 +111,9 @@ This document has two parts: rules that code must follow, and the gate before re
   emails at `@example.test`. No range is reserved for `+389`, so the seed takes its phones from one
   made-up block, written down with the other fake-data rules in `src/db/seed/fake-data.ts`; the
   allow-list below is what keeps anything from being sent to them (E00-T05a).
+- The seed's check (`fake-data.test.ts`) reads each name field on its own, and free text (a title,
+  a note, a label) only for phones and emails. A reviewer of a seed file checks that each person's
+  names share one script and that free text holds no name off the invented lists (E01-T01b).
 - Never copy production data down, not even "anonymised by hand".
 - Outgoing messages outside production reach only an allow-list of test contacts.
 
