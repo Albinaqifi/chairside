@@ -1,7 +1,7 @@
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { Staff } from '@/app/_lib/auth';
-import type { ExtraPermission, Role } from '@/modules/auth';
+import type { ExtraPermission, ProviderKind, Role } from '@/modules/auth';
 import { Sidebar } from './sidebar';
 
 // E00-T04b, tester: the sidebar as the staff layout renders it. navigation.test.ts lists each role's
@@ -18,7 +18,12 @@ vi.mock('next-intl/server', () => ({
   getTranslations: () => Promise.resolve((key: string) => key),
 }));
 
-function member(role: Role, extraPermissions: ExtraPermission[], clinicCount: number): Staff {
+function member(
+  role: Role,
+  extraPermissions: ExtraPermission[],
+  clinicCount: number,
+  providerKind: ProviderKind | null = null,
+): Staff {
   return {
     user: {
       id: '01970000-0000-7000-8000-0000000000a1',
@@ -31,6 +36,7 @@ function member(role: Role, extraPermissions: ExtraPermission[], clinicCount: nu
       clinicName: 'Test clinic (synthetic)',
       role,
       extraPermissions,
+      providerKind,
     },
     clinicCount,
   };
@@ -59,6 +65,19 @@ describe('the sidebar (E00-T04b, tester)', () => {
       '/import',
       '/settings',
       '/choose-clinic',
+    ]);
+  });
+
+  it("an owner whose membership is linked to a dentist column (E01-T01a): the owner's items with In the chair", async () => {
+    const { links } = await render(member('owner', [], 1, 'dentist'));
+    expect(links).toEqual([
+      '/',
+      '/calendar',
+      '/visit',
+      '/patients',
+      '/automations',
+      '/import',
+      '/settings',
     ]);
   });
 

@@ -3,7 +3,14 @@ import { getDb } from '@/db/client';
 import type { TenantTransaction } from '@/db/tenant';
 import { isUuid } from '@/lib/ids';
 import { withoutQueryValues } from '@/lib/query-errors';
-import { isExtraPermission, isRole, type ExtraPermission, type Role } from './permissions';
+import {
+  isExtraPermission,
+  isProviderKind,
+  isRole,
+  type ExtraPermission,
+  type ProviderKind,
+  type Role,
+} from './permissions';
 import type { ClinicChoice } from './resolve-clinic';
 import { memberships } from './schema';
 
@@ -19,9 +26,9 @@ export interface Membership {
 /**
  * The clinics a user may enter: one entry per active membership, by clinic name. This is a
  * cross-clinic lookup by design (there is no clinic yet when a user signs in), so it goes through
- * the one named database function `clinics_for_user()` (migration 0001, on the allow-list in
- * tests/integration/tenant-allow-list.ts). The function returns clinic id, clinic name, role and
- * extra permissions for that one user, nothing else.
+ * the one named database function `clinics_for_user()` (migrations 0001 and 0002, on the allow-list
+ * in tests/integration/tenant-allow-list.ts). The function returns clinic id, clinic name, role,
+ * extra permissions and the kind of the linked provider for that one user, nothing else (D-091).
  *
  * A failed query throws the copy withoutQueryValues() makes, without the user id it was sent
  * (D-070): every page and action calls this, and Next.js prints an error that escapes them.
@@ -31,7 +38,7 @@ export async function clinicsForUser(userId: string): Promise<ClinicChoice[]> {
   let rows: Record<string, unknown>[];
   try {
     ({ rows } = await getDb().execute(sql`
-      select membership_id, clinic_id, clinic_name, role, extra_permissions
+      select membership_id, clinic_id, clinic_name, role, extra_permissions, provider_kind
       from clinics_for_user(${userId})`));
   } catch (error) {
     throw withoutQueryValues(error);
@@ -42,6 +49,7 @@ export async function clinicsForUser(userId: string): Promise<ClinicChoice[]> {
     clinicName: String(row.clinic_name),
     role: toRole(row.role),
     extraPermissions: toExtraPermissions(row.extra_permissions),
+    providerKind: toProviderKind(row.provider_kind),
   }));
 }
 
@@ -77,4 +85,13 @@ function toRole(value: unknown): Role {
 function toExtraPermissions(value: unknown): ExtraPermission[] {
   if (!Array.isArray(value)) return [];
   return value.filter(isExtraPermission);
+}
+
+/**
+ * Null when the membership is linked to no provider. A kind the code does not know (the column's
+ * check allows none) also gives null: no permission comes from it, as with an unknown extra
+ * permission, and the person can still sign in.
+ */
+function toProviderKind(value: unknown): ProviderKind | null {
+  return isProviderKind(value) ? value : null;
 }

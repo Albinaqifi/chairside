@@ -279,7 +279,7 @@ describe('every role and every permission, through the wrapper', () => {
         },
       );
       for (const { who, person, role, extras } of members) {
-        // Memberships are not linked to providers before E01-T01 (D-072).
+        // These memberships are linked to no provider (D-072); provider-link.test.ts has linked ones.
         const expected = can(role, { extraPermissions: extras, providerKind: null }, permission);
         const before = handlerRuns;
 

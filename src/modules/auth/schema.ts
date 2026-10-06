@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -12,7 +13,10 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { newId } from '@/lib/ids';
-import { clinics } from '@/modules/tenancy/schema'; // for the foreign key only (D-058)
+// For the foreign keys only (D-058). scheduling's schema.ts imports users from this file too: the
+// cycle holds because each side reads the other only inside drizzle's callbacks.
+import { providers } from '@/modules/scheduling/schema';
+import { clinics } from '@/modules/tenancy/schema';
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -105,8 +109,9 @@ export const rateLimits = pgTable('rate_limits', {
 
 /**
  * A person's place in one clinic (D-021): their role, extra permissions and whether they may
- * enter. A tenant table. `provider_id` (the link to a calendar column) is added by E01-T01,
- * when providers exist.
+ * enter. A tenant table. `provider_id` links the person to their calendar column, a provider of
+ * the same clinic (E01-T01a); clinics_for_user() returns that provider's kind, which can() reads
+ * (D-091).
  */
 export const memberships = pgTable(
   'memberships',
@@ -123,6 +128,7 @@ export const memberships = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    providerId: uuid('provider_id'),
     status: text('status').notNull().default('active'),
     ...timestamps,
   },
@@ -130,6 +136,11 @@ export const memberships = pgTable(
     unique('memberships_clinic_id_id_key').on(t.clinicId, t.id),
     unique('memberships_clinic_id_user_id_key').on(t.clinicId, t.userId),
     index('memberships_user_id_idx').on(t.userId),
+    foreignKey({
+      name: 'memberships_provider_id_fk',
+      columns: [t.clinicId, t.providerId],
+      foreignColumns: [providers.clinicId, providers.id],
+    }),
     check(
       'memberships_role_check',
       sql`${t.role} in ('owner', 'dentist', 'hygienist', 'front_desk')`,

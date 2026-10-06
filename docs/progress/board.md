@@ -9,7 +9,7 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E01-T01a` is Ready: `/pipeline E01-T01a`
+- **Next task to start:** `E01-T01a` is Tested (PR #29) and its critical review approved: the owner merges it (`handoffs/E01-T01a.md`)
 - **Decisions it waits on:** none. Q-15's assumption is accepted (owner, 2026-10-06)
 
 ## Next (in order)
@@ -62,7 +62,7 @@ Fully specified.
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
 | E01-T01 | Schema: providers, treatment types, patients, appointments, hours | builder | critical | split (D-091) | Into E01-T01a and E01-T01b, the next two rows |
-| E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | Ready | Split from E01-T01 (D-091) in E00-T05a's Done pass; takes the provider link (E00-T04b review); Q-15's assumption accepted by the owner. See `handoffs/E01-T01a.md` |
+| E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | Tested | Split from E01-T01 (D-091) in E00-T05a's Done pass; takes the provider link (E00-T04b review); Q-15's assumption accepted by the owner. Migration 0002, the provider kind through `clinics_for_user()`. PR #29. Review: no required changes, 2 suggestions (Discovered). Tester: no findings, 11 cases added (review suggestion 2 among them), 2 notes (Discovered). Delta review of the added cases at `0c315db`: approved, 1 `none` suggestion (Discovered). Critical review at `db74cec`: approved, 2 `data` suggestions (Discovered). See `handoffs/E01-T01a.md` |
 | E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | Planned | Refined (D-091); Ready once E01-T01a is Done, checked in its Done pass. See `handoffs/E01-T01b.md` |
 | E01-T02 | Patients: list, search, create, edit | builder | normal | Planned | |
 | E01-T03 | Patient profile | builder | normal | Planned | |

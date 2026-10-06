@@ -15,6 +15,13 @@
       "when": 1791047331415,
       "tag": "0001_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791307188242,
+      "tag": "0002_scheduling",
+      "breakpoints": true
     }
   ]
 }

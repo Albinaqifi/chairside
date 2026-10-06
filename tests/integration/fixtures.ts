@@ -59,10 +59,19 @@ export async function rawQueryError(db: pg.Pool, query: SQL): Promise<unknown> {
 
 /** The Postgres error code of an error, also when a library wrapped it (`cause`). */
 export function pgErrorCode(error: unknown): string | undefined {
+  return pgErrorField(error, 'code');
+}
+
+/** The constraint a Postgres error names, also when a library wrapped it (`cause`). */
+export function pgErrorConstraint(error: unknown): string | undefined {
+  return pgErrorField(error, 'constraint');
+}
+
+function pgErrorField(error: unknown, field: 'code' | 'constraint'): string | undefined {
   let current = error;
   for (let depth = 0; current && depth < 5; depth++) {
-    const code = (current as { code?: unknown }).code;
-    if (typeof code === 'string') return code;
+    const value = (current as Record<string, unknown>)[field];
+    if (typeof value === 'string') return value;
     current = (current as { cause?: unknown }).cause;
   }
   return undefined;
@@ -75,16 +84,27 @@ export const PG = {
   invalidCursorName: '34000', // the cursor does not exist (any more)
   uniqueViolation: '23505',
   checkViolation: '23514',
+  notNullViolation: '23502',
+  foreignKeyViolation: '23503',
+  exclusionViolation: '23P01',
 } as const;
 
-/** Expects the promise to fail with the given Postgres error code. */
-export async function expectPgError(promise: Promise<unknown>, code: string): Promise<void> {
+/**
+ * Expects the promise to fail with the given Postgres error code and, when one is given, naming
+ * that constraint.
+ */
+export async function expectPgError(
+  promise: Promise<unknown>,
+  code: string,
+  constraint?: string,
+): Promise<void> {
   const error = await promise.then(
     () => undefined,
     (e: unknown) => e,
   );
   expect(error, 'expected the database to refuse').toBeDefined();
   expect(pgErrorCode(error)).toBe(code);
+  if (constraint !== undefined) expect(pgErrorConstraint(error)).toBe(constraint);
 }
 
 /** A synthetic staff email that no real person can have. */
@@ -206,7 +226,10 @@ export async function withoutGrant<T>(
   }
 }
 
-/** Inserts a membership. The app role only reads memberships in E00-T02, so this uses the migrator. */
+/**
+ * Inserts a membership, linked to a provider when `providerId` is given. The app role only reads
+ * memberships, so this uses the migrator.
+ */
 export async function insertMembership(
   db: pg.Pool,
   membership: {
@@ -215,12 +238,13 @@ export async function insertMembership(
     role?: string;
     status?: string;
     extraPermissions?: string[];
+    providerId?: string;
   },
 ): Promise<string> {
   const id = newId();
   await db.query(
-    `insert into memberships (id, clinic_id, user_id, role, status, extra_permissions)
-     values ($1, $2, $3, $4, $5, $6)`,
+    `insert into memberships (id, clinic_id, user_id, role, status, extra_permissions, provider_id)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
     [
       id,
       membership.clinicId,
@@ -228,6 +252,7 @@ export async function insertMembership(
       membership.role ?? 'front_desk',
       membership.status ?? 'active',
       membership.extraPermissions ?? [],
+      membership.providerId ?? null,
     ],
   );
   return id;

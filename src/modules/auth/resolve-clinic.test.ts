@@ -7,6 +7,7 @@ const a: ClinicChoice = {
   clinicName: 'A',
   role: 'owner',
   extraPermissions: [],
+  providerKind: null,
 };
 const b: ClinicChoice = {
   membershipId: '0199a000-0000-7000-8000-0000000000b1',
@@ -14,6 +15,7 @@ const b: ClinicChoice = {
   clinicName: 'B',
   role: 'dentist',
   extraPermissions: ['import'],
+  providerKind: 'dentist',
 };
 const c = '0199a000-0000-7000-8000-00000000000c'; // no membership there
 

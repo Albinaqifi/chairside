@@ -57,9 +57,10 @@ export function navigationFor(role: Role, extras: MembershipExtras): NavItem[] {
 }
 
 /**
- * What a membership adds to its role. Memberships are linked to providers from E01-T01; until then
- * nobody is, as in allowed() (src/app/_lib/actions.ts).
+ * What a membership adds to its role: its extra permissions, and the kind of the provider it is
+ * linked to, or null, from clinics_for_user() (D-091). allowed() (src/app/_lib/actions.ts) reads
+ * the same two.
  */
 export function membershipExtras(clinic: ClinicChoice): MembershipExtras {
-  return { extraPermissions: clinic.extraPermissions, providerKind: null };
+  return { extraPermissions: clinic.extraPermissions, providerKind: clinic.providerKind };
 }
