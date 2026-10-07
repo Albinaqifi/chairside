@@ -1739,3 +1739,23 @@ architecture), `changed` (differs from the original files), `process`.
   `radix-ui`); the newest, 1.52.0, was three days old.
 - **Revisit if:** an icon is needed that lucide-react does not draw; a version after 1.47.0 has been
   out a few weeks and a component needs it (move to it).
+
+### D-095 · Nothing typed about a patient stays in the browser: no field's own `autocomplete`, the search box too, and a browser re-check (E00-T04d Done)
+- **Origin:** E00-T04d's Done pass, 2026-10-07 (PR #35 merged, `handoffs/E00-T04d.md`): three `data`
+  lines from its review, delta review and critical review. The architect's, keeping the owner's
+  D-093 true.
+- **What:**
+  - In a staff form no field sets an `autocomplete` of its own but `off`: WebKit (Safari, an iPad
+    at the desk) gives such an input back after Back inside an `autocomplete="off"` form, under
+    another clinic's page too. This replaces D-093's "Revisit if" first case (a field that needs
+    the browser's suggestions sets its own): such a field comes back to the architect first.
+  - A field outside a staff form that takes patient details (E01-T02's search box, E01-T05's
+    patient search) is `autoComplete="off"` itself, and a search's words go in the request's body
+    (a `staffRead` action), never in the page's address (`?q=…`).
+  - E00-T06b checks D-093 in a real browser, Firefox among them: a browser that starts giving
+    fields back turns CI red. The task texts hold the detail; `CLAUDE.md` and
+    `security-privacy.md` section 8 say the rule.
+- **Why:** D-093's attribute guards `StaffForm`'s `<form>` only, and was checked once, by hand. The
+  browser's history and the host's request log keep an address: patient data in a log.
+- **Revisit if:** a field needs the browser's suggestions (then the form is reset when the page is
+  shown again, checked in WebKit); a search must live in the address (to share or bookmark it).

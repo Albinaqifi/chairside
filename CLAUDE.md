@@ -161,8 +161,10 @@ task, unless product code on `main` would hit it today.
   and shows the answer one way: `invalid_input` at the fields, `forbidden`, `clinic_changed` with a
   reload, the general failure (a call that rejects too), a toast when done; its button is disabled
   while it runs. Its form is `autocomplete="off"`: it keeps nothing in the browser, so no reload or
-  Back brings a field back, under another clinic either (D-093); a field that needs the browser's
-  suggestions sets its own. The select is the browser's own (`NativeSelect`); a checkbox's or a
+  Back brings a field back, under another clinic either (D-093); no field in it sets an
+  `autocomplete` of its own but `off` (WebKit gives such a field back), and a field outside a staff
+  form that takes patient details (a search box) is `autoComplete="off"` itself, its words never in
+  the page's address (D-095). The select is the browser's own (`NativeSelect`); a checkbox's or a
   switch's `StaffField` is `orientation="horizontal"`, its label beside it. Every staff page renders
   `<PageClinic clinicId={staff.clinic.clinicId} />`. Review checks, which no lint rule or test
   sees: any other button inside a staff form is `type="button"`
