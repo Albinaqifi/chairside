@@ -16,12 +16,15 @@ import {
   CardTitle,
 } from '@/ui/card';
 import { Checkbox } from '@/ui/checkbox';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogTrigger } from '@/ui/dialog';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/ui/empty';
 import { Field } from '@/ui/field';
 import { Input } from '@/ui/input';
 import { Logo } from '@/ui/logo';
 import { NativeSelect, NativeSelectOption } from '@/ui/native-select';
+import { Sheet, SheetBody, SheetClose, SheetContent, SheetFooter, SheetTrigger } from '@/ui/sheet';
 import { Switch } from '@/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs';
 import { Textarea } from '@/ui/textarea';
 import { DEMO_CHOICES } from './demo-choices';
 import { DemoForm, ToastDemo } from './demo-form';
@@ -37,6 +40,9 @@ const BADGES = [
   { variant: 'no-show', key: 'noShow' },
 ] as const satisfies readonly { variant: BadgeVariant; key: string }[];
 
+/** The demo tabs, each with its text under devComponents.tabs. */
+const TABS = ['first', 'second', 'third'] as const;
+
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations();
   return { title: t('shell.pageTitle', { page: t('devComponents.title') }) };
@@ -48,7 +54,9 @@ export async function generateMetadata(): Promise<Metadata> {
  * production build it answers 404 before anything else; its actions refuse there too
  * (./actions.ts). It is no item of the navigation. Like every staff page it starts from
  * currentStaff(), and the demo form sends the clinic the frame names. E00-T04d: each form field
- * alone, plain, disabled and with an error, and a checkbox ticked and a switch on.
+ * alone, plain, disabled and with an error, and a checkbox ticked and a switch on. E00-T04e: three
+ * tabs, a drawer at each of its two widths and the dialog, each with a field that takes the first
+ * focus.
  */
 export default async function ComponentsPage() {
   if (process.env.NODE_ENV === 'production') notFound();
@@ -249,6 +257,53 @@ export default async function ComponentsPage() {
         </Empty>
       </Section>
 
+      <Section heading={t('tabs.heading')}>
+        <Tabs defaultValue="first" className="max-w-xl">
+          <TabsList aria-label={t('tabs.label')}>
+            {TABS.map((tab) => (
+              <TabsTrigger key={tab} value={tab}>
+                {t(`tabs.${tab}`)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TabsContent value="first" className="grid gap-4">
+            <p className="text-muted">{t('tabs.firstContent')}</p>
+            <Field
+              label={t('tabs.field')}
+              render={(field) => <Input {...field} autoComplete="off" />}
+            />
+          </TabsContent>
+          <TabsContent value="second">{t('tabs.secondContent')}</TabsContent>
+          <TabsContent value="third">{t('tabs.thirdContent')}</TabsContent>
+        </Tabs>
+      </Section>
+
+      <Section heading={t('drawer.heading')}>
+        <div className="flex flex-wrap gap-2">
+          <DemoDrawer width={420} />
+          <DemoDrawer width={500} />
+        </div>
+      </Section>
+
+      <Section heading={t('dialog.heading')}>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="secondary">{t('dialog.open')}</Button>
+          </DialogTrigger>
+          <DialogContent title={t('dialog.title')} description={t('dialog.description')}>
+            <Field
+              label={t('dialog.field')}
+              render={(field) => <Input {...field} autoComplete="off" />}
+            />
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="secondary">{t('dialog.close')}</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </Section>
+
       <Section heading={t('logo.heading')}>
         <Logo />
       </Section>
@@ -262,6 +317,34 @@ export default async function ComponentsPage() {
         <DemoForm />
       </Section>
     </div>
+  );
+}
+
+/** A button that opens a drawer of this width: a field for the first focus, a line, a button. */
+async function DemoDrawer({ width }: { width: 420 | 500 }) {
+  const t = await getTranslations('devComponents.drawer');
+  const wide = width === 500;
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button variant="secondary">{wide ? t('openWide') : t('open')}</Button>
+      </SheetTrigger>
+      <SheetContent
+        width={width}
+        title={wide ? t('titleWide') : t('title')}
+        description={wide ? t('descriptionWide') : t('description')}
+      >
+        <SheetBody>
+          <Field label={t('field')} render={(field) => <Input {...field} autoComplete="off" />} />
+          <p className="text-muted">{t('body')}</p>
+        </SheetBody>
+        <SheetFooter>
+          <SheetClose asChild>
+            <Button variant="secondary">{t('close')}</Button>
+          </SheetClose>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 

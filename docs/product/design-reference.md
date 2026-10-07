@@ -81,8 +81,8 @@ Take these from the demo and define them once (Tailwind theme / CSS variables) i
 Never hard-code a colour in a component. They are in `src/app/globals.css`, with the few this list
 lacks (text on primary, links, focus, errors, small text; the sidebar's navigation colours,
 captions and small upper-case labels, E00-T04b; the toast's colours, radius, shadow and entry,
-E00-T04c; the switch's off colour and the checkbox's border colour and radius, E00-T04d) marked
-there. The controls' edges (`border-strong`, `checkbox-border`, `switch-off`) are as light as the
+E00-T04c; the switch's off colour and the checkbox's border colour and radius, E00-T04d; the
+overlay, the drawer's shadow, entry and title size, E00-T04e) marked there. The controls' edges (`border-strong`, `checkbox-border`, `switch-off`) are as light as the
 demo draws them, under WCAG 1.4.11's 3:1 against white: kept by the owner on 2026-10-07
 (`handoffs/E00-T04d.md`); the receptionist trial (Q-09) shows whether staff see them.
 
@@ -121,7 +121,8 @@ strong `oklch(0.6 0.1 H)`, ink `oklch(0.3 0.05 H)`. Store only the hue on the pr
 Borders 1 px. Almost no shadows. Entry animation: 0.3 s fade and 6 px rise.
 
 **Layout.** Sidebar 228 px, fixed. Main padding 28 px / 36 px. Content max width about 1,240 px.
-Drawers slide from the right: 420 px (appointment), 500 px (aftercare review).
+Drawers open at the right edge: 420 px (appointment), 500 px (aftercare review), never wider than
+the screen; they enter as the demo's does (line 1196), a fade and a 6 px rise in 0.2 s.
 
 **Staff app** is desktop-first and must also work on a tablet in landscape.
 **Patient pages** are phone-first (the demo's phone frame is about 300 px wide).
