@@ -16,6 +16,12 @@ export async function generateMetadata(): Promise<Metadata> {
  * their clinic (Q-11, D-096); the read checks that itself (searchPatients, every_member). The first
  * rows are read here, with nothing typed. Import from Excel shows for whoever the sidebar shows
  * Import to; the import page checks import.run itself (E04).
+ *
+ * The list is keyed by the clinic the page was rendered for. After another tab chose another
+ * clinic, Patients clicked on /patients renders this page again in place, and React keeps a
+ * component's state while its element keeps its type, its place and its key: without the key the
+ * list kept the first clinic's count and rows under the other clinic's name. With it, a render for
+ * another clinic starts a new list: that clinic's count and rows, and an empty box.
  */
 export default async function PatientsPage() {
   const staff = await currentStaff();
@@ -27,7 +33,7 @@ export default async function PatientsPage() {
   return (
     <div className="motion-safe:animate-enter">
       <PageClinic clinicId={staff.clinic.clinicId} />
-      <PatientList initial={first.value} canImport={canImport} />
+      <PatientList key={staff.clinic.clinicId} initial={first.value} canImport={canImport} />
     </div>
   );
 }

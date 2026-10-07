@@ -1,5 +1,5 @@
 import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
-import { isValidElement, type ReactElement, type ReactNode } from 'react';
+import { isValidElement, type ComponentProps, type ReactElement, type ReactNode } from 'react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Staff } from '@/app/_lib/auth';
 import { FrameClinic, PageClinic } from '@/app/_lib/frame-clinic';
@@ -11,12 +11,14 @@ import StaffLayout from '@/app/(staff)/layout';
 import { NAVIGATION } from '@/app/(staff)/navigation';
 import TodayPage from '@/app/(staff)/page';
 import PatientsPage from '@/app/(staff)/patients/page';
+import { PatientList } from '@/app/(staff)/patients/patient-list';
 import { PlaceholderPage } from '@/app/(staff)/placeholder-page';
 import SettingsPage from '@/app/(staff)/settings/page';
 import { Sidebar } from '@/app/(staff)/sidebar';
 import VisitPage from '@/app/(staff)/visit/page';
 import { closeDb } from '@/db/client';
 import { CLINIC_COOKIE } from '@/lib/cookies';
+import { newId } from '@/lib/ids';
 import { createStaffUser } from '@/modules/auth';
 import { config } from '@/proxy';
 import {
@@ -28,6 +30,7 @@ import {
   signInCookie,
   testEmail,
 } from './fixtures';
+import { insertRow } from './scheduling-fixtures';
 
 // E00-T04b, acceptance 4: every placeholder page checks the session itself, as Today does: the
 // request proxy is not the check (security-privacy.md, section 2). Each page is called as Next.js
@@ -233,5 +236,57 @@ describe('the frame names the clinic of the request, and each page the clinic it
       frame: oneClinic.clinicId,
       sidebars: [oneClinic.clinicId],
     });
+  });
+});
+
+// E01-T02a, critical review: after another tab chose another clinic, Patients clicked on
+// /patients, the address already open, renders the page again in place, and React keeps a
+// component's state while its element keeps its type, its place and its key. So the patient list
+// is keyed by the clinic its page was rendered for: a render for another clinic gets another key,
+// and React starts a new list with that render's rows and an empty box, never the first clinic's
+// rows under the second clinic's name. Read from the elements the page returns, as PageClinic
+// above; the browser's side is the tester's.
+
+describe('the patient list is keyed by the clinic its page was rendered for (E01-T02a)', () => {
+  /** One patient in each of the two clinics, by clinic id: each render's rows are its clinic's. */
+  const patientOf = new Map<string, string>();
+
+  beforeAll(async () => {
+    const firstNames = new Map([
+      [firstClinic, 'Elena'],
+      [secondClinic, 'Marko'],
+    ]);
+    for (const [clinicId, firstName] of firstNames) {
+      const id = newId();
+      await insertRow(admin, 'patients', {
+        id,
+        clinic_id: clinicId,
+        first_name: firstName,
+        last_name: 'Kodra',
+        language: 'en',
+      });
+      patientOf.set(clinicId, id);
+    }
+  });
+
+  it("a member of two clinics: each render's list keyed by its clinic, with that clinic's rows", async () => {
+    request.cookie = await signInCookie(twoClinics.email, PASSWORD, freshAddress());
+    for (const [which, chosen] of [
+      ['first', firstClinic],
+      ['second', secondClinic],
+    ] as const) {
+      request.clinic = chosen;
+      const lists = elementsOf<ComponentProps<typeof PatientList>>(
+        await PatientsPage(),
+        PatientList,
+      );
+      const shown = lists.map((list) => ({
+        key: list.key,
+        rows: list.props.initial.rows.map((row) => row.id),
+      }));
+      expect(shown, `rendered for the ${which} clinic`).toEqual([
+        { key: chosen, rows: [patientOf.get(chosen)] },
+      ]);
+    }
   });
 });
