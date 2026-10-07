@@ -1014,31 +1014,66 @@ Real screens.
 ### E00-T04e · Tabs, the drawer and the dialog
 
 - **Role:** builder · **Risk:** normal · **Depends on:** E00-T04d
-- **Read:** `design-ref` (Design tokens: shape and layout; the drawer's frame, demo lines
-  1192–1196; the settings tab bar, lines 750–752) · D-009, D-084, D-085 ("Not checked"), D-086, D-093 · the
-  architect section of `handoffs/E00-T04e.md`
+- **Read:** `design-ref` (Design tokens: shape and layout; the drawer's frame and header, demo lines
+  1193–1201; the settings tab bar, lines 750–752 and logic 1913) · D-009, D-084, D-085 ("Not
+  checked"), D-086, D-093, D-094 · the architect section of `handoffs/E00-T04e.md`
 
-**Why.** E01's screens open in these: the booking and appointment drawers, the settings tabs, a
-dialog that asks before something is cancelled. The last of E00-T04's parts (D-086, D-093).
+**Why.** E01's screens open in these: the booking and appointment drawers (E01-T05, E01-T06), the
+settings tabs (E01-T08), and the dialog in which a cancel asks who cancelled and why (E01-T06,
+`scope-v1.md`). The last of E00-T04's parts (D-086, D-093).
 
 **Do.**
-- From shadcn/ui (D-009), restyled to the tokens, in `src/ui/`: Tabs; the drawer from the right
-  (420 px, and 500 px for the aftercare review), which is shadcn/ui's Sheet on Radix's Dialog, not
-  its Drawer (that needs `vaul`, which D-086 does not list); the Dialog. Each that renders a button,
-  itself or through a Radix part, types its props without `formAction` and `formMethod`
-  (`Omit<…>`, D-084).
-- The text they carry (a close button's label) comes from the message file.
-- Each one on `/dev/components`.
+- Three of shadcn/ui's components (D-009, style new-york-v4), on Radix's, restyled to the tokens,
+  in `src/ui/`:
+  - **Tabs**, as the demo's settings tab bar (lines 750–752, logic 1913): the chosen tab in the
+    text colour at weight 600 over a 2 px `primary` line, the others `muted` at 500, a 1 px
+    `border` line under the bar. The arrow keys move between tabs (Radix's). Its comment says that
+    a tab's content leaves the page when another tab is chosen (Radix's), so a form never spans
+    two tabs.
+  - **The drawer** from the right: shadcn/ui's Sheet on Radix's Dialog, not its Drawer (that
+    needs `vaul`, which D-086 does not list), the right side only, 420 px wide and 500 px for the
+    aftercare review (E06-T08), never wider than the screen. The demo's frame (lines 1193–1201):
+    its overlay, which closes it on a click, its shadow, a header with the title and the round
+    close button. The close button comes after the content in the page's order, placed in the
+    header's corner, as shadcn/ui's is: Radix gives the first focus to the first control inside,
+    which E01-T05 wants to be its patient field.
+  - **The dialog**, shadcn/ui's Dialog. The demo has none: a card's surface, border and radius
+    over the drawer's overlay, at shadcn/ui's width.
+- **The entry:** the drawer and the dialog enter as the demo's drawer does (`csIn` in 0.2 s, line
+  1196: a fade and a 6 px rise), with the `enter` keyframes in `globals.css`, under `motion-safe:`
+  as the toast's. shadcn/ui's Sheet and Dialog animate with `tw-animate-css`'s classes, a package
+  D-086 does not list, which draw nothing here: replace them, add no package. A token the design
+  reference lacks (the overlay, the drawer's shadow) is added in `globals.css`, and in `cn.ts` when
+  it is a shadow or an animation, derived from one it has and named (`CLAUDE.md`).
+- **A title, always:** a drawer or a dialog written without a title does not compile (for one, the
+  title a required prop of its content). Radix 1.1.23 names a dialog only when its Title is
+  rendered, and says nothing when it is not.
+- Each that renders a button (a tab, a trigger, a close button), itself or through a Radix part,
+  types its props without `formAction` and `formMethod` (`Omit<…>`, D-084) and without `type`,
+  and writes `type="button"` after them, as the checkbox does: in a staff form, Send is the one
+  submit button (E00-T04d).
+- Their text (the close button's label) comes from the message file, read in `src/ui/` as
+  `toast.tsx` reads it; the close icon is lucide-react's (D-094), `aria-hidden`.
+- `/dev/components`: tabs with three tabs; a button that opens the drawer at 420 px, one that opens
+  it at 500 px, and one that opens the dialog.
 
-**Out of scope.** What goes inside a drawer (E01-T05, E01-T06, E06-T08). The calendar grid (our
-own, D-009; E01-T04).
+**Out of scope.** What goes inside a drawer or the dialog (E01-T05, E01-T06, E06-T08). A drawer
+from another side; an alert dialog. The calendar grid (our own, D-009; E01-T04).
 
 **Acceptance.**
-- [ ] Each component on `/dev/components` uses the tokens, the drawer at 420 and 500 px from the
-      right with the entry animation: screenshots are files in `docs/progress/handoffs/E00-T04e/`.
+- [ ] Each component on `/dev/components` uses the tokens: the tabs as the demo's bar, the drawer at
+      420 and 500 px from the right over the overlay, the dialog: screenshots are files in
+      `docs/progress/handoffs/E00-T04e/`. The drawer and the dialog enter with the fade and rise,
+      and without it when the system asks for less motion (tester, in a browser).
 - [ ] With the keyboard alone: tabs move with the arrow keys; the dialog and the drawer keep focus
-      inside, close with Escape and give focus back (tester, in a browser).
-- [ ] The dialog and the drawer each have a title that a screen reader reads.
+      inside, close with Escape and give focus back to the button that opened them (tester, in a
+      browser).
+- [ ] A click on the overlay closes the drawer and the dialog (tester, in a browser).
+- [ ] The dialog and the drawer each have a title that a screen reader reads (tester, the browser's
+      accessibility tree); one written without a title does not compile (a scratch file, removed
+      after).
+- [ ] In the server's HTML, a tab, a trigger and a close button rendered outside the content are
+      `type="button"`, whatever type a caller passes (unit test).
 - [ ] Lint refuses `formAction="/patients"` on each component that renders a button (a scratch file,
       removed after). Lint, the token search and the check for requests to other hosts pass, as in
       E00-T04a.
@@ -1156,8 +1191,8 @@ owner with a script, first on staging (E00-T07), later in production. The second
 
 - **Role:** builder · **Risk:** normal · **Depends on:** E00-T04a … E00-T04e, E00-T05a, E00-T06a,
   E00-T09
-- **Read:** `test-strategy` (The levels; End-to-end journeys) · D-012, D-014, D-075, D-076, D-086 ·
-  the handoff notes of E00-T04a … E00-T04e, E00-T05a and E00-T06a
+- **Read:** `test-strategy` (The levels; End-to-end journeys) · D-012, D-014, D-075, D-076, D-086,
+  D-093, D-095 · the handoff notes of E00-T04a … E00-T04e, E00-T05a and E00-T06a
 
 **Why.** A few journeys through a real browser prove that the pieces are wired together: login,
 session, layout, logout. Split from E00-T06 (D-075): it needs the seeded users (E00-T05a), the Today
@@ -1180,6 +1215,13 @@ E00-T04e). It is refined against what they built, once they are done.
   D-086). Its tool is a library, chosen with the owner when this task is refined (agent rule 4).
   `/dev/components` is hidden in a production build (E00-T04c): this task decides how the check
   reaches it, with the clock control's guard in mind.
+- **D-093 in a real browser** (E00-T04d critical review, `data`, D-095), on the demo form of
+  `/dev/components`, reached as the accessibility check reaches it: in Firefox (it gives fields
+  back after F5) and each other browser the journeys run in, a value chosen in every field, each
+  step its own action (Radix's hidden input follows its control only after the click), then
+  `location.reload()` (Playwright's `page.reload()` skips Firefox's restore) and Back to a page
+  loaded as a new document. Every field shows its default and both hidden inputs are unchecked;
+  with the form's `autocomplete` stripped in the page, the control, they come back.
 - A CI job for the journeys, after the build. Traces only on failure, kept briefly, synthetic data
   only.
 - `CLAUDE.md`: how to run the journeys locally.
@@ -1191,6 +1233,8 @@ E00-T04e). It is refined against what they built, once they are done.
 - [ ] J1 fails when login or logout is broken (tester).
 - [ ] The accessibility check passes on `/dev/components` and on J1's pages, and fails on a field
       without a label (tester).
+- [ ] The D-093 check passes in Firefox and each other browser the journeys run in, and fails with
+      the form's `autocomplete="off"` stripped in the page (tester).
 - [ ] The clock control cannot be enabled on staging or production (test).
 - [ ] A run leaves the development database untouched.
 - [ ] A full CI run still takes under 10 minutes.

@@ -147,7 +147,7 @@ every later row (each schema task brings its own). Any screen.
 
 - **Role:** builder · **Risk:** critical (permissions: the test of every action and every role,
   D-093) · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04e
-- **Read:** `scope` (Navigation and roles; Patients list and profile) · `design-ref` (demo lines 316–347; logic 1849–1858) · `data-model` (`patients`) · `test-strategy` (Permissions) · D-015, D-033, D-040, D-093
+- **Read:** `scope` (Navigation and roles; Patients list and profile) · `design-ref` (demo lines 316–347; logic 1849–1858) · `data-model` (`patients`) · `test-strategy` (Permissions) · D-015, D-033, D-040, D-093, D-095
 
 **Why.** Staff must find a patient in seconds by name or phone.
 
@@ -184,6 +184,12 @@ every later row (each schema task brings its own). Any screen.
 - **After a patient is created** the form is emptied or closed (a new `key` from `onDone`, or a
   reset): `StaffForm` keeps every field after every answer, done included (D-092), so a second
   Send would make a second patient (E00-T04c review, `slice`).
+- **Nothing typed about a patient stays in the browser** (E00-T04d review and delta review,
+  `data`, D-095): the search box, in no staff form, is `autoComplete="off"` itself, and its words
+  go in the request's body (a `staffRead` action), never in the page's address (`?q=…`), which
+  the browser's history and the host's request log keep. No field of the patient form sets an
+  `autocomplete` of its own (WebKit gives such a field back after Back). `staff-form.tsx`'s comment
+  says so, in place of "a field that needs the browser's suggestions sets its own".
 
 **Out of scope.** Profile page (T03). Consent switches (E02). Care plan, treatment plan columns.
 
@@ -201,6 +207,9 @@ every later row (each schema task brings its own). Any screen.
       added without an entry fails it.
 - [ ] After a patient is created, the form holds nothing of it, and a second Send creates no second
       patient (tester, in a browser).
+- [ ] The search box is `autocomplete="off"` and no field of the patient form has an `autocomplete`
+      of its own (unit test, as `demo-form.test.ts`'s); after a search, the address holds none of
+      its words (tester).
 
 ---
 
@@ -266,7 +275,7 @@ every later row (each schema task brings its own). Any screen.
 ### E01-T05 · Book an appointment (new-appointment drawer)
 
 - **Role:** builder · **Risk:** normal · **Depends on:** E01-T04, E01-T02
-- **Read:** `scope` (New appointment drawer) · `design-ref` (demo lines 1323–1362; logic 1958–1964, 2116–2135) · `data-model` (`appointments`, "No double booking") · D-020
+- **Read:** `scope` (New appointment drawer) · `design-ref` (demo lines 1323–1362; logic 1958–1964, 2116–2135) · `data-model` (`appointments`, "No double booking") · D-020, D-093, D-095
 
 **Why.** The single most used action. It must be fast.
 
@@ -282,6 +291,9 @@ every later row (each schema task brings its own). Any screen.
   duplicate check (E00-T03's double-submit line, on the Discovered list) covers it.
 - After a booking the drawer closes or its form is emptied: `StaffForm` keeps every field after
   done (D-092), so a second Send would book again (E00-T04c review, `slice`).
+- The patient search keeps nothing in the browser (E00-T04d review, `data`, D-095): inside the
+  booking form, no `autocomplete` of its own; outside it, `autoComplete="off"`; its words never in
+  the page's address.
 - A race (someone else took the slot meanwhile) shows a friendly message, not an error page.
 - Fully usable by keyboard; focus starts in the patient field.
 
@@ -296,6 +308,8 @@ every later row (each schema task brings its own). Any screen.
 - [ ] Two simultaneous bookings of the same slot: one succeeds, the other gets the friendly message (integration test).
 - [ ] The new block appears on the calendar immediately.
 - [ ] Audit row written; the appointment's `source` is `staff`.
+- [ ] The patient search has no `autocomplete` but `off` (unit test), and after a search the
+      address holds none of its words (tester).
 
 ---
 

@@ -102,9 +102,12 @@ This document has two parts: rules that code must follow, and the gate before re
 - A form never puts its fields in the URL: it posts to a URL named in its `action`, or takes a
   function as its action. The login form's submit button stays disabled until the page's script
   has run, and login needs JavaScript (D-076).
-- A staff form keeps nothing in the browser: `autocomplete="off"` on `StaffForm`'s form, so no
-  browser brings its fields back after a reload or Back, under another clinic either, or offers
-  past entries in them (D-093).
+- A staff form keeps nothing in the browser: `autocomplete="off"` on `StaffForm`'s form and no
+  field in it with an `autocomplete` of its own, so no browser brings its fields back after a
+  reload or Back, under another clinic either, or offers past entries in them (D-093, D-095). A
+  field outside a staff form that takes patient details (a search box) is `autocomplete="off"`
+  itself, and a search's words go in the request's body, never in the page's address, which the
+  browser's history and the host's request log keep (D-095).
 - Webhooks verify the provider's signature before doing anything.
 - File uploads: size limit, type check, parsed in the worker, never executed or served back.
 - Dependencies: lockfile committed, automated vulnerability check in CI (an advisory in a
