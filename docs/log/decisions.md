@@ -1699,3 +1699,27 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** React lets a form action keep its fields (then the dispatch alone sends it); a
   form must work before its script runs (then the action bound to the frame's clinic id,
   `action.bind(null, clinicId)`, D-072); a screen needs two clinics side by side (D-069).
+
+### D-093 · Staff forms keep nothing in the browser; E00-T04d split in two; the permission test comes with E01-T02 (E00-T04c Done)
+- **Origin:** E00-T04c's Done pass and E00-T04d's Ready pass, 2026-10-07 (PR #33 merged,
+  `handoffs/E00-T04c.md`, `handoffs/E00-T04d.md`). **Owner, 2026-10-07:** staff forms switch the
+  browser's memory off (the other choice: keep it, and find another fix). The rest is the architect's.
+- **What:**
+  - `StaffForm`'s form carries `autocomplete="off"`: no browser brings a staff form's fields back
+    after a reload or Back, or offers past entries in them. The login form keeps its own, for the
+    password manager. Built in E00-T04d; `security-privacy.md` section 8 says it.
+  - E00-T04d is split (D-086's "Revisit if"): **E00-T04d**, the form fields and the memory switched
+    off, critical (it changes `StaffForm`); **E00-T04e**, tabs, the drawer and the dialog, normal.
+    Both come before E01-T02, where D-087's order has E00-T04d. The select is the browser's own,
+    styled to the tokens: it sends what it shows and opens a tablet's own picker.
+  - The test `test-strategy.md` asks for, every action × every role, comes with E01-T02's first real
+    staff actions; E01-T02 is critical (permissions).
+- **Why:** Firefox gives a form's fields back after F5, before the script runs: after a clinic switch
+  in another tab, what was typed for one clinic comes back on the other's page (E00-T04c fix round 3,
+  seen by its tester). Radix's checkbox, switch and select keep a hidden copy that re-syncs only when
+  the value changes, so a restored copy sends what the screen does not show. One attribute closes
+  both, and keeps patient details out of a shared computer's form history. E00-T04c came to about
+  980 changed lines against 450–550 estimated; E00-T04d's seven components are about 600 as published.
+- **Revisit if:** a field needs the browser's suggestions (its own `autocomplete`, never the form's);
+  a browser restores fields despite the attribute (then reset the form on a reload); a select must
+  show more than text (Radix's, with the hidden copy checked).
