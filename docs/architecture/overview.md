@@ -53,7 +53,7 @@ One codebase, two running processes, one database.
 | UI | Tailwind CSS, shadcn/ui, demo tokens | D-009 |
 | Validation | Zod, on every input: forms, webhooks, AI responses | D-068 |
 | Dates and time zones | Luxon | — |
-| Phone numbers | libphonenumber-js | — |
+| Phone numbers | libphonenumber-js | D-097 |
 | Translations | next-intl | D-015 |
 | WhatsApp / email (SMS addable) | Adapters; fake first; real ones chosen in E03 | D-010, D-055 |
 | AI | Anthropic API from the worker | D-011 |
