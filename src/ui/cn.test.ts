@@ -26,6 +26,14 @@ describe('cn', () => {
     expect(cn('bg-primary-soft', 'hover:bg-nav-hover')).toBe('bg-primary-soft hover:bg-nav-hover');
   });
 
+  it("knows E00-T04c's toast tokens: its radius, shadow and animation replace their own kind only", () => {
+    expect(cn('rounded-control', 'rounded-toast')).toBe('rounded-toast');
+    expect(cn('shadow-toast', 'shadow-none')).toBe('shadow-none');
+    expect(cn('shadow-toast', 'text-on-toast')).toBe('shadow-toast text-on-toast');
+    expect(cn('animate-enter', 'animate-toast')).toBe('animate-toast');
+    expect(cn('bg-toast', 'text-on-toast', 'text-base')).toBe('bg-toast text-on-toast text-base');
+  });
+
   it('joins conditional classes as clsx does', () => {
     expect(cn('px-3', false, undefined, ['py-2', { 'w-full': true, hidden: false }])).toBe(
       'px-3 py-2 w-full',

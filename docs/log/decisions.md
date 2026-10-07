@@ -1675,3 +1675,27 @@ architecture), `changed` (differs from the original files), `process`.
   unchecked link in the schema.
 - **Revisit if:** `clinics_for_user()` must return more than a membership's own fields and its
   provider's kind: then a read inside the tenant transaction, not a wider cross-clinic function.
+
+### D-092 · The staff form: how a form calls a wrapped action, with the clinic its frame names (E00-T04c)
+- **Origin:** process, E00-T04c (builder): the bridge the task leaves to its builder, and D-072's
+  "Revisit if" (useActionState's call shape). Builder choices inside the task.
+- **What:**
+  - The wrappers' call shape stays `action(clinicId, input)` (D-072). `StaffForm` gives
+    useActionState a function of its own, `(previous, formData) => sendForm(action, clinicId,
+    formData)`; its state is the answer and a count of attempts. The clinic id is the frame's:
+    `FrameClinic`, filled by the staff layout with the clinic its sidebar names. `StaffForm` has
+    no clinic prop. A page rendered for another clinic than its frame's refreshes the frame
+    (`PageClinic`, `router.refresh()`).
+  - The form's `action` is that dispatch (D-076's lint), but its `onSubmit` dispatches the form's
+    data itself, in a transition: React 19 empties a form's fields after its form action, whatever
+    the answer, so field errors would stand under empty fields. A ref drops a second submit while
+    the first runs; the button is disabled meanwhile.
+  - A call that rejects is answered `failed` inside that function: in the transition it would
+    reach the nearest error boundary, and the app has none. Next.js's redirect is rethrown
+    (`unstable_rethrow`): its router is already navigating. `noValidate`: a field's error is the
+    server's, in the message file's words.
+- **Why:** the smallest bridge that keeps D-072's checked call shape, keeps what was typed when
+  the answer is a field error, and never runs an action in a clinic the person does not see named.
+- **Revisit if:** React lets a form action keep its fields (then the dispatch alone sends it); a
+  form must work before its script runs (then the action bound to the frame's clinic id,
+  `action.bind(null, clinicId)`, D-072); a screen needs two clinics side by side (D-069).

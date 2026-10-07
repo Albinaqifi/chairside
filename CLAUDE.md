@@ -84,7 +84,8 @@ Node starts, silently (`TZ=UTC` gets through). Check the zone Node has with
 src/app/              Next.js routes. Thin: parse input, call a module, render.
   (auth)/             Login and the clinic picker: the pages a user sees before they have a clinic.
   (staff)/            The staff app. Its layout and every page start from currentStaff().
-  _lib/               Request-edge helpers: who is signed in; the action wrappers; the auth client.
+  _lib/               Request-edge helpers: who is signed in; the action wrappers, the staff form that
+                      calls them and the frame's clinic it sends (D-092); the auth client.
   api/auth/           The auth library's routes (sign-in, sign-out, get-session). No code of ours.
   globals.css         The design tokens (Tailwind's theme) and the page's base styles.
 src/proxy.ts          Moves the session forward and renews its cookie (D-067); no valid session → /login,
@@ -147,13 +148,28 @@ task, unless product code on `main` would hit it today.
   D-072). `staffAction`: a change (session → clinic check → permission → Zod → handler and one audit
   row in one `withTenant`). `staffRead`: a read, as an action or `.forPage(input)` in a page.
   `userAction`: before a clinic is chosen. Each names its permission or `'every_member'`. The
-  browser calls `action(clinicId, input)` with its page's clinic (D-069) and gets `{ ok: true,
+  browser calls `action(clinicId, input)` with its frame's clinic (D-069) and gets `{ ok: true,
   value }` or `{ ok: false, error: { code } }`; `return refuse('code')` says no, a throw is `internal`:
   ```ts
   export const renamePatient = staffAction( // 'use server' file; patients.rename = a module function
     { permission: 'patients.manage', input: z.object({ patientId: z.uuid(), name: z.string() }),
       audit: { action: 'patient.renamed', entityType: 'patient', entityId: ({ input }) => input.patientId } },
     async ({ input, tx, now }) => (await patients.rename(tx, input, now)) ?? refuse('not_found'));
+  ```
+  A staff form is `StaffForm` with a `StaffField` per field (`src/app/_lib/staff-form.tsx`, D-092).
+  It sends the clinic its frame names (the staff layout's `FrameClinic`), never one a page passes,
+  and shows the answer one way: `invalid_input` at the fields, `forbidden`, `clinic_changed` with a
+  reload, the general failure (a call that rejects too), a toast when done; its button is disabled
+  while it runs. Every staff page renders `<PageClinic clinicId={staff.clinic.clinicId} />`. The
+  form sits in a client component that the page renders, as `DemoForm` does
+  (`src/app/(staff)/dev/components/demo-form.tsx`): a page can hand a client component a server
+  action, never another function such as `render` or `onDone` (React stops the render):
+  ```tsx
+  <StaffForm action={renamePatient} doneMessage={t('renamed')}
+    submitLabel={t('rename')} pendingLabel={t('renaming')}>
+    <input type="hidden" name="patientId" value={patient.id} />
+    <StaffField name="name" label={t('name')} render={(field) => <Input {...field} />} />
+  </StaffForm>
   ```
   Other pages use `currentStaff()` (`src/app/_lib/auth.ts`); a page outside `(staff)` starts from
   `currentStaff()` or `requireUser()`, or is public on purpose and says so in a comment, as the login

@@ -6,15 +6,16 @@ import { extendTailwindMerge } from 'tailwind-merge';
  * later one, so a caller's className can override a component's own. tailwind-merge knows
  * Tailwind's own scales only; ours (src/app/globals.css) are named here, or it would read
  * `text-heading` as a colour and drop a `text-muted` next to it, and keep two radii. A size,
- * radius, tracking or animation added to the stylesheet is added here too.
+ * radius, shadow, tracking or animation added to the stylesheet is added here too.
  */
 const merge = extendTailwindMerge({
   extend: {
     theme: {
       text: ['small', 'caption', 'overline', 'section', 'heading', 'wordmark'],
-      radius: ['card', 'control', 'pill'],
+      radius: ['card', 'control', 'pill', 'toast'],
+      shadow: ['toast'],
       tracking: ['heading', 'overline'],
-      animate: ['enter'],
+      animate: ['enter', 'toast'],
     },
   },
 });

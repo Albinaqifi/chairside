@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { currentStaff } from '@/app/_lib/auth';
+import { FrameClinic } from '@/app/_lib/frame-clinic';
 import { Sidebar } from './sidebar';
 
 /**
@@ -9,16 +10,19 @@ import { Sidebar } from './sidebar';
  *
  * The frame of every staff page, as the demo draws it (lines 22–60): the sidebar, then the content
  * area with the design reference's padding (28 px above, 36 px at the sides, 60 px below) and its
- * width, at most about 1,240 px (design-reference.md, "Layout").
+ * width, at most about 1,240 px (design-reference.md, "Layout"). It hands the clinic it rendered
+ * for, the one the sidebar names, to every form below it (FrameClinic, D-069): no page passes one.
  */
 export default async function StaffLayout({ children }: { children: ReactNode }) {
   const staff = await currentStaff();
   return (
-    <div className="flex min-h-dvh">
-      <Sidebar staff={staff} />
-      <main className="min-w-0 flex-1 px-9 pt-7 pb-15">
-        <div className="max-w-310">{children}</div>
-      </main>
-    </div>
+    <FrameClinic clinicId={staff.clinic.clinicId}>
+      <div className="flex min-h-dvh">
+        <Sidebar staff={staff} />
+        <main className="min-w-0 flex-1 px-9 pt-7 pb-15">
+          <div className="max-w-310">{children}</div>
+        </main>
+      </div>
+    </FrameClinic>
   );
 }

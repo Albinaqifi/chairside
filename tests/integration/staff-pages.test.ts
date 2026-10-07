@@ -1,14 +1,19 @@
 import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
-import type { ReactNode } from 'react';
+import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Staff } from '@/app/_lib/auth';
+import { FrameClinic, PageClinic } from '@/app/_lib/frame-clinic';
 import AutomationsPage from '@/app/(staff)/automations/page';
 import CalendarPage from '@/app/(staff)/calendar/page';
+import ComponentsPage from '@/app/(staff)/dev/components/page';
 import ImportPage from '@/app/(staff)/import/page';
 import StaffLayout from '@/app/(staff)/layout';
 import { NAVIGATION } from '@/app/(staff)/navigation';
 import TodayPage from '@/app/(staff)/page';
 import PatientsPage from '@/app/(staff)/patients/page';
+import { PlaceholderPage } from '@/app/(staff)/placeholder-page';
 import SettingsPage from '@/app/(staff)/settings/page';
+import { Sidebar } from '@/app/(staff)/sidebar';
 import VisitPage from '@/app/(staff)/visit/page';
 import { closeDb } from '@/db/client';
 import { CLINIC_COOKIE } from '@/lib/cookies';
@@ -160,5 +165,70 @@ describe('the request proxy runs for every path of the navigation', () => {
     for (const path of ['/login', '/login-history', '/patients.csv', '/settings/v1.2']) {
       expect(unstable_doesMiddlewareMatch({ config, url: `${ORIGIN}${path}` }), path).toBe(false);
     }
+  });
+});
+
+// E00-T04c, tester: the clinic id every staff form sends is the frame's (D-069, D-092), and the
+// staff layout is the frame's one source: it fills FrameClinic with the clinic of the request, the
+// one its sidebar names, and each page renders PageClinic with the clinic it was rendered for, so
+// a frame that names another catches up. Read from the elements the layout and the pages return;
+// no component in them is called but the placeholder page, a server component.
+
+/** Every element of `type` in a tree of elements, without calling any component in it. */
+function elementsOf<P>(node: ReactNode, type: unknown): ReactElement<P>[] {
+  if (Array.isArray(node)) return node.flatMap((child: ReactNode) => elementsOf<P>(child, type));
+  if (!isValidElement<{ children?: ReactNode }>(node)) return [];
+  const own = node.type === type ? [node as ReactElement<P>] : [];
+  return [...own, ...elementsOf<P>(node.props.children, type)];
+}
+
+/** The clinic id the staff layout's frame names, and the clinic its sidebar was given. */
+async function frameOfLayout(): Promise<{ frame: unknown; sidebars: string[] }> {
+  const layout = await StaffLayout({ children: null });
+  if (!isValidElement<{ clinicId?: unknown }>(layout) || layout.type !== FrameClinic) {
+    throw new Error('the staff layout does not start with FrameClinic');
+  }
+  const sidebars = elementsOf<{ staff: Staff }>(layout, Sidebar);
+  return {
+    frame: layout.props.clinicId,
+    sidebars: sidebars.map((s) => s.props.staff.clinic.clinicId),
+  };
+}
+
+/** The clinic ids a placeholder page hands PageClinic. */
+async function pageClinicsOf(page: () => Promise<ReactNode>): Promise<unknown[]> {
+  const shown = await page();
+  if (!isValidElement<{ heading: string }>(shown) || shown.type !== PlaceholderPage) {
+    throw new Error('the page does not show the placeholder page');
+  }
+  const rendered = await PlaceholderPage(shown.props);
+  return elementsOf<{ clinicId: unknown }>(rendered, PageClinic).map((e) => e.props.clinicId);
+}
+
+describe('the frame names the clinic of the request, and each page the clinic it was rendered for (E00-T04c)', () => {
+  it.each(['first', 'second'] as const)(
+    'a member of two clinics who chose the %s one: that clinic, in the frame, the sidebar and every page',
+    async (which) => {
+      const chosen = which === 'first' ? firstClinic : secondClinic;
+      request.cookie = await signInCookie(twoClinics.email, PASSWORD, freshAddress());
+      request.clinic = chosen;
+      expect(await frameOfLayout()).toEqual({ frame: chosen, sidebars: [chosen] });
+      for (const [path, page] of Object.entries(PAGES)) {
+        expect(await pageClinicsOf(page), path).toEqual([chosen]);
+      }
+      const components = await ComponentsPage();
+      const ids = elementsOf<{ clinicId: unknown }>(components, PageClinic).map(
+        (e) => e.props.clinicId,
+      );
+      expect(ids, '/dev/components').toEqual([chosen]);
+    },
+  );
+
+  it('a member of one clinic: that clinic', async () => {
+    request.cookie = await signInCookie(oneClinic.email, PASSWORD, freshAddress());
+    expect(await frameOfLayout()).toEqual({
+      frame: oneClinic.clinicId,
+      sidebars: [oneClinic.clinicId],
+    });
   });
 });

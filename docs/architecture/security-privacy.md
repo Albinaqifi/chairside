@@ -29,9 +29,10 @@ This document has two parts: rules that code must follow, and the gate before re
 - 2FA is mandatory for owners and for anyone with the `export` or `import` permission.
 - Every server action declares the permission it needs; the wrapper checks it. Hiding a
   button in the UI is never the check.
-- An action runs only in the clinic its page was shown for. The page sends that clinic's id,
-  and the wrapper refuses when the request now resolves to another clinic (another tab switched,
-  a membership was disabled). The id grants nothing; memberships decide (D-069).
+- An action runs only in the clinic its page was shown for. The form sends that clinic's id, the
+  one its frame names (the staff layout's, never one a page passes, D-092), and the wrapper refuses
+  when the request now resolves to another clinic (another tab switched, a membership was
+  disabled). The id grants nothing; memberships decide (D-069).
 - Every page checks the session itself (`currentStaff()`, or `requireUser()` before a clinic is
   chosen), or is public on purpose and says so. The request proxy is not the check: it lets a
   signed-out POST that looks like a server action through without a redirect, and a later Next.js
