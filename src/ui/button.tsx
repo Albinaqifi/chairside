@@ -35,6 +35,13 @@ const buttonVariants = cva(
 type ButtonProps = Omit<ComponentProps<'button'>, 'formAction' | 'formMethod'> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    /**
+     * Firefox's own use of the attribute on a button, which React's types leave out: after a
+     * reload or Back, Firefox gives a button the disabled state a script last set, before the
+     * page's script runs again; "off" stops that (MDN, the `disabled` attribute). StaffForm's
+     * submit button (E00-T04c).
+     */
+    autoComplete?: 'off';
   };
 
 function Button({ className, variant = 'primary', asChild = false, ...props }: ButtonProps) {

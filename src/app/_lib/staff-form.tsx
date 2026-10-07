@@ -72,7 +72,9 @@ export interface StaffFormProps<In, Out, R extends string> {
  *   enabled once the form runs in the browser, as the login form's (D-076). React would hold each
  *   submit made before then and send each one through the form's `action` once the script runs,
  *   past onSubmit and its guard, and then empty the fields: a double click ran the action twice
- *   (E00-T04c test finding 1). A disabled button stops Enter from submitting the form too.
+ *   (E00-T04c test finding 1). A disabled button stops Enter from submitting the form too. Its
+ *   `autoComplete="off"` keeps it disabled in Firefox after a reload or Back: without it, Firefox
+ *   gives the new page's button the state the old page's had, enabled, before the script runs.
  * - **Sent from onSubmit,** which dispatches the form's data itself: React's own form action empties
  *   every field after the action, an answer with field errors included (React 19 resets a form
  *   after its action). The `action` is still the dispatch, so the form is never sent to a URL.
@@ -159,7 +161,7 @@ export function StaffForm<In, Out, R extends string = never>({
           form={formRef}
         />
         <div>
-          <Button ref={submitRef} type="submit" disabled={!inBrowser || pending}>
+          <Button ref={submitRef} type="submit" disabled={!inBrowser || pending} autoComplete="off">
             {pending ? pendingLabel : submitLabel}
           </Button>
         </div>

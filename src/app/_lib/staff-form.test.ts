@@ -236,6 +236,24 @@ describe('what a staff form shows for each answer (E00-T04c, acceptance 5)', () 
     }
   });
 
+  it('in the server\'s HTML its submit button has autocomplete="off", so Firefox keeps it disabled after a reload or Back', () => {
+    // E00-T04c test finding 1, in Firefox: after F5 or Back, Firefox gave the new page's button the
+    // state the old page's had, enabled, before the page's script ran, so a double click and Enter
+    // were held and sent three times. "off" is Firefox's own way out (MDN, the disabled
+    // attribute); other browsers keep no button state.
+    const html = render();
+    const submitButtons = tags(html, 'button').filter(
+      (button) => (button.get('type') ?? 'submit').toLowerCase() === 'submit',
+    );
+    const submitInputs = tags(html, 'input').filter((input) =>
+      ['submit', 'image'].includes((input.get('type') ?? 'text').toLowerCase()),
+    );
+    expect(submitButtons, 'the submit buttons').not.toHaveLength(0);
+    for (const control of [...submitButtons, ...submitInputs]) {
+      expect(control.get('autocomplete')?.toLowerCase()).toBe('off');
+    }
+  });
+
   it('is a form that never goes to a URL, and leaves field checks to the server', () => {
     const [attributes] = tags(render(), 'form');
     expect(attributes?.get('action')).toMatch(/^javascript:/); // React's: a function as its action
