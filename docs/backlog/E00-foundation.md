@@ -7,17 +7,17 @@ clinics cannot see each other's data, and every change is checked automatically.
 Getting them right once, with tests, is cheaper than fixing them under features.
 
 Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → T04a → T04b → T05a → E01-T01a → E01-T01b
-→ T04c → T04d → T04e → E01-T02 → T06b → T05b → T07, then the rest of E01 (D-087, D-090, D-091,
-D-093). T08 is the second half of T03 (split in D-071), so it sits right after T03 in this file. T06
-is split in two (D-075): CI (T06a) comes first, Playwright and journey J1 (T06b) after T04 and T05a.
-T09 and T10 come from E00-T08's review and test (D-076, D-077), T11 from E00-T10's (D-084). T04 is
-split in four (D-086), its last part again in two (D-093): tokens, fonts, texts and the login page
-(T04a), the staff shell (T04b), the form pattern (T04c), the form fields (T04d), tabs, the drawer
-and the dialog (T04e). T05 is split in two (D-090): the seed (T05a), and `clinic:create` (T05b),
-which staging needs. E01-T01a, E01-T01b and E01-T02 come before T06b and T07, so a receptionist sees
-a patient list before Playwright and staging exist; T04c, T04d and T04e come before E01-T02, which
-depends on them (D-087, D-093). The tasks sit in this file in the order before D-087, with T05a and
-T05b after T04e.
+→ T04c → T04d → T04e → E01-T02a → E01-T02b → T06b → T05b → T07, then the rest of E01 (D-087,
+D-090, D-091, D-093, D-096). T08 is the second half of T03 (split in D-071), so it sits right after
+T03 in this file. T06 is split in two (D-075): CI (T06a) comes first, Playwright and journey J1
+(T06b) after T04 and T05a. T09 and T10 come from E00-T08's review and test (D-076, D-077), T11 from
+E00-T10's (D-084). T04 is split in four (D-086), its last part again in two (D-093): tokens, fonts,
+texts and the login page (T04a), the staff shell (T04b), the form pattern (T04c), the form fields
+(T04d), tabs, the drawer and the dialog (T04e). T05 is split in two (D-090): the seed (T05a), and
+`clinic:create` (T05b), which staging needs. E01-T01a, E01-T01b, E01-T02a and E01-T02b come before
+T06b and T07, so a receptionist sees a patient list before Playwright and staging exist; T04c, T04d
+and T04e come before E01-T02a, which depends on them (D-087, D-093, D-096). The tasks sit in this
+file in the order before D-087, with T05a and T05b after T04e.
 
 ---
 
@@ -1222,6 +1222,10 @@ E00-T04e). It is refined against what they built, once they are done.
   `location.reload()` (Playwright's `page.reload()` skips Firefox's restore) and Back to a page
   loaded as a new document. Every field shows its default and both hidden inputs are unchecked;
   with the form's `autocomplete` stripped in the page, the control, they come back.
+- **One login per role and browser** (E00-T04e builder, Discovered, `slice`): the runs log in once
+  for each and reuse the session (Playwright's `storageState`), J1's own login and wrong password
+  aside. The sign-in limit is ten a minute per address (D-064 point 5): a script that logged in
+  about ten times within a minute stopped at the login page.
 - A CI job for the journeys, after the build. Traces only on failure, kept briefly, synthetic data
   only.
 - `CLAUDE.md`: how to run the journeys locally.

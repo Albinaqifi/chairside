@@ -6,11 +6,12 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 **Why now:** appointments are what every message is about. And booking speed is the first
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
-Order: T01a → T01b → T02, T04, T08, T09 (parallel-safe) → T03, T05 → T06 → T07, T10 → T11. With
-E00 (D-087, D-090, D-091, D-093): E00-T05a → T01a → T01b → E00-T04c → E00-T04d → E00-T04e → T02 →
-E00-T06b → E00-T05b → E00-T07 → T04, T08, T09 and the rest, so a receptionist sees a patient list
-before Playwright and staging exist. T01 is split in two (D-091): the schema and the provider link
-(T01a), the seed (T01b).
+Order: T01a → T01b → T02a → T02b, T04, T08, T09 (parallel-safe) → T03, T05 → T06 → T07, T10 →
+T11. With E00 (D-087, D-090, D-091, D-093, D-096): E00-T05a → T01a → T01b → E00-T04c → E00-T04d →
+E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 → T04, T08, T09 and the rest, so a
+receptionist sees a patient list before Playwright and staging exist. T01 is split in two (D-091):
+the schema and the provider link (T01a), the seed (T01b). T02 is split in two (D-096): the list and
+the search (T02a), adding a patient (T02b); editing a patient's details moved to T03, the profile.
 
 ---
 
@@ -143,82 +144,165 @@ every later row (each schema task brings its own). Any screen.
 
 ---
 
-### E01-T02 · Patients: list, search, create, edit
+### E01-T02a · Patients: the list and the search
 
 - **Role:** builder · **Risk:** critical (permissions: the test of every action and every role,
-  D-093) · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04e
-- **Read:** `scope` (Navigation and roles; Patients list and profile) · `design-ref` (demo lines 316–347; logic 1849–1858) · `data-model` (`patients`) · `test-strategy` (Permissions) · D-015, D-033, D-040, D-093, D-095
+  D-093; a migration: the trigram indexes removed, D-096) · **Depends on:** E01-T01a, E01-T01b,
+  E00-T04a … E00-T04e
+- **Read:** `scope` (Navigation and roles; Patients list and profile) · `design-ref` (demo lines
+  316–347; logic 1849–1858) · `data-model` (`patients`, `appointments`) · `test-strategy`
+  (Permissions) · D-015, D-021, D-091, D-093, D-095, D-096, D-097 · the architect section of
+  `handoffs/E01-T02a.md`
 
-**Why.** Staff must find a patient in seconds by name or phone.
+**Why.** Staff must find a patient in seconds by name or phone. The first half of E01-T02 (D-096):
+the clinic's patients, listed and found; adding one is E01-T02b, editing one E01-T03. It is the
+first screen with patient rows, so two guards come with it: the logger's safety net, and the test
+that every action asks for the permission `scope-v1.md` gives each role.
 
 **Do.**
-- `patients` module functions: search (name or phone fragment), create, update, change
-  status. Phone normalised to E.164 using the clinic's default country; email lower-cased;
-  invalid values rejected with a clear message. The search runs in the clinic's transaction,
-  where E01-T01a's trigram indexes are never used: under Row-Level Security an index serves only
-  leakproof operators, and `LIKE`, `ILIKE` and pg_trgm's `%` are not; it reads that clinic's
-  patients, which the 300 ms criterion measures (E01-T01a review, `speed`). Whether the two indexes
-  stay (they cost writes; `data-model.md` lists them) is settled when this task is refined; no test
-  asks for an index to be used.
 - **The logger's safety net** (E01-T01a critical review, `data`), before this task's code handles
   patient rows: `src/lib/personal-fields.ts` also drops a field whose name ends in `e164`
   (`phone_e164`, `phoneE164`), the patient phone column, and `title` (an appointment's label, such
   as a treatment), unless a log field of that name must stay (then say why in the note); a
   `logger.test.ts` case for each.
-- Patients list screen: search box, rows (name, age and phone, last visit, next visit),
-  filter "All" (other filters arrive with their epics), empty state, link to import (placeholder).
-- Create / edit form: first name, last name, date of birth, phone, email, language, guardian
-  name, notes (labelled "not a clinical record"), status.
-- On create, warn about likely duplicates (same name + date of birth, or same name + same
-  contact). A shared phone alone is not a warning.
-- Dates and times are shown in the clinic's time zone (`clinics.timezone`, D-015), set once for
-  every staff page so later screens reuse it. `src/i18n/request.ts` sets none today: next-intl then
-  warns and uses the computer's zone, so the server and the browser can show one visit at different
-  times (Discovered, E00-T04a).
-- **Every action, every role** (E00-T04c critical review, `data`): the one table-driven test
-  `test-strategy.md` asks for, every staff action as every role, allowed or refused, matching
-  `scope-v1.md`'s table; an action without an entry fails it. Today `permissions.test.ts` checks
-  role × permission and each action's own test only its own refusal, so an action that names the
-  wrong permission fails nothing. How the test finds every action is settled when this task is
-  refined.
-- **After a patient is created** the form is emptied or closed (a new `key` from `onDone`, or a
-  reset): `StaffForm` keeps every field after every answer, done included (D-092), so a second
-  Send would make a second patient (E00-T04c review, `slice`).
-- **Nothing typed about a patient stays in the browser** (E00-T04d review and delta review,
-  `data`, D-095): the search box, in no staff form, is `autoComplete="off"` itself, and its words
-  go in the request's body (a `staffRead` action), never in the page's address (`?q=…`), which
-  the browser's history and the host's request log keep. No field of the patient form sets an
-  `autocomplete` of its own (WebKit gives such a field back after Back). `staff-form.tsx`'s comment
-  says so, in place of "a field that needs the browser's suggestions sets its own".
+- **The trigram indexes go** (owner, D-096): a migration drops `patients_full_name_trgm_idx`,
+  `patients_phone_e164_trgm_idx` and `pg_trgm`, which 0002 created for them alone; `schema.ts`
+  loses them and its comment that the search uses them. Under Row-Level Security an index serves
+  only leakproof operators, and `LIKE`, `ILIKE` and pg_trgm's `%` are not (E01-T01a review,
+  `speed`).
+- **The search**, a function of the `patients` module (`src/modules/patients/index.ts`): the
+  clinic's patients whose full name holds what is typed, or whose phone holds the digits typed,
+  however they are written (`+389 70 001 234`, `00389…`, `070 001 234`: a leading `00` or `0`
+  dropped). At most 50 rows, by last name, then first name; with nothing typed, the first 50.
+  Every status, an archived or deceased patient marked. It reads the clinic's patients through the
+  clinic's own key, which the 300 ms criterion measures. No value is cast to a name in its query
+  (`$1::regconfig`, `::regclass`): `withoutQueryValues()` cleans SQLSTATE class 22 and 42601 only,
+  so such a value would stay in a logged error (Discovered, E00-T03 test, `data`).
+- **The rows** (demo lines 316–347): name; age and phone; last visit; next visit. The age at the
+  clinic's today. The phone as the clinic's people write it, formatted on the server with
+  libphonenumber-js (D-097): the national form for the clinic's own country, the international one
+  otherwise. Last visit, the last completed appointment's date; next visit, the next booked or
+  confirmed one's date and time: from a function of the `scheduling` module
+  (`src/modules/scheduling/index.ts`), never its tables read from `patients` (module rule 1).
+  Above the rows: the count of the clinic's patients, the filter "All" (other filters arrive with
+  their epics), and "Import from Excel" to the import page for whoever the sidebar shows Import to
+  (`import.run`); an empty state when nothing matches. The demo's care plan, treatment and offers
+  columns wait for their epics, with nothing in their place.
+- **The search box keeps nothing in the browser** (E00-T04d review, `data`, D-095): it is in no
+  staff form, so it is `autoComplete="off"` itself, and its words go in the request's body (a
+  `staffRead` action for every member: every member sees every patient, Q-11, D-096), never in
+  the page's address (`?q=…`), which the browser's history and the host's request log keep.
+- **Dates and times in the clinic's time zone** (`clinics.timezone`, D-015), set once in
+  `src/i18n/request.ts` for every page, so later screens reuse it; next-intl's provider passes it
+  on to client components. Today none is set: next-intl warns and uses the computer's zone, so the
+  server and the browser can show one visit at different times (Discovered, E00-T04a). The zone is
+  read in the clinic's transaction (D-091), and that file also runs for the login page and the
+  clinic picker, where `currentStaff()` redirects (the note says more).
+- **Every action, every role** (E00-T04c critical review, `data`, D-093): the one table-driven test
+  `test-strategy.md` asks for, a unit test in `src/app/`. It finds every action itself: it imports
+  every file under `src/app` whose first statement is `'use server'` (lint makes each value export
+  there a wrapper-made action), and it fails when any other file there, tests and
+  `_lib/actions.ts` aside, calls `staffAction`, `staffRead` or `userAction`. Its own table gives
+  each action the row of `scope-v1.md`'s table it belongs to, written from `scope-v1.md`, never
+  from `PERMISSION_TABLE`; a `userAction` is listed as one. It calls each staff action as each
+  member (an owner, an owner linked to a dentist, a dentist, a hygienist, the front desk, the front
+  desk with import, the front desk with export), with `currentStaff()` and `withTenant` stand-ins
+  as in `dev/components/actions.test.ts` and an input no schema takes: a member the row refuses
+  gets `forbidden`, one it allows anything else (the wrapper checks the permission before the
+  input). An action without an entry fails it, and so does an entry without an action.
 
-**Out of scope.** Profile page (T03). Consent switches (E02). Care plan, treatment plan columns.
+**Out of scope.** Adding a patient (E01-T02b); editing one, and the profile (E01-T03). Consent
+switches (E02). The care plan, treatment and offers columns, and the other filters.
 
 **Acceptance.**
-- [ ] Search finds a seeded patient by part of the name and by part of the phone, digits only or formatted.
+- [ ] Search finds a seeded patient by part of the name, and by part of the phone typed as digits
+      only, with spaces, with `+389` or in the national form (`070 …`) (integration test).
 - [ ] Search over 20,000 generated patients returns in under 300 ms (integration test).
-- [ ] Phones are stored in E.164; an impossible number is rejected.
-- [ ] Creating a likely duplicate shows a warning and still allows saving.
-- [ ] Two siblings with the same phone can be created without a duplicate warning.
-- [ ] Every create and edit writes an audit row without personal values in it.
-- [ ] A user of the second clinic cannot find or open the first clinic's patients.
-- [ ] A visit's date and time show in the clinic's time zone whatever the computer's zone (test).
-- [ ] The logger drops a field named `phone_e164` or `phoneE164` (`logger.test.ts`).
-- [ ] One test runs every staff action as every role and matches `scope-v1.md`'s table; an action
-      added without an entry fails it.
-- [ ] After a patient is created, the form holds nothing of it, and a second Send creates no second
-      patient (tester, in a browser).
-- [ ] The search box is `autocomplete="off"` and no field of the patient form has an `autocomplete`
-      of its own (unit test, as `demo-form.test.ts`'s); after a search, the address holds none of
-      its words (tester).
+- [ ] A user of the second clinic finds none of the first clinic's patients (integration test).
+- [ ] A visit's date and time show in the clinic's time zone whatever the computer's zone (test);
+      the login page and the clinic picker still open, signed out and before a clinic is chosen.
+- [ ] The logger drops a field named `phone_e164`, `phoneE164` or `title` (`logger.test.ts`).
+- [ ] After `pnpm db:reset` neither trigram index nor `pg_trgm` exists (tester, in the database),
+      and `data-model.md` says so.
+- [ ] One test runs every staff action as every member and matches `scope-v1.md`'s table; an action
+      added without an entry fails it, and so does a wrapper called outside a `'use server'` file
+      (tester: a scratch file each, removed after).
+- [ ] The search box is `autocomplete="off"` (unit test, as `demo-form.test.ts`'s); after a search
+      the address holds none of its words (tester).
+- [ ] The list as the demo's for the columns that exist, an archived patient marked (screenshot in
+      the handoff note).
+- [ ] `pnpm check` and `pnpm build` pass.
 
 ---
 
-### E01-T03 · Patient profile
+### E01-T02b · Patients: add a patient
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T02
-- **Read:** `scope` (Patients list and profile) · `design-ref` (demo lines 348–446; logic 1860–1880)
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T02a
+- **Read:** `scope` (Patients list and profile) · `data-model` (`patients`) · D-033, D-040, D-053,
+  D-092, D-093, D-095, D-096, D-097
 
-**Why.** One place that answers "what is going on with this patient?".
+**Why.** The front desk adds a patient who is not in the list yet. The second half of E01-T02
+(D-096). E01-T03 edits a patient in this task's form; E01-T05's quick new patient and E04's import
+write through its module function.
+
+**Do.**
+- `patients.create` in the module. The phone read with libphonenumber-js (D-097) and the clinic's
+  `default_country` into E.164: a number in the national form takes that country, one with `+` or
+  `00` its own. An impossible number (a length no number of its country has) is refused at its
+  field; a possible one the package does not know is kept, so a new range is never refused at the
+  desk (E03 marks a number that cannot be reached). The email trimmed and lower-cased, an invalid
+  one refused at its field. Each field error in the message file's words (D-092).
+- **The page** `/patients/new`, opened by "New patient" on the list: a `StaffForm` with first name,
+  last name, date of birth, phone, email, language (a two-letter code, the clinic's own first,
+  D-053), guardian name (a line under it says the phone and email are then the guardian's, D-033)
+  and notes (labelled "not a clinical record"). A page, not a drawer: E01-T05's booking drawer is
+  the quick way to add a patient while booking.
+- **A likely duplicate, shown before Send** (D-033): when what is typed matches a patient of the
+  clinic with the same name and date of birth, or the same name and the same phone or email, a
+  warning above Send names that patient (name and date of birth); Send still saves. A shared phone
+  alone is never a warning (siblings). The check is a `staffRead` for every member, called as a
+  field is left; it saves nothing.
+- **After a patient is created** the form holds nothing of them: a new `key` from `onDone`, or the
+  page goes to the list. `StaffForm` keeps every field after every answer, done included (D-092),
+  so a second Send would make a second patient (E00-T04c review, `slice`). Its sent-once guard
+  covers a double click (E00-T04c), so no client-made id is needed (E00-T03 test's double-submit
+  line, its E01-T02 part).
+- **Audit:** `patient.created`, with no personal value in its row (`audit.record` refuses a
+  personal field name).
+- **Nothing typed about a patient stays in the browser** (E00-T04d review and delta review, `data`,
+  D-095): no field of the patient form sets an `autocomplete` of its own (WebKit gives such a field
+  back after Back). `staff-form.tsx`'s comment says so, in place of "a field that needs the
+  browser's suggestions sets its own" (the comment only).
+- Its actions in E01-T02a's permission test, under "Calendar, patients, booking".
+
+**Out of scope.** Editing a patient, and the profile (E01-T03). Merging duplicates (E04-T06).
+Consent switches (E02).
+
+**Acceptance.**
+- [ ] A phone typed in the national form (`070 …`), with `+389` or with `00389` is stored as the
+      same E.164 number; an impossible one is refused at its field (unit and integration tests).
+- [ ] An email is stored lower-cased; an invalid one is refused at its field.
+- [ ] Typing the name and date of birth of a patient already in the list shows the warning, and
+      Send still saves (the check's integration test; tester, in a browser).
+- [ ] Two siblings with the same phone and their own first names are created with no warning (test).
+- [ ] Every create writes one audit row with no personal value in it (integration test).
+- [ ] After a patient is created, the form holds nothing of them, and a second Send creates no
+      second patient (tester, in a browser).
+- [ ] No field of the patient form has an `autocomplete` of its own (unit test, as
+      `demo-form.test.ts`'s).
+- [ ] The permission test passes with this task's actions in its table.
+- [ ] `pnpm check` and `pnpm build` pass.
+
+---
+
+### E01-T03 · Patient profile, and editing a patient's details
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T02b
+- **Read:** `scope` (Patients list and profile) · `design-ref` (demo lines 348–446; logic
+  1860–1880) · D-033, D-040, D-095, D-096 · `handoffs/E01-T02b.md` (the patient form)
+
+**Why.** One place that answers "what is going on with this patient?", and where their details are
+put right. Editing came from E01-T02 (D-096): it shows the same record.
 
 **Do.**
 - Profile page: header (name, age, phone, email, patient since), buttons "Book appointment"
@@ -227,12 +311,23 @@ every later row (each schema task brings its own). Any screen.
 - Sections that later epics fill are **not rendered as fake content**: Messages (E02), Care
   plan (E05), Treatment plan (E06), Communication switches (E02).
 - Opening a profile writes a "viewed patient record" audit row.
+- **Editing the details** (from E01-T02, D-096): `/patients/<id>/edit`, reached from the profile:
+  E01-T02b's form with the patient's values, and their status (active, archived, deceased).
+  `patients.update` in the module, the phone and email read as on create. Audit: `patient.updated`,
+  naming the fields that changed, never their values; opening the edit page is a record view too.
+  A row of the patients list opens the profile.
+- A patient id of another clinic, or of none, answers not found on both pages.
 
 **Acceptance.**
 - [ ] The profile shows real data for seeded patients; an archived or deceased patient is clearly marked.
-- [ ] Opening a profile creates one audit row per view.
+- [ ] Opening a profile, or the edit page, creates one audit row per view.
 - [ ] Layout matches the demo's two-column profile for the sections that exist (screenshot in the handoff note).
 - [ ] No placeholder or invented data is shown for sections that do not exist yet.
+- [ ] Every edit writes one audit row naming the fields that changed, never their values
+      (integration test).
+- [ ] A patient of the other clinic answers not found on both pages, and no row is written
+      (integration test).
+- [ ] No field of the edit form has an `autocomplete` of its own (unit test).
 
 ---
 
@@ -274,8 +369,8 @@ every later row (each schema task brings its own). Any screen.
 
 ### E01-T05 · Book an appointment (new-appointment drawer)
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T04, E01-T02
-- **Read:** `scope` (New appointment drawer) · `design-ref` (demo lines 1323–1362; logic 1958–1964, 2116–2135) · `data-model` (`appointments`, "No double booking") · D-020, D-093, D-095
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T04, E01-T02b
+- **Read:** `scope` (New appointment drawer) · `design-ref` (demo lines 1323–1362; logic 1958–1964, 2116–2135) · `data-model` (`appointments`, "No double booking") · D-020, D-093, D-095 · `handoffs/E00-T04e.md` (the reviewer's suggestion 1, the tester's note 1)
 
 **Why.** The single most used action. It must be fast.
 
@@ -296,6 +391,19 @@ every later row (each schema task brings its own). Any screen.
   the page's address.
 - A race (someone else took the slot meanwhile) shows a friendly message, not an error page.
 - Fully usable by keyboard; focus starts in the patient field.
+- **A double click on the button that opens the drawer leaves it open** (E00-T04e test, `speed`):
+  today the second click lands on the overlay, which closes it on a click (Radix acts on the
+  `click` after a pointer down outside), so a receptionist who double-clicks "New appointment" sees
+  the drawer flash and go. The drawer's and the dialog's content (`src/ui/sheet.tsx`, `dialog.tsx`)
+  ignore a pointer down outside them for as long as a double click lasts after they open (half a
+  second, Windows' default); after that a click on the overlay closes them, and Escape and the close
+  button always do.
+- **A form inside the drawer or the dialog sends only itself** (E00-T04e review, `message`): React
+  passes a `submit` on to every `onSubmit` above it in React's tree, through the portal too (React
+  19.2.8), and `StaffForm` sends from `onSubmit` with `new FormData(event.currentTarget)`. A staff
+  form in a dialog opened from inside another staff form (a quick new patient from the booking form,
+  E01-T06's cancel from the drawer's move form) would also send the outer one. The drawer's and the
+  dialog's content stop a `submit` from leaving them (`src/ui/`); `StaffForm` is not changed.
 
 **Out of scope.** The "text a booking confirmation" tick box (E02-T12). Booking outside opening hours rules beyond a warning.
 
@@ -310,6 +418,11 @@ every later row (each schema task brings its own). Any screen.
 - [ ] Audit row written; the appointment's `source` is `staff`.
 - [ ] The patient search has no `autocomplete` but `off` (unit test), and after a search the
       address holds none of its words (tester).
+- [ ] A double click on "New appointment" (80, 150 and 250 ms between the clicks) leaves the drawer
+      open in Chromium, Firefox and WebKit; a click on the overlay a second later closes it (tester,
+      in a browser).
+- [ ] A staff form in a dialog opened from inside another staff form sends its own action only: one
+      request, one audit row (tester, in a browser, on a scratch page removed after).
 
 ---
 
@@ -339,6 +452,8 @@ every later row (each schema task brings its own). Any screen.
 - [ ] Restoring a cancelled appointment re-checks overlap.
 - [ ] Every transition writes an audit row with old and new status.
 - [ ] The event hook fires exactly once per successful change (test).
+- [ ] Cancelling from the dialog over the drawer runs the cancel only: the drawer's move form sends
+      nothing (tester, in a browser; E01-T05's guard, E00-T04e review).
 
 ---
 
@@ -431,7 +546,7 @@ Day / Week toggle.
 
 ### E01-T11 · Journey J2 and a hard look at scheduling
 
-- **Role:** tester · **Risk:** normal · **Depends on:** E01-T02 … E01-T10
+- **Role:** tester · **Risk:** normal · **Depends on:** E01-T02a … E01-T10
 - **Read:** `test-strategy` (End-to-end journeys; Tenant isolation; Permissions) · all E01 handoff notes
 
 **Do.**

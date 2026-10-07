@@ -9,13 +9,13 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E00-T04e` is Ready: `/pipeline E00-T04e` (`handoffs/E00-T04e.md`)
+- **Next task to start:** `E01-T02a` is Ready: `/pipeline E01-T02a` (`handoffs/E01-T02a.md`)
 - **Decisions it waits on:** none
 
 ## Next (in order)
 
-1. E00-T04e
-2. E01-T02
+1. E01-T02a
+2. E01-T02b
 3. E00-T06b
 4. E00-T05b
 5. E00-T07
@@ -46,11 +46,11 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T04b | The staff shell: sidebar, navigation by role, placeholder pages | builder | normal | **Done** | Merged by the owner (PR #25). The staff layout, the sidebar by permission, Today and six placeholder pages, Card, Badge, the empty state, Onest and Source Serif 4 (D-089). Leftovers → E00-T04c (the clinic a form sends), E01-T01 (the provider link); five struck. See `handoffs/E00-T04b.md` |
 | E00-T04c | The form pattern, the toast and the components page | builder | critical | **Done** | Merged by the owner (PR #33). `StaffForm` and `StaffField` send the frame's clinic and show each answer one way, Send once and only after the script (D-092); the toast; `/dev/components`. Leftovers → E00-T04d (the browser's memory off, owner, D-093; one submit button), E01-T02 (every action × every role; a form cleared after done), E01-T05, E01-T09, `CLAUDE.md`'s review checks; two done by its tester, eight struck. See `handoffs/E00-T04c.md` |
 | E00-T04d | The form fields: textarea, select, checkbox and switch | builder | critical | **Done** | Merged by the owner (PR #35). Textarea, the browser's own select, Radix's checkbox and switch, `StaffForm`'s form `autocomplete="off"` (D-093), one submit button, `lucide-react` (D-094). Leftovers → E01-T02, E01-T05, E00-T06b, `CLAUDE.md`, `security-privacy.md` (nothing typed about a patient stays in the browser, D-095); the controls' light edges kept (owner); one done by its tester, six struck. See `handoffs/E00-T04d.md` |
-| E00-T04e | Tabs, the drawer and the dialog | builder | normal | **Tested** | Branch `task/E00-T04e-tabs-drawer-dialog`, PR #37. `Tabs`, the drawer (`Sheet`) and `Dialog` in `src/ui/`, each on `/dev/components`; a title always, no new package. Review: no required changes, 1 suggestion (`message`, Discovered). Test: no findings; 3 notes on the Discovered list (a double click on a trigger opens and closes it, `speed`; two `none`); 4 cases added. Delta review of `67fa0b0..ea6e99f`: approved, no suggestions. See `handoffs/E00-T04e.md` |
+| E00-T04e | Tabs, the drawer and the dialog | builder | normal | **Done** | Merged by the owner (PR #37). `Tabs`, the drawer (`Sheet`) and `Dialog` in `src/ui/`, on `/dev/components`, a title always; the owner tried it. Leftovers → E01-T05 (a double click keeps the drawer open; a form in a drawer or dialog sends only itself, `message`), E01-T06, E00-T06b (one login per role and browser); one done by its tester, seven struck. See `handoffs/E00-T04e.md` |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | split (D-090) | Into E00-T05a and E00-T05b, the next two rows |
 | E00-T05a | Seed data: two clinics and a login for every role | builder | normal | **Done** | Merged by the owner (PR #27). `pnpm db:seed` and `db:reset` seed two clinics and a login for every role, under fixed ids (owner's answer (a)). Leftovers → E01-T01b, E03-T00 (`message`), `CLAUDE.md`, agent rule 5; six struck. See `handoffs/E00-T05a.md` |
 | E00-T05b | `clinic:create`: the operator's script for a new clinic | builder | critical | Planned | After E00-T06b, before E00-T07 (D-090); refined in E00-T06b's Done pass, where the owner decides what its setup link opens |
-| E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); needs E00-T04a … E00-T04e and E00-T05a, comes after E01-T02 (D-087); takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086); a browser check of D-093, Firefox among its browsers (D-095) |
+| E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); needs E00-T04a … E00-T04e and E00-T05a, comes after E01-T02b (D-087, D-096); one login per role and browser (E00-T04e); takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086); a browser check of D-093, Firefox among its browsers (D-095) |
 | E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | Planned | Owner: hosting accounts (Q-07). After E00-T05b, E00-T06b and E00-T09 |
 
 ## E01 · Scheduling (M1)
@@ -62,11 +62,13 @@ Fully specified.
 | E01-T01 | Schema: providers, treatment types, patients, appointments, hours | builder | critical | split (D-091) | Into E01-T01a and E01-T01b, the next two rows |
 | E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | **Done** | Merged by the owner (PR #29). Seven scheduling tables with their policies and the no-double-booking constraint (migration 0002); the provider kind through `clinics_for_user()`. Leftovers → E01-T02, E01-T04, E01-T05, E01-T10, E02-T01; the appointments indexes → E07-T00; one done by its tester, five struck. See `handoffs/E01-T01a.md` |
 | E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | **Done** | Merged by the owner (PR #31). `02-scheduling.ts`: three providers, 40 patients and a week of appointments for the seed's day; dentist and hygienist linked. Leftovers: the aftercare flags on the Discovered list (→ E06-T00), the fake-data check's two blind spots a review check in `security-privacy.md`; six struck. See `handoffs/E01-T01b.md` |
-| E01-T02 | Patients: list, search, create, edit | builder | critical | Planned | Critical: the test of every action and every role (E00-T04c critical review, D-093); a create form cleared after done; the search keeps nothing in the browser (D-095) |
-| E01-T03 | Patient profile | builder | normal | Planned | |
+| E01-T02 | Patients: list, search, create, edit | builder | critical | split (D-096) | Into E01-T02a and E01-T02b, the next two rows; editing moved to E01-T03 |
+| E01-T02a | Patients: the list and the search | builder | critical | Ready | Split from E01-T02 (D-096). Critical: the test of every action and every role (D-093), the trigram indexes removed (owner, D-096). The logger's safety net, the clinic's time zone, the search keeping nothing in the browser (D-095), libphonenumber-js (owner, D-097). See `handoffs/E01-T02a.md` |
+| E01-T02b | Patients: add a patient | builder | normal | Planned | Split from E01-T02 (D-096); refined in E01-T02a's Done pass. The phone read with libphonenumber-js (D-097); a likely duplicate shown before Send; the form emptied after done; nothing kept in the browser (D-095) |
+| E01-T03 | Patient profile, and editing a patient's details | builder | normal | Planned | Editing from E01-T02 (D-096) |
 | E01-T04 | Calendar: day view | builder | normal | Planned | |
-| E01-T05 | Book an appointment (drawer) | builder | normal | Planned | The patient search keeps nothing in the browser (D-095) |
-| E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | |
+| E01-T05 | Book an appointment (drawer) | builder | normal | Planned | The patient search keeps nothing in the browser (D-095); a double click keeps the drawer open; a form in a drawer or dialog sends only itself (E00-T04e) |
+| E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | The cancel dialog sends the cancel only (E00-T04e) |
 | E01-T07 | Calendar: week view | builder | low | Planned | |
 | E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | Planned | |
 | E01-T09 | Settings: providers and treatment types | builder | normal | Planned | |
@@ -202,6 +204,7 @@ Outline. Needs E07-T00.
 - E01-T01b · The scheduling seed: providers, patients and a week of appointments · merged 2026-10-06 (PR #31)
 - E00-T04c · The form pattern, the toast and the components page · merged 2026-10-07 (PR #33)
 - E00-T04d · The form fields: textarea, select, checkbox and switch · merged 2026-10-07 (PR #35)
+- E00-T04e · Tabs, the drawer and the dialog · merged 2026-10-07 (PR #37)
 
 ## Owner actions (standing)
 

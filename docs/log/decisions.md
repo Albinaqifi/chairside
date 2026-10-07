@@ -1759,3 +1759,48 @@ architecture), `changed` (differs from the original files), `process`.
   browser's history and the host's request log keep an address: patient data in a log.
 - **Revisit if:** a field needs the browser's suggestions (then the form is reset when the page is
   shown again, checked in WebKit); a search must live in the address (to share or bookmark it).
+
+### D-096 · E01-T02 split in two, and editing moves to the profile; the trigram indexes go; Q-11 answered (E00-T04e Done)
+- **Origin:** E00-T04e's Done pass, 2026-10-07 (PR #37 merged; `handoffs/E00-T04e.md`,
+  `handoffs/E01-T02a.md`). **Owner, 2026-10-07:** the two trigram indexes on `patients` are removed;
+  Q-11 is answered: every staff member sees every patient of their clinic. The rest is the architect's.
+- **What:**
+  - E01-T02 is split. **E01-T02a**, the list and the search, critical (the test of every action and
+    every role, D-093; the migration below), with the logger's safety net and the clinic's time
+    zone. **E01-T02b**, adding a patient, normal. Editing a patient's details, status among them,
+    moves to **E01-T03**, the profile, which shows the same record. The order: … → E00-T04e →
+    E01-T02a → E01-T02b → E00-T06b → E00-T05b → E00-T07 → the rest of E01. This replaces E01-T02's
+    place in D-091's order.
+  - `patients_full_name_trgm_idx`, `patients_phone_e164_trgm_idx` and `pg_trgm` go, in a migration
+    of E01-T02a: under Row-Level Security the app's search can never use them (their operators are
+    not leakproof). The search reads the clinic's patients through its own key, under 300 ms at
+    20,000 patients (E01-T02a's criterion). `data-model.md` says so.
+  - Q-11: every member of a clinic sees every patient of it, D-021's default made the owner's answer.
+    A read of patients names `every_member`.
+- **Why:** E01-T02 held about 1,000 lines of product code by estimate (a module, a list and a form
+  page, a duplicate check, phone numbers, the time zone), more than twice the one-session size
+  (`workflow.md`); E00-T04c's 980 took three fix rounds. E01-T02a is about 500 by estimate,
+  E01-T02b about 400. The list is what a receptionist needs first, adding comes next, and editing
+  sits where the record is shown. Indexes nothing can use only cost writes, and `data-model.md` said
+  the search used them.
+- **Revisit if:** a clinic's search gets slow (then a search that works under the policies, such as a
+  table of search keys per clinic, never a function that skips them); a role must not see every
+  patient (a `patients.view` permission, and the permission test's table).
+
+### D-097 · libphonenumber-js 1.13.13 for phone numbers (E01-T02a, E01-T02b)
+- **Origin:** stack, E01-T02's refinement in E00-T04e's Done pass. **Approved by the owner on
+  2026-10-07** (agent rule 4: new library). The stack table in `overview.md` named it without a
+  decision, as it named Zod before D-068.
+- **What:** `libphonenumber-js` exactly 1.13.13 (10 September 2026), in `dependencies`, with its
+  default metadata. E01-T02a shows a stored number as the clinic's people write it (the national
+  form for the clinic's own country, the international one otherwise), formatted on the server so
+  the metadata stays out of the browser. E01-T02b reads a typed number with the clinic's
+  `default_country` into E.164 and refuses an impossible one (a length no number of its country
+  has); a possible number the package does not know is kept, so a new range is never refused at the
+  desk. MIT licence, no dependencies, no install script.
+- **Why:** phone numbers differ by country in length, trunk prefix and grouping, and the package
+  carries Google's libphonenumber metadata for every country, which one developer cannot keep by
+  hand. Exactly 1.13.13 rather than a range: it publishes every two weeks, and a release out a few
+  weeks is the one trusted (D-088, D-094); 1.13.14 was two weeks old.
+- **Revisit if:** a pilot clinic's numbers are refused or misread (move to a newer version that has
+  been out a few weeks); the browser must read numbers itself (then weigh the metadata's size).

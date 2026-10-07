@@ -21,7 +21,7 @@ When answered: write the answer here, mark it **Answered (date)**, and add a dec
 | Q-08 | Which WhatsApp route (direct or partner) and which email provider | E03-T01 | Open (E03-T01 can run now) |
 | Q-09 | Is there a pilot clinic? What do they use today? | E04 (import priorities), v1.1 order | Open: owner does not know yet (2026-10-02) |
 | Q-10 | Languages for the staff app and patient messages | E00-T04 (first locale), E02 templates | **Answered 2026-10-02: English only during development; owner translates after v1** (D-053) |
-| Q-11 | Can every staff member see every patient of the clinic? | E01-T02 | Assumed yes (D-021) |
+| Q-11 | Can every staff member see every patient of the clinic? | E01-T02 | **Answered 2026-10-07: yes, every staff member sees every patient of their clinic** (D-096) |
 | Q-12 | How does the operator access a clinic's data for support? | E07 | Open |
 | Q-13 | Are Anthropic's API data terms acceptable? | E06-T05 | Open |
 | Q-14 | Cancel-by-link: allowed, and what cut-off? | E02-T09 | Assumed: allowed, 24 h default, per-clinic setting |
@@ -130,8 +130,12 @@ The translation pass, when it happens, covers: the app's texts (one message file
 message templates, the aftercare library seed, and a run of the AI evals in that language.
 It is a roadmap step between v1 and the first real clinic.
 
-### Q-11 · Patient visibility inside a clinic
-**Assumed:** all staff see all patients; a dentist's calendar opens on their own column.
+### Q-11 · Patient visibility inside a clinic — Answered 2026-10-07
+**Answer: yes.** Every staff member (owner, dentist, hygienist, front desk) sees every patient of
+their clinic: D-021's default, now the owner's answer (D-096). A read of patients names
+`every_member`, and E01-T02a's permission test holds it.
+
+_Original assumption:_ all staff see all patients; a dentist's calendar opens on their own column.
 
 ### Q-12 · Support access
 When a clinic asks for help, how do you look at their data? Options: never (screen-share only),
