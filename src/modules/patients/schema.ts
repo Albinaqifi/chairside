@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, date, index, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { check, date, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { newId } from '@/lib/ids';
 import { clinics } from '@/modules/tenancy/schema'; // for the foreign key only (D-058)
 
@@ -14,6 +14,9 @@ import { clinics } from '@/modules/tenancy/schema'; // for the foreign key only 
  *   form, not against a list (no language comes before the translation pass, D-053).
  * - `notes`: an administrative note, labelled "not a clinical record" wherever it is shown.
  * - `import_job_id` comes with `import_jobs` (E04-T01, D-091).
+ * - No index serves the name and phone search (E01-T02a): under Row-Level Security an index serves
+ *   only leakproof operators, and LIKE, ILIKE and pg_trgm's are not. Migration 0003 dropped the two
+ *   trigram indexes 0002 made for it, with pg_trgm (owner, D-096).
  */
 export const patients = pgTable(
   'patients',
@@ -42,13 +45,6 @@ export const patients = pgTable(
   },
   (t) => [
     unique('patients_clinic_id_id_key').on(t.clinicId, t.id),
-    // The patient search (E01-T02) matches parts of the full name and of the phone number. Its
-    // query must use these exact expressions for PostgreSQL to use the indexes (pg_trgm).
-    index('patients_full_name_trgm_idx').using(
-      'gin',
-      sql`(${t.firstName} || ' ' || ${t.lastName}) gin_trgm_ops`,
-    ),
-    index('patients_phone_e164_trgm_idx').using('gin', t.phoneE164.op('gin_trgm_ops')),
     check('patients_status_check', sql`${t.status} in ('active', 'archived', 'deceased')`),
     check(
       'patients_whatsapp_status_check',

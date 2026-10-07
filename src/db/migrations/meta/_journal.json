@@ -22,6 +22,13 @@
       "when": 1791307188242,
       "tag": "0002_scheduling",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791403855110,
+      "tag": "0003_drop_patient_trigram_indexes",
+      "breakpoints": true
     }
   ]
 }

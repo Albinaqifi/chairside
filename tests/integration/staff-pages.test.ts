@@ -195,13 +195,16 @@ async function frameOfLayout(): Promise<{ frame: unknown; sidebars: string[] }> 
   };
 }
 
-/** The clinic ids a placeholder page hands PageClinic. */
+/**
+ * The clinic ids a page hands PageClinic: a placeholder page's, or (E01-T02a) those in the tree a
+ * built page returns, as /dev/components below.
+ */
 async function pageClinicsOf(page: () => Promise<ReactNode>): Promise<unknown[]> {
   const shown = await page();
-  if (!isValidElement<{ heading: string }>(shown) || shown.type !== PlaceholderPage) {
-    throw new Error('the page does not show the placeholder page');
-  }
-  const rendered = await PlaceholderPage(shown.props);
+  const rendered =
+    isValidElement<{ heading: string }>(shown) && shown.type === PlaceholderPage
+      ? await PlaceholderPage(shown.props)
+      : shown;
   return elementsOf<{ clinicId: unknown }>(rendered, PageClinic).map((e) => e.props.clinicId);
 }
 
