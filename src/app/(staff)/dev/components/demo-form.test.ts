@@ -87,6 +87,11 @@ describe('the demo form, as the server sends it (E00-T04d)', () => {
     );
     expect(submitButtons).toHaveLength(1);
     expect(submitInputs).toHaveLength(0);
+    // E00-T04d tester: every button but Send writes type="button" itself. An empty or unknown type
+    // submits the form too (HTML's default), and the filter above counts those as not submitting.
+    expect(buttons.filter((button) => button.get('type')?.toLowerCase() !== 'button')).toHaveLength(
+      1,
+    );
     // The checkbox's and the switch's buttons are there, and are not submit buttons.
     expect(buttons.map((button) => button.get('role') ?? button.get('type'))).toEqual([
       'checkbox',
