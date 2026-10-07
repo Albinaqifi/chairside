@@ -11,11 +11,11 @@ import { extendTailwindMerge } from 'tailwind-merge';
 const merge = extendTailwindMerge({
   extend: {
     theme: {
-      text: ['small', 'caption', 'overline', 'section', 'heading', 'wordmark'],
+      text: ['small', 'caption', 'overline', 'section', 'title', 'heading', 'wordmark'],
       radius: ['card', 'control', 'pill', 'toast', 'checkbox'],
-      shadow: ['toast'],
+      shadow: ['toast', 'drawer'],
       tracking: ['heading', 'overline'],
-      animate: ['enter', 'toast'],
+      animate: ['enter', 'toast', 'drawer'],
     },
   },
 });

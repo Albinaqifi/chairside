@@ -6,7 +6,7 @@
  * font families, text sizes and radii are switched off, so a class outside these tokens gives no
  * style at all. Tokens the design reference lacks are marked "added"; the handoff note of the task
  * that added them names them (handoffs/E00-T04a.md, handoffs/E00-T04b.md, handoffs/E00-T04c.md,
- * handoffs/E00-T04d.md).
+ * handoffs/E00-T04d.md, handoffs/E00-T04e.md).
  *
  * A text size, radius, shadow, tracking or animation token added here is also named in src/ui/cn.ts:
  * tailwind-merge knows only Tailwind's own scales, so without it cn() reads `text-<new size>` as a
@@ -60,6 +60,10 @@
   --color-switch-off: oklch(0.86 0.006 95);
   --color-checkbox-border: oklch(0.8 0.01 210);
 
+  /* Added in E00-T04e: the overlay under the drawer and the dialog (demo line 1195), about the text
+     colour at 18 %. */
+  --color-overlay: oklch(0.25 0.02 210 / 0.18);
+
   /* Status colours, text / background / dot: the demo's ST and RED (lines 1376–1385), under the
      status names of data-model.md. The demo's "unconfirmed" (No reply yet: booked, and a reminder
      was sent) is no-reply here, its "done" is completed, its "noshow" is no-show. */
@@ -92,11 +96,15 @@
      headings (serif, 28–34 px). Added: labels and small print (the demo's labels), the wordmark
      (demo line 28), and the letter spacing of the wordmark and the 28 px headings. Added in
      E00-T04b: captions (the clinic's name under the logo, status pills: demo lines 30 and 134), and
-     the small upper-case labels with their letter spacing ("Signed in as", demo line 48). */
+     the small upper-case labels with their letter spacing ("Signed in as", demo line 48). Added in
+     E00-T04e: the drawer's title (serif, demo lines 1200, 1262, 1325), a step under the page
+     heading, with the demo's line height. */
   --text-base: 14px;
   --text-base--line-height: 1.45;
   --text-section: 16px;
   --text-heading: 28px;
+  --text-title: 26px;
+  --text-title--line-height: 1.15;
   --text-small: 12.5px;
   --text-caption: 12px;
   --text-overline: 11px;
@@ -113,14 +121,18 @@
   --radius-toast: 12px;
   --radius-checkbox: 5px;
 
-  /* Added in E00-T04c: the toast's shadow (demo line 1365), in the text colour's hue. The only
-     shadow: the design has almost none ("Shape"). */
+  /* Added in E00-T04c: the toast's shadow (demo line 1365), in the text colour's hue. Added in
+     E00-T04e: the drawer's, cast to its left (demo line 1196), the toast's hue and lighter. The only
+     shadows: the design has almost none ("Shape"). */
   --shadow-toast: 0 10px 30px -10px oklch(0.2 0.03 210 / 0.4);
+  --shadow-drawer: -20px 0 40px -20px oklch(0.2 0.03 210 / 0.25);
 
   /* The entry animation: a 0.3 s fade and 6 px rise (the demo's csIn). Added in E00-T04c: the
-     toast's, the same in 0.2 s (demo line 1365). */
+     toast's, the same in 0.2 s (demo line 1365). Added in E00-T04e: the drawer's, the same in 0.2 s
+     (demo line 1196), which the dialog takes too. */
   --animate-enter: enter 0.3s ease;
   --animate-toast: enter 0.2s ease;
+  --animate-drawer: enter 0.2s ease;
 
   @keyframes enter {
     from {

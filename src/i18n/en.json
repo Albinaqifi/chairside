@@ -71,6 +71,12 @@
     "label": "Notification",
     "region": "Notifications ({hotkey})"
   },
+  "drawer": {
+    "close": "Close"
+  },
+  "dialog": {
+    "close": "Close"
+  },
   "devComponents": {
     "title": "Components",
     "intro": "Every component of the design system, and a form that gives each answer. This page exists outside production only.",
@@ -155,6 +161,37 @@
       "showAnother": "Show another one",
       "first": "This is a toast. It goes away by itself.",
       "second": "This one replaced the first."
+    },
+    "tabs": {
+      "heading": "Tabs",
+      "label": "Three demo tabs",
+      "first": "First",
+      "second": "Second",
+      "third": "Third",
+      "field": "Type something here",
+      "firstContent": "Type in the field, choose another tab, then come back: the field is empty again. A tab's content leaves the page when another tab is chosen, so a form never spans two tabs.",
+      "secondContent": "The second tab's content. The arrow keys move between the tabs.",
+      "thirdContent": "The third tab's content."
+    },
+    "drawer": {
+      "heading": "Drawer",
+      "open": "Open the drawer",
+      "openWide": "Open the wide drawer",
+      "title": "A drawer",
+      "titleWide": "A wide drawer",
+      "description": "420 px wide, as the booking and appointment drawers.",
+      "descriptionWide": "500 px wide, as the aftercare review.",
+      "field": "A field: the first focus lands here",
+      "body": "Escape, the close button or a click on the overlay closes it, and the focus goes back to the button that opened it.",
+      "close": "Close the drawer"
+    },
+    "dialog": {
+      "heading": "Dialog",
+      "open": "Open the dialog",
+      "title": "A dialog",
+      "description": "A question with a few fields, over the drawer's overlay.",
+      "field": "A field: the first focus lands here",
+      "close": "Close the dialog"
     },
     "form": {
       "heading": "The form pattern",
