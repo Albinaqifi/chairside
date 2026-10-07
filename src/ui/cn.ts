@@ -12,7 +12,7 @@ const merge = extendTailwindMerge({
   extend: {
     theme: {
       text: ['small', 'caption', 'overline', 'section', 'heading', 'wordmark'],
-      radius: ['card', 'control', 'pill', 'toast'],
+      radius: ['card', 'control', 'pill', 'toast', 'checkbox'],
       shadow: ['toast'],
       tracking: ['heading', 'overline'],
       animate: ['enter', 'toast'],

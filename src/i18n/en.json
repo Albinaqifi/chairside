@@ -90,6 +90,38 @@
       "invalid": "A field with an error",
       "invalidError": "This is how an error shows under its field."
     },
+    "textarea": {
+      "heading": "Text area",
+      "plain": "A text area",
+      "disabled": "A disabled text area",
+      "invalid": "A text area with an error"
+    },
+    "select": {
+      "heading": "Select",
+      "plain": "A select",
+      "disabled": "A disabled select",
+      "invalid": "A select with an error"
+    },
+    "checkbox": {
+      "heading": "Checkbox",
+      "plain": "A checkbox",
+      "checked": "A ticked checkbox",
+      "disabled": "A disabled checkbox",
+      "invalid": "A checkbox with an error"
+    },
+    "switch": {
+      "heading": "Switch",
+      "plain": "A switch, off",
+      "on": "A switch, on",
+      "disabled": "A disabled switch",
+      "invalid": "A switch with an error"
+    },
+    "choices": {
+      "empty": "Choose one",
+      "first": "First",
+      "second": "Second",
+      "third": "Third"
+    },
     "badges": {
       "heading": "Status pills",
       "booked": "Booked",
@@ -126,9 +158,13 @@
     },
     "form": {
       "heading": "The form pattern",
-      "intro": "Send it to see each answer. A short or long note, or a code that is not four digits, shows an error at its field. Sent from a tab whose clinic another tab has changed, it asks for a reload.",
+      "intro": "Send it to see each answer. A short or long note, a code that is not four digits, empty or long details, or no choice shows an error at its field. The checkbox and the switch send “on” when they show on, and nothing when they show off. Sent from a tab whose clinic another tab has changed, it asks for a reload.",
       "note": "A note, 2 to 40 characters",
       "code": "A code of four digits",
+      "details": "Details, 1 to 200 characters",
+      "choice": "A choice",
+      "checkbox": "A checkbox",
+      "switch": "A switch",
       "answer": "What the action answers",
       "answers": {
         "done": "Done, with a toast",

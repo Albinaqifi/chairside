@@ -15,10 +15,15 @@ import {
   CardHeader,
   CardTitle,
 } from '@/ui/card';
+import { Checkbox } from '@/ui/checkbox';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/ui/empty';
 import { Field } from '@/ui/field';
 import { Input } from '@/ui/input';
 import { Logo } from '@/ui/logo';
+import { NativeSelect, NativeSelectOption } from '@/ui/native-select';
+import { Switch } from '@/ui/switch';
+import { Textarea } from '@/ui/textarea';
+import { DEMO_CHOICES } from './demo-choices';
 import { DemoForm, ToastDemo } from './demo-form';
 
 /** Each status pill, with the key of its text under devComponents.badges (the demo's, ST). */
@@ -42,12 +47,25 @@ export async function generateMetadata(): Promise<Metadata> {
  * whose action gives each answer on request, for checks by eye and with the keyboard. In a
  * production build it answers 404 before anything else; its actions refuse there too
  * (./actions.ts). It is no item of the navigation. Like every staff page it starts from
- * currentStaff(), and the demo form sends the clinic the frame names.
+ * currentStaff(), and the demo form sends the clinic the frame names. E00-T04d: each form field
+ * alone, plain, disabled and with an error, and a checkbox ticked and a switch on.
  */
 export default async function ComponentsPage() {
   if (process.env.NODE_ENV === 'production') notFound();
   const staff = await currentStaff();
   const t = await getTranslations('devComponents');
+
+  /** The demo select's choices, after an empty one. */
+  const choices = (
+    <>
+      <NativeSelectOption value="">{t('choices.empty')}</NativeSelectOption>
+      {DEMO_CHOICES.map((choice) => (
+        <NativeSelectOption key={choice} value={choice}>
+          {t(`choices.${choice}`)}
+        </NativeSelectOption>
+      ))}
+    </>
+  );
 
   return (
     <div className="motion-safe:animate-enter">
@@ -86,6 +104,103 @@ export default async function ComponentsPage() {
             label={t('fields.invalid')}
             error={t('fields.invalidError')}
             render={(field) => <Input {...field} />}
+          />
+        </div>
+      </Section>
+
+      <Section heading={t('textarea.heading')}>
+        <div className="grid max-w-md gap-4">
+          <Field label={t('textarea.plain')} render={(field) => <Textarea {...field} />} />
+          <Field
+            label={t('textarea.disabled')}
+            render={(field) => <Textarea {...field} disabled />}
+          />
+          <Field
+            label={t('textarea.invalid')}
+            error={t('fields.invalidError')}
+            render={(field) => <Textarea {...field} />}
+          />
+        </div>
+      </Section>
+
+      <Section heading={t('select.heading')}>
+        <div className="grid max-w-md gap-4">
+          <Field
+            label={t('select.plain')}
+            render={(field) => (
+              <NativeSelect {...field} defaultValue="">
+                {choices}
+              </NativeSelect>
+            )}
+          />
+          <Field
+            label={t('select.disabled')}
+            render={(field) => (
+              <NativeSelect {...field} defaultValue="second" disabled>
+                {choices}
+              </NativeSelect>
+            )}
+          />
+          <Field
+            label={t('select.invalid')}
+            error={t('fields.invalidError')}
+            render={(field) => (
+              <NativeSelect {...field} defaultValue="">
+                {choices}
+              </NativeSelect>
+            )}
+          />
+        </div>
+      </Section>
+
+      <Section heading={t('checkbox.heading')}>
+        <div className="grid max-w-md gap-4">
+          <Field
+            label={t('checkbox.plain')}
+            orientation="horizontal"
+            render={(field) => <Checkbox {...field} />}
+          />
+          <Field
+            label={t('checkbox.checked')}
+            orientation="horizontal"
+            render={(field) => <Checkbox {...field} defaultChecked />}
+          />
+          <Field
+            label={t('checkbox.disabled')}
+            orientation="horizontal"
+            render={(field) => <Checkbox {...field} disabled />}
+          />
+          <Field
+            label={t('checkbox.invalid')}
+            orientation="horizontal"
+            error={t('fields.invalidError')}
+            render={(field) => <Checkbox {...field} />}
+          />
+        </div>
+      </Section>
+
+      <Section heading={t('switch.heading')}>
+        <div className="grid max-w-md gap-4">
+          <Field
+            label={t('switch.plain')}
+            orientation="horizontal"
+            render={(field) => <Switch {...field} />}
+          />
+          <Field
+            label={t('switch.on')}
+            orientation="horizontal"
+            render={(field) => <Switch {...field} defaultChecked />}
+          />
+          <Field
+            label={t('switch.disabled')}
+            orientation="horizontal"
+            render={(field) => <Switch {...field} disabled />}
+          />
+          <Field
+            label={t('switch.invalid')}
+            orientation="horizontal"
+            error={t('fields.invalidError')}
+            render={(field) => <Switch {...field} />}
           />
         </div>
       </Section>

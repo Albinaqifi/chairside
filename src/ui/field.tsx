@@ -14,6 +14,12 @@ export interface FieldControlProps {
 }
 
 /**
+ * Where a field's label stands: above its control (an input, a textarea, a select), or beside it,
+ * after the control (a checkbox, a switch), as shadcn/ui's Field names the two.
+ */
+export type FieldOrientation = 'vertical' | 'horizontal';
+
+/**
  * A form field: its label, its control and its error, tied together for screen readers (E00-T04c).
  * After shadcn/ui's Form (D-009: FormField's `render`, FormItem, FormLabel, FormControl,
  * FormMessage), which takes its errors from react-hook-form; this one takes its error from the
@@ -21,11 +27,15 @@ export interface FieldControlProps {
  * so a control cannot replace the id its label names by having an id of its own. The control reads
  * its label, that it is invalid, and the error, which shows under it in the error colour. Not a
  * client component: a server page can render it too, with `render` run on the server.
+ *
+ * Horizontal (E00-T04d): the label stands after its control, in the demo's checkbox rows' text
+ * (lines 1305, 1352: the base size, weight 500), and the error under both, with the same ties.
  */
 function Field({
   name,
   label,
   error,
+  orientation = 'vertical',
   className,
   render,
 }: {
@@ -34,6 +44,8 @@ function Field({
   label: ReactNode;
   /** The error's text, from the message file; none or empty: no error. */
   error?: string;
+  /** Vertical, the default: the label above the control. Horizontal: beside it, after it. */
+  orientation?: FieldOrientation;
   className?: string;
   /** The control, given its id, name and the error's attributes. */
   render: (control: FieldControlProps) => ReactNode;
@@ -48,11 +60,23 @@ function Field({
   return (
     <div
       data-slot="field"
+      data-orientation={orientation}
       data-invalid={invalid || undefined}
       className={cn('grid gap-2', className)}
     >
-      <Label htmlFor={id}>{label}</Label>
-      {render(control)}
+      {orientation === 'horizontal' ? (
+        <div className="flex items-center gap-2.5">
+          {render(control)}
+          <Label htmlFor={id} className="text-base leading-snug font-medium">
+            {label}
+          </Label>
+        </div>
+      ) : (
+        <>
+          <Label htmlFor={id}>{label}</Label>
+          {render(control)}
+        </>
+      )}
       {invalid && (
         <p id={errorId} data-slot="field-error" className="text-small text-error">
           {error}

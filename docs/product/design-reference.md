@@ -81,7 +81,8 @@ Take these from the demo and define them once (Tailwind theme / CSS variables) i
 Never hard-code a colour in a component. They are in `src/app/globals.css`, with the few this list
 lacks (text on primary, links, focus, errors, small text; the sidebar's navigation colours,
 captions and small upper-case labels, E00-T04b; the toast's colours, radius, shadow and entry,
-E00-T04c) marked there.
+E00-T04c; the switch's off colour and the checkbox's border colour and radius, E00-T04d) marked
+there.
 
 **Fonts.** UI: `Onest`. Headings and big numbers: `Source Serif 4` (serif, weight 400–500).
 They replace the demo's Figtree and Newsreader, which have no Cyrillic letters (D-089).
