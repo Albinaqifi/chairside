@@ -258,6 +258,30 @@ describe("the clinic's place: its time zone and country", () => {
     });
   });
 
+  it("in each clinic's transaction that clinic's place, never another clinic's", async () => {
+    // Added by the tester: test-strategy.md, "Tenant isolation", through the tenancy module's public
+    // function, which reads whatever row of clinics the transaction sees. The two clinics differ in
+    // both values, so a read of any row but the transaction's own fails one of the two.
+    const inAuckland = await insertClinic(admin);
+    const inNewYork = await insertClinic(admin);
+    await admin.query(
+      `update clinics set timezone = 'Pacific/Auckland', default_country = 'NZ' where id = $1`,
+      [inAuckland],
+    );
+    await admin.query(
+      `update clinics set timezone = 'America/New_York', default_country = 'US' where id = $1`,
+      [inNewYork],
+    );
+    expect(await withTenant(inAuckland, (tx) => clinicPlace(tx))).toEqual({
+      timeZone: 'Pacific/Auckland',
+      country: 'NZ',
+    });
+    expect(await withTenant(inNewYork, (tx) => clinicPlace(tx))).toEqual({
+      timeZone: 'America/New_York',
+      country: 'US',
+    });
+  });
+
   it('a zone Intl does not know fails the list, rather than show times in another zone', async () => {
     const clinic = await insertClinic(admin);
     await admin.query(`update clinics set timezone = 'Mars/Olympus_Mons' where id = $1`, [clinic]);
