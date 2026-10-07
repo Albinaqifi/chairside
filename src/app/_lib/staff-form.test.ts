@@ -17,6 +17,7 @@ type Bridge = (previous: FormState<unknown>, formData: FormData) => Promise<Form
 const form = vi.hoisted(() => ({
   state: undefined as unknown,
   pending: false,
+  inBrowser: false,
   bridge: undefined as Bridge | undefined,
 }));
 vi.mock('react', async (importOriginal) => {
@@ -26,6 +27,16 @@ vi.mock('react', async (importOriginal) => {
     useActionState: (bridge: Bridge, initial: unknown) => {
       form.bridge = bridge;
       return [form.state ?? initial, () => undefined, form.pending];
+    },
+    // React's own, which gives the server's snapshot as the server sends the form; with
+    // `inBrowser`, the browser's snapshot, as React gives it once the page has hydrated.
+    useSyncExternalStore: <T>(
+      subscribe: (onStoreChange: () => void) => () => void,
+      getSnapshot: () => T,
+      getServerSnapshot?: () => T,
+    ): T => {
+      const asServerSends = react.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+      return form.inBrowser ? getSnapshot() : asServerSends;
     },
   };
 });
@@ -49,22 +60,28 @@ const doneResult: ActionResult<Out, 'demo_refused'> = { ok: true, value: { answe
 beforeEach(() => {
   form.state = undefined;
   form.pending = false;
+  form.inBrowser = false;
   form.bridge = undefined;
   toast.show.mockReset();
 });
 
-/** A staff form with two fields, in a frame for `frameClinicId`, as the server renders it. */
+/**
+ * A staff form with two fields, in a frame for `frameClinicId`, as the server renders it; with
+ * `inBrowser`, as it renders once it runs in the browser.
+ */
 function render(
   options: {
     action?: DemoAction;
     frameClinicId?: string;
     answer?: FormAnswer<unknown>;
     pending?: boolean;
+    inBrowser?: boolean;
     onDone?: (value: Out) => void;
   } = {},
 ): string {
   if (options.answer) form.state = { answer: options.answer, attempt: 1 };
   form.pending = options.pending ?? false;
+  form.inBrowser = options.inBrowser ?? false;
   const field = (name: string): ReactNode =>
     createElement(StaffField, {
       key: name,
@@ -191,12 +208,32 @@ describe('what a staff form shows for each answer (E00-T04c, acceptance 5)', () 
   });
 
   it('while the action runs, the submit button is disabled and says so', () => {
-    const running = submitButton(render({ pending: true }));
+    // In the browser, where an action runs. The server's HTML is the next test's: its button is
+    // disabled whatever the state (E00-T04c test finding 1).
+    const running = submitButton(render({ pending: true, inBrowser: true }));
     expect(running.has('disabled')).toBe(true);
-    const idle = submitButton(render({ pending: false }));
+    const idle = submitButton(render({ pending: false, inBrowser: true }));
     expect(idle.has('disabled')).toBe(false);
     expect(render({ pending: true })).toContain('demo.sending');
     expect(render({ pending: false })).toContain('demo.send');
+  });
+
+  it("in the server's HTML its submit button is disabled, so nothing is sent before the script runs", () => {
+    // E00-T04c test finding 1: React holds each submit made before the page's script runs and,
+    // once it runs, sends each one through the form's action, past onSubmit and its guard. A
+    // double click ran the action twice, and React's reset emptied the fields. A disabled button
+    // stops a click and Enter alike (D-076, as the login form's).
+    const html = render();
+    const submitButtons = tags(html, 'button').filter(
+      (button) => (button.get('type') ?? 'submit').toLowerCase() === 'submit',
+    );
+    const submitInputs = tags(html, 'input').filter((input) =>
+      ['submit', 'image'].includes((input.get('type') ?? 'text').toLowerCase()),
+    );
+    expect(submitButtons, 'the submit buttons').not.toHaveLength(0);
+    for (const control of [...submitButtons, ...submitInputs]) {
+      expect(control.has('disabled')).toBe(true);
+    }
   });
 
   it('is a form that never goes to a URL, and leaves field checks to the server', () => {

@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useRef,
+  useSyncExternalStore,
   type FormEvent,
   type ReactNode,
 } from 'react';
@@ -32,6 +33,11 @@ export interface FormState<Out> {
 
 /** The answer the fields read their problems from. */
 const AnswerContext = createContext<FormAnswer<unknown>>(IDLE);
+
+/** Whether the form runs in the browser never changes once it does: nothing to subscribe to. */
+function subscribeToNothing() {
+  return () => undefined;
+}
 
 export interface StaffFormProps<In, Out, R extends string> {
   /** The wrapper-made action, as the browser calls it: `action(clinicId, input)`. */
@@ -62,10 +68,14 @@ export interface StaffFormProps<In, Out, R extends string> {
  *   form data); the wrappers take (clinic id, input). A function of the form's own sits between.
  * - **Sent once:** the submit button is disabled while the action runs, and a second submit before
  *   React has disabled it is dropped, so a double click sends one request.
+ * - **Not before the page's script runs:** the submit button is disabled in the server's HTML and
+ *   enabled once the form runs in the browser, as the login form's (D-076). React would hold each
+ *   submit made before then and send each one through the form's `action` once the script runs,
+ *   past onSubmit and its guard, and then empty the fields: a double click ran the action twice
+ *   (E00-T04c test finding 1). A disabled button stops Enter from submitting the form too.
  * - **Sent from onSubmit,** which dispatches the form's data itself: React's own form action empties
  *   every field after the action, an answer with field errors included (React 19 resets a form
- *   after its action). The `action` is still the dispatch, so the form is never sent to a URL: before
- *   the page's script runs, React holds a submission and sends it once the script is running.
+ *   after its action). The `action` is still the dispatch, so the form is never sent to a URL.
  * - **noValidate:** a field's error shows one way, the server's, never the browser's own bubble.
  */
 export function StaffForm<In, Out, R extends string = never>({
@@ -80,6 +90,12 @@ export function StaffForm<In, Out, R extends string = never>({
 }: StaffFormProps<In, Out, R>) {
   const clinicId = useFrameClinic();
   const showToast = useToast();
+  // false in the server's HTML and while the page hydrates, true once the form runs in the browser.
+  const inBrowser = useSyncExternalStore(
+    subscribeToNothing,
+    () => true,
+    () => false,
+  );
   const formRef = useRef<HTMLFormElement>(null);
   const submitRef = useRef<HTMLButtonElement>(null);
   const sending = useRef(false);
@@ -143,7 +159,7 @@ export function StaffForm<In, Out, R extends string = never>({
           form={formRef}
         />
         <div>
-          <Button ref={submitRef} type="submit" disabled={pending}>
+          <Button ref={submitRef} type="submit" disabled={!inBrowser || pending}>
             {pending ? pendingLabel : submitLabel}
           </Button>
         </div>
