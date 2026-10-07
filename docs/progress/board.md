@@ -9,13 +9,13 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E00-T04c` is Ready: `/pipeline E00-T04c` (`handoffs/E00-T04c.md`)
-- **Decisions it waits on:** none
+- **Next task to start:** `E00-T04d` is Ready: `/pipeline E00-T04d` (`handoffs/E00-T04d.md`)
+- **Decisions it waits on:** none (the owner's answer is D-093)
 
 ## Next (in order)
 
-1. E00-T04c
-2. E00-T04d
+1. E00-T04d
+2. E00-T04e
 3. E01-T02
 4. E00-T06b
 5. E00-T05b
@@ -42,15 +42,16 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T09 | The login form never puts the password in the URL | builder | critical | **Done** | Merged by the owner (PR #15). The form posts to `/login`, its button is disabled until the script runs, a `<noscript>` line; lint `chairside/forms-post` for every form (D-076, D-080). The review suggestion and the tester's `next/form` line → E00-T10 (D-081). See `handoffs/E00-T09.md` |
 | E00-T10 | Close the gaps in the lint guards | builder | critical | **Done** | Merged by the owner (PR #17). Re-exports and drivers, lint comments, rejections and `.catch`/`.finally` statements, `src/pages`, script files in `src/`, `formAction`, spreads and `next/form` (D-077, D-081, D-082). Its leftovers → E00-T11 (D-084); four struck. See `handoffs/E00-T10.md` |
 | E00-T11 | Components in the form lint, and the gaps E00-T10 left | builder | critical | **Done** | Merged by the owner (PR #20). Components and generic spreads in the form lint, `export default` of a handle, drivers passed on from `src/db/`, `'use server'` `.tsx` files, lint comments everywhere, whole case names (D-084, D-085). Its blind spots stay review checks (owner, D-086); two comments → E00-T04a; `CLAUDE.md` rule 7 and R-32 corrected. See `handoffs/E00-T11.md` |
-| E00-T04 | App shell and design system | builder | normal | split (D-086) | Into E00-T04a … E00-T04d, the next four rows |
+| E00-T04 | App shell and design system | builder | normal | split (D-086) | Into E00-T04a … E00-T04e, the next five rows (E00-T04d split again, D-093) |
 | E00-T04a | Tokens, fonts, texts and the login page | builder | normal | **Done** | Merged by the owner (PR #23). Tokens in `globals.css`, local fonts, next-intl, Button, Input, Label, both pages restyled, favicon, text and accessibility lint (D-088). Fonts with Cyrillic → E00-T04b (owner, D-089); other leftovers → E00-T04b, E00-T04c, E01-T02, E01-T04, `CLAUDE.md`; six struck. See `handoffs/E00-T04a.md` |
 | E00-T04b | The staff shell: sidebar, navigation by role, placeholder pages | builder | normal | **Done** | Merged by the owner (PR #25). The staff layout, the sidebar by permission, Today and six placeholder pages, Card, Badge, the empty state, Onest and Source Serif 4 (D-089). Leftovers → E00-T04c (the clinic a form sends), E01-T01 (the provider link); five struck. See `handoffs/E00-T04b.md` |
-| E00-T04c | The form pattern, the toast and the components page | builder | critical | **Tested** | Branch `task/E00-T04c-form-pattern`, PR #33. `StaffForm` sends the frame's clinic (D-069) and shows each answer; the bridge to `useActionState` is D-092. Toast on Radix's, `/dev/components`. Reviewed at `5b38481`: 2 required changes, both fixed in fix round 1, 2 suggestions (Discovered). Tested at `85ed706`: back to the builder, 1 finding (`message`: before the page's script runs, a double click on Send ran the action twice); 2 notes (Discovered); 3 cases added. Fix round 2: Send disabled until the page's script runs, as login's (D-076); one test's button renders moved into the browser, as the tester accepted. Tested again at `240fccc`: back to the builder, 1 finding (`message`: in Firefox after a reload or Back, Send is enabled before the script and a double click runs the action twice; Chrome holds); 1 Discovered line (login, Firefox). Fix round 3 (approved by the owner): Send carries `autocomplete="off"`, so Firefox keeps it disabled after F5 or Back; one test added; 1 Discovered line (`data`: Firefox refills a form's fields after F5). Tested again at `13110ea`: finding 1 fixed (Firefox: a new load, F5, Back, Forward), no finding; 1 note (`data`: that line, seen across clinics). Delta review of `5b38481..01de2b4`: approved, 1 `message` suggestion (Discovered). Critical review of `main..144b211`: approved, no test added, 2 suggestions (`data`: no every-action × every-role permission test, for E01-T02's refinement; `none`) (Discovered). See `handoffs/E00-T04c.md` |
-| E00-T04d | The other components: fields, tabs, drawer and dialog | builder | normal | Planned | After E00-T04c, refined in its Done pass (D-086) |
+| E00-T04c | The form pattern, the toast and the components page | builder | critical | **Done** | Merged by the owner (PR #33). `StaffForm` and `StaffField` send the frame's clinic and show each answer one way, Send once and only after the script (D-092); the toast; `/dev/components`. Leftovers → E00-T04d (the browser's memory off, owner, D-093; one submit button), E01-T02 (every action × every role; a form cleared after done), E01-T05, E01-T09, `CLAUDE.md`'s review checks; two done by its tester, eight struck. See `handoffs/E00-T04c.md` |
+| E00-T04d | The form fields: textarea, select, checkbox and switch | builder | critical | Ready | Split again (D-093): the four fields, the select the browser's own; staff forms keep nothing in the browser (owner, D-093); one submit button per form. See `handoffs/E00-T04d.md` |
+| E00-T04e | Tabs, the drawer and the dialog | builder | normal | Planned | Split from E00-T04d (D-093); refined in its Done pass (D-086) |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | split (D-090) | Into E00-T05a and E00-T05b, the next two rows |
 | E00-T05a | Seed data: two clinics and a login for every role | builder | normal | **Done** | Merged by the owner (PR #27). `pnpm db:seed` and `db:reset` seed two clinics and a login for every role, under fixed ids (owner's answer (a)). Leftovers → E01-T01b, E03-T00 (`message`), `CLAUDE.md`, agent rule 5; six struck. See `handoffs/E00-T05a.md` |
 | E00-T05b | `clinic:create`: the operator's script for a new clinic | builder | critical | Planned | After E00-T06b, before E00-T07 (D-090); refined in E00-T06b's Done pass, where the owner decides what its setup link opens |
-| E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); needs E00-T04a … E00-T04d and E00-T05a, comes after E01-T02 (D-087); takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086) |
+| E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); needs E00-T04a … E00-T04e and E00-T05a, comes after E01-T02 (D-087); takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086) |
 | E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | Planned | Owner: hosting accounts (Q-07). After E00-T05b, E00-T06b and E00-T09 |
 
 ## E01 · Scheduling (M1)
@@ -62,7 +63,7 @@ Fully specified.
 | E01-T01 | Schema: providers, treatment types, patients, appointments, hours | builder | critical | split (D-091) | Into E01-T01a and E01-T01b, the next two rows |
 | E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | **Done** | Merged by the owner (PR #29). Seven scheduling tables with their policies and the no-double-booking constraint (migration 0002); the provider kind through `clinics_for_user()`. Leftovers → E01-T02, E01-T04, E01-T05, E01-T10, E02-T01; the appointments indexes → E07-T00; one done by its tester, five struck. See `handoffs/E01-T01a.md` |
 | E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | **Done** | Merged by the owner (PR #31). `02-scheduling.ts`: three providers, 40 patients and a week of appointments for the seed's day; dentist and hygienist linked. Leftovers: the aftercare flags on the Discovered list (→ E06-T00), the fake-data check's two blind spots a review check in `security-privacy.md`; six struck. See `handoffs/E01-T01b.md` |
-| E01-T02 | Patients: list, search, create, edit | builder | normal | Planned | |
+| E01-T02 | Patients: list, search, create, edit | builder | critical | Planned | Critical: the test of every action and every role (E00-T04c critical review, D-093); a create form cleared after done |
 | E01-T03 | Patient profile | builder | normal | Planned | |
 | E01-T04 | Calendar: day view | builder | normal | Planned | |
 | E01-T05 | Book an appointment (drawer) | builder | normal | Planned | |
@@ -200,6 +201,7 @@ Outline. Needs E07-T00.
 - E00-T05a · Seed data: two clinics and a login for every role · merged 2026-10-06 (PR #27)
 - E01-T01a · Schema: providers, treatment types, patients, appointments, hours · merged 2026-10-06 (PR #29)
 - E01-T01b · The scheduling seed: providers, patients and a week of appointments · merged 2026-10-06 (PR #31)
+- E00-T04c · The form pattern, the toast and the components page · merged 2026-10-07 (PR #33)
 
 ## Owner actions (standing)
 

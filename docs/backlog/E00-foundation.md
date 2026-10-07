@@ -7,16 +7,17 @@ clinics cannot see each other's data, and every change is checked automatically.
 Getting them right once, with tests, is cheaper than fixing them under features.
 
 Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → T04a → T04b → T05a → E01-T01a → E01-T01b
-→ T04c → T04d → E01-T02 → T06b → T05b → T07, then the rest of E01 (D-087, D-090, D-091). T08 is
-the second half of T03 (split in D-071), so it sits right after T03 in this file. T06 is split in
-two (D-075): CI (T06a) comes first, Playwright and journey J1 (T06b) after T04 and T05a. T09 and
-T10 come from E00-T08's review and test (D-076, D-077), T11 from E00-T10's (D-084). T04 is split
-in four (D-086): tokens, fonts, texts and the login page (T04a), the staff shell (T04b), the form
-pattern (T04c), the other components (T04d). T05 is split in two (D-090): the seed (T05a), and
-`clinic:create` (T05b), which staging needs. E01-T01a, E01-T01b and E01-T02 come before T06b and
-T07, so a receptionist sees a patient list before Playwright and staging exist; T04c and T04d come
-before E01-T02, which depends on them (D-087). The tasks sit in this file in the order before
-D-087, with T05a and T05b after T04d.
+→ T04c → T04d → T04e → E01-T02 → T06b → T05b → T07, then the rest of E01 (D-087, D-090, D-091,
+D-093). T08 is the second half of T03 (split in D-071), so it sits right after T03 in this file. T06
+is split in two (D-075): CI (T06a) comes first, Playwright and journey J1 (T06b) after T04 and T05a.
+T09 and T10 come from E00-T08's review and test (D-076, D-077), T11 from E00-T10's (D-084). T04 is
+split in four (D-086), its last part again in two (D-093): tokens, fonts, texts and the login page
+(T04a), the staff shell (T04b), the form pattern (T04c), the form fields (T04d), tabs, the drawer
+and the dialog (T04e). T05 is split in two (D-090): the seed (T05a), and `clinic:create` (T05b),
+which staging needs. E01-T01a, E01-T01b and E01-T02 come before T06b and T07, so a receptionist sees
+a patient list before Playwright and staging exist; T04c, T04d and T04e come before E01-T02, which
+depends on them (D-087, D-093). The tasks sit in this file in the order before D-087, with T05a and
+T05b after T04e.
 
 ---
 
@@ -949,42 +950,100 @@ submit from a first: E01-T02 and E01-T05 (Discovered, E00-T03 test).
 
 ---
 
-### E00-T04d · The other components: fields, tabs, drawer and dialog
+### E00-T04d · The form fields: textarea, select, checkbox and switch
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04c
-- **Read:** `design-ref` (Design tokens: shape and layout; the drawer's frame, demo lines
-  1192–1196) · D-009, D-084, D-085 ("Not checked"), D-086 · the architect section of
-  `handoffs/E00-T04d.md`
+- **Role:** builder · **Risk:** critical (the tenant and action wrappers: what `StaffForm`'s form
+  lets a browser keep and bring back, under another clinic too, D-069, D-092, D-093) · **Depends
+  on:** E00-T04c
+- **Read:** `design-ref` (Design tokens: colours and shape; the demo's textareas, lines 499 and
+  940) · `security` (Part 1, section 8) · D-009, D-084, D-085 ("Not checked"), D-086, D-092, D-093 ·
+  the architect section of `handoffs/E00-T04d.md`
 
-**Why.** E01's screens are built from these: the booking and appointment drawers, the settings
-tabs, a confirming dialog, the fields of every form. The last of E00-T04's four parts (D-086).
+**Why.** E01's forms are built from these: a patient's notes and language, a treatment type's
+"needs aftercare", the communication switches. Each sends what it shows, once, and a staff form
+keeps nothing in the browser that a reload could bring back, under another clinic either (owner,
+D-093). The fourth of E00-T04's parts, split again (D-093).
 
 **Do.**
-- From shadcn/ui (D-009), restyled to the tokens, in `src/ui/`: textarea, select, checkbox, toggle
-  (an on/off switch), tabs, the drawer from the right (420 px, and 500 px for the aftercare
-  review), the dialog. Each that renders a button or an input, itself or through a Radix part,
-  types its props without `formAction` and `formMethod` (`Omit<…>`, D-084): the published ones take
-  Radix's full props, which lint refuses.
-- The text they carry (a close button's label, a select's empty choice) comes from the message
-  file.
-- Each one on `/dev/components`, and in the demo form where it is a field (with its label and
-  error, E00-T04c).
+- **Four fields** in `src/ui/`, restyled to the tokens (D-009): shadcn/ui's Textarea; a select that
+  is the browser's own `<select>`, styled as `Input` is (shadcn/ui's native select if its registry
+  has one, otherwise written after `Input`, D-093); shadcn/ui's Checkbox and Switch (Radix's; the
+  switch is the on/off one, not shadcn/ui's Toggle), on in the `accent` colour. Each takes a
+  field's control props as `Input` does (`render={(field) => <Textarea {...field} />}`): its label
+  names it and its error is read with it; a checkbox's or a switch's label stands beside it. Each
+  that renders a button or an input, itself or through a Radix part, types its props without
+  `formAction` and `formMethod` (`Omit<…>`, D-084). Keyboard focus shows `Button`'s outline
+  (`--color-focus`), never the browser's own (E00-T04c test note 2). Their text (a select's empty
+  choice) comes from the message file.
+- **The browser's memory off** (owner, D-093): `StaffForm`'s `<form>` carries `autocomplete="off"`.
+  After a clinic switch in another tab, F5 renders the page for the other clinic, and Firefox would
+  put back what was typed for the first (E00-T04c fix round 3, `data`). Radix's checkbox and switch
+  keep a hidden copy of their state in a form, which Firefox restores while the visible control
+  starts from its default: the form would send "on" under a switch that shows "off".
+- **One submit button per staff form** (E00-T04c delta review, `message`): a button that a field
+  renders is `type="button"` (Radix's parts are), so Enter and a click before the page's script
+  runs reach only Send, which waits for it (`CLAUDE.md`, the staff form's review checks).
+- **`/dev/components`**: each field alone (plain, disabled, with an error), and each in the demo
+  form as a `StaffField`; the demo action's schema can refuse the textarea and the select, so their
+  errors show at them.
+- **Docs.** `CLAUDE.md`'s staff form paragraph: the form keeps nothing in the browser (D-093).
 
-**Out of scope.** What goes inside a drawer (E01-T05, E01-T06, E06-T08). A date picker or the
-calendar grid (our own, D-009; E01-T04).
+**Out of scope.** Tabs, the drawer and the dialog (E00-T04e). A radio group (the demo form's radios
+stay as they are). A date or time picker (E01-T04, E01-T05). Error texts for a number (E01-T09).
+Real screens.
+
+**Acceptance.**
+- [ ] Each field on `/dev/components` uses the tokens, a checked checkbox and a switch that is on in
+      `accent`, keyboard focus in `--color-focus`: screenshots are files in
+      `docs/progress/handoffs/E00-T04d/`.
+- [ ] In the demo form, each new field's label names it, its error shows at it, and the request
+      sends what it shows: a switch left off sends no value (tester, the browser's network log).
+- [ ] In Firefox, with values chosen in the demo form, F5 and Back show each field empty or at its
+      default, and Send then sends what is shown; after a clinic switch in another tab, F5 shows the
+      other clinic's page with none of what was chosen (tester, in Firefox; a unit test that a staff
+      form's server HTML has `autocomplete="off"` on its form).
+- [ ] The server's HTML of the demo form holds one submit button, Send (unit test).
+- [ ] With the keyboard alone, the textarea, the select, the checkbox and the switch work (tester,
+      in a browser).
+- [ ] Lint refuses `formAction="/patients"` on the checkbox and the switch (a scratch file, removed
+      after). Lint, the token search and the check for requests to other hosts pass, as in E00-T04a.
+- [ ] `pnpm check` and `pnpm build` pass.
+
+---
+
+### E00-T04e · Tabs, the drawer and the dialog
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04d
+- **Read:** `design-ref` (Design tokens: shape and layout; the drawer's frame, demo lines
+  1192–1196; the settings tab bar, lines 750–752) · D-009, D-084, D-085 ("Not checked"), D-086, D-093 · the
+  architect section of `handoffs/E00-T04e.md`
+
+**Why.** E01's screens open in these: the booking and appointment drawers, the settings tabs, a
+dialog that asks before something is cancelled. The last of E00-T04's parts (D-086, D-093).
+
+**Do.**
+- From shadcn/ui (D-009), restyled to the tokens, in `src/ui/`: Tabs; the drawer from the right
+  (420 px, and 500 px for the aftercare review), which is shadcn/ui's Sheet on Radix's Dialog, not
+  its Drawer (that needs `vaul`, which D-086 does not list); the Dialog. Each that renders a button,
+  itself or through a Radix part, types its props without `formAction` and `formMethod`
+  (`Omit<…>`, D-084).
+- The text they carry (a close button's label) comes from the message file.
+- Each one on `/dev/components`.
+
+**Out of scope.** What goes inside a drawer (E01-T05, E01-T06, E06-T08). The calendar grid (our
+own, D-009; E01-T04).
 
 **Acceptance.**
 - [ ] Each component on `/dev/components` uses the tokens, the drawer at 420 and 500 px from the
-      right with the entry animation: screenshots are files in `docs/progress/handoffs/E00-T04d/`.
+      right with the entry animation: screenshots are files in `docs/progress/handoffs/E00-T04e/`.
 - [ ] With the keyboard alone: tabs move with the arrow keys; the dialog and the drawer keep focus
-      inside, close with Escape and give focus back; the select, the checkbox and the toggle work
-      with the keyboard (tester, in a browser).
-- [ ] Every field has a label tied to its control; the dialog and the drawer each have a title that
-      a screen reader reads.
-- [ ] Lint refuses `formAction="/patients"` on each component that renders a button or an input (a
-      scratch file, removed after). Lint, the token search and the check for requests to other
-      hosts pass, as in E00-T04a.
+      inside, close with Escape and give focus back (tester, in a browser).
+- [ ] The dialog and the drawer each have a title that a screen reader reads.
+- [ ] Lint refuses `formAction="/patients"` on each component that renders a button (a scratch file,
+      removed after). Lint, the token search and the check for requests to other hosts pass, as in
+      E00-T04a.
 - [ ] `pnpm check` and `pnpm build` pass.
+
 ---
 
 ### E00-T05a · Seed data: two clinics and a login for every role
@@ -1095,15 +1154,15 @@ owner with a script, first on staging (E00-T07), later in production. The second
 
 ### E00-T06b · Playwright and the first end-to-end journey (J1)
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04a … E00-T04d, E00-T05a, E00-T06a,
+- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04a … E00-T04e, E00-T05a, E00-T06a,
   E00-T09
 - **Read:** `test-strategy` (The levels; End-to-end journeys) · D-012, D-014, D-075, D-076, D-086 ·
-  the handoff notes of E00-T04a … E00-T04d, E00-T05a and E00-T06a
+  the handoff notes of E00-T04a … E00-T04e, E00-T05a and E00-T06a
 
 **Why.** A few journeys through a real browser prove that the pieces are wired together: login,
 session, layout, logout. Split from E00-T06 (D-075): it needs the seeded users (E00-T05a), the Today
-page of the app shell (E00-T04b) and, for the accessibility check, the components page (E00-T04c,
-E00-T04d). It is refined against what they built, once they are done.
+page of the app shell (E00-T04b) and, for the accessibility check, the components page (E00-T04c …
+E00-T04e). It is refined against what they built, once they are done.
 
 **Do.**
 - Playwright (named in D-012; its exact version gets a decision entry at refinement), set up

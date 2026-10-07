@@ -7,9 +7,10 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
 Order: T01a → T01b → T02, T04, T08, T09 (parallel-safe) → T03, T05 → T06 → T07, T10 → T11. With
-E00 (D-087, D-090, D-091): E00-T05a → T01a → T01b → E00-T04c → E00-T04d → T02 → E00-T06b → E00-T05b
-→ E00-T07 → T04, T08, T09 and the rest, so a receptionist sees a patient list before Playwright and
-staging exist. T01 is split in two (D-091): the schema and the provider link (T01a), the seed (T01b).
+E00 (D-087, D-090, D-091, D-093): E00-T05a → T01a → T01b → E00-T04c → E00-T04d → E00-T04e → T02 →
+E00-T06b → E00-T05b → E00-T07 → T04, T08, T09 and the rest, so a receptionist sees a patient list
+before Playwright and staging exist. T01 is split in two (D-091): the schema and the provider link
+(T01a), the seed (T01b).
 
 ---
 
@@ -144,8 +145,9 @@ every later row (each schema task brings its own). Any screen.
 
 ### E01-T02 · Patients: list, search, create, edit
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04d
-- **Read:** `scope` (Patients list and profile) · `design-ref` (demo lines 316–347; logic 1849–1858) · `data-model` (`patients`) · D-015, D-033, D-040
+- **Role:** builder · **Risk:** critical (permissions: the test of every action and every role,
+  D-093) · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04e
+- **Read:** `scope` (Navigation and roles; Patients list and profile) · `design-ref` (demo lines 316–347; logic 1849–1858) · `data-model` (`patients`) · `test-strategy` (Permissions) · D-015, D-033, D-040, D-093
 
 **Why.** Staff must find a patient in seconds by name or phone.
 
@@ -173,6 +175,15 @@ every later row (each schema task brings its own). Any screen.
   every staff page so later screens reuse it. `src/i18n/request.ts` sets none today: next-intl then
   warns and uses the computer's zone, so the server and the browser can show one visit at different
   times (Discovered, E00-T04a).
+- **Every action, every role** (E00-T04c critical review, `data`): the one table-driven test
+  `test-strategy.md` asks for, every staff action as every role, allowed or refused, matching
+  `scope-v1.md`'s table; an action without an entry fails it. Today `permissions.test.ts` checks
+  role × permission and each action's own test only its own refusal, so an action that names the
+  wrong permission fails nothing. How the test finds every action is settled when this task is
+  refined.
+- **After a patient is created** the form is emptied or closed (a new `key` from `onDone`, or a
+  reset): `StaffForm` keeps every field after every answer, done included (D-092), so a second
+  Send would make a second patient (E00-T04c review, `slice`).
 
 **Out of scope.** Profile page (T03). Consent switches (E02). Care plan, treatment plan columns.
 
@@ -186,6 +197,10 @@ every later row (each schema task brings its own). Any screen.
 - [ ] A user of the second clinic cannot find or open the first clinic's patients.
 - [ ] A visit's date and time show in the clinic's time zone whatever the computer's zone (test).
 - [ ] The logger drops a field named `phone_e164` or `phoneE164` (`logger.test.ts`).
+- [ ] One test runs every staff action as every role and matches `scope-v1.md`'s table; an action
+      added without an entry fails it.
+- [ ] After a patient is created, the form holds nothing of it, and a second Send creates no second
+      patient (tester, in a browser).
 
 ---
 
@@ -214,7 +229,7 @@ every later row (each schema task brings its own). Any screen.
 
 ### E01-T04 · Calendar: day view
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04d
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04e
 - **Read:** `scope` (Calendar) · `design-ref` (demo lines 215–283; logic 1812–1834; status colours 1377–1385; provider colours) · D-018, D-019, D-041
 
 **Why.** The calendar is where the front desk lives.
@@ -265,6 +280,8 @@ every later row (each schema task brings its own). Any screen.
   ordinary booking of the same time, not a second `overlap_ok` one, so a double click on "Book
   anyway" would keep two rows and E02 would remind the patient of each. The create action's
   duplicate check (E00-T03's double-submit line, on the Discovered list) covers it.
+- After a booking the drawer closes or its form is emptied: `StaffForm` keeps every field after
+  done (D-092), so a second Send would book again (E00-T04c review, `slice`).
 - A race (someone else took the slot meanwhile) shows a friendly message, not an error page.
 - Fully usable by keyboard; focus starts in the patient field.
 
@@ -329,7 +346,7 @@ Day / Week toggle.
 
 ### E01-T08 · Settings: clinic details, opening hours, closed days
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04d
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04e
 - **Read:** `scope` (Settings) · `design-ref` (demo lines 746–778; logic 1912–1919) · `data-model` (`clinics`, `clinic_hours`, `closed_days`)
 
 **Do.**
@@ -359,6 +376,10 @@ Day / Week toggle.
   deactivate (never delete: past appointments keep their provider), order.
 - Treatment types: add, edit (name, default length, optional price, "needs aftercare"),
   deactivate.
+- **A number's own error text** (E00-T04c, `speed`): the first number fields. `form.fieldErrors`
+  has one text per kind of problem, so a length below its limit reads "This is too short.". Texts
+  for a number too small or too big (or a text per field in `StaffField`), which E01-T05's length
+  uses too.
 
 **Acceptance.**
 - [ ] A new provider appears as a calendar column; a deactivated one disappears from new
@@ -366,6 +387,8 @@ Day / Week toggle.
 - [ ] A deactivated treatment type is not offered for new bookings.
 - [ ] Breaks appear hatched on the calendar.
 - [ ] All changes audited; restricted to `settings.manage`.
+- [ ] A length or a price out of range shows a number's own error text, not a text field's (unit
+      test).
 
 ---
 
