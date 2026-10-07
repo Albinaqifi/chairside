@@ -84,6 +84,12 @@ describe('Tabs', () => {
     expect(toldSubmit.map((tab) => tab.get('type'))).toEqual(['button', 'button', 'button']);
   });
 
+  it('never empties its form either: a tab told reset is still type="button" (E00-T04e tester)', () => {
+    // "whatever type a caller passes": a reset button in a staff form would empty every field.
+    const toldReset = tags(render({ type: 'reset' }), 'button');
+    expect(toldReset.map((tab) => tab.get('type'))).toEqual(['button', 'button', 'button']);
+  });
+
   it("is the demo's bar: a 1 px border line under it; the chosen tab in the text colour at 600 over a 2 px primary line, the others muted at 500", () => {
     const html = render();
     expect(classesOf(slot(html, 'div', 'tabs')[0])).toEqual(

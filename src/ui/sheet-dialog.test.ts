@@ -89,6 +89,17 @@ describe.each(KINDS)('$name', (kind) => {
     expect(tags(told, 'button').map((button) => button.get('type'))).toEqual(['button', 'button']);
   });
 
+  it('a trigger and a close button outside the content stay type="button" when a caller says reset (E00-T04e tester)', () => {
+    // "whatever type a caller passes": a reset button in a staff form would empty every field.
+    const toldReset = { type: 'reset' } as never;
+    const html = inForm(
+      kind,
+      createElement(Trigger, toldReset, 'open'),
+      createElement(Close, toldReset, 'close'),
+    );
+    expect(tags(html, 'button').map((button) => button.get('type'))).toEqual(['button', 'button']);
+  });
+
   it('with asChild, they lend type="button" to the Button they hold, which has no type of its own', () => {
     const alone = renderToString(createElement(Button, null, 'alone'));
     expect(tags(alone, 'button')[0]?.has('type')).toBe(false);
@@ -161,6 +172,16 @@ describe('the props of the drawer and the dialog (D-084)', () => {
       nullTitledDialog,
       titled,
     ]).toHaveLength(5);
+  });
+
+  it('nor one whose title may be false, as `shown && title` is (E00-T04e tester)', () => {
+    const shown = false as boolean;
+    const maybeFalse = shown && 'A title';
+    // @ts-expect-error a title that may be false renders nothing: the drawer would have no name
+    const falseTitledDrawer: SheetContentProps = { title: maybeFalse };
+    // @ts-expect-error nor would the dialog
+    const falseTitledDialog: DialogContentProps = { title: maybeFalse };
+    expect([falseTitledDrawer, falseTitledDialog]).toHaveLength(2);
   });
 
   it('the drawer is 420 or 500 px wide, nothing else', () => {
