@@ -56,11 +56,28 @@ function member(role: Role): Staff {
   };
 }
 
-/** The demo form's data, asking for `answer`, with valid fields unless told otherwise. */
-function sent(answer: string, fields: { note?: string; code?: string } = {}): FormData {
+/**
+ * The demo form's data, asking for `answer`, with valid fields unless told otherwise. The checkbox
+ * and the switch are off unless told otherwise: off, the browser sends nothing for them.
+ */
+function sent(
+  answer: string,
+  fields: {
+    note?: string;
+    code?: string;
+    details?: string;
+    choice?: string;
+    checkbox?: string;
+    switch?: string;
+  } = {},
+): FormData {
   const data = new FormData();
   data.append('note', fields.note ?? 'a note');
   data.append('code', fields.code ?? '1234');
+  data.append('details', fields.details ?? 'some details');
+  data.append('choice', fields.choice ?? 'second');
+  if (fields.checkbox !== undefined) data.append('checkbox', fields.checkbox);
+  if (fields.switch !== undefined) data.append('switch', fields.switch);
   data.append('answer', answer);
   return data;
 }
@@ -151,6 +168,58 @@ describe('outside production, each answer as asked', () => {
       },
     });
     expect(db.opened).toBe(0);
+  });
+
+  it.each([
+    { what: 'empty details', fields: { details: '  ' }, path: 'details', code: 'too_small' },
+    {
+      what: 'details of 201 characters',
+      fields: { details: 'x'.repeat(201) },
+      path: 'details',
+      code: 'too_big',
+    },
+    { what: 'the empty choice', fields: { choice: '' }, path: 'choice', code: 'invalid_value' },
+    {
+      what: 'a choice the select does not offer',
+      fields: { choice: 'fourth' },
+      path: 'choice',
+      code: 'invalid_value',
+    },
+    {
+      what: 'a checkbox sent as anything but on',
+      fields: { checkbox: 'yes' },
+      path: 'checkbox',
+      code: 'invalid_value',
+    },
+    {
+      what: 'a switch sent as anything but on',
+      fields: { switch: 'off' },
+      path: 'switch',
+      code: 'invalid_value',
+    },
+  ])(
+    'E00-T04d, $what: invalid_input at that field, before any transaction',
+    async ({ fields, path, code }) => {
+      expect(await demoAnswer(CLINIC, sent('done', fields))).toEqual({
+        ok: false,
+        error: { code: 'invalid_input', issues: [{ path: [path], code }] },
+      });
+      expect(db.opened).toBe(0);
+    },
+  );
+
+  it('E00-T04d: the checkbox and the switch, on or off, are both fine', async () => {
+    for (const fields of [
+      {},
+      { checkbox: 'on' },
+      { switch: 'on' },
+      { checkbox: 'on', switch: 'on' },
+    ]) {
+      expect(await demoAnswer(CLINIC, sent('done', fields))).toEqual({
+        ok: true,
+        value: { answer: 'done' },
+      });
+    }
   });
 
   it('the owner-only action: forbidden to the front desk, before any transaction', async () => {

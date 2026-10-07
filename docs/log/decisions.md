@@ -1723,3 +1723,19 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a field needs the browser's suggestions (its own `autocomplete`, never the form's);
   a browser restores fields despite the attribute (then reset the form on a reload); a select must
   show more than text (Radix's, with the hidden copy checked).
+
+### D-094 · E00-T04d's package: lucide-react, for the first icons
+- **Origin:** process, E00-T04d (builder). The package is D-009's, one of those D-086 lists for
+  shadcn/ui's components; D-088 left it waiting for the first icon. This entry records its version,
+  as D-086 asks.
+- **What:** `lucide-react` exactly 1.47.0 (17 September 2026), in `dependencies`. The first icons
+  are shadcn/ui's own: the checkbox's check mark (`CheckIcon`) and the native select's chevron
+  (`ChevronDownIcon`). It has no dependencies of its own and no install script (React is a peer);
+  only the icons a file imports reach the browser. An icon without a label of its own is drawn
+  with `aria-hidden="true"`.
+- **Why:** shadcn/ui's checkbox and native select import these icons from it, so the components stay
+  as published. Exactly 1.47.0 rather than a range: lucide-react publishes a new version every few
+  days, and a release that has been out a few weeks is the one trusted (D-088's reasoning for
+  `radix-ui`); the newest, 1.52.0, was three days old.
+- **Revisit if:** an icon is needed that lucide-react does not draw; a version after 1.47.0 has been
+  out a few weeks and a component needs it (move to it).

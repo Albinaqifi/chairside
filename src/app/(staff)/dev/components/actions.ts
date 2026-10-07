@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { refuse, staffAction } from '@/app/_lib/actions';
 import type { Staff } from '@/app/_lib/auth';
+import { DEMO_CHOICES } from './demo-choices';
 
 /*
  * The demo form's actions on /dev/components (E00-T04c): each gives the answer the form asks for,
@@ -17,6 +18,13 @@ const demoInput = z.object({
   note: z.string().trim().min(2).max(40),
   /** Four digits: anything else shows a field error. */
   code: z.string().regex(/^\d{4}$/),
+  /** The textarea (E00-T04d): 1 to 200 characters, so empty or long details show a field error. */
+  details: z.string().trim().min(1).max(200),
+  /** The select: one of its three choices; its empty choice shows a field error. */
+  choice: z.enum(DEMO_CHOICES),
+  /** The checkbox and the switch: "on" when they show on; off, the browser sends nothing. */
+  checkbox: z.literal('on').optional(),
+  switch: z.literal('on').optional(),
   /** The answer the form asks for; forbidden is the owner-only action's (below). */
   answer: z.enum(['done', 'refusal', 'internal', 'forbidden']),
 });

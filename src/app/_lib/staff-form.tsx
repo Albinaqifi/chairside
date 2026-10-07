@@ -14,7 +14,7 @@ import {
 } from 'react';
 import { Button } from '@/ui/button';
 import { cn } from '@/ui/cn';
-import { Field, type FieldControlProps } from '@/ui/field';
+import { Field, type FieldControlProps, type FieldOrientation } from '@/ui/field';
 import { useToast } from '@/ui/toast';
 import type { StaffAction } from './actions';
 import { IDLE, sendForm, type FormAnswer } from './form-answer';
@@ -79,6 +79,12 @@ export interface StaffFormProps<In, Out, R extends string> {
  *   every field after the action, an answer with field errors included (React 19 resets a form
  *   after its action). The `action` is still the dispatch, so the form is never sent to a URL.
  * - **noValidate:** a field's error shows one way, the server's, never the browser's own bubble.
+ * - **Nothing kept in the browser** (owner, D-093): `autocomplete="off"` on the form, so no browser
+ *   gives its fields back after a reload or Back, or offers past entries in them. After a clinic
+ *   switch in another tab, a reload renders the page for the other clinic, and Firefox would put
+ *   back what was typed for the first. Radix's checkbox and switch send a hidden input that they set
+ *   only when they change: given back, it would send what the control does not show. A field that
+ *   needs the browser's suggestions sets its own `autocomplete`, never the form's (D-093).
  */
 export function StaffForm<In, Out, R extends string = never>({
   action,
@@ -150,6 +156,7 @@ export function StaffForm<In, Out, R extends string = never>({
         action={dispatch}
         onSubmit={submit}
         noValidate
+        autoComplete="off"
         className={cn('grid gap-4', className)}
       >
         {children}
@@ -173,17 +180,20 @@ export function StaffForm<In, Out, R extends string = never>({
 /**
  * One field of a StaffForm: its label, its control and its problem from the last answer, tied
  * together for screen readers (src/ui/field.tsx). The control is given its id, its name and the
- * problem's attributes: `render={(field) => <Input {...field} />}`.
+ * problem's attributes: `render={(field) => <Input {...field} />}`. A checkbox or a switch takes
+ * `orientation="horizontal"`, its label beside it.
  */
 export function StaffField({
   name,
   label,
+  orientation,
   className,
   render,
 }: {
   /** The field's name in the form's data, as the action's input schema names it. */
   name: string;
   label: ReactNode;
+  orientation?: FieldOrientation;
   className?: string;
   render: (control: FieldControlProps) => ReactNode;
 }) {
@@ -195,6 +205,7 @@ export function StaffField({
       name={name}
       label={label}
       error={problem && t(problem)}
+      orientation={orientation}
       className={className}
       render={render}
     />

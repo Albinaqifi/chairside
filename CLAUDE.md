@@ -160,8 +160,12 @@ task, unless product code on `main` would hit it today.
   It sends the clinic its frame names (the staff layout's `FrameClinic`), never one a page passes,
   and shows the answer one way: `invalid_input` at the fields, `forbidden`, `clinic_changed` with a
   reload, the general failure (a call that rejects too), a toast when done; its button is disabled
-  while it runs. Every staff page renders `<PageClinic clinicId={staff.clinic.clinicId} />`. Review
-  checks, which no lint rule or test sees: any other button inside a staff form is `type="button"`
+  while it runs. Its form is `autocomplete="off"`: it keeps nothing in the browser, so no reload or
+  Back brings a field back, under another clinic either (D-093); a field that needs the browser's
+  suggestions sets its own. The select is the browser's own (`NativeSelect`); a checkbox's or a
+  switch's `StaffField` is `orientation="horizontal"`, its label beside it. Every staff page renders
+  `<PageClinic clinicId={staff.clinic.clinicId} />`. Review checks, which no lint rule or test
+  sees: any other button inside a staff form is `type="button"`
   (else it sends the form before the script runs, past the guard); only the staff layout renders
   `FrameClinic` and only `StaffForm` calls `sendForm`; an action called outside a form (a status
   button) takes its clinic from `useFrameClinic()`, never from the page (D-092). The

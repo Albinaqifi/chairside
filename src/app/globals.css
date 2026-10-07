@@ -5,7 +5,8 @@
  * component takes its colours, fonts and radii only from here (CLAUDE.md): Tailwind's own colours,
  * font families, text sizes and radii are switched off, so a class outside these tokens gives no
  * style at all. Tokens the design reference lacks are marked "added"; the handoff note of the task
- * that added them names them (handoffs/E00-T04a.md, handoffs/E00-T04b.md, handoffs/E00-T04c.md).
+ * that added them names them (handoffs/E00-T04a.md, handoffs/E00-T04b.md, handoffs/E00-T04c.md,
+ * handoffs/E00-T04d.md).
  *
  * A text size, radius, shadow, tracking or animation token added here is also named in src/ui/cn.ts:
  * tailwind-merge knows only Tailwind's own scales, so without it cn() reads `text-<new size>` as a
@@ -53,6 +54,12 @@
   --color-toast: oklch(0.26 0.03 200);
   --color-on-toast: oklch(0.97 0.01 195);
 
+  /* Added in E00-T04d: the demo's switch when off (lines 429, 462, 558; logic 1876, 1999),
+     border-strong a step darker; and its checkbox's border when not ticked (lines 1305, 1352; logic
+     2072, 2126), the muted text's hue made light. On, both are accent. */
+  --color-switch-off: oklch(0.86 0.006 95);
+  --color-checkbox-border: oklch(0.8 0.01 210);
+
   /* Status colours, text / background / dot: the demo's ST and RED (lines 1376–1385), under the
      status names of data-model.md. The demo's "unconfirmed" (No reply yet: booked, and a reminder
      was sent) is no-reply here, its "done" is completed, its "noshow" is no-show. */
@@ -98,11 +105,13 @@
   --tracking-overline: 0.08em;
 
   /* Radii: cards 14–18 px (16, the demo's most frequent), buttons and inputs 8–10 px, pills. Added
-     in E00-T04c: the toast's 12 px (demo line 1365), between the control's and the card's. */
+     in E00-T04c: the toast's 12 px (demo line 1365), between the control's and the card's. Added in
+     E00-T04d: the checkbox's 5 px (demo lines 1305, 1352), half the control's. */
   --radius-card: 16px;
   --radius-control: 10px;
   --radius-pill: 99px;
   --radius-toast: 12px;
+  --radius-checkbox: 5px;
 
   /* Added in E00-T04c: the toast's shadow (demo line 1365), in the text colour's hue. The only
      shadow: the design has almost none ("Shape"). */

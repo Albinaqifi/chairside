@@ -260,6 +260,41 @@ describe('what a staff form shows for each answer (E00-T04c, acceptance 5)', () 
     expect(attributes?.has('method')).toBe(false);
     expect(attributes?.has('novalidate')).toBe(true);
   });
+
+  it('in the server\'s HTML its form has autocomplete="off": it keeps nothing in the browser (D-093)', () => {
+    // E00-T04d, owner (D-093): Firefox gives a form's fields back after F5 or Back, before the
+    // script runs, so after a clinic switch in another tab what was typed for one clinic came back
+    // on the other's page; Radix's checkbox and switch send a hidden input that a restore would set
+    // unlike the control the person sees. The form's attribute is each field's, unless the field
+    // names its own.
+    const [attributes] = tags(render(), 'form');
+    expect(attributes?.get('autocomplete')).toBe('off');
+  });
+});
+
+describe('a staff field (E00-T04d)', () => {
+  it('horizontal, for a checkbox or a switch: its label beside the control, after it, naming it', () => {
+    const props: StaffFormProps<unknown, Out, never> = {
+      action: vi.fn<StaffAction<unknown, Out>>(),
+      doneMessage: 'demo.done',
+      submitLabel: 'demo.send',
+      pendingLabel: 'demo.sending',
+      children: createElement(StaffField, {
+        name: 'agreed',
+        label: 'label.agreed',
+        orientation: 'horizontal',
+        render: (control) => createElement(Input, { ...control, type: 'checkbox' }),
+      }),
+    };
+    const frame: ComponentProps<typeof FrameClinic> = {
+      clinicId: CLINIC_A,
+      children: createElement(StaffForm<unknown, Out, never>, props),
+    };
+    const html = renderToString(createElement(FrameClinic, frame));
+    const agreed = input(html, 'agreed');
+    expect(tags(html, 'label').find((l) => l.get('for') === agreed.get('id'))).toBeDefined();
+    expect(html.indexOf('name="agreed"')).toBeLessThan(html.indexOf('label.agreed'));
+  });
 });
 
 describe('a staff form sends the clinic id of the frame it is in (E00-T04c, acceptance 2)', () => {
