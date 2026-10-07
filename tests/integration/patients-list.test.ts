@@ -4,6 +4,7 @@ import { FIRST_NAMES, fakePhone, LAST_NAMES } from '@/db/seed/fake-data';
 import { withTenant } from '@/db/tenant';
 import { newId } from '@/lib/ids';
 import { LIST_LIMIT, listPatients, type PatientList } from '@/modules/patients';
+import { lastAndNextVisits } from '@/modules/scheduling';
 import { clinicPlace } from '@/modules/tenancy';
 import { insertClinic, migratorPool } from './fixtures';
 import { insertProvider, insertRow, insertUser } from './scheduling-fixtures';
@@ -229,6 +230,23 @@ describe("a user of the second clinic finds none of the first clinic's patients 
   it("and the first clinic's search finds none of the second's", async () => {
     expect(await idsFound(clinicA, '070 001 235')).toEqual([]);
     expect(await idsFound(clinicA, 'Kodra')).not.toContain(bPatient);
+  });
+
+  it("nor the first clinic's visits through scheduling, given that clinic's patient by id", async () => {
+    // test-strategy.md, "Tenant isolation": through the module's public function, which takes its
+    // ids from its caller (a later screen may take one from the browser). In clinic A the same
+    // call finds her visits, so the empty answer in clinic B is the isolation, not a wrong id.
+    const visitsOf = (clinicId: string) =>
+      withTenant(clinicId, (tx) => lastAndNextVisits(tx, [a.anaKodra], NOW));
+    expect(await visitsOf(clinicA)).toEqual(
+      new Map([
+        [
+          a.anaKodra,
+          { last: new Date('2026-09-15T08:00:00Z'), next: new Date('2026-10-10T08:00:00Z') },
+        ],
+      ]),
+    );
+    expect(await visitsOf(clinicB)).toEqual(new Map());
   });
 });
 
