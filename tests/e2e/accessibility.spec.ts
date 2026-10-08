@@ -38,8 +38,14 @@ test('on the demo form, Tab reaches every field and then the button, in order', 
   const form = demoForm(page);
   await expect(form.send).toBeEnabled();
 
-  // From the first field on; the radio group is one stop, its chosen answer.
+  // Tab reaches the first field from the stop before the form (tester: focused by script alone, a
+  // first field out of the Tab order passed); then every field, the radio group one stop, its
+  // chosen answer.
   await form.note.focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(form.note).not.toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(form.note).toBeFocused();
   for (const next of [
     form.code,
     form.details,
