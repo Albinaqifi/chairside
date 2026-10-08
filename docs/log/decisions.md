@@ -1829,3 +1829,45 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a clinic or the law asks who searched for whom (then a row per search, without its
   words); a form needs a refusal marked at its field (then `StaffForm`'s `refusals` names the field,
   typed by the action's codes and input keys, in a critical task).
+
+### D-099 · The tests run once, in UTC: the Auckland steps leave CI and the agents' machines (owner, PR #42)
+- **Origin:** **Owner, 2026-10-08:** PR #42 took the Auckland steps out of CI; asked in E01-T02b's
+  Done pass, the owner chose "gone everywhere". Replaces D-075's "then the unit and integration
+  tests again with `TZ=Pacific/Auckland`" and the Auckland step name D-078 gives as an example.
+- **What:**
+  - CI runs each check once, in UTC; builders and testers no longer run the Auckland steps
+    (`CLAUDE.md`, "CI"; `builder.md`; `test-strategy.md`, "Hidden local time").
+  - Code that handles moments or days is guarded by its own tests, which name the zones they run in
+    and never rely on the computer's, as `patient-list.test.ts` and `new-patient-form.test.ts` do.
+    E02-T02's send-time tables also run with the process's zone set to `Pacific/Auckland` in the test.
+  - The seed's day (`seed-day.test.ts`, `02-scheduling.test.ts`) had only the second run: it is now
+    tested in the computer's zone alone. Accepted, `none`: the seed runs on this machine only.
+    E00-T06b corrects the five comments that still say CI repeats the tests in Auckland.
+- **Why:** the two steps took about 3 of a run's 7½ minutes (run 37806088255 with them; 37807574106
+  without, 4 min 21 s), and every pipeline round waits for a run.
+- **Revisit if:** a bug from the computer's time zone reaches `main` (then the Monday run repeats
+  the tests in Auckland, the owner's second option).
+
+### D-100 · E00-T06b refined: Playwright and axe-core, Chromium on every run and three browsers on Mondays and before each hand-off, the components page on `next dev`, the clock its own task
+- **Origin:** E00-T06b's Ready pass, in E01-T02b's Done pass, 2026-10-08. **Owner, 2026-10-08:**
+  the accessibility check uses axe-core (a library, agent rule 4); CI runs the journeys in Chromium
+  on every pull request and push, and in Chromium, Firefox and WebKit on the Monday run; agents run
+  all three. The rest is the architect's. Replaces D-075's "the test clock control stays in E00-T06b".
+- **What:**
+  - Development packages, exact: `@playwright/test` 1.63.0 (D-012); `@axe-core/playwright` 4.13.0
+    with `axe-core` 4.13.0 (MPL-2.0). Releases out a few weeks (D-094): 1.64.0 was a day old.
+  - J1 tests the production build (`next start`, a port of its own) against `<database>_e2e`,
+    rebuilt and seeded each run, in steps of CI's one job after the build. `/dev/components` stays
+    out of production builds: its checks reach it on `next dev`, a second server on that database
+    (Next 16 writes `next dev`'s output to `.next/dev`, beside the build). No product code changes.
+  - The builder runs the journeys in all three browsers before every hand-off, as it runs
+    `pnpm build`: D-095's "turns CI red" holds on the Monday run, and the builder's run sees it first.
+  - The test clock control becomes E00-T06c, before the first journey that sets "now"; J1 does not.
+- **Why:** axe-core is the engine most accessibility tools run, with no service. Chromium alone adds
+  an estimated 1½ minutes to the 4½ PR #42 left; it restores no fields on reload, so the two
+  browsers that do run where no pull request waits. A switch opening the page in a production
+  build would make the task critical (production configuration), and better-auth's origin check
+  would not stop a script; D-093's check looks at the form's attributes, the same in both builds.
+- **Revisit if:** a Monday run fails in Firefox or WebKit alone (then they run on every pull
+  request); a run takes over 10 minutes; the builder's three-browser run takes more than a few
+  minutes; a journey needs a set "now" before E00-T06c is built.

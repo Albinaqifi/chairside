@@ -59,23 +59,22 @@ Every script must work on Windows (the owner's OS): no bash-only syntax in `pack
 
 ### CI
 
-`.github/workflows/ci.yml` (D-075) runs the `pnpm check` steps, `pnpm build`, the tests again with
-`TZ=Pacific/Auckland`, and `pnpm audit`: on every pull request to `main`, every push to `main` and
-every Monday. A pull request that changes only files under `docs/`, Markdown files under
-`.claude/`, `CLAUDE.md` or `README.md` gets no run; the architect merges its own such planning pull
-request (D-087). The owner merges every other pull request, only on green (R-34). Each level on
-your machine, with the database up:
+`.github/workflows/ci.yml` (D-075) runs the `pnpm check` steps, `pnpm build` and `pnpm audit`, each
+once, in UTC (D-099): on every pull request to `main`, every push to `main` and every Monday. A pull
+request that changes only files under `docs/`, Markdown files under `.claude/`, `CLAUDE.md` or
+`README.md` gets no run; the architect merges its own such planning pull request (D-087). The owner
+merges every other pull request, only on green (R-34). Each level on your machine, with the
+database up:
 
 | Level | Command |
 |---|---|
 | The `pnpm check` steps | `pnpm check`, or one of its commands |
 | The build | `pnpm build` |
-| The Auckland steps, PowerShell | `$env:TZ = 'Pacific/Auckland'; pnpm test; pnpm test:integration; Remove-Item Env:TZ` |
-| The Auckland steps, macOS or Linux | `TZ=Pacific/Auckland pnpm test && TZ=Pacific/Auckland pnpm test:integration` |
 | The dependency check | `pnpm audit --prod` (must pass) · `pnpm audit` (everything; read it). Never `--fix`, `--ignore` or `--ignore-unfixable`: they write `pnpm-workspace.yaml` |
 
-Not Git Bash for the Auckland steps (the agents' Bash tool): it drops `TZ=Pacific/Auckland` before
-Node starts, silently (`TZ=UTC` gets through). Check the zone Node has with
+To run something in another zone (a server in `Pacific/Auckland`), not Git Bash (the agents' Bash
+tool): it drops `TZ=Pacific/Auckland` before Node starts, silently (`TZ=UTC` gets through);
+PowerShell's `$env:TZ` works. Check the zone Node has with
 `node -e "console.log(Intl.DateTimeFormat().resolvedOptions().timeZone)"`.
 
 ### Folder structure
@@ -205,7 +204,8 @@ task, unless product code on `main` would hit it today.
   `toLocaleString()` or an `Intl.DateTimeFormat` without a zone. A calendar date (`date`: a date of
   birth, a closed day) is no moment: it stays a `YYYY-MM-DD` string until shown, then is formatted
   from `new Date('YYYY-MM-DD')` with `timeZone: 'UTC'`, and tested in a zone behind UTC, where the
-  day before would show (D-098).
+  day before would show (D-098). A test of such code names the zones it runs in and never relies on
+  the computer's: CI runs once, in UTC (D-099).
 - Styles: a component takes colours, fonts and radii only from the theme in `src/app/globals.css`
   (`bg-primary`, `font-serif`, `rounded-card`); Tailwind's own palette, font families, text sizes
   and radii are switched off. A token the design reference lacks is added there, derived from one it

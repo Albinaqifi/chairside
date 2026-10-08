@@ -90,8 +90,8 @@ A fresh builder session fixes the failing steps, nothing else.
 - Set the task to "In progress" on the board. Read the failing steps' logs:
   `gh run view <run-id> --log-failed` (the run id is the last number in the link).
 - Fix each failing step under the rules of "Fixing findings": first reproduce the failure on your
-  machine with the step's own command (`CLAUDE.md`, "CI", gives each level, the Auckland steps on
-  Windows included), never change what a test expects, and stop with Blocked where agent rules 4
+  machine with the step's own command (`CLAUDE.md`, "CI", gives each level), never change what a
+  test expects, and stop with Blocked where agent rules 4
   and 8 say so. A failure you cannot reproduce or explain from its log (a flaky test, an outage in
   the middle of a step): do not re-run CI and do not touch the test; write what you saw, set the
   task to Blocked, and stop.

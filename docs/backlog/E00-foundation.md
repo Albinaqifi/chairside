@@ -10,7 +10,8 @@ Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → T04a →
 → T04c → T04d → T04e → E01-T02a → E01-T02b → T06b → T05b → T07, then the rest of E01 (D-087,
 D-090, D-091, D-093, D-096). T08 is the second half of T03 (split in D-071), so it sits right after
 T03 in this file. T06 is split in two (D-075): CI (T06a) comes first, Playwright and journey J1
-(T06b) after T04 and T05a. T09 and T10 come from E00-T08's review and test (D-076, D-077), T11 from
+(T06b) after T04 and T05a; the journeys' clock (T06c, D-100) comes before the first journey that
+sets "now", E01-T11's or E02-T14's. T09 and T10 come from E00-T08's review and test (D-076, D-077), T11 from
 E00-T10's (D-084). T04 is split in four (D-086), its last part again in two (D-093): tokens, fonts,
 texts and the login page (T04a), the staff shell (T04b), the form pattern (T04c), the form fields
 (T04d), tabs, the drawer and the dialog (T04e). T05 is split in two (D-090): the seed (T05a), and
@@ -1180,6 +1181,9 @@ owner with a script, first on staging (E00-T07), later in production. The second
   clinic picker included, so they can neither switch clinic nor log out (E01-T02a test, `slice`).
 - Running it twice with the same owner email creates no duplicate and does not crash.
 - It refuses a database that is not on this machine without an explicit flag.
+- **The logger's net, plurals** (E01-T02b, `data`): `src/lib/personal-fields.ts` also drops a field
+  whose name ends in a plural of an ending it lists, an `s` or `es` added (`names`, `phones`,
+  `addresses`, `treatmentTypes`), with `logger.test.ts` cases and its other cases unchanged.
 - `docs/runbook.md` (E00-T07 starts it): how to create a clinic.
 
 **Out of scope.** Inviting other staff (E04-T02). An admin screen (D-042). The seed (E00-T05a).
@@ -1191,65 +1195,117 @@ owner with a script, first on staging (E00-T07), later in production. The second
 - [ ] It refuses a time zone Intl does not know (`Europe/Skopie`) and an unsupported country (`UK`),
       writing nothing (test).
 - [ ] Its audit row names the clinic and the action; no email or name reaches the logs.
+- [ ] The logger drops a plural of each ending it lists (`names`, `phones`, `addresses`,
+      `treatmentTypes` among them), its other cases unchanged (`logger.test.ts`).
 - [ ] `pnpm check` and `pnpm build` pass.
 
 ---
 
 ### E00-T06b · Playwright and the first end-to-end journey (J1)
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E00-T04a … E00-T04e, E00-T05a, E00-T06a,
-  E00-T09
-- **Read:** `test-strategy` (The levels; End-to-end journeys) · D-012, D-014, D-075, D-076, D-086,
-  D-093, D-095 · the handoff notes of E00-T04a … E00-T04e, E00-T05a and E00-T06a
+- **Role:** builder · **Risk:** normal (no product code changes: `/dev/components` is checked on
+  `next dev`, D-100) · **Depends on:** E00-T04a … E00-T04e, E00-T05a, E00-T06a, E00-T09 (all Done)
+- **Read:** `test-strategy` (The levels; Message timing's "Hidden local time"; End-to-end journeys) ·
+  D-075 ("How CI runs"), D-076, D-078, D-093, D-095, D-099, D-100 · `CLAUDE.md` ("CI") · the
+  architect section of `handoffs/E00-T06b.md`
 
 **Why.** A few journeys through a real browser prove that the pieces are wired together: login,
-session, layout, logout. Split from E00-T06 (D-075): it needs the seeded users (E00-T05a), the Today
-page of the app shell (E00-T04b) and, for the accessibility check, the components page (E00-T04c …
-E00-T04e). It is refined against what they built, once they are done.
+session, layout, logout. Split from E00-T06 (D-075), refined against what E00-T04a … E00-T04e and
+E00-T05a built. The clock later journeys set is E00-T06c's (D-100).
 
 **Do.**
-- Playwright (named in D-012; its exact version gets a decision entry at refinement), set up
-  against a freshly seeded end-to-end database, never the development database, testing a
-  production build on its own port.
-- Journey **J1**: log in, see Today, log out; a wrong password is refused. With JavaScript off, the
-  login form sends nothing, and neither the address bar nor the browser history holds the password
-  (E00-T09).
-- A way for end-to-end tests to control "now" (test-only clock control), impossible to enable on
-  staging or production. `NODE_ENV` cannot be its guard: `next build` writes `production` into the
-  build the tests run against (D-075). Sized when this task is refined; if it does not fit, it gets
-  its own task before the first journey that needs it.
-- An automated accessibility check (labels, contrast, keyboard) in the same runs, on
-  `/dev/components` and on every page J1 visits (`test-strategy.md`; moved here from E00-T04,
-  D-086). Its tool is a library, chosen with the owner when this task is refined (agent rule 4).
-  `/dev/components` is hidden in a production build (E00-T04c): this task decides how the check
-  reaches it, with the clock control's guard in mind.
+- **Playwright and its two servers.** `@playwright/test` 1.63.0, exact, a development dependency
+  (D-100); the journeys in `tests/e2e/`, run by `pnpm test:e2e` (Windows too), in three projects:
+  Chromium, Firefox and WebKit. Both servers use `<database>_e2e`, the name in `DATABASE_URL` with
+  `_e2e` added as the integration tests add `_test`, rebuilt with `resetDatabase()` (as theirs is)
+  and filled with `seedDatabase()` (E00-T05a made it for this) in the run's global setup; never the
+  development database. The production build in `.next` (`pnpm build` first; in CI, its build step)
+  runs with `next start` on a port of its own, for J1. `next dev` runs on another port for
+  `/dev/components`, which a production build hides (E00-T04c): Next 16 writes its output to
+  `.next/dev`, beside the build, and it compiles a page on its first request, so the run waits for
+  `/dev/components` itself. No retries: a journey that fails once is a finding. Traces on failure
+  only. Playwright's output folders go in `.gitignore` (Prettier reads it) and in ESLint's
+  `globalIgnores`.
+- Journey **J1**, as the seeded front desk: log in, see Today, log out; a wrong password is refused.
+  With JavaScript off, the login form sends nothing, and neither the address bar nor the browser
+  history holds the password (E00-T09, D-076).
+- **The accessibility check**, with axe-core (the owner's choice): `@axe-core/playwright` 4.13.0
+  (D-100), in the same runs, on `/dev/components` and on every page J1 visits: WCAG 2.1 A and AA.
+  Next's dev tools element (`nextjs-portal`) is not ours and is left out. A violation fails the run
+  and names the rule and the element. One in what exists today is fixed here when it is a missing
+  name or label outside `StaffForm` and the login form, which this task does not change; any other
+  (a token's contrast, or one in those two) goes in the note with a Discovered line, and only that
+  element is left out of the check, never a rule. And a keyboard walk (D-086): J1 once with the
+  keyboard alone; on the demo form, Tab reaches every field and the button in order.
 - **D-093 in a real browser** (E00-T04d critical review, `data`, D-095), on the demo form of
-  `/dev/components`, reached as the accessibility check reaches it: in Firefox (it gives fields
-  back after F5) and each other browser the journeys run in, a value chosen in every field, each
-  step its own action (Radix's hidden input follows its control only after the click), then
-  `location.reload()` (Playwright's `page.reload()` skips Firefox's restore) and Back to a page
-  loaded as a new document. Every field shows its default and both hidden inputs are unchecked;
-  with the form's `autocomplete` stripped in the page, the control, they come back.
-- **One login per role and browser** (E00-T04e builder, Discovered, `slice`): the runs log in once
-  for each and reuse the session (Playwright's `storageState`), J1's own login and wrong password
-  aside. The sign-in limit is ten a minute per address (D-064 point 5): a script that logged in
-  about ten times within a minute stopped at the login page.
-- A CI job for the journeys, after the build. Traces only on failure, kept briefly, synthetic data
-  only.
-- `CLAUDE.md`: how to run the journeys locally.
+  `/dev/components`: in each browser of the run, a value chosen in every field, each step its own
+  action (Radix's hidden input follows its control only after the click), then `location.reload()`
+  (Playwright's `page.reload()` skips Firefox's restore, F5's) and Back to a page loaded as a new
+  document. Every field shows its default and both hidden inputs are unchecked; with the form's
+  `autocomplete` stripped in the page, the control, they come back.
+- **One login for the checks** (E00-T04e builder, `slice`): the accessibility and D-093 checks log in
+  once per run, as the seeded front desk, and every browser reuses that session on both servers
+  (Playwright's `storageState`, in an ignored folder: a cookie for `localhost` reaches every port,
+  and both servers share the database and `BETTER_AUTH_SECRET`); J1 logs in itself. A run signs in
+  at most seven times (J1's two in each of three browsers, the checks' one): the limit is ten a
+  minute per address (D-064 point 5).
+- **CI** (owner, D-100), in the one job: a step `Setup: Playwright browsers` before
+  `Setup: start the database` (Chromium on a pull request or a push; Chromium, Firefox and WebKit,
+  with their system packages, on the Monday run). `pnpm build` gets an `id`, and after it a step
+  `pnpm test:e2e` in the same browsers, gated as the checks are but on the build's success
+  (`!cancelled() && steps.<id>.outcome == 'success'`). When it fails, a step with
+  `continue-on-error` uploads its traces, kept three days, so an upload never turns a run red. Step
+  names as D-078 says; actions pinned to a full commit SHA; synthetic data only.
+- **Docs.** `CLAUDE.md`: `pnpm test:e2e` in Commands and in "CI" (its paragraph and its levels: CI
+  runs Chromium, the Monday run all three), how to run the journeys on Windows, `tests/e2e` in the
+  folder structure. The `pnpm check` row and `builder.md`'s three "`pnpm build`" lines: the builder
+  also runs `pnpm test:e2e`, all three browsers, before it hands off (D-100). The five comments that
+  still say CI runs the tests again in `Pacific/Auckland` (`seed-day.ts`, `seed-day.test.ts`,
+  `02-scheduling.test.ts`, `patient-list.test.ts`, `new-patient-form.test.ts`) say what holds now
+  (D-099), comments only.
 
-**Out of scope.** Other journeys. The fake channel (E02-T04). The worker's clock (E02-T07).
+**Out of scope.** Other journeys. A clock the journeys set (E00-T06c). The fake channel (E02-T04).
+The worker's clock (E02-T07). Journeys against staging. Whether a browser offers past entries in a
+field (its own suggestion list): Playwright cannot see it, so it stays a look by hand (D-093).
 
 **Acceptance.**
-- [ ] J1 passes in CI and locally on Windows.
-- [ ] J1 fails when login or logout is broken (tester).
+- [ ] J1 passes locally on Windows in Chromium, Firefox and WebKit, and in the pull request's CI run.
+- [ ] J1 fails when login or logout is broken, and when the login form sends anything with
+      JavaScript off (tester, a mutation each).
 - [ ] The accessibility check passes on `/dev/components` and on J1's pages, and fails on a field
-      without a label (tester).
-- [ ] The D-093 check passes in Firefox and each other browser the journeys run in, and fails with
-      the form's `autocomplete="off"` stripped in the page (tester).
-- [ ] The clock control cannot be enabled on staging or production (test).
-- [ ] A run leaves the development database untouched.
-- [ ] A full CI run still takes under 10 minutes.
+      without a label (tester); J1 also passes with the keyboard alone.
+- [ ] The D-093 check passes in each browser, and fails with the form's `autocomplete="off"`
+      stripped in the page (tester).
+- [ ] Under `src/`, the diff changes only the five comments; `/dev/components` still answers 404 on
+      the production build (its tests unchanged).
+- [ ] A run leaves the development database untouched and signs in at most seven times (tester).
+- [ ] The pull request's CI run runs J1 after the build and takes under 10 minutes; the steps' order,
+      conditions and names are as the CI item says, the Monday run naming all three browsers (read
+      in the workflow: that run comes after the merge).
+- [ ] `pnpm check` and `pnpm build` pass.
+
+---
+
+### E00-T06c · A clock the end-to-end journeys set
+
+- **Role:** builder · **Risk:** critical (the action wrappers pass "now" on, and its switch must do
+  nothing on staging or production) · **Depends on:** E00-T06b
+- **Read:** refined first, with the first journey that sets "now" (D-100)
+
+**Why.** A journey that books, reminds or expires something depends on the day and the hour it runs
+unless the test sets "now". Split from E00-T06b, whose J1 does not need it (D-100).
+
+**Do.** An outline, refined with E01-T11 if J2 sets "now", otherwise with E02-T14's J3.
+- A way for end-to-end tests to set the app's "now" (the `Clock` the edge passes on), impossible to
+  enable on staging or production. Its guard cannot be `NODE_ENV`: `next build` writes `production`
+  into the build the journeys test (D-075). No such switch exists yet: E00-T06b reaches
+  `/dev/components` through `next dev` (D-100).
+
+**Out of scope.** The worker's clock (E02-T07).
+
+**Acceptance.**
+- [ ] A journey sets "now", and the pages and actions it reaches use it.
+- [ ] The control cannot be enabled on staging or production (test).
 
 ---
 
@@ -1283,9 +1339,12 @@ still tiny, and gives every later milestone a place to be demonstrated.
   request headers and cookies, so no session cookie or client address reaches Sentry: Next.js hands
   a request's headers to its error hook. Inactive when no key is set. Next.js's "Failed to find
   Server Action" error is not sent: anyone can cause it, without a session, by posting a multipart
-  form that names no server action (board, Discovered, E00-T08 tester note 5; D-075).
+  form that names no server action (board, Discovered, E00-T08 tester note 5; D-075). Nor is
+  `The destination stream closed early`, which any browser causes by leaving a page before it has
+  loaded (E01-T02b test): sent, either would spend the Sentry quota on noise.
 - `docs/runbook.md` started: how to deploy, roll back, read logs, run a migration, create a clinic.
-  It says a "Failed to find Server Action" log line is noise unless it follows a deploy.
+  It says a "Failed to find Server Action" log line is noise unless it follows a deploy, and that
+  `The destination stream closed early` is always noise.
 
 **Owner action.** Create the hosting, Sentry and monitor accounts; enter secrets in the host's
 secret store (agents never see them); run `clinic:create` on staging.

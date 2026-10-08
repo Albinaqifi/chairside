@@ -73,7 +73,8 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
       the "Monday 08:00 with a quiet Sunday" case.
 - [ ] Property tests: never after the appointment start; never inside quiet hours; never on a closed day.
 - [ ] Late booking returns `covered_by_confirmation`, a late send time, or `too_late` exactly as specified.
-- [ ] The suite passes under `TZ=UTC` and `TZ=Pacific/Auckland`.
+- [ ] The tests pass whatever the computer's zone: their tables also run with the process's zone set
+      to `Pacific/Auckland` inside the test (CI runs once, in UTC, D-099).
 - [ ] The functions import nothing from the database, Next.js or the clock.
 
 ---
@@ -331,7 +332,7 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 
 ### E02-T14 · Journeys J3 and J4, and trying to break messaging
 
-- **Role:** tester · **Risk:** critical · **Depends on:** E02-T06 … E02-T13
+- **Role:** tester · **Risk:** critical · **Depends on:** E02-T06 … E02-T13, E00-T06c (the clock, D-100)
 - **Read:** `test-strategy` (all critical areas; End-to-end journeys) · `messaging` · all E02 handoff notes
 
 **Do.**

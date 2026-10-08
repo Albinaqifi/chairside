@@ -24,7 +24,7 @@ Q-19).
 | **Unit** | Vitest | Pure functions: send-time calculation, state machines, template rendering, channel fallback order, phone and date normalising, duplicate matching, recall due dates, permission table, prompt building | Every commit, seconds |
 | **Property** | fast-check | Rules that must hold for *any* input (see below) | Every commit |
 | **Integration** | Vitest + real Postgres (Docker) | Module functions with the database: tenant isolation, constraints, planner and dispatcher, webhooks, import commit and undo, the action wrapper | Every commit, about a minute |
-| **End to end** | Playwright | A few complete user journeys through the real UI with the fake channel and a controllable clock | Every pull request |
+| **End to end** | Playwright | A few complete user journeys through the real UI with the fake channel and a controllable clock | Every pull request and push in Chromium; Chromium, Firefox and WebKit on Mondays and before each builder hand-off (D-100) |
 | **AI evals** | Script + fixtures | Quality and safety of AI-drafted text | When a prompt or model changes, and before release |
 | **Production checks** | Canary job, heartbeat | "Did what should have happened, happen?" | Continuously |
 
@@ -52,8 +52,10 @@ Pure-function tables for `computeSendTime` and friends:
 - Booked after its reminder time: sent late, replaced by the confirmation, or skipped as too late.
 - Quiet hours: reminders move earlier, everything else later.
 - Recall month arithmetic: 31 August + 6 months; 29 February.
-- **Hidden local time:** the whole suite runs with `TZ=UTC` and again with
-  `TZ=Pacific/Auckland`. A difference means code used the server's time zone.
+- **Hidden local time:** CI runs the suite once, in UTC (D-099). A test of code that handles
+  moments or days names the zones it runs in (the clinic's, one behind UTC, one far ahead such as
+  `Pacific/Auckland`) and never relies on the computer's; the send-time tables also run with the
+  process's zone set to `Pacific/Auckland` inside the test (E02-T02).
 
 Property tests:
 - A reminder is never scheduled after its appointment starts.
@@ -104,7 +106,7 @@ Property tests:
 ## End-to-end journeys (Playwright)
 
 Keep this list short. Each runs against a fresh seeded database, the fake channel and a clock
-the test controls.
+the test controls (E00-T06c, from the first journey that needs it; J1 does not, D-100).
 
 | # | Journey | Added in |
 |---|---|---|
