@@ -1171,7 +1171,13 @@ owner with a script, first on staging (E00-T07), later in production. The second
 - Settled when this task is refined: the database role it writes clinics and memberships with on a
   hosted database (the app role cannot: the migration role, a grant or a function), and where it
   runs, since production credentials never reach a development machine (`overview.md`) and the
-  host's image holds no development packages such as tsx (D-090).
+  host's image holds no development packages such as tsx (D-090). The migration role owns the tables,
+  so no policy binds it: a module function that relies on the policy alone, such as `clinicPlace(tx)`
+  or `patients.create`, would read any clinic's row there (E01-T02a critical review).
+- It refuses a time zone Intl does not know and a country the phone package does not support
+  (libphonenumber-js's `isSupportedCountry`, D-097), before it writes anything: the database checks
+  neither, and a clinic with such a zone fails every page for its members, the login page and the
+  clinic picker included, so they can neither switch clinic nor log out (E01-T02a test, `slice`).
 - Running it twice with the same owner email creates no duplicate and does not crash.
 - It refuses a database that is not on this machine without an explicit flag.
 - `docs/runbook.md` (E00-T07 starts it): how to create a clinic.
@@ -1182,6 +1188,8 @@ owner with a script, first on staging (E00-T07), later in production. The second
 - [ ] `clinic:create` creates a clinic whose owner signs in after following the setup link.
 - [ ] Running it twice with the same owner email creates no duplicate and ends with a clear message.
 - [ ] Without the explicit flag it refuses a database that is not on this machine (test).
+- [ ] It refuses a time zone Intl does not know (`Europe/Skopie`) and an unsupported country (`UK`),
+      writing nothing (test).
 - [ ] Its audit row names the clinic and the action; no email or name reaches the logs.
 - [ ] `pnpm check` and `pnpm build` pass.
 
@@ -1261,6 +1269,15 @@ still tiny, and gives every later milestone a place to be demonstrated.
 - Infrastructure description for the host (web service, background worker, managed
   PostgreSQL in Frankfurt), migrations run on deploy with the migration role. Next.js telemetry
   off on staging (`NEXT_TELEMETRY_DISABLED=1`, D-075).
+- **The database lowers Cyrillic** (E01-T02a review, `speed`): the patient search compares
+  `lower()` of the name and of what is typed, and under a database character type of `C` or `POSIX`
+  `lower()` changes ASCII letters only, so a name typed in lower case is not found. Local and CI
+  cannot show it (both `en_US.utf8`). The database is created with `TEMPLATE template0` and a
+  character type that lowers Unicode (libc `en_US.UTF-8`, as locally, or the builtin provider's
+  `C.UTF-8`); the locale cannot change after `CREATE DATABASE`. Right after it is created, the check
+  `SELECT lower(U&'\0410\0403\040C\00C7\00CB') = U&'\0430\0453\045C\00E7\00EB';` answers `t`
+  (`SHOW lc_ctype` no longer exists from PostgreSQL 16); the runbook gives both, for production too
+  (E07-T09).
 - `/api/health`: checks the database and that the worker's heartbeat is recent.
 - Sentry (EU) wired in both processes with personal-data scrubbing on. The scrubbing also removes
   request headers and cookies, so no session cookie or client address reaches Sentry: Next.js hands
@@ -1285,6 +1302,8 @@ secret store (agents never see them); run `clinic:create` on staging.
       Sentry; the deliberate test error still does.
 - [ ] Deploys happen from `main` automatically; a rollback is documented and was tried once.
 - [ ] No secret is in the repository or the image.
+- [ ] On the staging database the Cyrillic check answers `t` (the command and its answer in the
+      handoff note), and the runbook says how production's database is created and checked.
 - [ ] Staging holds synthetic data only.
 
 **Milestone check (M0):** log in on staging; the isolation tests and meta-test are green in CI.

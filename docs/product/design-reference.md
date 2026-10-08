@@ -138,5 +138,7 @@ No jargon on patient pages. Keep this tone in every new screen the demo does not
 
 Login, two-factor, invite acceptance, password reset, failed-message and attention items,
 expired link, "too late to cancel", second-check screen, import undo, audit log, opt-out page,
-closed days. Build them from the same tokens and components, in the same tone. When a layout
+closed days, the new-patient page (E01-T02b: the demo's only new patient is the booking drawer's
+quick one, lines 1335 and 2120–2131, E01-T05; its list has no "New patient" button). Build them
+from the same tokens and components, in the same tone. When a layout
 choice is not obvious, the builder proposes one in the handoff note and flags it for the owner.
