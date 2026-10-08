@@ -25,12 +25,12 @@ export type SearchAnswer =
  * page) is Next.js's to carry out, as for a staff form (src/app/_lib/form-answer.ts, D-074).
  */
 export async function sendSearch(
-  read: StaffAction<{ query: string }, PatientList>,
+  read: StaffAction<{ text: string }, PatientList>,
   clinicId: string,
-  query: string,
+  text: string,
 ): Promise<SearchAnswer> {
   try {
-    const result = await read(clinicId, { query });
+    const result = await read(clinicId, { text });
     if (result.ok) return { kind: 'found', list: result.value };
     return result.error.code === 'clinic_changed' ? { kind: 'clinic_changed' } : { kind: 'failed' };
   } catch (error) {

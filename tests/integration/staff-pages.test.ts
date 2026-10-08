@@ -10,6 +10,8 @@ import ImportPage from '@/app/(staff)/import/page';
 import StaffLayout from '@/app/(staff)/layout';
 import { NAVIGATION } from '@/app/(staff)/navigation';
 import TodayPage from '@/app/(staff)/page';
+import { NewPatientForm } from '@/app/(staff)/patients/new/new-patient-form';
+import NewPatientPage from '@/app/(staff)/patients/new/page';
 import PatientsPage from '@/app/(staff)/patients/page';
 import { PatientList } from '@/app/(staff)/patients/patient-list';
 import { PlaceholderPage } from '@/app/(staff)/placeholder-page';
@@ -287,6 +289,32 @@ describe('the patient list is keyed by the clinic its page was rendered for (E01
       expect(shown, `rendered for the ${which} clinic`).toEqual([
         { key: chosen, rows: [patientOf.get(chosen)] },
       ]);
+    }
+  });
+});
+
+// E01-T02b: the new-patient page is no item of the navigation, so the cases above do not reach it.
+// It checks the session itself, as every staff page does, renders PageClinic with the clinic it was
+// rendered for, and keys its form by that clinic (D-098): a render for another clinic starts an
+// empty form, never one holding what was typed for the first.
+
+describe('the new-patient page (E01-T02b)', () => {
+  it('signed out: to the login page; a member of two clinics who has not chosen one: to the picker', async () => {
+    expect(await redirectOf(NewPatientPage())).toBe('/login');
+    request.cookie = await signInCookie(twoClinics.email, PASSWORD, freshAddress());
+    expect(await redirectOf(NewPatientPage())).toBe('/choose-clinic');
+  });
+
+  it('a member of two clinics who chose one: PageClinic and the form, keyed by that clinic', async () => {
+    request.cookie = await signInCookie(twoClinics.email, PASSWORD, freshAddress());
+    for (const chosen of [firstClinic, secondClinic]) {
+      request.clinic = chosen;
+      const page = await NewPatientPage();
+      const clinics = elementsOf<{ clinicId: unknown }>(page, PageClinic).map(
+        (e) => e.props.clinicId,
+      );
+      expect(clinics).toEqual([chosen]);
+      expect(elementsOf(page, NewPatientForm).map((form) => form.key)).toEqual([chosen]);
     }
   });
 });

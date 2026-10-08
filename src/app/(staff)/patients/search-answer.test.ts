@@ -18,7 +18,7 @@ describe('sendSearch', () => {
   it("sends what was typed, as the read's input, with the clinic id given", async () => {
     const read = answering({ ok: true, value: LIST });
     expect(await sendSearch(read, CLINIC, 'Ana')).toEqual({ kind: 'found', list: LIST });
-    expect(read).toHaveBeenCalledWith(CLINIC, { query: 'Ana' });
+    expect(read).toHaveBeenCalledWith(CLINIC, { text: 'Ana' });
   });
 
   it('clinic_changed: the list asks for a reload', async () => {
@@ -29,7 +29,7 @@ describe('sendSearch', () => {
   it.each([
     { code: 'internal' as const },
     { code: 'forbidden' as const },
-    { code: 'invalid_input' as const, issues: [{ path: ['query'], code: 'too_big' }] },
+    { code: 'invalid_input' as const, issues: [{ path: ['text'], code: 'too_big' }] },
   ])('$code: the general failure', async (error) => {
     expect(await sendSearch(answering({ ok: false, error }), CLINIC, 'Ana')).toEqual({
       kind: 'failed',
