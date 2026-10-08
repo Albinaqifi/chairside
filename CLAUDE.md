@@ -160,7 +160,10 @@ task, unless product code on `main` would hit it today.
   It sends the clinic its frame names (the staff layout's `FrameClinic`), never one a page passes,
   and shows the answer one way: `invalid_input` at the fields, `forbidden`, `clinic_changed` with a
   reload, the general failure (a call that rejects too), a toast when done; its button is disabled
-  while it runs. Its form is `autocomplete="off"`: it keeps nothing in the browser, so no reload or
+  while it runs. A check the input alone settles is the schema's, shown at its field; one that needs
+  the clinic's settings or rows (a phone read with the clinic's country, a day already closed) is the
+  handler's `refuse('code')`, shown above the button with a text (`refusals`) that names the field
+  (D-098). `StaffForm`'s form is `autocomplete="off"`: it keeps nothing in the browser, so no reload or
   Back brings a field back, under another clinic either (D-093); no field in it sets an
   `autocomplete` of its own but `off` (WebKit gives such a field back), and a field outside a staff
   form that takes patient details (a search box) is `autoComplete="off"` itself, its words never in
@@ -170,7 +173,10 @@ task, unless product code on `main` would hit it today.
   sees: any other button inside a staff form is `type="button"`
   (else it sends the form before the script runs, past the guard); only the staff layout renders
   `FrameClinic` and only `StaffForm` calls `sendForm`; an action called outside a form (a status
-  button) takes its clinic from `useFrameClinic()`, never from the page (D-092). The
+  button) takes its clinic from `useFrameClinic()`, never from the page (D-092); a client component
+  that keeps state made from its page's rows is keyed by the page's clinic
+  (`key={staff.clinic.clinicId}`, as the patient list is), as React keeps a component's state when
+  its page renders in place for another clinic (D-098). The
   form sits in a client component that the page renders, as `DemoForm` does
   (`src/app/(staff)/dev/components/demo-form.tsx`): a page can hand a client component a server
   action, never another function such as `render` or `onDone` (React stops the render):
@@ -194,6 +200,12 @@ task, unless product code on `main` would hit it today.
   but take a `<label>` whose text is `{t(…)}` for one holding a control: that a label names its
   control (`htmlFor`, the control's `id`) is a review check. A module gives a key (a role), never
   the text: it cannot import next-intl (module rule 3).
+- Dates and times: a moment (`timestamptz`) is shown through next-intl's formatter (`useFormatter`,
+  `getFormatter`), which carries the clinic's zone (`src/i18n/request.ts`, D-015), never through
+  `toLocaleString()` or an `Intl.DateTimeFormat` without a zone. A calendar date (`date`: a date of
+  birth, a closed day) is no moment: it stays a `YYYY-MM-DD` string until shown, then is formatted
+  from `new Date('YYYY-MM-DD')` with `timeZone: 'UTC'`, and tested in a zone behind UTC, where the
+  day before would show (D-098).
 - Styles: a component takes colours, fonts and radii only from the theme in `src/app/globals.css`
   (`bg-primary`, `font-serif`, `rounded-card`); Tailwind's own palette, font families, text sizes
   and radii are switched off. A token the design reference lacks is added there, derived from one it

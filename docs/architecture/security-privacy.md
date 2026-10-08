@@ -127,6 +127,10 @@ This document has two parts: rules that code must follow, and the gate before re
 ### 10. Audit
 - Logged: logins, patient record views, creates/edits/deletes, exports, imports, approvals,
   consent changes, patient link use, permission changes.
+- A patient record view is one patient's record opened: the profile or its edit page (E01-T03),
+  one row per view. A list or a search of patients is not one (the patient list, the booking
+  drawer's search, a likely-duplicate warning): it writes no row, and what was typed is never
+  written anywhere (D-098).
 - Append-only, enforced by database permissions.
 - Owners can read it, filtered by patient, person and date.
 

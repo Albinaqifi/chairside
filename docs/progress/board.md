@@ -9,17 +9,16 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E01-T02a` is Ready: `/pipeline E01-T02a` (`handoffs/E01-T02a.md`)
+- **Next task to start:** `E01-T02b` is Ready: `/pipeline E01-T02b` (`handoffs/E01-T02b.md`)
 - **Decisions it waits on:** none
 
 ## Next (in order)
 
-1. E01-T02a
-2. E01-T02b
-3. E00-T06b
-4. E00-T05b
-5. E00-T07
-6. The rest of E01, in the epic's own order (D-087)
+1. E01-T02b
+2. E00-T06b
+3. E00-T05b
+4. E00-T07
+5. The rest of E01, in the epic's own order (D-087)
 
 ## Blocked
 
@@ -49,9 +48,9 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T04e | Tabs, the drawer and the dialog | builder | normal | **Done** | Merged by the owner (PR #37). `Tabs`, the drawer (`Sheet`) and `Dialog` in `src/ui/`, on `/dev/components`, a title always; the owner tried it. Leftovers → E01-T05 (a double click keeps the drawer open; a form in a drawer or dialog sends only itself, `message`), E01-T06, E00-T06b (one login per role and browser); one done by its tester, seven struck. See `handoffs/E00-T04e.md` |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | split (D-090) | Into E00-T05a and E00-T05b, the next two rows |
 | E00-T05a | Seed data: two clinics and a login for every role | builder | normal | **Done** | Merged by the owner (PR #27). `pnpm db:seed` and `db:reset` seed two clinics and a login for every role, under fixed ids (owner's answer (a)). Leftovers → E01-T01b, E03-T00 (`message`), `CLAUDE.md`, agent rule 5; six struck. See `handoffs/E00-T05a.md` |
-| E00-T05b | `clinic:create`: the operator's script for a new clinic | builder | critical | Planned | After E00-T06b, before E00-T07 (D-090); refined in E00-T06b's Done pass, where the owner decides what its setup link opens |
+| E00-T05b | `clinic:create`: the operator's script for a new clinic | builder | critical | Planned | After E00-T06b, before E00-T07 (D-090); refined in E00-T06b's Done pass, where the owner decides what its setup link opens. Refuses a time zone or a country the code does not know (E01-T02a) |
 | E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | Planned | Split from E00-T06 (D-075); needs E00-T04a … E00-T04e and E00-T05a, comes after E01-T02b (D-087, D-096); one login per role and browser (E00-T04e); takes E00-T04's automated accessibility check, its tool chosen with the owner (D-086); a browser check of D-093, Firefox among its browsers (D-095) |
-| E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | Planned | Owner: hosting accounts (Q-07). After E00-T05b, E00-T06b and E00-T09 |
+| E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | Planned | Owner: hosting accounts (Q-07). After E00-T05b, E00-T06b and E00-T09. A database that lowers Cyrillic, checked on staging (E01-T02a) |
 
 ## E01 · Scheduling (M1)
 
@@ -63,14 +62,14 @@ Fully specified.
 | E01-T01a | Schema: providers, treatment types, patients, appointments, hours | builder | critical | **Done** | Merged by the owner (PR #29). Seven scheduling tables with their policies and the no-double-booking constraint (migration 0002); the provider kind through `clinics_for_user()`. Leftovers → E01-T02, E01-T04, E01-T05, E01-T10, E02-T01; the appointments indexes → E07-T00; one done by its tester, five struck. See `handoffs/E01-T01a.md` |
 | E01-T01b | The scheduling seed: providers, patients and a week of appointments | builder | normal | **Done** | Merged by the owner (PR #31). `02-scheduling.ts`: three providers, 40 patients and a week of appointments for the seed's day; dentist and hygienist linked. Leftovers: the aftercare flags on the Discovered list (→ E06-T00), the fake-data check's two blind spots a review check in `security-privacy.md`; six struck. See `handoffs/E01-T01b.md` |
 | E01-T02 | Patients: list, search, create, edit | builder | critical | split (D-096) | Into E01-T02a and E01-T02b, the next two rows; editing moved to E01-T03 |
-| E01-T02a | Patients: the list and the search | builder | critical | **Tested** | Branch `task/E01-T02a-patients-list-search`, PR #39. The list and its search at `/patients`, the clinic's time zone for every page, the test of every action as every member, migration 0003 (the trigram indexes and `pg_trgm` dropped), the logger's safety net, libphonenumber-js 1.13.13 (D-097). Reviewed at `b4bfbbf`: 1 required change (`data`), fixed in fix round 1. Tested at `7d0ffc3`: no findings, 1 case added, 3 Discovered lines. Delta review of `b4bfbbf..f60b447`: approved. Critical review of `main..da7ed8d`: 1 required change (`data`: the list keeps the first clinic's rows when its page renders in place for another), fixed in fix round 2 (the list keyed by its page's clinic, 1 case). Tested at `f213cc9`: required change 1 seen in three browsers, no findings, 1 Discovered line (`none`). Delta review of `da7ed8d..62bb58f`: approved. Critical review of `da7ed8d..3bba580`: approved, no required change. See `handoffs/E01-T02a.md` |
-| E01-T02b | Patients: add a patient | builder | normal | Planned | Split from E01-T02 (D-096); refined in E01-T02a's Done pass. The phone read with libphonenumber-js (D-097); a likely duplicate shown before Send; the form emptied after done; nothing kept in the browser (D-095) |
+| E01-T02a | Patients: the list and the search | builder | critical | **Done** | Merged by the owner (PR #39). `main` green (run 37747287624). The list and its search at `/patients`, the clinic's zone for every page, every action tested as every member, migration 0003 (the trigram indexes gone), the logger's net (D-096, D-097). Leftovers → E01-T02b, E00-T05b, E00-T07, E01-T04, E01-T08, `CLAUDE.md` and `security-privacy.md` (D-098); two search lines and the owner's Latin/Cyrillic request on the Discovered list for later, a `data` line → E04-T00, E07-T00; the search's input to be renamed `text` in E01-T02b (owner); nine struck. See `handoffs/E01-T02a.md` |
+| E01-T02b | Patients: add a patient | builder | normal | Ready | Split from E01-T02 (D-096); refined in E01-T02a's Done pass (D-098). The phone read with the clinic's country, its problem shown above Send; a likely duplicate shown before Send; the list shows the new patient; the logger's net, and the search's input renamed `text` (owner). See `handoffs/E01-T02b.md` |
 | E01-T03 | Patient profile, and editing a patient's details | builder | normal | Planned | Editing from E01-T02 (D-096) |
-| E01-T04 | Calendar: day view | builder | normal | Planned | |
+| E01-T04 | Calendar: day view | builder | normal | Planned | Times through the formatter, rows keyed by clinic (E01-T02a, D-098) |
 | E01-T05 | Book an appointment (drawer) | builder | normal | Planned | The patient search keeps nothing in the browser (D-095); a double click keeps the drawer open; a form in a drawer or dialog sends only itself (E00-T04e) |
 | E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | The cancel dialog sends the cancel only (E00-T04e) |
 | E01-T07 | Calendar: week view | builder | low | Planned | |
-| E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | Planned | |
+| E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | Planned | A time zone and a phone country the code knows (E01-T02a) |
 | E01-T09 | Settings: providers and treatment types | builder | normal | Planned | |
 | E01-T10 | Today screen, first version | builder | normal | Planned | |
 | E01-T11 | Journey J2 and a hard look at scheduling | tester | normal | Planned | Owner: receptionist trial if possible (Q-09) |
@@ -205,6 +204,7 @@ Outline. Needs E07-T00.
 - E00-T04c · The form pattern, the toast and the components page · merged 2026-10-07 (PR #33)
 - E00-T04d · The form fields: textarea, select, checkbox and switch · merged 2026-10-07 (PR #35)
 - E00-T04e · Tabs, the drawer and the dialog · merged 2026-10-07 (PR #37)
+- E01-T02a · Patients: the list and the search · merged 2026-10-08 (PR #39)
 
 ## Owner actions (standing)
 

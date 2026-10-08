@@ -237,59 +237,127 @@ switches (E02). The care plan, treatment and offers columns, and the other filte
 
 ### E01-T02b · Patients: add a patient
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T02a
-- **Read:** `scope` (Patients list and profile) · `data-model` (`patients`) · D-033, D-040, D-053,
-  D-092, D-093, D-095, D-096, D-097
+- **Role:** builder · **Risk:** normal (no migration, policy or wrapper; `StaffForm` changes in its
+  comment only, D-098) · **Depends on:** E01-T02a
+- **Read:** `scope` (Patients list and profile) · `data-model` (`patients`) · `design-ref` (the
+  list's header, demo lines 316–322; the demo has no patient form: "Screens the demo does not
+  have") · D-033, D-040, D-053, D-092, D-093, D-095, D-096, D-097, D-098 · the architect section of
+  `handoffs/E01-T02b.md`
 
 **Why.** The front desk adds a patient who is not in the list yet. The second half of E01-T02
 (D-096). E01-T03 edits a patient in this task's form; E01-T05's quick new patient and E04's import
 write through its module function.
 
 **Do.**
-- `patients.create` in the module. The phone read with libphonenumber-js (D-097) and the clinic's
-  `default_country` into E.164: a number in the national form takes that country, one with `+` or
-  `00` its own. An impossible number (a length no number of its country has) is refused at its
-  field; a possible one the package does not know is kept, so a new range is never refused at the
-  desk (E03 marks a number that cannot be reached). The email trimmed and lower-cased, an invalid
-  one refused at its field. Each field error in the message file's words (D-092).
-- **The page** `/patients/new`, opened by "New patient" on the list: a `StaffForm` with first name,
-  last name, date of birth, phone, email, language (a two-letter code, the clinic's own first,
-  D-053), guardian name (a line under it says the phone and email are then the guardian's, D-033)
-  and notes (labelled "not a clinical record"). A page, not a drawer: E01-T05's booking drawer is
-  the quick way to add a patient while booking.
+- **`patients.create`** in the module (`src/modules/patients/index.ts`): one patient of the
+  transaction's clinic, its id returned; a mistake of the desk is returned as a code, never thrown,
+  and the action turns it into `refuse(code)`.
+  - **The phone** (D-097), read with the clinic's own `default_country` (`clinicPlace(tx)`), never
+    with a country the page sends: in the national form it takes that country, with `+` or `00` its
+    own; stored as E.164. It is trimmed, and the invisible marks a copied number carries removed
+    (`\p{Cf}`: WhatsApp, Teams and Outlook wrap a number in direction marks), before it is read.
+    Refused as `phone_impossible`: a length no number of its country has, letters, a calling code
+    no country has, an extension (`ext. 5`: the package splits it off, and no message reaches it),
+    an E.164 form of more than 15 digits (the column's check; the package lets
+    `+49 30 1234567890123` through), and a number read with its trunk 0 still in it: its
+    `nationalNumber` starts with `0` and `isValid()` is false (`070 001 23`, a digit missing: the
+    package keeps the 0 and calls it possible, `+38907000123`, though no Macedonian number has 7
+    digits after its 0). A valid number whose own digits start with 0 is kept (`+39 06 1234 5678`,
+    a line in Rome), and so is a possible number the package does not know (`+389 99 123 456`), so
+    a new range is never refused at the desk: `isValid()` alone never refuses. A clinic country the
+    package does not support is the clinic's fault, not the desk's: an Error, answered `internal`,
+    never `phone_impossible`.
+  - **The email** trimmed and lower-cased, then checked. **An optional field** sent empty (a form
+    sends `''`) is stored as null, `notes` as `''` (its column is not null).
+- **The page** `/patients/new`, opened by "New patient" beside "Import from Excel" on the list, for
+  whoever has `patients.manage` (every member): a `StaffForm` with first name, last name, date of
+  birth, phone, email, language, guardian name (a line under it says the phone and email are then
+  the guardian's, D-033) and notes (labelled "not a clinical record"). Language: the browser's own
+  select of a new `languages` group in the message file, its keys the codes stored (`en` alone
+  until the translation pass: the name of the one language there is, not a new language, D-053),
+  the first selected; the module stores any two lower-case letters. A page, not a drawer: E01-T05's
+  booking drawer is the quick way to add a patient while booking.
+- **Where a problem shows** (D-098): what the input alone settles is the schema's, at its field (a
+  name missing, an email that is no email, a date that is no date). The date of birth is the
+  browser's date field, which sends a date it cannot read (half typed) as `''`: it is stored as
+  none, like a field left empty, by design. The phone needs the clinic's country, so its problem is
+  the handler's refusal, shown above Send through `StaffForm`'s `refusals`, in words that name the
+  phone and never repeat the number. How `StaffForm` shows an answer does not change (only its
+  comment does, below). The schema's problems come first; the phone's refusal shows once they are
+  fixed.
 - **A likely duplicate, shown before Send** (D-033): when what is typed matches a patient of the
-  clinic with the same name and date of birth, or the same name and the same phone or email, a
-  warning above Send names that patient (name and date of birth); Send still saves. A shared phone
-  alone is never a warning (siblings). The check is a `staffRead` for every member, called as a
-  field is left; it saves nothing.
-- **After a patient is created** the form holds nothing of them: a new `key` from `onDone`, or the
-  page goes to the list. `StaffForm` keeps every field after every answer, done included (D-092),
-  so a second Send would make a second patient (E00-T04c review, `slice`). Its sent-once guard
-  covers a double click (E00-T04c), so no client-made id is needed (E00-T03 test's double-submit
-  line, its E01-T02 part).
+  clinic with the same name and date of birth, or the same name and the same phone or email (the
+  same name: the same first and last name, each trimmed and compared in any case, with `lower()`,
+  as the search compares), a warning above Send names that patient (name and date of birth); Send
+  still saves. A shared phone alone is never a warning (siblings). The check is a `staffRead` for
+  every member, called as a field is left, with the frame's clinic and its words in the request's
+  body (D-092, D-095); it saves nothing, and it is no record view, so it writes no audit row
+  (D-098). It reads the typed phone with `patients.create`'s reader, so it compares E.164 numbers;
+  an impossible phone matches no one. The date of birth it shows is a calendar date, formatted in
+  UTC (`CLAUDE.md`, D-098).
+- **After a patient is created** the page goes to the list (the form's `onDone`, `router.push`),
+  which reads the clinic's patients again: its count includes them, and so do its rows while the
+  clinic has no more than 50 (the seed's clinic has 40). The action calls
+  `revalidatePath('/patients')` when it succeeds, or Back would show the list from before, kept by
+  the router. Never `redirect()` in the handler: the wrapper answers a throw `internal`. The action
+  answers the new id only. `StaffForm`'s sent-once guard covers a double click (E00-T04c), so no
+  client-made id is needed (E00-T03 test's double-submit line, its E01-T02 part).
+- **The list shows each render's rows** (E01-T02a critical review, `slice`): `PatientList` keeps
+  the rows of its first `initial` in its state, so Patients clicked again, or a refresh in place
+  (`router.refresh()`), shows the first load's rows until something is typed (after a create the
+  list is a new one: opening the form unmounted it). A later render of the page shows its count
+  and rows when nothing is typed, and searches again when something is. Its key by the page's
+  clinic stays (D-098).
 - **Audit:** `patient.created`, with no personal value in its row (`audit.record` refuses a
   personal field name).
 - **Nothing typed about a patient stays in the browser** (E00-T04d review and delta review, `data`,
   D-095): no field of the patient form sets an `autocomplete` of its own (WebKit gives such a field
   back after Back). `staff-form.tsx`'s comment says so, in place of "a field that needs the
   browser's suggestions sets its own" (the comment only).
+- **The logger's net** (E01-T02a test, `data`): `src/lib/personal-fields.ts` also drops a field
+  whose name ends in `title` (`appointmentTitle`), `treatment` or `treatmentType`, with a
+  `logger.test.ts` case each. The patient search's input is renamed from `query` to `text`, a name
+  the net already drops (**owner, 2026-10-08:** the two lines of `search-answer.test.ts` that name
+  it change that name and nothing else, agent rule 8). Only the read's input is renamed
+  (`actions.ts`, `search-answer.ts`, the page's `forPage`): `PatientTable`'s own `query` prop keeps
+  its name, so `patient-list.test.ts` does not change. `query` itself stays out of the net: a
+  failed query's error keeps its SQL (placeholders only) under that name, which two
+  `logger.test.ts` cases expect.
 - Its actions in E01-T02a's permission test, under "Calendar, patients, booking".
 
 **Out of scope.** Editing a patient, and the profile (E01-T03). Merging duplicates (E04-T06).
-Consent switches (E02).
+Consent switches (E02). A refusal marked at its field (Discovered, D-098). A search that treats
+Latin and Cyrillic as one (the owner's, later).
 
 **Acceptance.**
 - [ ] A phone typed in the national form (`070 …`), with `+389` or with `00389` is stored as the
-      same E.164 number; an impossible one is refused at its field (unit and integration tests).
-- [ ] An email is stored lower-cased; an invalid one is refused at its field.
+      same E.164 number, and one pasted with direction marks reads as typed; a possible number the
+      package does not know is kept, and so is a valid foreign number whose digits start with 0
+      (`+39 06 1234 5678`, in the reader's unit test only: rows that tests store take phones from
+      the seed's block, agent rule 5) (unit and integration tests).
+- [ ] An impossible phone (too long, too short, letters, an extension, more than 15 digits as
+      `+49 30 1234567890123`, a digit missing as in `070 001 23`) is refused: no patient row, no
+      audit row, and the message above Send names the phone (integration test; unit test of the
+      form's text).
+- [ ] An email is stored lower-cased and an invalid one is refused at its field; an optional field
+      left empty is stored empty, never answered "Fill this in." (unit test).
 - [ ] Typing the name and date of birth of a patient already in the list shows the warning, and
-      Send still saves (the check's integration test; tester, in a browser).
+      Send still saves; in the second clinic the same typing shows none, the check finding none of
+      the first clinic's patients (the check's integration test, in each clinic's transaction;
+      tester, in a browser).
 - [ ] Two siblings with the same phone and their own first names are created with no warning (test).
 - [ ] Every create writes one audit row with no personal value in it (integration test).
-- [ ] After a patient is created, the form holds nothing of them, and a second Send creates no
-      second patient (tester, in a browser).
+- [ ] After a patient is created the list (the seed's clinic) counts and shows them, an earlier
+      list reached by Back too; the form holds nothing of them, and a second Send creates no second
+      patient (tester, in a browser, on `pnpm build` and `pnpm start`).
+- [ ] On the list, Patients clicked again shows the clinic's current count and rows (tester).
+- [ ] The warning's date of birth shows its own day with the formatter in `America/New_York`
+      (1 January; unit test).
 - [ ] No field of the patient form has an `autocomplete` of its own (unit test, as
       `demo-form.test.ts`'s).
+- [ ] The logger drops `appointmentTitle`, `treatment` and `treatmentType`, its other cases
+      unchanged (`logger.test.ts`); the search sends what is typed as `text`
+      (`search-answer.test.ts`).
 - [ ] The permission test passes with this task's actions in its table.
 - [ ] `pnpm check` and `pnpm build` pass.
 
@@ -354,6 +422,8 @@ put right. Editing came from E01-T02 (D-096): it shows the same record.
   kind and `activeMembership()` no provider (E01-T01a, builder's known gap, `slice`). Read it in
   the clinic's transaction, not through `clinics_for_user()` (D-091, "Revisit if"); T10 reads the same.
 - Data loaded for the visible day in the clinic's time zone; refreshes every 30 seconds and on window focus.
+  Times through next-intl's formatter, rows kept in state keyed by the page's clinic (`CLAUDE.md`,
+  D-098).
 - Clicking a block or an empty slot calls a handler (the drawers arrive in T05 and T06).
 
 **Out of scope.** Booking, editing, week view, drag and drop.
@@ -484,11 +554,16 @@ Day / Week toggle.
   **Closed days** (date + label).
 - A typed, validated accessor for clinic settings (the only way settings are read).
 - Only `settings.manage` may change anything.
+- The time zone is one Intl knows and the phone country one the phone package supports
+  (`isSupportedCountry`, D-097): the database checks neither, and a zone Intl does not know fails
+  every page for the clinic's members, the login page and the clinic picker included (E01-T02a
+  test, `slice`). Both are the user's own input, so the schema checks them at their fields (D-098).
 
 **Out of scope.** Staff tab (E04), Channels tab (E03), quiet hours UI (E03).
 
 **Acceptance.**
-- [ ] Changes are saved, validated (a real IANA time zone, closing after opening) and audited.
+- [ ] Changes are saved, validated (a time zone Intl knows, a phone country the phone package
+      supports, closing after opening) and audited.
 - [ ] Front desk and dentist cannot open Settings (server refuses, not just hidden).
 - [ ] Changing the time zone changes how the calendar shows existing appointments (they keep their real moment).
 - [ ] Closed days and non-opening days show on the calendar.
@@ -508,7 +583,9 @@ Day / Week toggle.
 - **A number's own error text** (E00-T04c, `speed`): the first number fields. `form.fieldErrors`
   has one text per kind of problem, so a length below its limit reads "This is too short.". Texts
   for a number too small or too big (or a text per field in `StaffField`), which E01-T05's length
-  uses too.
+  uses too. A change to `StaffForm`, `StaffField` or `form-answer.ts` makes this task critical, as it
+  made E00-T04d (D-093): settled in its Ready pass, with the field-level refusal on the Discovered
+  list (D-098).
 
 **Acceptance.**
 - [ ] A new provider appears as a calendar column; a deactivated one disappears from new

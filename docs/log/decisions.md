@@ -1804,3 +1804,28 @@ architecture), `changed` (differs from the original files), `process`.
   weeks is the one trusted (D-088, D-094); 1.13.14 was two weeks old.
 - **Revisit if:** a pilot clinic's numbers are refused or misread (move to a newer version that has
   been out a few weeks); the browser must read numbers itself (then weigh the metadata's size).
+
+### D-098 · Screens with patients: a list is no record view, rows keyed by clinic, dates through the formatter, the clinic's checks refused above the button (E01-T02a Done)
+- **Origin:** E01-T02a's Done pass and E01-T02b's Ready pass, 2026-10-08 (PR #39 merged;
+  `handoffs/E01-T02a.md`, `handoffs/E01-T02b.md`): two `data` lines and a `slice` line from
+  E01-T02a's review and fix round 2, and E01-T02b's phone. The architect's.
+- **What:**
+  - A list or a search of patients is not a patient record view: no audit row, and what was typed
+    is written nowhere. A record view is one patient's profile or edit page opened (E01-T03), so
+    E01-T05's search and E01-T02b's duplicate warning write none (`security-privacy.md` section 10).
+  - A client component that keeps state made from its page's rows is keyed by the page's clinic
+    (`key={staff.clinic.clinicId}`), as the patient list is. A review check in `CLAUDE.md`.
+  - A moment is shown through next-intl's formatter, which carries the clinic's zone; a calendar
+    date is formatted in UTC, never in the clinic's zone (`CLAUDE.md`, Dates and times).
+  - A check the input alone settles is the schema's, shown at its field. One that needs the clinic's
+    settings or rows (a phone read with the clinic's country, a day already closed) is the handler's
+    refusal, shown above the button with a text that names the field. How `StaffForm` shows an
+    answer does not change.
+- **Why:** E01-T02a's builder settled the audit question in a code comment; the stale rows were found
+  by hand in a critical review, and no test sees the next ones; next-intl shows a date of birth on the
+  day before in a zone behind UTC. The wrappers parse the input before the clinic's transaction
+  opens, so no schema can read its country; showing a refusal at a field would change `StaffForm`,
+  which made E00-T04d critical (D-093), for a red border and the focus.
+- **Revisit if:** a clinic or the law asks who searched for whom (then a row per search, without its
+  words); a form needs a refusal marked at its field (then `StaffForm`'s `refusals` names the field,
+  typed by the action's codes and input keys, in a critical task).
