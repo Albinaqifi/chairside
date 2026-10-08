@@ -42,10 +42,11 @@ Stack and reasons: `docs/architecture/overview.md`. First-time setup: `README.md
 
 | Command | What it does |
 |---|---|
-| `pnpm check` | **Everything a task must pass:** format, lint, types, unit and integration tests; before it hands off, the builder also runs `pnpm build` (CI builds too). Needs the database: `docker compose up -d --wait`. |
+| `pnpm check` | **Everything a task must pass:** format, lint, types, unit and integration tests; before it hands off, the builder also runs `pnpm build`, then `pnpm test:e2e` in all three browsers (CI runs both, D-100). Needs the database: `docker compose up -d --wait`. |
 | `pnpm dev` | The app at http://localhost:3000. |
 | `pnpm test` | Unit tests (`src/**/*.test.ts`, `eslint-rules/`). No database. |
 | `pnpm test:integration` | Tests against real PostgreSQL (`tests/integration/`). First rebuilds the separate `<db>_test` database from the migrations. |
+| `pnpm test:e2e` | The end-to-end journeys and checks (`tests/e2e/`, Playwright) in Chromium, Firefox and WebKit; one browser: `--project=chromium`. Runs the production build of `pnpm build` and `next dev`, both on the separate `<db>_e2e` database, rebuilt and seeded each run. How to run them: "CI" below. |
 | `pnpm exec vitest run <file>` | One test file. |
 | `pnpm lint` · `pnpm typecheck` | ESLint (a warning fails too) · `next typegen` + `tsc`. |
 | `pnpm format` · `pnpm format:check` | Prettier: fix · check only. Markdown and `docs/` are not formatted. |
@@ -60,17 +61,26 @@ Every script must work on Windows (the owner's OS): no bash-only syntax in `pack
 ### CI
 
 `.github/workflows/ci.yml` (D-075) runs the `pnpm check` steps, `pnpm build` and `pnpm audit`, each
-once, in UTC (D-099): on every pull request to `main`, every push to `main` and every Monday. A pull
-request that changes only files under `docs/`, Markdown files under `.claude/`, `CLAUDE.md` or
-`README.md` gets no run; the architect merges its own such planning pull request (D-087). The owner
-merges every other pull request, only on green (R-34). Each level on your machine, with the
-database up:
+once, in UTC (D-099), and after the build the end-to-end journeys: in Chromium, and in Chromium,
+Firefox and WebKit on the Monday run (D-100). It runs on every pull request to `main`, every push to
+`main` and every Monday. A pull request that changes only files under `docs/`, Markdown files under
+`.claude/`, `CLAUDE.md` or `README.md` gets no run; the architect merges its own such planning pull
+request (D-087). The owner merges every other pull request, only on green (R-34). Each level on your
+machine, with the database up:
 
 | Level | Command |
 |---|---|
 | The `pnpm check` steps | `pnpm check`, or one of its commands |
 | The build | `pnpm build` |
+| The end-to-end journeys | `pnpm build`, then `pnpm test:e2e`: all three browsers, which the builder runs before every hand-off (CI: Chromium; the Monday run: all three) |
 | The dependency check | `pnpm audit --prod` (must pass) · `pnpm audit` (everything; read it). Never `--fix`, `--ignore` or `--ignore-unfixable`: they write `pnpm-workspace.yaml` |
+
+The journeys on Windows (and anywhere): the browsers once, `pnpm exec playwright install chromium
+firefox webkit` (about 500 MB, again after a Playwright upgrade); then, with the database up,
+`pnpm build` (the journeys run the build in `.next`, so build again after a change) and
+`pnpm test:e2e`. It starts `next start` on port 3100 and `next dev` on port 3101, both on
+`<db>_e2e`, never the development database; stop `pnpm dev` first (Next.js runs one `next dev` per
+folder). A failed journey keeps its trace: `pnpm exec playwright show-trace test-results/<test>/trace.zip`.
 
 To run something in another zone (a server in `Pacific/Auckland`), not Git Bash (the agents' Bash
 tool): it drops `TZ=Pacific/Auckland` before Node starts, silently (`TZ=UTC` gets through);
@@ -97,11 +107,13 @@ src/i18n/             next-intl's request configuration and the message file, en
 src/lib/              Small shared pieces: clock, ids, logger, personal-fields.
 src/ui/               shadcn/ui components restyled to the tokens, the logo, the fonts, cn().
 tests/integration/    Tests against real PostgreSQL, including the tenant meta-test.
+tests/e2e/            End-to-end journeys and checks in real browsers (Playwright, playwright.config.ts):
+                      J1, the accessibility check, the D-093 check (E00-T06b).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 ```
 
-Create a folder only when it has content. Coming later: `tests/e2e` (E00-T06b), `src/worker` (E00-T07).
+Create a folder only when it has content. Coming later: `src/worker` (E00-T07).
 
 ### Module rules (lint enforces them; `eslint-rules/architecture.test.ts` proves it)
 

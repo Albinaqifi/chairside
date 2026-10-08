@@ -31,8 +31,9 @@ While building:
 - Stop and ask the owner in the situations listed in agent rule 4.
 
 When done:
-- Run the full check command from `CLAUDE.md` and `pnpm build`, and make sure both pass: CI
-  runs the build too, and a red build is a fix round.
+- Run the full check command from `CLAUDE.md`, `pnpm build`, then `pnpm test:e2e` in all three
+  browsers, and make sure all pass: CI runs the build and the journeys too (in Chromium; all three
+  on Mondays, D-100), and a red step is a fix round.
 - Write your section of `docs/progress/handoffs/<task-id>.md`, about 80 lines: what you built,
   where, the acceptance table naming the test or the command for each criterion (one line
   each), what is not done, what the reviewer and tester should look hard at, and for a screen
@@ -64,7 +65,8 @@ A fresh builder session fixes what the reviewer or the tester reported, nothing 
 - A finding whose fix falls under agent rule 4 (data model, new library or secret, login or
   tenant change the task did not ask for, deleting data, cost) is not fixed either: write the
   options and your recommendation, set Blocked, and stop.
-- Run the full check command and `pnpm build`, and make sure both pass.
+- Run the full check command, `pnpm build` and `pnpm test:e2e` (all three browsers), and make
+  sure all pass.
 - Append `## Builder — YYYY-MM-DD (fix round N)` to the handoff note: one line per finding
   with what you changed, the test that proves it, and the result. N counts every fix round of
   the task, review (the critical review included), test and CI rounds together.
@@ -95,7 +97,8 @@ A fresh builder session fixes the failing steps, nothing else.
   and 8 say so. A failure you cannot reproduce or explain from its log (a flaky test, an outage in
   the middle of a step): do not re-run CI and do not touch the test; write what you saw, set the
   task to Blocked, and stop.
-- Run the full check command and `pnpm build`, and make sure both pass.
+- Run the full check command, `pnpm build` and `pnpm test:e2e` (all three browsers), and make
+  sure all pass.
 - Append `## Builder — YYYY-MM-DD (fix round N)` to the handoff note. Its "Fixes:" line names the
   red run by its link; then one line per failing step: what you changed, the command that fails
   without the fix and passes with it, and the result.

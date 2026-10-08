@@ -206,8 +206,8 @@ describe('the warning: who the patient being typed may already be (D-033)', () =
   };
 
   // A date of birth is a calendar date (D-098): formatted in a zone behind UTC, 1 January would
-  // show as 31 December 1989. The computer runs in one zone only; CI runs the tests again in
-  // Pacific/Auckland, ahead of UTC.
+  // show as 31 December 1989. Each case names its zone, behind and ahead of UTC, and none relies on
+  // the computer's (CI runs them once, in UTC: D-099).
   it.each(['America/New_York', 'Pacific/Auckland', 'UTC', 'Europe/Skopje'])(
     'names the patient and their date of birth on its own day, in %s (acceptance 9)',
     (zone) => {

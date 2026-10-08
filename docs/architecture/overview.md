@@ -57,7 +57,7 @@ One codebase, two running processes, one database.
 | Translations | next-intl | D-015 |
 | WhatsApp / email (SMS addable) | Adapters; fake first; real ones chosen in E03 | D-010, D-055 |
 | AI | Anthropic API from the worker | D-011 |
-| Tests | Vitest, Playwright, fast-check, real Postgres | D-012 |
+| Tests | Vitest, Playwright with axe-core, fast-check, real Postgres | D-012, D-100 |
 | Errors, logs | Sentry (EU), pino | D-013 |
 | Code and CI | GitHub, GitHub Actions | D-014 |
 

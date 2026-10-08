@@ -4,9 +4,10 @@
  * clinic's local date and time with its zone's name, `2026-10-26 09:00 Europe/Skopje`, which
  * PostgreSQL turns into the moment when it stores a timestamptz.
  *
- * The computer's own time zone is never read (`getDay()`, `setHours()`, `toLocaleString()`…): CI
- * runs the tests again in Pacific/Auckland. The clinic's day comes from Intl.DateTimeFormat with
- * the clinic's `timeZone`; days are counted in UTC, where every day has 24 hours.
+ * The computer's own time zone is never read (`getDay()`, `setHours()`, `toLocaleString()`…): the
+ * tests run once, in the computer's zone (UTC in CI, D-099), which would not show it. The clinic's
+ * day comes from Intl.DateTimeFormat with the clinic's `timeZone`; days are counted in UTC, where
+ * every day has 24 hours.
  */
 
 /** A date of the calendar, `YYYY-MM-DD`: a clinic's day. */

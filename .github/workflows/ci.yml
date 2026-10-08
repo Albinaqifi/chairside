@@ -68,6 +68,11 @@ jobs:
         # Local values, not secrets (D-064, point 2), as on a developer machine.
         run: cp .env.example .env
 
+      - name: 'Setup: Playwright browsers'
+        # For the end-to-end journeys (E00-T06b, D-100): Chromium on a pull request or a push;
+        # Chromium, Firefox and WebKit, with their system packages, on the Monday run.
+        run: pnpm exec playwright install ${{ github.event_name == 'schedule' && '--with-deps chromium firefox webkit' || 'chromium' }}
+
       - name: 'Setup: start the database'
         id: database
         run: docker compose up -d --wait
@@ -96,8 +101,28 @@ jobs:
         run: pnpm test:integration
 
       - name: pnpm build
+        id: build
         if: ${{ !cancelled() && steps.database.outcome == 'success' }}
         run: pnpm build
+
+      # The end-to-end journeys run the build above, so they run only when it succeeded (D-100):
+      # Chromium on a pull request or a push, all three browsers on the Monday run.
+      - name: "${{ github.event_name == 'schedule' && 'pnpm test:e2e (Chromium, Firefox, WebKit)' || 'pnpm test:e2e (Chromium)' }}"
+        id: e2e
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm test:e2e ${{ github.event_name == 'schedule' && '--project=chromium --project=firefox --project=webkit' || '--project=chromium' }}
+
+      # The traces of the journeys that failed, kept three days, for a look with
+      # `pnpm exec playwright show-trace`. Synthetic data only. An upload that fails never turns
+      # the run red (continue-on-error).
+      - name: Traces of the failed journeys
+        if: ${{ !cancelled() && steps.e2e.outcome == 'failure' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-traces
+          path: test-results/
+          retention-days: 3
 
       # Dependency check (D-075). An advisory in a production dependency turns the run red.
       - name: pnpm audit --prod
