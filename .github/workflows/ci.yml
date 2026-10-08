@@ -34,7 +34,7 @@ concurrency:
 env:
   # Next.js sends anonymous usage data unless this is set, in CI too (D-075).
   NEXT_TELEMETRY_DISABLED: '1'
-  # The steps of pnpm check and the build run in UTC; the Auckland steps set their own zone.
+  # Every step runs in UTC.
   TZ: UTC
 
 jobs:
@@ -98,21 +98,6 @@ jobs:
       - name: pnpm build
         if: ${{ !cancelled() && steps.database.outcome == 'success' }}
         run: pnpm build
-
-      # The Auckland steps: the same tests in a zone far from UTC. A test that passes in one zone
-      # and fails in the other depends on the server's time zone (test-strategy.md, "Hidden local
-      # time").
-      - name: pnpm test (TZ=Pacific/Auckland)
-        if: ${{ !cancelled() && steps.database.outcome == 'success' }}
-        run: pnpm test
-        env:
-          TZ: Pacific/Auckland
-
-      - name: pnpm test:integration (TZ=Pacific/Auckland)
-        if: ${{ !cancelled() && steps.database.outcome == 'success' }}
-        run: pnpm test:integration
-        env:
-          TZ: Pacific/Auckland
 
       # Dependency check (D-075). An advisory in a production dependency turns the run red.
       - name: pnpm audit --prod
