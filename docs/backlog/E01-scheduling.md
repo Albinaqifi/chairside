@@ -623,7 +623,8 @@ Day / Week toggle.
 
 ### E01-T11 · Journey J2 and a hard look at scheduling
 
-- **Role:** tester · **Risk:** normal · **Depends on:** E01-T02a … E01-T10
+- **Role:** tester · **Risk:** normal · **Depends on:** E01-T02a … E01-T10, E00-T06b; E00-T06c if J2
+  sets "now", decided when this task is refined (D-100)
 - **Read:** `test-strategy` (End-to-end journeys; Tenant isolation; Permissions) · all E01 handoff notes
 
 **Do.**
