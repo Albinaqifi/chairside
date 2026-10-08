@@ -21,7 +21,6 @@ export const PERSONAL_FIELDS = [
   'to', // a message's recipient: a phone number or an email address
   'from',
   'reason', // free text, e.g. why a patient cancelled
-  'title', // an appointment's label, such as a treatment ("Filling 36")
   'text',
   'subject',
   'content',
@@ -59,6 +58,11 @@ export const PERSONAL_FIELD_ENDINGS = [
   'html',
   'smsText',
   'messageText',
+  // An appointment's label, which names a treatment ("Filling 36"), and the treatment itself
+  // (E01-T02b): title, appointmentTitle, treatment, treatmentType; ids such as treatmentTypeId stay.
+  'title',
+  'treatment',
+  'treatmentType',
   'params', // the values a database query was sent; request and search parameters
   'url', // URLs and paths can carry patient link tokens
   'href',

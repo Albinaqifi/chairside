@@ -202,6 +202,23 @@ describe('logger', () => {
     expect(JSON.parse(output())).toMatchObject({ appointmentId: 'appointment-1' });
   });
 
+  // E01-T02b (E01-T02a test): a field whose name ends in title, treatment or treatmentType, as an
+  // appointment's label and its treatment name the care a patient gets.
+  it.each(['appointmentTitle', 'treatment', 'treatmentType'])('drops a field named %s', (field) => {
+    const { logger, output } = capture();
+    logger.info({ [field]: MARKER, appointmentId: 'appointment-1' }, 'appointment booked');
+
+    expect(output()).not.toContain(MARKER);
+    expect(JSON.parse(output())).toMatchObject({ appointmentId: 'appointment-1' });
+  });
+
+  it('keeps the id of a treatment type: an id, not a name', () => {
+    const { logger, output } = capture();
+    logger.info({ treatmentTypeId: 'treatment-type-1' }, 'appointment booked');
+
+    expect(JSON.parse(output())).toMatchObject({ treatmentTypeId: 'treatment-type-1' });
+  });
+
   it('drops them nested, and in child logger bindings', () => {
     const { logger, output } = capture();
     logger.child({ phoneE164: MARKER }).info({

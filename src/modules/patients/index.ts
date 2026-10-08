@@ -1,6 +1,15 @@
 /**
- * A clinic's patients (data-model.md section 2). Public API of the patients module.
+ * A clinic's patients (data-model.md section 2). Public API of the patients module: list and search
+ * them (E01-T02a), add one and find who they may already be (E01-T02b), as
+ * `import * as patients from '@/modules/patients'`, then `patients.create(tx, patient, now)`.
  */
+export { create, type CreateRefusal, type CreateResult, type NewPatient } from './create';
+export {
+  DUPLICATES_LIMIT,
+  likelyDuplicates,
+  type LikelyDuplicate,
+  type TypedPatient,
+} from './duplicates';
 export {
   LIST_LIMIT,
   listPatients,

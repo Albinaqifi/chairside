@@ -11,6 +11,7 @@ import { cn } from '@/ui/cn';
 import { Input } from '@/ui/input';
 import { searchPatients } from './actions';
 import { SEARCH_MAX_LENGTH, sendSearch, type SearchAnswer } from './search-answer';
+import { afterPageRender, type ShownList } from './shown-list';
 
 /** How long the list waits after the last key before it searches. */
 const SEARCH_DELAY_MS = 250;
@@ -32,15 +33,40 @@ const NEXT_VISIT = {
  * moment after the last key, to the patients' read with the frame's clinic (D-092): in the
  * request's body, never in the page's address (D-095). An answer that comes after a later search
  * was sent is dropped. The box is in no form and keeps nothing in the browser (D-095).
+ *
+ * E01-T02b: New patient beside Import from Excel, for whoever has patients.manage (`canAdd`; left
+ * out, it is hidden). And each render of the page is shown, not only the first: Patients clicked
+ * again, or a refresh in place, renders the page again for the same clinic, and React keeps this
+ * list with its state, so its rows were the first render's until something was typed (E01-T02a
+ * critical review). A later render's count and rows now show at once when nothing is typed
+ * (afterPageRender, while rendering); when something is typed, it is searched again (below).
  */
-export function PatientList({ initial, canImport }: { initial: List; canImport: boolean }) {
+export function PatientList({
+  initial,
+  canImport,
+  canAdd = false,
+}: {
+  initial: List;
+  canImport: boolean;
+  canAdd?: boolean;
+}) {
   const t = useTranslations();
   const clinicId = useFrameClinic();
   const box = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const sent = useRef(0);
-  const [shown, setShown] = useState({ query: '', list: initial });
+  const [shown, setShown] = useState<ShownList>({ query: '', list: initial });
   const [problem, setProblem] = useState<Exclude<SearchAnswer['kind'], 'found'> | null>(null);
+  // The page's rows this list was last rendered with; a later render of the page brings its own.
+  const [rendered, setRendered] = useState(initial);
+  if (rendered !== initial) {
+    setRendered(initial);
+    const next = afterPageRender(shown, initial);
+    if (next !== shown) {
+      setShown(next);
+      setProblem(null);
+    }
+  }
 
   const search = useCallback(
     (typed: string) => {
@@ -63,12 +89,17 @@ export function PatientList({ initial, canImport }: { initial: List; canImport: 
     [clinicId],
   );
 
-  // Typed before the page's script ran: React leaves it in the box, and it is searched here.
+  // Typed before the page's script ran: React leaves it in the box, and it is searched here. And
+  // typed when a later render of the page arrives (`initial`): searched again, so the rows are the
+  // clinic's current ones. Its timer is not cleared here: a search still waiting (for an emptied
+  // box) is sent as it was.
   useEffect(() => {
     const typed = box.current?.value ?? '';
     if (typed !== '') search(typed);
-    return () => clearTimeout(timer.current);
-  }, [search]);
+  }, [initial, search]);
+
+  // A search still waiting when the list goes away is never sent.
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   /** Reloads the page, for the clinic chosen in the other tab, with the box emptied first. */
   function reload() {
@@ -88,10 +119,19 @@ export function PatientList({ initial, canImport }: { initial: List; canImport: 
               : t('patients.count', { count: list.total })}
           </p>
         </div>
-        {canImport && (
-          <Button asChild variant="secondary">
-            <Link href="/import">{t('patients.import')}</Link>
-          </Button>
+        {(canImport || canAdd) && (
+          <div className="flex flex-wrap gap-2.5">
+            {canImport && (
+              <Button asChild variant="secondary">
+                <Link href="/import">{t('patients.import')}</Link>
+              </Button>
+            )}
+            {canAdd && (
+              <Button asChild>
+                <Link href="/patients/new">{t('patients.new')}</Link>
+              </Button>
+            )}
+          </div>
         )}
       </div>
       <div className="mb-3.5 flex flex-wrap items-center gap-2.5">

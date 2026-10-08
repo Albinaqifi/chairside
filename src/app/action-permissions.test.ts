@@ -128,6 +128,10 @@ const ACTIONS: Record<string, Record<string, ScopeRow | 'userAction'>> = {
     demoOwnerOnly: 'Staff, settings, audit log, results panel',
   },
   'src/app/(staff)/patients/actions.ts': { searchPatients: 'Calendar, patients, booking' },
+  'src/app/(staff)/patients/new/actions.ts': {
+    createPatient: 'Calendar, patients, booking',
+    findLikelyDuplicates: 'Calendar, patients, booking',
+  },
   'src/app/_lib/clinic-time-zone.ts': { clinicTimeZone: 'No area of the table: every member' },
 };
 

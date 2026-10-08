@@ -83,8 +83,10 @@ export interface StaffFormProps<In, Out, R extends string> {
  *   gives its fields back after a reload or Back, or offers past entries in them. After a clinic
  *   switch in another tab, a reload renders the page for the other clinic, and Firefox would put
  *   back what was typed for the first. Radix's checkbox and switch send a hidden input that they set
- *   only when they change: given back, it would send what the control does not show. A field that
- *   needs the browser's suggestions sets its own `autocomplete`, never the form's (D-093).
+ *   only when they change: given back, it would send what the control does not show. No field sets
+ *   an `autocomplete` of its own but `off`: WebKit gives such a field back after Back, under another
+ *   clinic's page too, so nothing typed about a patient stays in the browser (D-095). A field that
+ *   needs the browser's suggestions comes back to the architect first.
  */
 export function StaffForm<In, Out, R extends string = never>({
   action,

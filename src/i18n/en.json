@@ -49,6 +49,7 @@
     "count": "{count, plural, one {# patient} other {# patients}}",
     "countAndFirst": "{count, plural, one {# patient} other {# patients}} · showing the first {shown}",
     "import": "Import from Excel",
+    "new": "New patient",
     "search": "Search patients",
     "searchPlaceholder": "Search by name or phone",
     "filters": "Filters",
@@ -66,6 +67,32 @@
     "noMatch": "No patients match “{query}”.",
     "failed": "The search did not work. Try again.",
     "clinicChanged": "The clinic was changed in another tab. Reload the page to go on in the clinic chosen there."
+  },
+  "newPatient": {
+    "title": "New patient",
+    "intro": "Only the name is needed. Fill in what you know.",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "dateOfBirth": "Date of birth",
+    "language": "Language of messages",
+    "phone": "Phone",
+    "email": "Email",
+    "guardianName": "Guardian's name",
+    "guardianHint": "For a child: with a guardian named, the phone and email above are the guardian's, and messages go to them.",
+    "notes": "Notes (not a clinical record)",
+    "add": "Add patient",
+    "adding": "Adding…",
+    "added": "Patient added.",
+    "phoneImpossible": "The phone number does not look right. Check its digits; a number from another country starts with + and its country code.",
+    "duplicate": {
+      "heading": "This may be a patient already in the list:",
+      "born": "{name}, born {born}",
+      "noBirthDate": "{name}, no date of birth",
+      "addAnyway": "Check the list first. Add patient still adds a new patient."
+    }
+  },
+  "languages": {
+    "en": "English"
   },
   "placeholder": {
     "title": "Coming soon",
