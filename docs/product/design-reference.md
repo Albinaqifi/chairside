@@ -82,7 +82,8 @@ Never hard-code a colour in a component. They are in `src/app/globals.css`, with
 lacks (text on primary, links, focus, errors, small text; the sidebar's navigation colours,
 captions and small upper-case labels, E00-T04b; the toast's colours, radius, shadow and entry,
 E00-T04c; the switch's off colour and the checkbox's border colour and radius, E00-T04d; the
-overlay, the drawer's shadow, entry and title size, E00-T04e) marked there. The controls' edges (`border-strong`, `checkbox-border`, `switch-off`) are as light as the
+overlay, the drawer's shadow, entry and title size, E00-T04e; the pills of an archived and a
+deceased patient, the grey of a completed visit, E01-T02a) marked there. The controls' edges (`border-strong`, `checkbox-border`, `switch-off`) are as light as the
 demo draws them, under WCAG 1.4.11's 3:1 against white: kept by the owner on 2026-10-07
 (`handoffs/E00-T04d.md`); the receptionist trial (Q-09) shows whether staff see them.
 

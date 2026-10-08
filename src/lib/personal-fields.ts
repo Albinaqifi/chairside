@@ -21,6 +21,7 @@ export const PERSONAL_FIELDS = [
   'to', // a message's recipient: a phone number or an email address
   'from',
   'reason', // free text, e.g. why a patient cancelled
+  'title', // an appointment's label, such as a treatment ("Filling 36")
   'text',
   'subject',
   'content',
@@ -41,6 +42,7 @@ export const PERSONAL_FIELD_ENDINGS = [
   'email',
   'phone',
   'phoneNumber',
+  'e164', // a phone number in E.164 form: the patient phone column, phone_e164
   'mobile',
   'msisdn',
   'waId', // WhatsApp id: the phone number

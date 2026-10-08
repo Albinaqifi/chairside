@@ -16,6 +16,9 @@ const VARIANTS: BadgeVariant[] = [
   'completed',
   'cancelled',
   'no-show',
+  // E01-T02a: a patient's status, in the patient list.
+  'archived',
+  'deceased',
 ];
 
 /** The class attribute of the badge as the server renders it. */

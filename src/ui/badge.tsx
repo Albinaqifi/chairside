@@ -5,8 +5,9 @@ import { cn } from './cn';
 /**
  * shadcn/ui's Badge (D-009, style new-york-v4), restyled to the demo's status pill (demo line 134):
  * 12 px, weight 600, on a pill, in the status colours of the theme (src/app/globals.css). Its
- * variants are rewritten to the statuses, and one must be named: a pill without a status says
- * nothing. Its asChild and focus styles are gone: a pill is a label, never a link or a button.
+ * variants are rewritten to the statuses, an appointment's and (E01-T02a) a patient's who is not
+ * active, and one must be named: a pill without a status says nothing. Its asChild and focus
+ * styles are gone: a pill is a label, never a link or a button.
  */
 const badgeVariants = cva(
   'inline-flex w-fit shrink-0 items-center justify-center gap-1.25 overflow-hidden rounded-pill border border-transparent px-2.25 py-0.75 text-caption font-semibold whitespace-nowrap [&>svg]:pointer-events-none [&>svg]:size-3',
@@ -20,6 +21,8 @@ const badgeVariants = cva(
         completed: 'bg-status-completed-bg text-status-completed-fg',
         cancelled: 'bg-status-cancelled-bg text-status-cancelled-fg',
         'no-show': 'bg-status-no-show-bg text-status-no-show-fg',
+        archived: 'bg-status-archived-bg text-status-archived-fg',
+        deceased: 'bg-status-deceased-bg text-status-deceased-fg',
       },
     },
   },

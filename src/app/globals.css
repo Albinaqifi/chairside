@@ -6,7 +6,7 @@
  * font families, text sizes and radii are switched off, so a class outside these tokens gives no
  * style at all. Tokens the design reference lacks are marked "added"; the handoff note of the task
  * that added them names them (handoffs/E00-T04a.md, handoffs/E00-T04b.md, handoffs/E00-T04c.md,
- * handoffs/E00-T04d.md, handoffs/E00-T04e.md).
+ * handoffs/E00-T04d.md, handoffs/E00-T04e.md, handoffs/E01-T02a.md).
  *
  * A text size, radius, shadow, tracking or animation token added here is also named in src/ui/cn.ts:
  * tailwind-merge knows only Tailwind's own scales, so without it cn() reads `text-<new size>` as a
@@ -91,6 +91,12 @@
   --color-status-no-show-fg: var(--color-red-fg);
   --color-status-no-show-bg: var(--color-red-bg);
   --color-status-no-show-dot: var(--color-red-dot);
+  /* Added in E01-T02a: a patient who is archived or deceased (data-model.md), marked in the patient
+     list: the grey of a completed visit, which is no longer current either. */
+  --color-status-archived-fg: var(--color-status-completed-fg);
+  --color-status-archived-bg: var(--color-status-completed-bg);
+  --color-status-deceased-fg: var(--color-status-completed-fg);
+  --color-status-deceased-bg: var(--color-status-completed-bg);
 
   /* Text sizes: the base size and its line height, section headings (weight 600) and page
      headings (serif, 28–34 px). Added: labels and small print (the demo's labels), the wordmark

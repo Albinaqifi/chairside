@@ -192,6 +192,28 @@ describe('logger', () => {
     expect(output()).not.toContain(MARKER);
   });
 
+  // E01-T02a (E01-T01a critical review): the patient phone column, under the database's name and
+  // the code's, and an appointment's title, the calendar's label, which names a treatment.
+  it.each(['phone_e164', 'phoneE164', 'title'])('drops a field named %s', (field) => {
+    const { logger, output } = capture();
+    logger.info({ [field]: MARKER, appointmentId: 'appointment-1' }, 'appointment booked');
+
+    expect(output()).not.toContain(MARKER);
+    expect(JSON.parse(output())).toMatchObject({ appointmentId: 'appointment-1' });
+  });
+
+  it('drops them nested, and in child logger bindings', () => {
+    const { logger, output } = capture();
+    logger.child({ phoneE164: MARKER }).info({
+      patient: { id: 'patient-1', phone_e164: MARKER, guardianPhoneE164: MARKER },
+      appointments: [{ id: 'appointment-1', title: MARKER }],
+    });
+
+    expect(output()).not.toContain(MARKER);
+    expect(output()).toContain('patient-1');
+    expect(output()).toContain('appointment-1');
+  });
+
   it('keeps names that only contain a short personal word', () => {
     const { logger, output } = capture();
     // `to`, `from`, `ip` and `reason` match only as whole names. A reason code is not free text.

@@ -38,6 +38,9 @@ const BADGES = [
   { variant: 'completed', key: 'completed' },
   { variant: 'cancelled', key: 'cancelled' },
   { variant: 'no-show', key: 'noShow' },
+  // E01-T02a: a patient's status, in the patient list.
+  { variant: 'archived', key: 'archived' },
+  { variant: 'deceased', key: 'deceased' },
 ] as const satisfies readonly { variant: BadgeVariant; key: string }[];
 
 /** The demo tabs, each with its text under devComponents.tabs. */

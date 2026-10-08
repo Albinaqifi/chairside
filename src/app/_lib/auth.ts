@@ -45,16 +45,40 @@ export interface Staff {
   clinicCount: number;
 }
 
+type StaffResolution =
+  { kind: 'staff'; staff: Staff } | { kind: 'signed_out' } | { kind: 'no_clinic' };
+
 /**
- * The signed-in user and the clinic they act for, or a redirect: to the login page without a
- * session, to the clinic picker when the clinic is not settled. Only a clinic the user has an
+ * Who this request is for: a member in a settled clinic, or why not. Only a clinic the user has an
  * active membership in can come out of here (resolveClinic), whatever the cookie says.
  */
-export const currentStaff = cache(async (): Promise<Staff> => {
-  const user = await requireUser();
+const resolveStaff = cache(async (): Promise<StaffResolution> => {
+  const user = await currentUser();
+  if (!user) return { kind: 'signed_out' };
   const choices = await clinicsForUser(user.id);
   const picked = (await cookies()).get(CLINIC_COOKIE)?.value;
   const resolved = resolveClinic(choices, picked);
-  if (resolved.kind !== 'clinic') redirect('/choose-clinic');
-  return { user, clinic: resolved.choice, clinicCount: choices.length };
+  if (resolved.kind !== 'clinic') return { kind: 'no_clinic' };
+  return { kind: 'staff', staff: { user, clinic: resolved.choice, clinicCount: choices.length } };
 });
+
+/**
+ * The signed-in user and the clinic they act for, or a redirect: to the login page without a
+ * session, to the clinic picker when the clinic is not settled.
+ */
+export const currentStaff = cache(async (): Promise<Staff> => {
+  const resolution = await resolveStaff();
+  if (resolution.kind === 'signed_out') redirect('/login');
+  if (resolution.kind === 'no_clinic') redirect('/choose-clinic');
+  return resolution.staff;
+});
+
+/**
+ * What currentStaff() gives, without its redirects: null without a session or a settled clinic.
+ * For what runs for every page, the login page and the clinic picker too, and must send no one
+ * anywhere: the clinic's time zone (src/i18n/request.ts). Never a check of who may do something.
+ */
+export async function settledStaff(): Promise<Staff | null> {
+  const resolution = await resolveStaff();
+  return resolution.kind === 'staff' ? resolution.staff : null;
+}

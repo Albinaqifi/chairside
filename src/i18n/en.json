@@ -45,6 +45,28 @@
     "import": "Import patients",
     "settings": "Settings"
   },
+  "patients": {
+    "count": "{count, plural, one {# patient} other {# patients}}",
+    "countAndFirst": "{count, plural, one {# patient} other {# patients}} · showing the first {shown}",
+    "import": "Import from Excel",
+    "search": "Search patients",
+    "searchPlaceholder": "Search by name or phone",
+    "filters": "Filters",
+    "all": "All",
+    "name": "Name",
+    "lastVisit": "Last visit",
+    "nextVisit": "Next visit",
+    "fullName": "{first} {last}",
+    "ageAndPhone": "{age, plural, one {# year} other {# years}} · {phone}",
+    "noPhone": "No phone",
+    "none": "—",
+    "archived": "Archived",
+    "deceased": "Deceased",
+    "noPatients": "No patients yet.",
+    "noMatch": "No patients match “{query}”.",
+    "failed": "The search did not work. Try again.",
+    "clinicChanged": "The clinic was changed in another tab. Reload the page to go on in the clinic chosen there."
+  },
   "placeholder": {
     "title": "Coming soon",
     "description": "This part of Chairside is still being built."
@@ -136,7 +158,9 @@
       "arrived": "In the chair",
       "completed": "Done",
       "cancelled": "Cancelled",
-      "noShow": "No-show"
+      "noShow": "No-show",
+      "archived": "Archived",
+      "deceased": "Deceased"
     },
     "card": {
       "heading": "Card",
