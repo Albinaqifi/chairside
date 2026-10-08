@@ -42,17 +42,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    {
-      name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        // The D-093 check's control serves /dev/components through Playwright (form-memory.spec.ts).
-        // Chromium counts such a page as a public one and stops it from reaching `next dev` on this
-        // machine (Local Network Access), so its script would never run. Every other page of a run
-        // is on localhost already.
-        launchOptions: { args: ['--disable-features=LocalNetworkAccessChecks'] },
-      },
-    },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
