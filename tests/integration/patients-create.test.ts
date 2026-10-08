@@ -8,7 +8,14 @@ import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { createStaffUser } from '@/modules/auth';
 import * as patients from '@/modules/patients';
-import { insertClinic, insertMembership, migratorPool, signInCookie, testEmail } from './fixtures';
+import {
+  captureOutput,
+  insertClinic,
+  insertMembership,
+  migratorPool,
+  signInCookie,
+  testEmail,
+} from './fixtures';
 import { insertRow } from './scheduling-fixtures';
 
 // E01-T02b, acceptance 1, 2, 4, 5 and 6: adding a patient and the likely-duplicate check, as the app
@@ -514,5 +521,83 @@ describe('siblings who share a phone (acceptance 5, D-033)', () => {
       [clinicA, fakePhone(1234)],
     );
     expect(rows.map((row) => row.id).sort()).toEqual([a.ana, ...added].sort());
+  });
+});
+
+// Tester (E01-T02b), test-strategy.md, "Tenant isolation": no input of the action names a clinic, so
+// another clinic named in the form is dropped, and the frame's clinic is checked against the request's.
+describe('another clinic gets no patient, however it is named', () => {
+  it("a clinic id among the form's fields is no input: the patient is the request's clinic's", async () => {
+    asFrontDeskOf(clinicA);
+    const [inB, auditB] = [await patientsIn(clinicB), await createdRowsIn(clinicB)];
+    const data = form({ firstName: 'Arben', lastName: 'Ezerovski' });
+    for (const name of ['clinicId', 'clinic_id']) data.append(name, clinicB);
+    const result = await createPatient(clinicA, data);
+    if (!result.ok) throw new Error(`refused: ${result.error.code}`);
+    const { rows } = await admin.query('select clinic_id from patients where id = $1', [
+      result.value.id,
+    ]);
+    expect(rows).toEqual([{ clinic_id: clinicA }]);
+    expect([await patientsIn(clinicB), await createdRowsIn(clinicB)]).toEqual([inB, auditB]);
+  });
+
+  it("sent with clinic A's id while the request is in clinic B: clinic_changed, nothing written in either", async () => {
+    asFrontDeskOf(clinicB);
+    const counts = async () => [
+      await patientsIn(clinicA),
+      await patientsIn(clinicB),
+      await createdRowsIn(clinicA),
+      await createdRowsIn(clinicB),
+    ];
+    const before = await counts();
+    expect(
+      await createPatient(clinicA, form({ firstName: 'Arben', lastName: 'Ezerovski' })),
+    ).toEqual({ ok: false, error: { code: 'clinic_changed' } });
+    expect(await counts()).toEqual(before);
+  });
+});
+
+// Tester (E01-T02b), test-strategy.md, "Logging": a way for a typed value to reach a database
+// error. The schema takes a date of birth in year 0 (no browser's date field sends one), the column
+// refuses it, and the database's message quotes it (22008). Whatever the answer, nothing typed
+// reaches the output, and nothing is written.
+describe('a create the database refuses logs nothing that was typed', () => {
+  it('a date of birth in year 0: no row, no audit row, none of the typed values in the output', async () => {
+    asFrontDeskOf(clinicA);
+    const [rowsBefore, auditBefore] = [await patientsIn(clinicA), await createdRowsIn(clinicA)];
+    const { output, result } = await captureOutput(() =>
+      createPatient(
+        clinicA,
+        form({
+          firstName: 'Shpëtim',
+          lastName: 'Dardha',
+          dateOfBirth: '0000-01-01',
+          phone: '070 001 306',
+          email: 'Shpetim.Dardha@Example.TEST',
+          guardianName: 'Blerina Dardha',
+          notes: 'Prefers afternoons.',
+        }),
+      ),
+    );
+    if (!result || result.ok) throw new Error('a date of birth in year 0 was stored');
+    // Answered internal today: then the wrapper's failure line was captured, without the values.
+    if (result.error.code === 'internal') expect(output).toContain('answered internal');
+    for (const value of [
+      'Shpëtim',
+      'Shpetim',
+      'shpetim',
+      'Dardha',
+      'dardha',
+      '0000-01-01',
+      '38970001306',
+      '070 001 306',
+      'afternoons',
+    ]) {
+      expect(output).not.toContain(value);
+    }
+    expect([await patientsIn(clinicA), await createdRowsIn(clinicA)]).toEqual([
+      rowsBefore,
+      auditBefore,
+    ]);
   });
 });
