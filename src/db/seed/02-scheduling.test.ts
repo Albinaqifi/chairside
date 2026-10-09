@@ -12,8 +12,9 @@ import {
 } from './seeded';
 
 // E01-T01b, acceptance 2 and 4: the rows the scheduling seed file makes for a fixed day, read
-// without a database. CI runs these tests again in Pacific/Auckland: the rows must not change with
-// the computer's time zone. The days are those of one week; the clocks go back on its Sunday.
+// without a database. The rows must not change with the computer's time zone; these tests run once,
+// in that zone (UTC in CI), as D-099 accepts for the seed. The days are those of one week; the
+// clocks go back on its Sunday.
 
 const WEEK = [
   { day: '2026-10-19', name: 'Monday' },

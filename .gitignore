@@ -15,6 +15,13 @@ next-env.d.ts
 coverage/
 *.tsbuildinfo
 
+# Playwright's output (E00-T06b): traces and reports, which hold scripts, and the front desk's
+# session that the end-to-end checks share.
+/test-results/
+/playwright-report/
+/blob-report/
+/tests/e2e/.auth/
+
 # Logs
 npm-debug.log*
 pnpm-debug.log*

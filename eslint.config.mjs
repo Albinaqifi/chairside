@@ -264,5 +264,17 @@ export default defineConfig([
     files: ['src/app/(auth)/login/login-form.tsx'],
     rules: { 'jsx-a11y/no-autofocus': 'off' },
   },
-  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'coverage/**']),
+  globalIgnores([
+    '.next/**',
+    'out/**',
+    'build/**',
+    'next-env.d.ts',
+    'coverage/**',
+    // Playwright's output (E00-T06b): its HTML report holds scripts, and ESLint does not read
+    // .gitignore.
+    'test-results/**',
+    'playwright-report/**',
+    'blob-report/**',
+    'tests/e2e/.auth/**',
+  ]),
 ]);

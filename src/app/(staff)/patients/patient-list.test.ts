@@ -170,7 +170,7 @@ describe("a visit's date and time, in the clinic's time zone whatever the comput
   // The last visit at 23:30 UTC on 12 March: 13 March in Skopje and in Auckland. The next at 08:00
   // UTC on Friday 9 October: 10:00 in Skopje (summer time), 21:00 in Auckland (daylight time). The
   // computer runs in one zone only, so the three cases cannot all pass when the zone is the
-  // computer's; CI runs them again in Pacific/Auckland.
+  // computer's, wherever they run (CI runs them once, in UTC: D-099).
   const visits = row({
     lastVisit: '2026-03-12T23:30:00.000Z',
     nextVisit: '2026-10-09T08:00:00.000Z',

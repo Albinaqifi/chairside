@@ -11,8 +11,8 @@ import {
 } from './seed-day';
 
 // E01-T01b: the seed's day and its week, without a time library and never in the computer's own
-// time zone. CI runs these tests again with TZ=Pacific/Auckland, where most of the moments below
-// fall on another date than in Skopje, so a helper that read the computer's zone would fail there.
+// time zone. These tests run once, in the computer's zone (UTC in CI), so a helper that read that
+// zone could pass here; D-099 accepts it, as the seed runs on this machine only.
 
 describe('the day it is in the clinic', () => {
   it('is the date in the zone of the clinic, not in UTC and not on this computer', () => {
