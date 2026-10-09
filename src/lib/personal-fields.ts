@@ -81,8 +81,8 @@ export const PERSONAL_FIELD_WORDS = ['password', 'secret'] as const;
  * in a plural of an ending is personal too: every ending with `s` or `es` added (`patientNames`,
  * `phones`, `addresses`, `treatmentTypes`), and the three whose English plural is neither
  * (`requestBodies`, `diagnoses`, `datesOfBirth`). Such a field holding a list of records
- * (`recipients: [{ id, phone }]`) is cleaned record by record by the logger, so the ids stay
- * (isPluralPersonalField, logger.ts); anything else it holds is dropped whole.
+ * (`recipients: [{ id, phone }]`) keeps only the records' ids in the logger (`[{ id }]`,
+ * isPluralPersonalField, logger.ts); anything else it holds is dropped whole.
  */
 const PLURAL_SUFFIXES = ['s', 'es'];
 const IRREGULAR_PLURALS = ['bodies', 'diagnoses', 'datesOfBirth'];
@@ -131,7 +131,8 @@ export function isPersonalField(field: string): boolean {
 /**
  * True if a field with this name is personal only as the plural of an ending (`recipients`,
  * `phones`), not by a name, an ending or a word of its own (`notes` is an ending itself): the logger
- * cleans such a field record by record when it holds a list of records, and drops it otherwise.
+ * keeps only the ids of such a field's records when it holds a list of records, and drops it
+ * otherwise.
  */
 export function isPluralPersonalField(field: string): boolean {
   return personalKind(field) === 'plural';

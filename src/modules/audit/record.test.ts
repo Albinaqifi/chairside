@@ -46,7 +46,7 @@ describe('audit entry metadata', () => {
   });
 
   // E00-T05b: the plurals personal-fields.ts adds. Metadata holds ids and codes, so a plural is
-  // refused whatever it holds, a list of records too (the logger cleans those record by record).
+  // refused whatever it holds, a list of records too (the logger keeps only their ids).
   it.each([
     ['a list of values', { phones: [MARKER] }],
     ['a list of records', { recipients: [{ id: 'recipient-1' }] }],

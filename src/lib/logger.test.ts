@@ -282,6 +282,49 @@ describe('logger', () => {
     }
   });
 
+  // E00-T05b review (required change 1, `data`): a record under a personal plural holds what the
+  // singular holds, so it keeps only its ids, whatever its other fields are called: `first`,
+  // `number`, `channel` and `value` are no personal names, but under `names`, `phones`, `contacts`
+  // or `tokens` they hold a name, a phone number, a contact or a token.
+  it('keeps only the ids of the records a plural holds, nested lists alike', () => {
+    const { logger, output } = capture();
+    logger.info({
+      names: [{ id: 'name-1', first: MARKER, last: MARKER }],
+      phones: [{ id: 'phone-1', number: MARKER }],
+      contacts: [{ id: 'contact-1', channel: MARKER, value: MARKER }],
+      tokens: [{ id: 'token-1', value: MARKER }, [{ id: 'token-2', value: MARKER }]],
+      recipients: [
+        {
+          patientId: 'patient-1',
+          appointmentIds: ['appointment-1'],
+          clinic_id: 'clinic-1',
+          message_ids: ['message-1'],
+          waId: MARKER,
+          person: { id: 'person-1', first: MARKER },
+        },
+      ],
+      requestId: 'request-1',
+    });
+
+    expect(output()).not.toContain(MARKER);
+    const { names, phones, contacts, tokens, recipients, requestId } = JSON.parse(output());
+    expect({ names, phones, contacts, tokens, recipients, requestId }).toEqual({
+      names: [{ id: 'name-1' }],
+      phones: [{ id: 'phone-1' }],
+      contacts: [{ id: 'contact-1' }],
+      tokens: [{ id: 'token-1' }, [{ id: 'token-2' }]],
+      recipients: [
+        {
+          patientId: 'patient-1',
+          appointmentIds: ['appointment-1'],
+          clinic_id: 'clinic-1',
+          message_ids: ['message-1'],
+        },
+      ],
+      requestId: 'request-1',
+    });
+  });
+
   it('drops a plural whole that holds anything but a list of records', () => {
     class Held {
       value: string;

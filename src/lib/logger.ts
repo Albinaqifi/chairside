@@ -14,10 +14,10 @@ import { messageWithoutValues, restack } from './query-errors';
  * As a safety net, every field listed in personal-fields.ts is dropped before a line is
  * written, at any depth: in the logged object, in printf-style arguments (`%s`, `%o`, `%O`,
  * `%j`), in child-logger bindings, and inside errors (including their causes). A field personal
- * only as a plural (`recipients`) that holds a list of records is cleaned record by record
- * instead, so the records' ids stay. The values a
- * failed database query was sent are removed from error messages and stacks too. pino's own
- * `redact` option is not used because it only matches fixed paths.
+ * only as a plural (`recipients`) that holds a list of records keeps only the records' ids, at
+ * any depth, and drops the rest, as the singular is dropped whole. The values a failed database
+ * query was sent are removed from error messages and stacks too. pino's own `redact` option is
+ * not used because it only matches fixed paths.
  *
  * Text cannot be cleaned: pass errors and values as fields or arguments, never inside the message.
  */
@@ -79,29 +79,44 @@ function cleanArgument(value: unknown): unknown {
   return cleaned;
 }
 
-/** Copies a value without personal fields. Errors become plain objects. */
-function clean(value: unknown, ancestors = new WeakSet<object>()): unknown {
+/**
+ * Copies a value without personal fields. Errors become plain objects. With `idsOnly`, under a
+ * personal plural, an object keeps only its ids (isIdField), and so does everything they hold.
+ */
+function clean(value: unknown, ancestors = new WeakSet<object>(), idsOnly = false): unknown {
   if (value === null || typeof value !== 'object') return value;
   if (ancestors.has(value)) return '[Circular]';
 
   ancestors.add(value);
   try {
-    if (value instanceof Error) return clean(errorToObject(value), ancestors);
+    if (value instanceof Error) return clean(errorToObject(value), ancestors, idsOnly);
     const toJSON = (value as { toJSON?: unknown }).toJSON;
-    if (typeof toJSON === 'function') return clean(toJSON.call(value), ancestors);
-    if (Array.isArray(value)) return value.map((item) => clean(item, ancestors));
+    if (typeof toJSON === 'function') return clean(toJSON.call(value), ancestors, idsOnly);
+    if (Array.isArray(value)) return value.map((item) => clean(item, ancestors, idsOnly));
 
     const copy: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value)) {
-      // A plural (`recipients`) holding records is cleaned record by record, so their ids stay;
-      // holding anything else, it is dropped like the singular (personal-fields.ts).
-      const kept = !isPersonalField(key) || (isPluralPersonalField(key) && isListOfRecords(item));
-      if (kept) copy[key] = clean(item, ancestors);
+      if (idsOnly ? isIdField(key) : !isPersonalField(key)) {
+        copy[key] = clean(item, ancestors, idsOnly);
+      } else if (!idsOnly && isPluralPersonalField(key) && isListOfRecords(item)) {
+        // A plural (`recipients`) holding records keeps only their ids: a record holds what the
+        // singular holds, `{ first }` under `names` as under `name`. Holding anything else, it is
+        // dropped like the singular (personal-fields.ts).
+        copy[key] = clean(item, ancestors, true);
+      }
     }
     return copy;
   } finally {
     ancestors.delete(value);
   }
+}
+
+/**
+ * An id's name: `id`, or one ending in `Id`, `Ids`, `_id` or `_ids` (`patientId`, `clinic_ids`)
+ * that is not personal itself (`waId`, a phone number, goes).
+ */
+function isIdField(key: string): boolean {
+  return (key === 'id' || /(?:Ids?|_ids?)$/.test(key)) && !isPersonalField(key);
 }
 
 /**
