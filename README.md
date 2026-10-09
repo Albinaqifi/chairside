@@ -13,6 +13,8 @@ Scheduling for small dental clinics, with automatic patient reminders. What and 
 - **Git**.
 - **GitHub CLI** (`gh`), logged in with `gh auth login`: agents use it to open pull requests.
   On Windows: `winget install GitHub.cli`.
+- **The test browsers**, for `pnpm test:e2e` only, once after `pnpm install` (step 2) and again
+  after a Playwright upgrade: `pnpm exec playwright install chromium firefox webkit` (about 500 MB).
 
 The commands below work in PowerShell, Command Prompt and macOS or Linux terminals. The one
 command that differs is copying the settings file (step 3).
@@ -104,6 +106,7 @@ run `pnpm db:reset` to move it to the current week.
 | `pnpm check` | Runs every check a change must pass: formatting, lint, types, unit tests and database tests. The database must be running. |
 | `pnpm test` | Unit tests only (fast, no database). |
 | `pnpm test:integration` | Tests against the real database. They use their own database (`chairside_test`), so your local data is not touched. |
+| `pnpm test:e2e` | The end-to-end journeys in Chromium, Firefox and WebKit. Run `pnpm build` first and stop `pnpm dev`. They use their own database (`chairside_e2e`). |
 | `pnpm db:reset` | Deletes the local database, builds it again from the migrations and fills it with the seed. |
 | `pnpm db:seed` | Adds the seed to the local database. A second run adds nothing. |
 | `pnpm format` | Fixes code formatting. |
@@ -118,6 +121,8 @@ run `pnpm db:reset` to move it to the current week.
   feature. Copy the two `BETTER_AUTH_` lines from `.env.example` into it.
 - **`pnpm typecheck` fails on a page file that no longer exists:** old generated types in
   `.next/`. Delete the `.next` folder and run it again.
+- **`pnpm dev` answers "not found" for a page that exists:** Next.js sometimes starts that way on
+  Windows. Save the page's file (no change needed), or stop and start `pnpm dev` again.
 - **Cannot connect to the database:** start Docker Desktop, then `docker compose up -d --wait`.
 - **Port 5433 is already in use:** another program uses it. Stop that program, or change the
   port in `docker-compose.yml` and in the three database URLs in `.env`.

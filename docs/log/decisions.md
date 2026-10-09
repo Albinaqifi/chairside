@@ -1871,3 +1871,28 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a Monday run fails in Firefox or WebKit alone (then they run on every pull
   request); a run takes over 10 minutes; the builder's three-browser run takes more than a few
   minutes; a journey needs a set "now" before E00-T06c is built.
+
+### D-101 · `clinic:create`: the first owner chooses a password through a one-time link; the script writes as the app role; on a host it runs in the image, as the worker does
+- **Origin:** E00-T05b's Ready pass, in E00-T06b's Done pass, 2026-10-09. **Owner, 2026-10-09:** the
+  first owner gets in through a one-time link to a page where they choose their own password; the
+  link works for 3 days; the script uses the app's own database login, given the right to add a
+  clinic and its members (login, links, tenant isolation: agent rule 4). The rest is the architect's.
+- **What:**
+  - The link carries the auth library's own password-reset token for the new person, who has no
+    password until then: at least 128 random bits, one use, 3 days, only its SHA-256 hash stored
+    (`verification.storeIdentifier: 'hashed'`), after `#` so no request log or Referer holds it. The
+    page `/login/set-password` sends it with the new password to the library's `/reset-password`.
+  - Migration 0004 grants the app role `INSERT` on `clinics` and `memberships`, nothing more. The
+    script writes the clinic, the membership and its audit row inside `withTenant` for the new
+    clinic, so Row-Level Security binds it. A page or an action cannot add a clinic with it: its
+    `withTenant` is for its own clinic, which exists already.
+  - It runs on this machine, and against a hosted database only with an explicit flag: there, in the
+    app's image as the worker runs (E00-T07), never from a development machine against production
+    (D-044). This answers D-090's "Revisit if" for E00-T05b. No new setting.
+- **Why:** nobody but the owner ever knows their password, and neither a library nor a table is
+  added. As the migration role the script would run past the policies, and a module function that
+  relies on them (`clinicPlace(tx)`) would read any clinic's rows (E01-T02a critical review). The
+  worker needs our TypeScript in the image anyway.
+- **Revisit if:** E04-T00 gives invites their own token (`staff_invites.token_hash`,
+  `data-model.md`) rather than this one; a page or action must create a clinic (none does in v1,
+  D-042); the host cannot run a one-off command in the image.
