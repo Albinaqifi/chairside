@@ -33,6 +33,12 @@ export default defineConfig({
   globalSetup: './tests/e2e/global-setup.ts',
   // A journey that fails once is a finding, never retried.
   retries: 0,
+  // A quarter of the logical cores, not Playwright's half: each worker runs a browser, and both
+  // servers and the database share the machine with them. On a 16-thread machine, 8 workers made
+  // every step about twice as slow as 4 did, for no shorter a run, and `next dev`'s pages now and then
+  // outlasted their waits without a fault (E00-T06b tester, after fix round 2: the D-093 check after
+  // Back). On CI's 2-core runner this is 1, as Playwright's default was.
+  workers: '25%',
   forbidOnly: !!process.env.CI,
   reporter: 'list',
   use: {

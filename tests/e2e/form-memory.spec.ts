@@ -19,6 +19,18 @@ import { serveWithoutFormAutocomplete } from './without-form-autocomplete.ts';
 
 type Return = 'reload' | 'back';
 
+// Each test loads `next dev`'s page three times, the control through a server of its own: in a full
+// run up to 25 s at 4 workers, against Playwright's 30 s (E00-T06b fix round 3, measured).
+test.describe.configure({ timeout: 60_000 });
+
+/**
+ * How long the check waits for `next dev`'s page to come back and run its script. In a full run it
+ * renders and hydrates while the run's other browsers load it too, and it has taken longer than
+ * Playwright's 5 s without a fault (E00-T06b tester, after fix round 2: Firefox after Back; fix
+ * round 3: 5.7 s for a first visit at 8 workers). What the check then reads keeps the 5 s.
+ */
+const DEV_PAGE = { timeout: 15_000 };
+
 const GIVES_FIELDS_BACK: Record<string, Record<Return, boolean>> = {
   chromium: { reload: false, back: true },
   firefox: { reload: true, back: true },
@@ -33,7 +45,7 @@ const LOADED_BY: Record<Return, NavigationTimingType> = { reload: 'reload', back
 /** Chooses a value in every field of the demo form, each its own action, and waits for each. */
 async function chooseInEveryField(page: Page): Promise<void> {
   const form = demoForm(page);
-  await expect(form.send).toBeEnabled();
+  await expect(form.send).toBeEnabled(DEV_PAGE);
   await form.note.fill('A demo note');
   await form.code.fill('1234');
   await form.details.fill('Demo details');
@@ -61,9 +73,9 @@ async function leaveAndComeBack(page: Page, how: Return, origin: string): Promis
     await page.goto(`${origin}/`);
     await page.goBack();
   }
-  await expect(page).toHaveURL(`${origin}/dev/components`);
+  await expect(page).toHaveURL(`${origin}/dev/components`, DEV_PAGE);
   // The script has run: what React and Radix do with a restored value has happened.
-  await expect(demoForm(page).send).toBeEnabled();
+  await expect(demoForm(page).send).toBeEnabled(DEV_PAGE);
   expect(
     await page.evaluate(() => 'd093OldDocument' in window),
     'the page came back as a new document, not from the back/forward cache',
