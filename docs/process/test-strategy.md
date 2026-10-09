@@ -106,7 +106,10 @@ Property tests:
 ## End-to-end journeys (Playwright)
 
 Keep this list short. Each runs against a fresh seeded database, the fake channel and a clock
-the test controls (E00-T06c, from the first journey that needs it; J1 does not, D-100).
+the test controls (E00-T06c, from the first journey that needs it; J1 does not, D-100). A journey
+writes out every address it opens, the build's (`APP` in `tests/e2e/servers.ts`): Playwright's
+default base URL is `next dev`'s, so a relative address would test `next dev` without an error
+(a review check, E00-T06b delta review).
 
 | # | Journey | Added in |
 |---|---|---|

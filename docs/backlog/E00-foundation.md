@@ -1153,51 +1153,110 @@ Audit rows for seeded data.
 
 ### E00-T05b · `clinic:create`: the operator's script for a new clinic
 
-- **Role:** builder · **Risk:** critical (login: the first owner's account and their way in;
-  production configuration: a hosted database) · **Depends on:** E00-T03 (`audit.record()`),
-  E00-T05a (tsx, the fake-data rules)
-- **Read:** `security` (Part 1, sections 2 and 7) · `overview` (Environments) · D-042, D-062,
-  D-063, D-090 · the architect section of `handoffs/E00-T05b.md`
+- **Role:** builder · **Risk:** critical (a migration: grants to the app role; login: the first
+  owner's account, a one-time setup link and its page; production configuration: a hosted
+  database) · **Depends on:** E00-T03 (`audit.record()`), E00-T04a (tokens, components, texts),
+  E00-T05a (tsx, the fake-data rules), E00-T06b (the end-to-end checks), E00-T09 (the login form's
+  pattern), E01-T02a (the phone package, D-097), all Done
+- **Read:** `security` (Part 1, sections 1, 2, 6, 7 and 8) · `overview` (Environments) ·
+  `design-reference` ("Wording style", "Screens the demo does not have") · `scope-v1` ("Navigation
+  and roles") · D-042, D-062, D-063, D-076, D-090, D-097, D-100, D-101 · the architect section of
+  `handoffs/E00-T05b.md`
 
 **Why.** There is no sign-up page (D-042): the operator creates each real clinic and its first
 owner with a script, first on staging (E00-T07), later in production. The second half of E00-T05
-(D-090), refined in E00-T06b's Done pass, the task before it in the order.
+(D-090). The owner chose how the first owner gets in: a one-time link to a page where they choose
+their own password, so nobody else ever knows it (D-101).
 
 **Do.**
-- `pnpm clinic:create`: creates a clinic (name, time zone, locale, currency, country) and its first
-  owner (email, name) with the role `owner`, and writes an audit row through `audit.record()`.
-- The first owner's way in: a one-time setup link the script prints, with which they choose a
-  password. What the link opens is decided with the owner when this task is refined (login, agent
-  rule 4); E04-T02's invites and password reset need the same kind of link.
-- Settled when this task is refined: the database role it writes clinics and memberships with on a
-  hosted database (the app role cannot: the migration role, a grant or a function), and where it
-  runs, since production credentials never reach a development machine (`overview.md`) and the
-  host's image holds no development packages such as tsx (D-090). The migration role owns the tables,
-  so no policy binds it: a module function that relies on the policy alone, such as `clinicPlace(tx)`
-  or `patients.create`, would read any clinic's row there (E01-T02a critical review).
-- It refuses a time zone Intl does not know and a country the phone package does not support
-  (libphonenumber-js's `isSupportedCountry`, D-097), before it writes anything: the database checks
-  neither, and a clinic with such a zone fails every page for its members, the login page and the
-  clinic picker included, so they can neither switch clinic nor log out (E01-T02a test, `slice`).
-- Running it twice with the same owner email creates no duplicate and does not crash.
-- It refuses a database that is not on this machine without an explicit flag.
+- **`pnpm clinic:create`**, a script in `src/db/` run with tsx, as the seed is (D-090): it creates a
+  clinic (its name; its time zone, country, currency and locale, North Macedonia's unless given:
+  `Europe/Skopje`, `MK`, `MKD`, `en`, D-049, D-053) and its first owner (email, name) with the role
+  `owner`, and prints the owner's setup link.
+- **As the app role** (owner, D-101): migration 0004 (`pnpm db:generate --custom --name <what>`)
+  grants `chairside_app` `INSERT` on `clinics` and on `memberships`, nothing more. The script makes
+  the person through the auth module (D-063), then, inside `withTenant` for the new clinic's id, the
+  clinic, the membership and one audit row (`clinic.created`, actor `system`, the clinic as its
+  entity; ids and codes only), each through its own module's function (`tenancy` owns `clinics`,
+  `auth` owns `memberships`). It never connects as the migration role, so the policies bind it as
+  they bind every page.
+- **No password until they choose one:** the person is made without a password login, so nobody can
+  sign in as them before the link is used. The seed's people keep theirs.
+- **The setup link** (owner, D-101): `BETTER_AUTH_URL`, the page's path, then the token after `#`,
+  which a browser never sends, so no request log and no Referer holds it. The token is the auth
+  library's own password-reset token for that person (identifier `reset-password:` and the token,
+  its value the person's id, made through the library's internal adapter as `createStaffUser()`
+  makes people): at least 128 random bits, URL-safe, one use, valid 3 days (owner), and only its
+  SHA-256 hash stored (`verification.storeIdentifier: 'hashed'` in `better-auth.ts`, which the
+  library's `/reset-password` reads too). The script prints the link on the terminal; no logger
+  sees it.
+- **The page** `/login/set-password`, beside the login page (the proxy lets `/login…` through
+  untouched, `src/proxy.ts`), public on purpose and saying so in a comment: a heading, a
+  new-password field (`autoComplete="new-password"`) and a button; the layout is the builder's
+  proposal, flagged for the owner (`design-reference.md`). It sends the password with the token to
+  the library's `/reset-password` (`authClient.resetPassword`), which checks its length, sets it
+  (making the person's password login when there is none), spends the token and ends the person's
+  sessions; then the page says the password is set and links to the login page. Like the login form
+  (D-076): it posts to its own URL, its button is disabled until the script runs, a `<noscript>`
+  line. A token that is missing, wrong, used or expired gets one message, the same for each.
+  Opening the page changes nothing. Its texts in `en.json`.
+- **Before anything is written**, it refuses, with a message that names the field and no stack: a
+  time zone Intl does not know and a country the phone package does not support
+  (`isSupportedCountry`, D-097) (the database checks neither, and a clinic with such a zone fails
+  every page for its members, the login page and the clinic picker included, so they can neither
+  switch clinic nor log out: E01-T02a test, `slice`); a currency that is not three capital letters;
+  a locale other than `en`; an email that is not one; an empty name.
+- **Run again with the same owner email**, it makes no second person or clinic and ends with a
+  clear message, writing nothing. One exception: a person a broken run left behind (no clinic, no
+  password) is taken up, so the same command finishes what the broken run began.
+- **Where it runs** (D-101): on this machine against the local database; against a database that
+  is not on this machine only with an explicit flag, checked before it connects (`connectionTarget()`
+  in `src/db/reset.ts`). On a host it runs inside the app's image, the way the worker does (E00-T07),
+  never from a development machine against production (D-044). It reads the app's settings only
+  (`DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`): nothing new in `.env.example`.
 - **The logger's net, plurals** (E01-T02b, `data`): `src/lib/personal-fields.ts` also drops a field
   whose name ends in a plural of an ending it lists, an `s` or `es` added (`names`, `phones`,
   `addresses`, `treatmentTypes`), with `logger.test.ts` cases and its other cases unchanged.
-- `docs/runbook.md` (E00-T07 starts it): how to create a clinic.
+- **Docs.** `docs/runbook.md`, started here (E00-T07 adds the host's part): how to create a clinic,
+  what its link does, that the operator sends it to the owner by hand, and that a link that expired
+  unused is answered on staging by a new clinic under another email until E04-T02. `CLAUDE.md`:
+  `pnpm clinic:create` in Commands, in the folder structure's `src/db/` line. `README.md`: the
+  command under "Everyday commands".
 
-**Out of scope.** Inviting other staff (E04-T02). An admin screen (D-042). The seed (E00-T05a).
+**Out of scope.** Inviting other staff, "forgot password" and a new link for one that expired
+(E04-T02: the same page and the same kind of token, D-101). Sending the link by email (the operator
+sends it by hand). Two-factor for owners (E04-T03). Running it on a host (E00-T07). An admin screen
+(D-042). The seed (E00-T05a).
 
 **Acceptance.**
-- [ ] `clinic:create` creates a clinic whose owner signs in after following the setup link.
-- [ ] Running it twice with the same owner email creates no duplicate and ends with a clear message.
-- [ ] Without the explicit flag it refuses a database that is not on this machine (test).
-- [ ] It refuses a time zone Intl does not know (`Europe/Skopie`) and an unsupported country (`UK`),
-      writing nothing (test).
-- [ ] Its audit row names the clinic and the action; no email or name reaches the logs.
+- [ ] `clinic:create` makes a clinic and its owner; the owner chooses a password through the printed
+      link and signs in with it; before that, nobody can sign in as them (test, through the
+      library's routes).
+- [ ] The link works once and for 3 days: a used, expired, wrong or missing token changes nothing,
+      and the page shows one and the same message for each (test).
+- [ ] The database holds only the token's SHA-256 hash; the link reaches the terminal and nothing
+      else: no log line, no audit row (test).
+- [ ] With migration 0004's grants revoked (`withoutGrant`, `tests/integration/fixtures.ts`), a run
+      writes no clinic and no membership; 0004 grants `INSERT` on `clinics` and `memberships` and
+      nothing else; nothing in the script reads `MIGRATION_DATABASE_URL` (test, and the migration
+      read).
+- [ ] Run twice with the same owner email: no second person or clinic, nothing written, a clear
+      message. A run that broke after making the person (the clinic's insert refused) is finished by
+      the same command run again (test).
+- [ ] Without the explicit flag it refuses a database that is not on this machine, before it
+      connects (test).
+- [ ] It refuses a time zone Intl does not know (`Europe/Skopie`), an unsupported country (`UK`), a
+      malformed email or currency and an empty name, writing nothing, each with a message naming
+      the field (test).
+- [ ] Its audit row names the clinic and the action; no email, name or token reaches the logs or
+      the audit row (test).
+- [ ] End to end, in each browser: a link the script made opens the page; a password chosen with
+      the keyboard alone is set and the page says so; the page passes the accessibility check;
+      without JavaScript its form sends nothing; the run still signs in at most seven times
+      (`tests/e2e/`, D-100).
 - [ ] The logger drops a plural of each ending it lists (`names`, `phones`, `addresses`,
       `treatmentTypes` among them), its other cases unchanged (`logger.test.ts`).
-- [ ] `pnpm check` and `pnpm build` pass.
+- [ ] `pnpm check`, `pnpm build` and `pnpm test:e2e` (all three browsers) pass.
 
 ---
 
@@ -1312,13 +1371,18 @@ unless the test sets "now". Split from E00-T06b, whose J1 does not need it (D-10
 ### E00-T07 · Staging: web, worker and database deployed
 
 - **Role:** builder + owner · **Risk:** critical · **Depends on:** E00-T05b, E00-T06b, E00-T09 · **Needs:** Q-07 (working assumption accepted for staging)
-- **Read:** `overview` (The shape; Environments; Things that keep it running) · `security` (Part 1, section 7) · D-005, D-007, D-013, D-075, D-077
+- **Read:** `overview` (The shape; Environments; Things that keep it running) · `security` (Part 1, section 7) · D-005, D-007, D-013, D-075, D-077, D-090, D-101
 
 **Why.** A walking skeleton in a real environment exposes deployment problems while the app is
 still tiny, and gives every later milestone a place to be demonstrated.
 
 **Do.**
 - One Dockerfile; the same image runs as `web` or `worker`.
+- **The image runs our TypeScript outside Next.js:** the worker, whose imports use `@/`, and
+  `pnpm clinic:create` the same way (E00-T05b, D-101), as a one-off command on the host with that
+  environment's settings and the script's explicit flag. tsx in the image or a bundle made at build
+  time is this task's choice, with a decision entry if it moves or adds a package (D-090). The owner
+  makes staging's first clinic with it.
 - Worker entry point: starts pg-boss, registers one repeating "heartbeat" job that logs and
   pings an external monitor URL if configured, shuts down gracefully. The worker's folder joins
   `chairside/database-access`'s lists: pg-boss, and `withTenant` for the job handler (D-071, D-077).
@@ -1342,9 +1406,10 @@ still tiny, and gives every later milestone a place to be demonstrated.
   form that names no server action (board, Discovered, E00-T08 tester note 5; D-075). Nor is
   `The destination stream closed early`, which any browser causes by leaving a page before it has
   loaded (E01-T02b test): sent, either would spend the Sentry quota on noise.
-- `docs/runbook.md` started: how to deploy, roll back, read logs, run a migration, create a clinic.
-  It says a "Failed to find Server Action" log line is noise unless it follows a deploy, and that
-  `The destination stream closed early` is always noise.
+- `docs/runbook.md` (E00-T05b starts it with how to create a clinic): how to deploy, roll back,
+  read logs, run a migration, and run `clinic:create` on the host. It says a "Failed to find Server
+  Action" log line is noise unless it follows a deploy, and that `The destination stream closed
+  early` is always noise.
 
 **Owner action.** Create the hosting, Sentry and monitor accounts; enter secrets in the host's
 secret store (agents never see them); run `clinic:create` on staging.
@@ -1352,8 +1417,9 @@ secret store (agents never see them); run `clinic:create` on staging.
 **Out of scope.** Production environment (E07). Custom domain (Q-03). Any real job besides the heartbeat.
 
 **Acceptance.**
-- [ ] Staging URL serves the login page over HTTPS; the owner of a clinic `clinic:create` made there
-      can log in (the seed runs on this machine only, D-090).
+- [ ] Staging URL serves the login page over HTTPS; the owner of a clinic `clinic:create` made there,
+      run in the image on the host, chooses a password through its setup link and logs in (the seed
+      runs on this machine only, D-090).
 - [ ] The worker runs as its own process and the heartbeat job fires on schedule.
 - [ ] `/api/health` turns unhealthy when the worker is stopped (demonstrated).
 - [ ] A deliberate test error appears in Sentry with no personal fields in it.

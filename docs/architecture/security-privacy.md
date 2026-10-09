@@ -26,6 +26,10 @@ This document has two parts: rules that code must follow, and the gate before re
 
 ### 2. Login and permissions
 - Passwords, sessions and 2FA come from the auth library. Never hand-rolled.
+- Outside the local seed, a person chooses their own password, through a one-time link: nobody else
+  ever knows it. `clinic:create` prints one for a clinic's first owner (D-101). Its token has at
+  least 128 random bits, only its SHA-256 hash is stored, it works once and for 3 days, and it sits
+  after `#`, so no request log holds it; a used, expired or wrong link gets one and the same answer.
 - 2FA is mandatory for owners and for anyone with the `export` or `import` permission.
 - Every server action declares the permission it needs; the wrapper checks it. Hiding a
   button in the UI is never the check.
