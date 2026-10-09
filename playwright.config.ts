@@ -67,7 +67,10 @@ export default defineConfig({
       // /dev/components lives here: a production build answers 404 for it (E00-T04c).
       name: 'next dev',
       command: `pnpm exec next dev --port ${DEV_PORT}`,
-      url: `${DEV}/login`,
+      // Ready once it takes connections, not once a page answers: next dev can start with one of its
+      // pages answering 404 until a file of the page changes, /login too. The global setup opens the
+      // pages the checks use and brings such a page back (global-setup.ts).
+      port: DEV_PORT,
       env: e2eEnv(database, DEV),
       reuseExistingServer: false,
       timeout: 120_000,

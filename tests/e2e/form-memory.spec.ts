@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { serveComponentsPage, type ComponentsPageServer } from './components-page-server.ts';
 import { demoForm } from './demo-form.ts';
-import { DEV } from './servers.ts';
-import { serveWithoutFormAutocomplete } from './without-form-autocomplete.ts';
 
 // D-093 in a real browser (E00-T06b; D-095): a staff form keeps nothing in the browser. On the demo
 // form of /dev/components, a value is chosen in every field, then the page comes back after a
@@ -11,16 +10,22 @@ import { serveWithoutFormAutocomplete } from './without-form-autocomplete.ts';
 // what the screen does not show. The document read must be the one the reload or the Back loaded,
 // by its navigation type: a page that loads itself again would turn a Back into a reload.
 //
-// The control: served without the form's `autocomplete="off"` (without-form-autocomplete.ts), the
-// same steps get the values back, where the browser gives fields back at all. Measured with
-// Playwright 1.63.0 on Windows (2026-10-08): with the attribute, no browser gives a field back;
-// without it, Firefox does after a reload and after Back, Chromium and WebKit after Back only.
-// Where a browser gives nothing back, its control is skipped and says why.
+// The page comes from a server of the test's own in front of `next dev` (components-page-server.ts),
+// in an answer no browser shows again from its cache: after Back the page comes from the server and
+// runs `next dev`'s script without the debug data `next dev` keeps in the browser, which a page from
+// the cache waits for (the last test below). The browsers give fields back as from their cache.
+//
+// The control: the same server without the form's `autocomplete="off"`, the same steps get the
+// values back, where the browser gives fields back at all. Measured with Playwright 1.63.0 on
+// Windows (2026-10-08, and again on 2026-10-09 with the page from the server after Back): with the
+// attribute, no browser gives a field back; without it, Firefox does after a reload and after Back,
+// Chromium and WebKit after Back only. Where a browser gives nothing back, its control is skipped
+// and says why.
 
 type Return = 'reload' | 'back';
 
-// Each test loads `next dev`'s page three times, the control through a server of its own: in a full
-// run up to 25 s at 4 workers, against Playwright's 30 s (E00-T06b fix round 3, measured).
+// Each test loads `next dev`'s page up to three times, through the test's own server: in a full run
+// up to 25 s at 4 workers, against Playwright's 30 s (E00-T06b fix round 3, measured).
 test.describe.configure({ timeout: 60_000 });
 
 /**
@@ -90,23 +95,38 @@ async function leaveAndComeBack(page: Page, how: Return, origin: string): Promis
   ).toBe(LOADED_BY[how]);
 }
 
+/** Runs `steps` with the components page served for this test alone (components-page-server.ts). */
+async function withComponentsPage(
+  options: { stripFormAutocomplete: boolean },
+  steps: (server: ComponentsPageServer) => Promise<void>,
+): Promise<void> {
+  const server = await serveComponentsPage(options);
+  try {
+    await steps(server);
+  } finally {
+    await server.close();
+  }
+}
+
 for (const how of ['reload', 'back'] as const) {
   test(`after ${AFTER[how]}, every field of the demo form shows its default`, async ({ page }) => {
-    await page.goto(`${DEV}/dev/components`);
-    await chooseInEveryField(page);
-    await leaveAndComeBack(page, how, DEV);
+    await withComponentsPage({ stripFormAutocomplete: false }, async ({ origin }) => {
+      await page.goto(`${origin}/dev/components`);
+      await chooseInEveryField(page);
+      await leaveAndComeBack(page, how, origin);
 
-    const form = demoForm(page);
-    await expect(form.form).toHaveAttribute('autocomplete', 'off');
-    await expect(form.note).toHaveValue('');
-    await expect(form.code).toHaveValue('');
-    await expect(form.details).toHaveValue('');
-    await expect(form.choice).toHaveValue('');
-    await expect(form.checkbox).not.toBeChecked();
-    await expect(form.switch).not.toBeChecked();
-    await expect(form.answer('done')).toBeChecked();
-    await expect(form.hiddenCheckbox).not.toBeChecked();
-    await expect(form.hiddenSwitch).not.toBeChecked();
+      const form = demoForm(page);
+      await expect(form.form).toHaveAttribute('autocomplete', 'off');
+      await expect(form.note).toHaveValue('');
+      await expect(form.code).toHaveValue('');
+      await expect(form.details).toHaveValue('');
+      await expect(form.choice).toHaveValue('');
+      await expect(form.checkbox).not.toBeChecked();
+      await expect(form.switch).not.toBeChecked();
+      await expect(form.answer('done')).toBeChecked();
+      await expect(form.hiddenCheckbox).not.toBeChecked();
+      await expect(form.hiddenSwitch).not.toBeChecked();
+    });
   });
 
   test(`control: without the form's autocomplete="off", ${AFTER[how]} gives the values back`, async ({
@@ -117,12 +137,11 @@ for (const how of ['reload', 'back'] as const) {
       !GIVES_FIELDS_BACK[browserName]?.[how],
       `${browserName} gives no field back after ${AFTER[how]}, with the form's attribute or without (measured on Windows)`,
     );
-    const withoutAttribute = await serveWithoutFormAutocomplete();
-    try {
-      await page.goto(`${withoutAttribute.origin}/dev/components`);
+    await withComponentsPage({ stripFormAutocomplete: true }, async ({ origin }) => {
+      await page.goto(`${origin}/dev/components`);
       await expect(demoForm(page).form).not.toHaveAttribute('autocomplete');
       await chooseInEveryField(page);
-      await leaveAndComeBack(page, how, withoutAttribute.origin);
+      await leaveAndComeBack(page, how, origin);
 
       // What the form's attribute guards; the note and the code have their own.
       const form = demoForm(page);
@@ -133,8 +152,56 @@ for (const how of ['reload', 'back'] as const) {
       await expect(form.hiddenCheckbox).toBeChecked();
       await expect(form.hiddenSwitch).toBeChecked();
       await expect(form.checkbox).not.toBeChecked();
-    } finally {
-      await withoutAttribute.close();
-    }
+    });
   });
 }
+
+/**
+ * The IndexedDB database where `next dev`'s script keeps each page's debug data, to show the page
+ * again from the browser's cache (Next.js 16.3.8, `next/dist/client/dev/debug-channel.js`).
+ */
+const NEXT_DEV_DEBUG_DATA = '__next_debug_channel';
+
+/**
+ * Makes every request to open NEXT_DEV_DEBUG_DATA wait forever, as a stalled read would, and counts
+ * them in the page (`window.debugDataRequests`): a test can then see that `next dev` asked.
+ */
+async function holdNextDevDebugData(page: Page): Promise<void> {
+  await page.addInitScript((database) => {
+    const open = IDBFactory.prototype.open;
+    IDBFactory.prototype.open = function (this: IDBFactory, name: string, version?: number) {
+      if (name !== database) return open.call(this, name, version);
+      const counted = window as Window & { debugDataRequests?: number };
+      counted.debugDataRequests = (counted.debugDataRequests ?? 0) + 1;
+      // A request that never answers: neither success nor error.
+      return { addEventListener() {}, removeEventListener() {} } as unknown as IDBOpenDBRequest;
+    };
+  }, NEXT_DEV_DEBUG_DATA);
+}
+
+// After Back the check's page must run its script without the debug data `next dev` keeps in the
+// browser: a page shown again from the browser's cache waits for it, and the pages that never ran
+// their script after Back had come from the cache (E00-T06b testers, fix rounds 2 and 3, Firefox
+// under load). Here that data never comes. With the page served as `next dev` serves it, red in
+// Chromium and Firefox every time (fix round 4, measured); WebKit loaded it from the server either
+// way.
+test("after Back, the demo form's page runs its script without the debug data next dev keeps in the browser", async ({
+  page,
+}) => {
+  await holdNextDevDebugData(page);
+  await withComponentsPage({ stripFormAutocomplete: false }, async ({ origin }) => {
+    await page.goto(`${origin}/dev/components`);
+    await expect(demoForm(page).send).toBeEnabled(DEV_PAGE);
+    // `next dev` stores the page's debug data once the page is idle: it asked, so the hold is in its way.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () => (window as Window & { debugDataRequests?: number }).debugDataRequests ?? 0,
+          ),
+        { message: "next dev asks for the database of a page's debug data", ...DEV_PAGE },
+      )
+      .toBeGreaterThan(0);
+    await leaveAndComeBack(page, 'back', origin);
+  });
+});
