@@ -45,6 +45,12 @@ Each document has one job. Read only what your task points you to.
 | [progress/handoffs/](progress/handoffs/) | One note per task, appended by each role that worked on it. |
 | [progress/discovered.md](progress/discovered.md) | Things agents noticed outside their task, one line each, weighed by agent rule 15. Not read at the start of a session; the architect turns `data` and `message` lines into work. |
 
+## Operations
+
+| File | Job |
+|---|---|
+| [runbook.md](runbook.md) | How the operator runs the system by hand: creating a clinic and its first owner (`pnpm clinic:create`); the host's part comes with E00-T07. |
+
 ## Logs (append-only)
 
 | File | Job |

@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import type { TenantTransaction } from '@/db/tenant';
-import { isUuid } from '@/lib/ids';
+import { isUuid, newId } from '@/lib/ids';
 import { withoutQueryValues } from '@/lib/query-errors';
 import {
   isExtraPermission,
@@ -75,6 +75,30 @@ export async function activeMembership(
     extraPermissions: toExtraPermissions(row.extraPermissions),
     status: row.status === 'disabled' ? 'disabled' : 'active',
   };
+}
+
+/**
+ * Adds the person to the clinic of this transaction with this role, and gives the membership's id.
+ * Its clinic is the transaction's own (current_clinic_id()), which the policy checks too: a
+ * transaction adds members to its own clinic only. `pnpm clinic:create` adds a new clinic's first
+ * owner with it (E00-T05b); staff management will add the rest (E04).
+ */
+export async function addMembership(
+  tx: TenantTransaction,
+  { userId, role }: { userId: string; role: Role },
+  now: Date,
+): Promise<string> {
+  if (!isUuid(userId)) throw new TypeError('addMembership: userId must be a UUID');
+  const id = newId();
+  await tx.insert(memberships).values({
+    id,
+    clinicId: sql`current_clinic_id()`,
+    userId,
+    role,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return id;
 }
 
 function toRole(value: unknown): Role {

@@ -5,7 +5,7 @@ import pino, {
   type Logger,
   type LoggerOptions,
 } from 'pino';
-import { isPersonalField } from './personal-fields';
+import { isPersonalField, isPluralPersonalField } from './personal-fields';
 import { messageWithoutValues, restack } from './query-errors';
 
 /**
@@ -13,7 +13,9 @@ import { messageWithoutValues, restack } from './query-errors';
  *
  * As a safety net, every field listed in personal-fields.ts is dropped before a line is
  * written, at any depth: in the logged object, in printf-style arguments (`%s`, `%o`, `%O`,
- * `%j`), in child-logger bindings, and inside errors (including their causes). The values a
+ * `%j`), in child-logger bindings, and inside errors (including their causes). A field personal
+ * only as a plural (`recipients`) that holds a list of records is cleaned record by record
+ * instead, so the records' ids stay. The values a
  * failed database query was sent are removed from error messages and stacks too. pino's own
  * `redact` option is not used because it only matches fixed paths.
  *
@@ -91,12 +93,31 @@ function clean(value: unknown, ancestors = new WeakSet<object>()): unknown {
 
     const copy: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value)) {
-      if (!isPersonalField(key)) copy[key] = clean(item, ancestors);
+      // A plural (`recipients`) holding records is cleaned record by record, so their ids stay;
+      // holding anything else, it is dropped like the singular (personal-fields.ts).
+      const kept = !isPersonalField(key) || (isPluralPersonalField(key) && isListOfRecords(item));
+      if (kept) copy[key] = clean(item, ancestors);
     }
     return copy;
   } finally {
     ancestors.delete(value);
   }
+}
+
+/**
+ * A list of records: an array whose every item is a plain object (`{ id, phone }`) or a list of
+ * records itself. Never a text, a number, a Date or another class's instance: a list of values.
+ */
+function isListOfRecords(value: unknown): boolean {
+  return (
+    Array.isArray(value) && value.every((item) => isPlainObject(item) || isListOfRecords(item))
+  );
+}
+
+function isPlainObject(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const prototype: unknown = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 }
 
 function errorToObject(error: Error): Record<string, unknown> {

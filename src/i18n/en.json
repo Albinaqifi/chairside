@@ -23,6 +23,25 @@
       "failed": "Login did not work. Try again."
     }
   },
+  "setPassword": {
+    "title": "Choose your password · Chairside",
+    "heading": "Choose your password",
+    "intro": "Choose the password you will log in with. Only you will know it.",
+    "password": "New password",
+    "hint": "At least {min} characters.",
+    "submit": "Set password",
+    "submitting": "Setting…",
+    "noscript": "JavaScript is needed to set your password. Turn it on in your browser, then reload the page.",
+    "done": "Your password is set. Log in with your email and your new password.",
+    "logIn": "Go to the login page",
+    "errors": {
+      "invalidLink": "This link does not work. It may have been used already, be more than {days} days old, or not have been copied whole. Ask whoever sent it to you for a new one.",
+      "tooShort": "Choose a password of at least {min} characters.",
+      "tooLong": "Choose a password of at most {max} characters.",
+      "tooManyAttempts": "Too many attempts. Wait a minute, then try again.",
+      "failed": "Setting your password did not work. Try again."
+    }
+  },
   "chooseClinic": {
     "title": "Choose a clinic · Chairside",
     "heading": "Choose a clinic",

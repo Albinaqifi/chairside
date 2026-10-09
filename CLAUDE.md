@@ -52,6 +52,7 @@ Stack and reasons: `docs/architecture/overview.md`. First-time setup: `README.md
 | `pnpm format` · `pnpm format:check` | Prettier: fix · check only. Markdown and `docs/` are not formatted. |
 | `pnpm db:reset` | Rebuild the local database from nothing: roles, database, every migration, then the seed. Refuses any non-local host, and URLs that do not all name the same host and port. |
 | `pnpm db:seed` | Add the seed (`src/db/seed/`): two invented clinics, a login for every role and a week of appointments, listed in `README.md`. The same guard as `db:reset`; a second run adds nothing. |
+| `pnpm clinic:create --name … --owner-email … --owner-name …` | The operator's script for a new clinic and its first owner (`src/db/clinic-create.ts`, D-101): writes as the app role, prints the one-time link where the owner chooses a password. On this machine; a database elsewhere only with `--remote-database`, on a host in the app's image. `docs/runbook.md`. |
 | `pnpm db:migrate` | Apply pending migrations as the migration role. |
 | `pnpm db:generate --name <what>` | Generate a migration from changed `schema.ts` files. |
 | `pnpm build` · `pnpm start` | Production build · run it. |
@@ -102,13 +103,15 @@ src/proxy.ts          Moves the session forward and renews its cookie (D-067); n
                       Not the permission check: pages and actions still call currentStaff().
                       It skips paths that start with `login` or hold a dot: a staff path never does.
 src/modules/<name>/   All business logic. index.ts = public API, schema.ts = its tables.
-src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts, the seed (seed/).
+src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts, the seed (seed/),
+                      `pnpm clinic:create` (clinic-create.ts).
 src/i18n/             next-intl's request configuration and the message file, en.json.
 src/lib/              Small shared pieces: clock, ids, logger, personal-fields.
 src/ui/               shadcn/ui components restyled to the tokens, the logo, the fonts, cn().
 tests/integration/    Tests against real PostgreSQL, including the tenant meta-test.
 tests/e2e/            End-to-end journeys and checks in real browsers (Playwright, playwright.config.ts):
-                      J1, the accessibility check, the D-093 check (E00-T06b).
+                      J1, the accessibility check, the D-093 check (E00-T06b), the setup link's page
+                      (E00-T05b).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 ```
@@ -134,8 +137,9 @@ task, unless product code on `main` would hit it today.
    `clinics_for_user()`, D-062), `withTenant` also in `src/app/_lib/actions.ts`, database drivers
    only in `src/db/`; none of them is passed on from there. `import type { TenantTransaction }`
    anywhere; tests are exempt (`eslint-rules/database-access.mjs`, D-071, D-077, D-084). The seed
-   (`src/db/seed/`) connects as the migration role and lint does not stop an import of it:
-   reviewers check that only `src/db/` and tests import it.
+   (`src/db/seed/`) connects as the migration role, and `src/db/clinic-create.ts` opens `withTenant`
+   for a new clinic (D-101), and lint does not stop an import of either: reviewers check that only
+   `src/db/` and tests import them.
 7. Type-aware, in `src/`: every promise is awaited (Drizzle queries too) and only Errors are thrown
    or rejected (a refusal is returned, never thrown). In `.ts` and `.mts` files a statement that
    only hangs `.catch(…)`, `.then(ok, fail)` or `.finally(…)` on a promise is reported; in a `.tsx`
@@ -236,8 +240,8 @@ task, unless product code on `main` would hit it today.
   `ctx.addIssue`, never by throwing: a thrown error is logged with its message, and `JSON.parse`,
   `BigInt()` and `new URL()` put their input in theirs.
 - Files Node runs directly (`src/db/migrate.ts`, `src/db/reset.ts`): import only packages and
-  relative `.ts` files, never `@/`. The seed (`src/db/seed/`) runs with tsx and may import `@/`
-  (D-090).
+  relative `.ts` files, never `@/`. The seed (`src/db/seed/`) and `src/db/clinic-create.ts` run with
+  tsx and may import `@/` (D-090, D-101).
 - Next.js 16 differs from older versions: read `node_modules/next/dist/docs/` before writing
   Next.js code. `AGENTS.md` holds the block `next dev` checks for; leave it.
 

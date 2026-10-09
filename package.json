@@ -22,6 +22,7 @@
     "db:migrate": "node --env-file-if-exists=.env src/db/migrate.ts",
     "db:reset": "node --env-file-if-exists=.env src/db/reset.ts && pnpm db:seed",
     "db:seed": "tsx --env-file-if-exists=.env src/db/seed/index.ts",
+    "clinic:create": "tsx --env-file-if-exists=.env src/db/clinic-create.ts",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration"
   },
   "dependencies": {

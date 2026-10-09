@@ -5,12 +5,13 @@
 export {
   cookiesAreSecure,
   getAuth,
+  PASSWORD_LENGTH,
   SESSION_IDLE_SECONDS,
   SESSION_REFRESH_SECONDS,
   SIGN_IN_RATE_LIMIT,
   type Auth,
 } from './better-auth';
-export { activeMembership, clinicsForUser, type Membership } from './memberships';
+export { activeMembership, addMembership, clinicsForUser, type Membership } from './memberships';
 export {
   can,
   EXTRA_PERMISSIONS,
@@ -28,4 +29,5 @@ export {
   type Role,
 } from './permissions';
 export { resolveClinic, type ClinicChoice, type ClinicResolution } from './resolve-clinic';
-export { createStaffUser, type NewStaffUser } from './users';
+export { createSetupLink, SET_PASSWORD_PATH, SETUP_LINK_DAYS } from './setup-link';
+export { createStaffUser, findStaffUser, type NewStaffUser, type StaffUser } from './users';
