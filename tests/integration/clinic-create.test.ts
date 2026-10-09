@@ -278,6 +278,51 @@ describe('the link works once and for 3 days (acceptance 2)', () => {
     expect(new Set(read.map((answer) => JSON.stringify(answer))).size).toBe(1);
     expect(read[0]).toMatchObject(INVALID_TOKEN);
   });
+
+  // E00-T05b test: a double click, or the link open in two tabs, sends it twice at once.
+  it('used twice at once: one use sets its password, the other is refused as a used link', async () => {
+    const clinic = newClinic();
+    const { link } = await made(clinic);
+    const userId = await userIdOf(clinic.ownerEmail);
+
+    const answers = await Promise.all(
+      [PASSWORD, OTHER_PASSWORD].map(async (password) => ({
+        password,
+        ...(await answerOf(await setPassword(tokenOf(link), password))),
+      })),
+    );
+
+    const [set, ...refused] = [...answers].sort((a, b) => a.status - b.status);
+    expect(set, 'one use set its password').toMatchObject({ status: 200, body: { status: true } });
+    expect(refused).toEqual([expect.objectContaining(INVALID_TOKEN)]);
+    const { accounts, verifications } = await personState(userId);
+    expect([accounts.length, verifications.length], 'one password login, no live link').toEqual([
+      1, 0,
+    ]);
+    expect((await signIn(clinic.ownerEmail, set!.password)).status).toBe(200);
+    expect((await signIn(clinic.ownerEmail, refused[0]!.password)).status).toBe(401);
+  });
+
+  // E00-T05b test: the library checks the length before it spends the token, so a password it
+  // refuses leaves the link working (the page checks the length too, before it sends).
+  it('a password too short or too long changes nothing: the link still works', async () => {
+    const clinic = newClinic();
+    const { link } = await made(clinic);
+    const userId = await userIdOf(clinic.ownerEmail);
+    const before = await personState(userId);
+
+    for (const [password, code] of [
+      ['x'.repeat(7), 'PASSWORD_TOO_SHORT'],
+      ['x'.repeat(129), 'PASSWORD_TOO_LONG'],
+    ] as const) {
+      expect(await answerOf(await setPassword(tokenOf(link), password)), code).toMatchObject({
+        status: 400,
+        body: { code },
+      });
+    }
+    expect(await personState(userId)).toEqual(before);
+    expect((await setPassword(tokenOf(link), PASSWORD)).status).toBe(200);
+  });
 });
 
 describe('only the token’s SHA-256 hash is stored; the link reaches the terminal and nothing else (acceptance 3)', () => {
