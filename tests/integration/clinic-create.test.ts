@@ -568,4 +568,28 @@ describe('the audit row, the logs and the terminal carry no email, name or token
     }
     for (const value of [clinic.ownerEmail, 'Markerline']) expect(output).not.toContain(value);
   });
+
+  // E00-T05b critical review: a run that fails ends with its error, which the terminal shows and a
+  // host's log may keep, so the error holds nothing typed. The person's lookup is sent the email,
+  // the person's insert the email and the name; the clinic's insert comes after the person and the
+  // link are made.
+  it.each([
+    { grant: 'select', table: 'users' },
+    { grant: 'insert', table: 'users' },
+    { grant: 'insert', table: 'clinics' },
+  ])(
+    'a run that fails ($grant on $table refused) shows its error, and no email, name or link',
+    async ({ grant, table }) => {
+      const clinic = newClinic({ ownerName: 'Owner Markerline' });
+      const { output, result } = await withoutGrant(admin, grant, table, () =>
+        captureOutput(() => runClinicCreate(commandLine(clinic))),
+      );
+      expect(result, 'the run ended with its error').toBeUndefined();
+      expect(output).toContain(`permission denied for table ${table}`);
+      const [localPart] = clinic.ownerEmail.split('@');
+      for (const value of [localPart!, 'Markerline', '/login/set-password#']) {
+        expect(output).not.toContain(value);
+      }
+    },
+  );
 });
