@@ -96,7 +96,7 @@ and reaches the database as `db:5432`. The values below are `.env.example`'s loc
 ones; the port is 3200, so `pnpm dev` can keep 3000. One line, in any terminal:
 
 ```
-docker run --rm --name chairside-web --network chairside_default -p 127.0.0.1:3200:3000 -e DATABASE_URL=postgres://chairside_app:local-app-password@db:5432/chairside -e BETTER_AUTH_URL=http://localhost:3200 -e BETTER_AUTH_SECRET=local-image-check-secret-for-http-only chairside
+docker run --rm --name chairside-web --network chairside_default -p 127.0.0.1:3200:3000 -e DATABASE_URL=postgres://chairside_app:local-app-password@db:5432/chairside -e BETTER_AUTH_URL=http://localhost:3200 -e BETTER_AUTH_SECRET=WvmU7awnhS+hURz48Xzur7L/WDwpIn2OzurTHxKrCr0= chairside
 ```
 
 Open http://localhost:3200: the login page, where a seeded login (README.md) reaches Today.
@@ -110,7 +110,7 @@ does not hold; it takes the same options. Seen from the container the database i
 machine, so the command refuses before it connects unless `--remote-database` is given, as on a host:
 
 ```
-docker run --rm --network chairside_default -e DATABASE_URL=postgres://chairside_app:local-app-password@db:5432/chairside -e BETTER_AUTH_URL=http://localhost:3200 -e BETTER_AUTH_SECRET=local-image-check-secret-for-http-only chairside node --import tsx src/db/clinic-create.ts --name "Lakeside Dental" --owner-email owner2@example.test --owner-name "Owner" --remote-database
+docker run --rm --network chairside_default -e DATABASE_URL=postgres://chairside_app:local-app-password@db:5432/chairside -e BETTER_AUTH_URL=http://localhost:3200 -e BETTER_AUTH_SECRET=WvmU7awnhS+hURz48Xzur7L/WDwpIn2OzurTHxKrCr0= chairside node --import tsx src/db/clinic-create.ts --name "Lakeside Dental" --owner-email owner2@example.test --owner-name "Owner" --remote-database
 ```
 
 It prints the clinic's id and the link, which opens on the web started above: the same
@@ -133,8 +133,8 @@ reason: the web's log then has one line `health check failed` with a `code`:
 It never waits on the worker: a host restarts a web whose check fails, and the web must stay up while
 the worker is down. With a refused secret the web serves no page at all (500, the same error in its
 log): the auth library does not start, so no session is ever signed with a secret anyone can read. To
-see it here, run the web as above with `-e BETTER_AUTH_URL=https://chairside.example.test` and
-`.env.example`'s `BETTER_AUTH_SECRET`: `/api/health` answers 503 and the log names
+see it here, run the web as above with `-e BETTER_AUTH_URL=https://chairside.example.test` in place of
+the http one; its secret is already `.env.example`'s: `/api/health` answers 503 and the log names
 `auth_secret_example`. Over http (this machine, CI) any secret is taken, as before.
 
 ### What the image holds

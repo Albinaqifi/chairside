@@ -28,6 +28,17 @@ describe('the example secret', () => {
   it('is long enough, so only its value refuses it', () => {
     expect(EXAMPLE_AUTH_SECRET.length).toBeGreaterThanOrEqual(AUTH_SECRET_MIN_LENGTH);
   });
+
+  it("is the one the runbook's commands set, so a copy of them on https is refused", () => {
+    // docs/runbook.md runs the image here, over http. A command copied to a host with an https
+    // BETTER_AUTH_URL must meet the refusal, never sign sessions with a committed secret it takes.
+    const runbook = readFileSync(new URL('../../../docs/runbook.md', import.meta.url), 'utf8');
+    const secrets = [...runbook.matchAll(/BETTER_AUTH_SECRET=(\S*)/g)].map(([, secret]) => secret);
+    expect(secrets.length).toBeGreaterThan(0);
+    for (const secret of secrets) {
+      expect(authSecretRefusal(HTTPS, secret ?? '')).toBe('auth_secret_example');
+    }
+  });
 });
 
 describe('authSecretRefusal', () => {
