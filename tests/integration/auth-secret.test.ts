@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/auth/[...all]/route';
 import { closeDb } from '@/db/client';
@@ -207,5 +208,54 @@ describe('BETTER_AUTH_SECRETS, and whitespace around the secret', () => {
     expect(answer).toBeInstanceOf(Response);
     expect((answer as Response).status).toBe(200);
     expect(await sessions()).toBe(before + 1);
+  });
+});
+
+// E00-T07a tester, fix round 2: the check judges BETTER_AUTH_SECRET alone, so on https the session
+// must be signed with exactly that value, never with another setting the library also reads
+// (BETTER_AUTH_SECRETS, refused above; AUTH_SECRET, which better-auth 1.7.7 takes only when the
+// secret it is given is empty). The session cookie is the token, a dot and the token's HMAC-SHA256
+// with the signing secret, in base64 (better-call's signCookieValue): recomputed here, it names the
+// secret that signed. A library upgrade that signs with another setting turns this red.
+describe('the secret that signs the session', () => {
+  const STRONG = `MARKER-${'k'.repeat(37)}`; // 44 characters
+
+  /** The session cookie's token and signature, from a sign-in's answer. */
+  function sessionCookie(answer: Response): { token: string; signature: string } {
+    const value = answer.headers
+      .getSetCookie()
+      .map((cookie) => /session_token=([^;]+)/.exec(cookie)?.[1])
+      .find((found) => found !== undefined);
+    expect(value, 'a session cookie').toBeDefined();
+    const decoded = decodeURIComponent(value!);
+    const dot = decoded.lastIndexOf('.');
+    return { token: decoded.slice(0, dot), signature: decoded.slice(dot + 1) };
+  }
+
+  const signedWith = (secret: string, token: string) =>
+    createHmac('sha256', secret).update(token).digest('base64');
+
+  it("is BETTER_AUTH_SECRET on https, while AUTH_SECRET holds .env.example's", async () => {
+    authSettings(HTTPS_ORIGIN, STRONG);
+    vi.stubEnv('AUTH_SECRET', EXAMPLE_AUTH_SECRET);
+    const answer = await signIn(HTTPS_ORIGIN);
+    expect(answer).toBeInstanceOf(Response);
+    expect((answer as Response).status).toBe(200);
+
+    const { token, signature } = sessionCookie(answer as Response);
+    expect(signature, 'signed with the secret the check judged').toBe(signedWith(STRONG, token));
+    expect(signature).not.toBe(signedWith(EXAMPLE_AUTH_SECRET, token));
+  });
+
+  it("is BETTER_AUTH_SECRETS' first entry over http, as the refusal on https expects", async () => {
+    // The control: the same reading names another secret when the library signs with one.
+    authSettings(HTTP_ORIGIN, LONG_ENOUGH_SECRET);
+    vi.stubEnv('BETTER_AUTH_SECRETS', `1:${SHORT_SECRET}`);
+    const answer = await signIn(HTTP_ORIGIN);
+    expect(answer).toBeInstanceOf(Response);
+
+    const { token, signature } = sessionCookie(answer as Response);
+    expect(signature).toBe(signedWith(SHORT_SECRET, token));
+    expect(signature).not.toBe(signedWith(LONG_ENOUGH_SECRET, token));
   });
 });
