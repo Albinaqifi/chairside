@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
+import { betterAuth } from 'better-auth';
+import { memoryAdapter } from 'better-auth/adapters/memory';
 import { describe, expect, it, vi } from 'vitest';
 import {
   AUTH_SECRET_MIN_LENGTH,
@@ -271,6 +273,72 @@ describe('a BETTER_AUTH_URL the auth library reads as https, however it is writt
       expect(authSecretRefusal(url, EXAMPLE_AUTH_SECRET), JSON.stringify(url)).toBeNull();
       expect(authSecretRefusal(url, SHORT), JSON.stringify(url)).toBeNull();
       expect(authSecretRefusal(url, LONG_ENOUGH, LIST), JSON.stringify(url)).toBeNull();
+    }
+  });
+});
+
+// E00-T07a tester, after fix round 3: the check reads BETTER_AUTH_URL as the auth library itself does,
+// asked of the library (an in-memory instance), not of a parser standing in for it. Each form below is
+// built from what a value pasted into a host's settings can carry around and inside its scheme: where
+// the library's origin is https, or its session cookie Secure, every refusal is met; where it is http,
+// none; a form the library cannot start with makes no session either way. A better-auth upgrade that
+// reads the URL another way turns this red.
+describe('BETTER_AUTH_URL, as the auth library itself reads it', () => {
+  async function libraryReads(url: string): Promise<'https' | 'http' | 'no start'> {
+    try {
+      const auth = betterAuth({
+        baseURL: url,
+        secret: LONG_ENOUGH,
+        database: memoryAdapter({}),
+        telemetry: { enabled: false },
+        logger: { disabled: true },
+      });
+      const context = await auth.$context;
+      const cookie = context.authCookies.sessionToken;
+      const https =
+        String(context.options.baseURL).startsWith('https://') ||
+        cookie.attributes.secure === true ||
+        cookie.name.startsWith('__Secure-');
+      return https ? 'https' : 'http';
+    } catch {
+      return 'no start';
+    }
+  }
+
+  it('meets every refusal where the library reads https, and none where it reads http', async () => {
+    const forms: string[] = [];
+    const noBreakSpace = String.fromCharCode(0xa0);
+    const byteOrderMark = String.fromCharCode(0xfeff);
+    for (const before of ['', ' ', '\n', '\r\n', '\t', noBreakSpace, byteOrderMark])
+      for (const scheme of ['https', 'HTTPS', 'ht\ttps', 'http', 'HTTP', 'blob:https', 'wss'])
+        for (const separator of ['://', ':/', ':', ':\\', ':///'])
+          for (const after of ['', '/', '/api/auth', ' ', '\n'])
+            forms.push(`${before}${scheme}${separator}chairside.example.test${after}`);
+    const readings = await Promise.all(forms.map(libraryReads));
+
+    const wrong: string[] = [];
+    readings.forEach((library, i) => {
+      const url = forms[i] ?? '';
+      const refusals = [
+        authSecretRefusal(url, EXAMPLE_AUTH_SECRET),
+        authSecretRefusal(url, SHORT),
+        authSecretRefusal(url, LONG_ENOUGH, `1:${SHORT}`),
+      ];
+      if (library === 'https' && refusals.some((refusal) => refusal === null)) {
+        wrong.push(`https to the library, taken: ${JSON.stringify(url)}`);
+      }
+      if (library === 'http' && refusals.some((refusal) => refusal !== null)) {
+        wrong.push(`http to the library, refused: ${JSON.stringify(url)}`);
+      }
+    });
+    expect(wrong).toEqual([]);
+
+    // Not true by default: the library read forms each way, as the review's forms show.
+    expect(await libraryReads(` ${HTTPS}`)).toBe('https');
+    expect(await libraryReads('https:\\chairside.example.test')).toBe('https');
+    expect(await libraryReads(HTTP)).toBe('http');
+    for (const kind of ['https', 'http', 'no start'] as const) {
+      expect(readings.filter((library) => library === kind).length, kind).toBeGreaterThan(100);
     }
   });
 });
