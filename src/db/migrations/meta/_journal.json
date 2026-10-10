@@ -29,6 +29,13 @@
       "when": 1791403855110,
       "tag": "0003_drop_patient_trigram_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791554494299,
+      "tag": "0004_clinic_create_grants",
+      "breakpoints": true
     }
   ]
 }

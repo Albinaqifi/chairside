@@ -8,9 +8,14 @@ import { runMigrations } from './migrate.ts';
 import { requiredEnv } from './required-env.ts';
 
 /** The role the migrations grant table access to. */
-const APP_ROLE = 'chairside_app';
+export const APP_ROLE = 'chairside_app';
 /** This machine, as pg names the host it connects to (it drops the brackets of `[::1]`). */
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+/** True when `host`, as connectionTarget() gives it, is this machine. */
+export function isLocalHost(host: string): boolean {
+  return LOCAL_HOSTS.has(host);
+}
 
 export interface DatabaseUrls {
   /** A superuser connection, used to create roles and databases. */
@@ -86,7 +91,7 @@ export function checkLocalTargets(
     { variable: 'DATABASE_URL', ...app },
   ];
   for (const { host } of targets) {
-    if (!LOCAL_HOSTS.has(host)) {
+    if (!isLocalHost(host)) {
       throw new Error(`Refusing to ${action} a database on "${host}": only local ones.`);
     }
   }

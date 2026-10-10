@@ -186,14 +186,34 @@ describe('the memberships table', () => {
     );
   });
 
-  it('is read-only for the app role in E00-T02', async () => {
-    await withTenant(clinicC, async (tx) => {
-      await expectPgError(
-        tx.execute(sql`
-          insert into memberships (id, clinic_id, user_id, role)
-          values (gen_random_uuid(), ${clinicC}, ${nobody}, 'owner')`),
-        PG.insufficientPrivilege,
-      );
+  // Read-only for the app role from E00-T02 until E00-T05b: migration 0004 gives it INSERT, for
+  // `pnpm clinic:create`'s first owner (owner, D-101). The policy keeps every insert in the
+  // transaction's own clinic, and nothing lets the app change or delete a membership.
+  it('lets the app role add a member to its own clinic only, and change or delete none', async () => {
+    const added = sql`
+      insert into memberships (id, clinic_id, user_id, role)
+      values (gen_random_uuid(), ${clinicC}, ${nobody}, 'owner')`;
+    // Its own clinic: added, then rolled back, so `nobody` keeps no membership.
+    await expect(
+      withTenant(clinicC, async (tx) => {
+        await tx.execute(added);
+        throw new Error('added, now rolled back');
+      }),
+    ).rejects.toThrow('added, now rolled back');
+    // Another clinic's: refused by the policy.
+    await withTenant(clinicA, async (tx) => {
+      await expectPgError(tx.execute(added), PG.insufficientPrivilege);
     });
+    // Changed or deleted, in its own clinic too: no privilege.
+    for (const statement of [
+      sql`update memberships set role = 'dentist' where user_id = ${inBoth}`,
+      sql`delete from memberships where user_id = ${inBoth}`,
+    ]) {
+      await withTenant(clinicA, async (tx) => {
+        await expectPgError(tx.execute(statement), PG.insufficientPrivilege);
+      });
+    }
+    const { rows } = await admin.query('select 1 from memberships where user_id = $1', [nobody]);
+    expect(rows).toEqual([]);
   });
 });

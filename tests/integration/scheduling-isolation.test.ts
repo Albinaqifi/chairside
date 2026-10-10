@@ -173,8 +173,9 @@ describe('the grants', () => {
       appointments: change,
       clinic_hours: changeAndDelete,
       closed_days: changeAndDelete,
-      // Still read-only: nobody links a person to a provider from the app yet (E01-T09, E04).
-      memberships: ['SELECT'],
+      // INSERT for `pnpm clinic:create`'s first owner (owner, D-101, migration 0004); still no
+      // UPDATE: nobody links a person to a provider from the app yet (E01-T09, E04).
+      memberships: ['INSERT', 'SELECT'],
     });
   });
 });

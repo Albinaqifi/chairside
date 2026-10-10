@@ -33,6 +33,12 @@ export const SESSION_REFRESH_SECONDS = 60;
 export const SIGN_IN_RATE_LIMIT = { window: 60, max: 10 } as const;
 
 /**
+ * How long a password may be, in characters: the library's own defaults, named so the page where a
+ * person chooses theirs can say it (E00-T05b). The library checks it whenever a password is set.
+ */
+export const PASSWORD_LENGTH = { min: 8, max: 128 } as const;
+
+/**
  * The library's routes that check a password. Each is limited like sign-in, so no route lets
  * anyone guess a password faster (the library's defaults are 100 per 10 seconds for
  * `/verify-password` and 3 per 10 seconds for `/change-password`). Counters are per address and
@@ -111,8 +117,16 @@ function createAuth() {
       // (E00-T05a), the operator script (E00-T05b) and invites (E04), all through
       // createStaffUser().
       disableSignUp: true,
+      minPasswordLength: PASSWORD_LENGTH.min,
+      maxPasswordLength: PASSWORD_LENGTH.max,
+      // A setup link (E00-T05b) is a password reset: when it is used, every session the person has
+      // ends.
       revokeSessionsOnPasswordReset: true,
     },
+    // One-time tokens (a setup link's, D-101) are stored as the SHA-256 hash of their identifier
+    // (`reset-password:` and the token), never the token itself: a copy of the table opens nothing.
+    // The library hashes what it is given the same way when it looks a token up or spends it.
+    verification: { storeIdentifier: 'hashed' },
     session: {
       expiresIn: SESSION_IDLE_SECONDS,
       updateAge: SESSION_REFRESH_SECONDS,

@@ -45,6 +45,18 @@ describe('audit entry metadata', () => {
     expect(refusal?.message).not.toMatch(/email|phone|firstName|notes|dateOfBirth/i);
   });
 
+  // E00-T05b: the plurals personal-fields.ts adds. Metadata holds ids and codes, so a plural is
+  // refused whatever it holds, a list of records too (the logger keeps only their ids).
+  it.each([
+    ['a list of values', { phones: [MARKER] }],
+    ['a list of records', { recipients: [{ id: 'recipient-1' }] }],
+    ['nested', { changes: [{ treatmentTypes: [MARKER] }] }],
+  ])('refuses a personal field name in the plural, holding %s', (_, metadata) => {
+    const refusal = refusalOf(metadata);
+    expect(refusal?.message).toMatch(/personal field/);
+    expect(refusal?.message).not.toContain(MARKER);
+  });
+
   it('checks what will be stored, so toJSON, getters and class instances cannot hide a key', () => {
     class Changes {
       email: string;

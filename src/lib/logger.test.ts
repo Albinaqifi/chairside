@@ -231,6 +231,138 @@ describe('logger', () => {
     expect(output()).toContain('appointment-1');
   });
 
+  // E00-T05b (E01-T02b, `data`): a list holds what one value holds, so every ending it lists is
+  // dropped in the plural too: with `s` or `es` added, and the three whose plural is neither.
+  it('drops a plural of each ending it lists: s or es added', () => {
+    const { logger, output } = capture();
+    const plurals = PERSONAL_FIELD_ENDINGS.flatMap((ending) => [`${ending}s`, `${ending}es`]);
+    const entry = Object.fromEntries(plurals.map((field) => [field, `${MARKER}-${field}`]));
+    logger.info({ ...entry, clinicId: 'clinic-1' }, 'listed');
+
+    expect(output()).not.toContain(MARKER);
+    expect(JSON.parse(output())).toMatchObject({ clinicId: 'clinic-1', msg: 'listed' });
+  });
+
+  it.each([
+    'names',
+    'phones',
+    'addresses',
+    'treatmentTypes',
+    'patientNames',
+    'guardian_phones',
+    'emailAddresses',
+    'appointmentTitles',
+    'confirmLinks',
+    'linkTokens',
+    'requestBodies',
+    'diagnoses',
+    'datesOfBirth',
+  ])('drops a plural, %s, nested and in child logger bindings too', (field) => {
+    const { logger, output } = capture();
+    logger.child({ [field]: [MARKER] }).info({
+      [field]: [MARKER, MARKER],
+      patients: [{ id: 'patient-1', [field]: [MARKER] }],
+    });
+
+    expect(output()).not.toContain(MARKER);
+    expect(output()).toContain('patient-1');
+  });
+
+  it('cleans a plural that holds a list of records record by record, so their ids stay', () => {
+    const { logger, output } = capture();
+    logger.info({
+      recipients: [{ id: 'recipient-1', phone: MARKER }],
+      phones: [{ id: 'phone-1', e164: MARKER }, [{ id: 'phone-2', note: MARKER }]],
+      treatmentTypes: [{ id: 'treatment-type-1', name: MARKER }],
+    });
+
+    expect(output()).not.toContain(MARKER);
+    for (const id of ['recipient-1', 'phone-1', 'phone-2', 'treatment-type-1']) {
+      expect(output()).toContain(id);
+    }
+  });
+
+  // E00-T05b review (required change 1, `data`): a record under a personal plural holds what the
+  // singular holds, so it keeps only its ids, whatever its other fields are called: `first`,
+  // `number`, `channel` and `value` are no personal names, but under `names`, `phones`, `contacts`
+  // or `tokens` they hold a name, a phone number, a contact or a token.
+  it('keeps only the ids of the records a plural holds, nested lists alike', () => {
+    const { logger, output } = capture();
+    logger.info({
+      names: [{ id: 'name-1', first: MARKER, last: MARKER }],
+      phones: [{ id: 'phone-1', number: MARKER }],
+      contacts: [{ id: 'contact-1', channel: MARKER, value: MARKER }],
+      tokens: [{ id: 'token-1', value: MARKER }, [{ id: 'token-2', value: MARKER }]],
+      recipients: [
+        {
+          patientId: 'patient-1',
+          appointmentIds: ['appointment-1'],
+          clinic_id: 'clinic-1',
+          message_ids: ['message-1'],
+          waId: MARKER,
+          person: { id: 'person-1', first: MARKER },
+        },
+      ],
+      requestId: 'request-1',
+    });
+
+    expect(output()).not.toContain(MARKER);
+    const { names, phones, contacts, tokens, recipients, requestId } = JSON.parse(output());
+    expect({ names, phones, contacts, tokens, recipients, requestId }).toEqual({
+      names: [{ id: 'name-1' }],
+      phones: [{ id: 'phone-1' }],
+      contacts: [{ id: 'contact-1' }],
+      tokens: [{ id: 'token-1' }, [{ id: 'token-2' }]],
+      recipients: [
+        {
+          patientId: 'patient-1',
+          appointmentIds: ['appointment-1'],
+          clinic_id: 'clinic-1',
+          message_ids: ['message-1'],
+        },
+      ],
+      requestId: 'request-1',
+    });
+  });
+
+  it('drops a plural whole that holds anything but a list of records', () => {
+    class Held {
+      value: string;
+      constructor(value: string) {
+        this.value = value;
+      }
+    }
+    const { logger, output } = capture();
+    logger.info({
+      names: { first: MARKER, last: MARKER },
+      addresses: [{ id: 'address-1' }, `${MARKER} Harbour Street`],
+      birthDates: [new Date('1990-01-01T00:00:00Z')],
+      contacts: [new Held(MARKER)],
+      patientNames: [[MARKER]],
+      emails: `${MARKER}@example.test`,
+      requestId: 'request-1',
+    });
+
+    expect(output()).not.toContain(MARKER);
+    expect(output()).not.toContain('1990-01-01');
+    expect(output()).not.toContain('address-1');
+    expect(JSON.parse(output())).toMatchObject({ requestId: 'request-1' });
+  });
+
+  it('keeps ids and counts whose names only end like a plural', () => {
+    const { logger, output } = capture();
+    const kept = {
+      patientIds: ['patient-1', 'patient-2'],
+      treatmentTypeIds: ['treatment-type-1'],
+      phoneCountries: ['MK'],
+      emailCounts: { sent: 2 },
+      outputTokens: 80,
+    };
+    logger.info(kept);
+
+    expect(JSON.parse(output())).toMatchObject(kept);
+  });
+
   it('keeps names that only contain a short personal word', () => {
     const { logger, output } = capture();
     // `to`, `from`, `ip` and `reason` match only as whole names. A reason code is not free text.
