@@ -1,0 +1,31 @@
+# What `docker build` never sends to the image's build (Dockerfile, E00-T07a).
+
+# Settings and secrets, at any depth: the image is built without them and holds none. Every setting
+# comes from the environment the image runs in. `.env.example` too: the image never reads it.
+**/.env
+**/.env.*
+
+# The front desk's session that the end-to-end checks share, and test and tool output.
+tests/e2e/.auth/
+test-results/
+playwright-report/
+blob-report/
+coverage/
+**/*.tsbuildinfo
+**/*.log
+
+# What the build makes itself: the dependencies and the build output.
+**/node_modules/
+.next/
+out/
+next-env.d.ts
+
+# What no stage needs: history, planning, the design reference, editor and agent settings.
+.git/
+.github/
+.claude/
+docs/
+design/
+.idea/
+.DS_Store
+Thumbs.db

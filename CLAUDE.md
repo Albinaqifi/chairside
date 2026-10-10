@@ -97,14 +97,16 @@ src/app/              Next.js routes. Thin: parse input, call a module, render.
   _lib/               Request-edge helpers: who is signed in; the action wrappers, the staff form that
                       calls them and the frame's clinic it sends (D-092); the auth client.
   api/auth/           The auth library's routes (sign-in, sign-out, get-session). No code of ours.
+  api/health/         The host's check of the web (D-102): 200 or 503, no session, never the worker.
   globals.css         The design tokens (Tailwind's theme) and the page's base styles.
 src/proxy.ts          Moves the session forward and renews its cookie (D-067); no valid session → /login,
                       except a server action: its wrapper sends the person there (D-074).
                       Not the permission check: pages and actions still call currentStaff().
-                      It skips paths that start with `login` or hold a dot: a staff path never does.
+                      It skips paths that start with `login` or hold a dot, and `/api/health` itself:
+                      a staff path never is one.
 src/modules/<name>/   All business logic. index.ts = public API, schema.ts = its tables.
 src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts, the seed (seed/),
-                      `pnpm clinic:create` (clinic-create.ts).
+                      `pnpm clinic:create` (clinic-create.ts), the health check's query (health.ts).
 src/i18n/             next-intl's request configuration and the message file, en.json.
 src/lib/              Small shared pieces: clock, ids, logger, personal-fields.
 src/ui/               shadcn/ui components restyled to the tokens, the logo, the fonts, cn().
@@ -114,6 +116,9 @@ tests/e2e/            End-to-end journeys and checks in real browsers (Playwrigh
                       (E00-T05b).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
+Dockerfile            The one image staging and production run (D-007, D-103): the web by default,
+                      a script with `node --import tsx <file>`; no `.env`, no secret (.dockerignore).
+                      How to build and run it: `docs/runbook.md`.
 ```
 
 Create a folder only when it has content. Coming later: `src/worker` (E00-T07b).
@@ -241,7 +246,8 @@ task, unless product code on `main` would hit it today.
   `BigInt()` and `new URL()` put their input in theirs.
 - Files Node runs directly (`src/db/migrate.ts`, `src/db/reset.ts`): import only packages and
   relative `.ts` files, never `@/`. The seed (`src/db/seed/`) and `src/db/clinic-create.ts` run with
-  tsx and may import `@/` (D-090, D-101).
+  tsx and may import `@/` (D-090, D-101); tsx is a production dependency, so the image runs such a
+  script too, as `node --import tsx <file>` (D-103).
 - Next.js 16 differs from older versions: read `node_modules/next/dist/docs/` before writing
   Next.js code. `AGENTS.md` holds the block `next dev` checks for; leave it.
 

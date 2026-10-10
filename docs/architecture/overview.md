@@ -181,7 +181,9 @@ Production credentials never exist on a development machine or in an agent sessi
 
 ## Things that keep it running
 
-- Health endpoint for the host. Heartbeat ping from the worker to an external monitor.
+- Health endpoint for the host, `/api/health` (E00-T07a): the database answers through a login that
+  cannot get past the policies, and the auth secret is not the example's; it never waits on the
+  worker (D-102). Heartbeat ping from the worker to an external monitor.
 - Sentry for errors, with personal data stripped before sending: from E07-T03; until then errors
   are in the host's logs (owner, D-102).
 - Nightly canary: every appointment tomorrow has a planned reminder or a recorded reason.

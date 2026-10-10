@@ -35,6 +35,12 @@ export const ROUTE_HANDLERS = [
     file: 'src/app/api/auth/[...all]/route.ts',
     reason: 'The auth library: sign-in, sign-out, get-session (D-063). No code of ours.',
   },
+  {
+    file: 'src/app/api/health/route.ts',
+    reason:
+      "The host's check of the web (D-102): a GET with no session, answered 200 or 503, naming no " +
+      'reason. It reads no clinic and no person, and sets no cookie.',
+  },
 ];
 
 const WRAPPERS = new Set(['staffAction', 'staffRead', 'userAction']);

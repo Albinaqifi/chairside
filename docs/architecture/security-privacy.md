@@ -17,7 +17,9 @@ This document has two parts: rules that code must follow, and the gate before re
 - All database access happens inside a tenant transaction opened by the standard wrappers.
   Never create a database connection or query outside them.
 - The app's database role cannot bypass Row-Level Security, cannot change schema, cannot
-  update or delete audit rows.
+  update or delete audit rows. On a host, the web's health check (`/api/health`) fails while
+  `DATABASE_URL` logs in as a role that can get past the policies: a superuser, one with
+  `BYPASSRLS`, a table's owner or a member of one, so such a web never goes live (E00-T07a).
 - The job queue's tables (pg-boss, D-005) are shared by every clinic and have no policy: a job's
   data holds ids and codes only, never a patient's details, and its handler works inside its
   clinic's tenant transaction (D-102).
@@ -105,6 +107,12 @@ This document has two parts: rules that code must follow, and the gate before re
   a real secret never appears in it.
 - Agents do not read or print `.env` files.
 - Production credentials never exist on a development machine.
+- The app's image holds no `.env` file and no secret, and is built without either: every setting
+  comes from the host (D-103). Over https, as the auth library reads `BETTER_AUTH_URL` (a space or
+  a line break before it, or `https:/host`, too), the library never starts with `.env.example`'s
+  secret or one shorter than 32 characters, spaces and line breaks around it not counted, nor while
+  `BETTER_AUTH_SECRETS` is set, a list it would sign with in that secret's place; so no session is
+  made, and the health check fails (E00-T07a).
 
 ### 8. Web basics
 - HTTPS everywhere, secure and http-only cookies, CSRF protection on every state-changing

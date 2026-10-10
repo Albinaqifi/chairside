@@ -1922,3 +1922,28 @@ architecture), `changed` (differs from the original files), `process`.
   cannot make pg-boss's tables (`CLAUDE.md`, database roles).
 - **Revisit if:** the host treats a failed check otherwise (E00-T07c); pg-boss must change its
   schema while it runs; the owner wants Sentry before the pilot.
+
+### D-103 · The image: production dependencies only, tsx among them; a script runs as `node --import tsx`; the build needs no setting
+- **Origin:** E00-T07a (builder), 2026-10-10: the task's choice between tsx in the image and a bundle
+  made at build time (D-090's "Revisit if", D-101). It moves a package, hence this entry.
+- **What:**
+  - `tsx` moves from `devDependencies` to `dependencies`, at the same version (4.23.15): the
+    lockfile changes in its importers section only. The image installs the production dependencies
+    alone (`pnpm install --prod`), so `pnpm audit --prod` covers everything it holds (D-075); tsx
+    brings esbuild 0.28.2, which has no advisory. This replaces D-090's "`tsx` is a development
+    dependency".
+  - `Dockerfile`: Node.js 24 on Debian 13 slim; pnpm, at `package.json`'s version, only in the stages
+    that install. The image holds the build (`.next`, without its build cache), the production
+    dependencies, `src/`, `package.json`, `next.config.ts` and `tsconfig.json`; it runs as the
+    `node` user, with `NODE_ENV=production` and `NEXT_TELEMETRY_DISABLED=1`. The web is
+    `node node_modules/next/dist/bin/next start`, so Node.js gets the host's stop signal; a script
+    is `node --import tsx <file>` (`clinic:create`; the worker, E00-T07b). No pnpm in the image.
+  - `currentUser()` reads the request's headers before it makes the auth library: `next build` then
+    stops trying to prerender a page there, so the image is built with no setting at all (without
+    one, the build failed on `/_not-found`: `BETTER_AUTH_URL is not set`).
+- **Why:** a bundle needs a bundler as a direct dependency, a new package; installing every
+  dependency would put the development tools, and their advisories, where patient data is; pnpm adds
+  a process between the host and Node.js and runs nothing the image needs.
+- **Revisit if:** the worker starts too slowly or uses too much memory under tsx (E00-T07b); the
+  image's size (about 1 GB unpacked) matters on the host (E00-T07c: `output: 'standalone'`); Node.js
+  runs our `@/` imports itself.
