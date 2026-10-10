@@ -365,4 +365,63 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
     });
     await vi.waitFor(() => expect(worked).toHaveLength(1), { timeout: 20_000, interval: 250 });
   });
+
+  // Critical review (E00-T07b): a job fails too when its handler runs past the queue's
+  // expireInSeconds (900 s, pg-boss's default; 1 s here). pg-boss then fails it in its own words, and
+  // the handler's error, thrown afterwards, still reaches one log line and never the job's row, in a
+  // table every clinic shares (security-privacy.md, section 1).
+  it("keeps only pg-boss's words in the row of a job whose handler runs past its time, and the handler's error in one log line per attempt", async () => {
+    const queue = freshQueue();
+    // Made first, as the migration role, with a 1 s limit: workJobs() leaves a queue that is there as
+    // it is. pg-boss's supervisor at its own pace (a minute), so the worker's own timer ends each run.
+    await migrator.query(
+      `select pgboss.create_queue($1, '{"policy": "standard", "expireInSeconds": 1}')`,
+      [queue],
+    );
+    const thrown: unknown[] = [];
+    expect(
+      await startQueue({
+        timings: {
+          cronMonitorIntervalSeconds: 1,
+          cronWorkerIntervalSeconds: 1,
+          pollingIntervalSeconds: 0.5,
+        },
+      }),
+    ).toBeNull();
+    await scheduleJob(queue, '* * * * *');
+    await workJobs(queue, async (job) => {
+      // Past its time pg-boss aborts the job's signal; the handler fails only then.
+      await new Promise((resolve) => job.signal.addEventListener('abort', resolve, { once: true }));
+      const error = new Error(`${MARKER} late`, { cause: new Error(`${MARKER} cause`) });
+      thrown.push(error);
+      throw error;
+    });
+    // pg-boss runs a job three times (two retries, its default) before it fails for good.
+    await vi.waitFor(
+      async () => {
+        expect(thrown).toHaveLength(3);
+        expect(await jobsOf(queue)).toMatchObject([{ state: 'failed' }]);
+      },
+      { timeout: 30_000, interval: 250 },
+    );
+    await stopQueue();
+
+    const [job] = await jobsOf(queue);
+    // pg-boss's words, from whichever saw the time run out: the worker's timer, or the supervisor.
+    expect(job?.output).toBeOneOf([
+      expect.objectContaining({ name: 'Error', message: 'handler execution exceeded 1s' }),
+      { value: { message: 'job timed out' } },
+    ]);
+    expect(job?.row).not.toContain(MARKER);
+    expect(lines().filter((line) => line.fields.code === JOB_FAILED)).toEqual(
+      thrown.map((err) => ({
+        level: 'error',
+        fields: { code: JOB_FAILED, queue, jobId: job?.id, err },
+        message: 'job failed',
+      })),
+    );
+    expect(
+      lines().filter((line) => line.level !== 'info' && line.fields.code !== JOB_FAILED),
+    ).toEqual([]);
+  });
 });
