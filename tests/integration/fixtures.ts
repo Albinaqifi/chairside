@@ -227,6 +227,17 @@ export async function withoutGrant<T>(
 }
 
 /**
+ * Empties the job queue's tables as the migration role, which owns them, so a test starts with no
+ * queue, job, schedule or worker an earlier one left (E00-T07b). A schedule sends one job a minute at
+ * most, its minute kept with the job: a test whose schedule must fire needs that minute's jobs gone.
+ */
+export async function emptyJobQueue(db: pg.Pool): Promise<void> {
+  await db.query('delete from pgboss.job');
+  await db.query('delete from pgboss.queue'); // its schedules go with it
+  await db.query('delete from pgboss.instance');
+}
+
+/**
  * Inserts a membership, linked to a provider when `providerId` is given. The app role only reads
  * memberships, so this uses the migrator.
  */

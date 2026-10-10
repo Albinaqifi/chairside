@@ -7,8 +7,9 @@
  */
 
 /**
- * Global tables: no clinic and no Row-Level Security. The app role reaches only the auth
- * library's tables among them (migration 0001), nothing else.
+ * Global tables: no clinic and no Row-Level Security. The app role reaches the auth library's
+ * tables among them (migration 0001) and the rows of seven of the job queue's (migration 0005),
+ * nothing else.
  */
 export const GLOBAL_TABLES: Readonly<Record<string, string>> = {
   'drizzle.__drizzle_migrations': 'Migration journal, written by the migration role only.',
@@ -20,6 +21,31 @@ export const GLOBAL_TABLES: Readonly<Record<string, string>> = {
   'public.verifications': 'The auth library’s one-time tokens (password reset, E04).',
   'public.rate_limits':
     'Request counters for the login rate limit, by client address and path, written by the auth library.',
+  // The job queue, pg-boss's own tables (D-005, D-102, D-104), made by migration 0005 with fixed names:
+  // shared by every clinic, so a job's data holds ids and codes only, and its handler works inside its
+  // clinic's tenant transaction (security-privacy.md, section 1).
+  'pgboss.version':
+    'The job queue’s schema version (45) and when its passes last ran (schedules, maintenance): no row of any clinic’s.',
+  'pgboss.queue':
+    'The job queues by name, with their settings and counts: one queue serves every clinic.',
+  'pgboss.schedule':
+    'Recurring jobs (the worker’s heartbeat): a queue name, a cron expression and data that holds ids and codes only.',
+  'pgboss.job':
+    'Every job, partitioned by queue name: data holds ids and codes only, never a patient’s details, and a failed job keeps the code `job_failed`, never its error (D-104).',
+  'pgboss.job_common':
+    'The default partition of `pgboss.job`, which holds every queue’s jobs: no queue has a table of its own (D-104).',
+  'pgboss.job_dependency':
+    'Which job waits for which (pg-boss’s flows): queue names and job ids only.',
+  'pgboss.instance':
+    'The worker processes running pg-boss: host, process id, versions, the options they run with (no connection string) and pool counts.',
+  'pgboss.subscription':
+    'pg-boss’s publish and subscribe: not used by Chairside, no grant to the app role.',
+  'pgboss.bam':
+    'pg-boss’s index builds after an upgrade: not used (it runs with `migrate: false`), no grant to the app role.',
+  'pgboss.warning':
+    'pg-boss’s stored warnings: not used (none kept, D-104), no grant to the app role.',
+  'pgboss.queue_stats':
+    'pg-boss’s queue statistics, partitioned by day: not used (no statistics, D-104), no partition exists and no grant to the app role.',
 };
 
 /** Tables that are the tenant itself: their own `id` is the clinic id, and the policy compares it. */

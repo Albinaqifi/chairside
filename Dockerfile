@@ -2,7 +2,8 @@
 
 # The one image staging and production run (D-007; E00-T07a, D-103). Its default command is the web,
 # `next start`, in whose Node.js process the request proxy runs (src/proxy.ts, D-067). With a command
-# of its own it runs the operator's `clinic:create` (D-101); E00-T07b adds the worker's. Every setting
+# of its own it runs the operator's `clinic:create` (D-101), or the worker, `node --import tsx
+# src/worker/index.ts` (E00-T07b), which Node.js runs itself too, so SIGTERM reaches it. Every setting
 # comes from the environment it runs in: the image holds no .env file and no secret, and is built
 # without either (.dockerignore). How to build it and run it: docs/runbook.md.
 

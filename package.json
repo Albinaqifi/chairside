@@ -23,6 +23,7 @@
     "db:reset": "node --env-file-if-exists=.env src/db/reset.ts && pnpm db:seed",
     "db:seed": "tsx --env-file-if-exists=.env src/db/seed/index.ts",
     "clinic:create": "tsx --env-file-if-exists=.env src/db/clinic-create.ts",
+    "worker": "tsx --env-file-if-exists=.env src/worker/index.ts",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration"
   },
   "dependencies": {
@@ -35,6 +36,7 @@
     "next": "16.3.8",
     "next-intl": "4.14.9",
     "pg": "^8.23.1",
+    "pg-boss": "12.37.1",
     "pino": "^10.3.1",
     "radix-ui": "1.6.7",
     "react": "19.2.8",
