@@ -125,8 +125,9 @@ reason: the web's log then has one line `health check failed` with a `code`:
 | Code | What to fix |
 |---|---|
 | `auth_settings_missing` | `BETTER_AUTH_URL` or `BETTER_AUTH_SECRET` is not set. |
-| `auth_secret_example` | `BETTER_AUTH_URL` is https and `BETTER_AUTH_SECRET` is `.env.example`'s. Set a random one, for example from `openssl rand -base64 32`. |
-| `auth_secret_short` | `BETTER_AUTH_URL` is https and `BETTER_AUTH_SECRET` is shorter than 32 characters. The same fix. |
+| `auth_secret_example` | `BETTER_AUTH_URL` is https and `BETTER_AUTH_SECRET` is `.env.example`'s, with or without spaces or a line break around it. Set a random one, for example from `openssl rand -base64 32`. |
+| `auth_secret_short` | `BETTER_AUTH_URL` is https and `BETTER_AUTH_SECRET` is shorter than 32 characters, spaces and line breaks around it not counted. The same fix. |
+| `auth_secrets_set` | `BETTER_AUTH_URL` is https and `BETTER_AUTH_SECRETS` is set: the auth library's own list of secrets, which it would sign with in place of `BETTER_AUTH_SECRET`, and which nothing checks. Chairside uses `BETTER_AUTH_SECRET` alone: remove `BETTER_AUTH_SECRETS`. |
 | `database_unreachable` | The database did not answer through `DATABASE_URL`. The line holds the error: the host, the port, a refused login. |
 | `database_login_past_policies` | `DATABASE_URL` logs in as a role that gets past the clinics' row rules: a superuser, a role with `BYPASSRLS`, the tables' owner (the migration role) or a member of it. Use the app's own login, `chairside_app`. |
 

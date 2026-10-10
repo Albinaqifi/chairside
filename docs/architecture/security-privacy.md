@@ -109,8 +109,9 @@ This document has two parts: rules that code must follow, and the gate before re
 - Production credentials never exist on a development machine.
 - The app's image holds no `.env` file and no secret, and is built without either: every setting
   comes from the host (D-103). Over https the auth library never starts with `.env.example`'s
-  secret or one shorter than 32 characters, so no session is made, and the health check fails
-  (E00-T07a).
+  secret or one shorter than 32 characters, spaces and line breaks around it not counted, nor while
+  `BETTER_AUTH_SECRETS` is set, a list it would sign with in that secret's place; so no session is
+  made, and the health check fails (E00-T07a).
 
 ### 8. Web basics
 - HTTPS everywhere, secure and http-only cookies, CSRF protection on every state-changing

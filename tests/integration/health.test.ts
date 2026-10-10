@@ -329,6 +329,59 @@ describe('GET /api/health: logins found by asking the roles, and URLs it cannot 
   });
 });
 
+// E00-T07a tester, findings 1 and 2: the check fails whenever the auth library would not start,
+// however the secret is given. The library reads BETTER_AUTH_SECRETS itself and signs with its first
+// entry in place of BETTER_AUTH_SECRET, so that list is refused on https whatever it holds; and the
+// example secret with whitespace around it is still the example. That the library then never starts:
+// tests/integration/auth-secret.test.ts.
+describe('GET /api/health: the auth secret, however it is given', () => {
+  const HTTPS = 'https://chairside.example.test';
+  const SHORT = `MARKER-${'s'.repeat(AUTH_SECRET_MIN_LENGTH - 8)}`; // 31 characters
+  const STRONG = `MARKER-${'k'.repeat(37)}`; // 44 characters
+
+  it.each([
+    { holding: 'a short secret', secrets: `1:${SHORT}` },
+    { holding: ".env.example's secret", secrets: `1:${EXAMPLE_AUTH_SECRET}` },
+    { holding: 'two long secrets', secrets: `2:${STRONG}x,1:${STRONG}` },
+  ])(
+    'answers 503 on https while BETTER_AUTH_SECRETS is set, holding $holding, and logs no secret',
+    async ({ secrets }) => {
+      const answer = await health({
+        BETTER_AUTH_URL: HTTPS,
+        BETTER_AUTH_SECRET: STRONG,
+        BETTER_AUTH_SECRETS: secrets,
+      });
+      expectFailure(answer, 'auth_secrets_set');
+      for (const value of [SHORT, STRONG, EXAMPLE_AUTH_SECRET]) {
+        expect(answer.loggedText).not.toContain(value);
+      }
+    },
+  );
+
+  it.each([
+    { around: 'a space after it', secret: `${EXAMPLE_AUTH_SECRET} ` },
+    { around: 'a newline after it', secret: `${EXAMPLE_AUTH_SECRET}\n` },
+    {
+      around: 'a space before it and a Windows line end after it',
+      secret: ` ${EXAMPLE_AUTH_SECRET}\r\n`,
+    },
+  ])("answers 503 on https with .env.example's secret and $around", async ({ secret }) => {
+    const answer = await health({ BETTER_AUTH_URL: HTTPS, BETTER_AUTH_SECRET: secret });
+    expectFailure(answer, 'auth_secret_example');
+    expect(answer.loggedText).not.toContain(EXAMPLE_AUTH_SECRET);
+  });
+
+  it('answers 200 over http with either, as on this machine', async () => {
+    const withList = await health({ BETTER_AUTH_URL: ORIGIN, BETTER_AUTH_SECRETS: `1:${SHORT}` });
+    expect(withList.status).toBe(200);
+    const withNewline = await health({
+      BETTER_AUTH_URL: ORIGIN,
+      BETTER_AUTH_SECRET: `${EXAMPLE_AUTH_SECRET}\n`,
+    });
+    expect(withNewline.status).toBe(200);
+  });
+});
+
 describe("the request proxy's matcher", () => {
   const proxied = (path: string) =>
     unstable_doesMiddlewareMatch({ config, url: `${ORIGIN}${path}` });

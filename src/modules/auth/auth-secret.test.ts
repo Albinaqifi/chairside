@@ -110,3 +110,92 @@ describe('the refusals', () => {
     }
   });
 });
+
+// E00-T07a tester, finding 1: the auth library reads BETTER_AUTH_SECRETS itself and signs with its
+// first entry in place of the BETTER_AUTH_SECRET it is given (better-auth 1.7.7,
+// dist/context/create-context.mjs). Chairside sets no such list, so over https it is refused whatever
+// it holds; over http nothing changes. The library itself: tests/integration/auth-secret.test.ts.
+describe("BETTER_AUTH_SECRETS, the auth library's own list of secrets", () => {
+  const KNOWN = '1:MARKER-short-known'; // a version and a short secret
+
+  it('is refused over https whatever it holds: the library would sign with its first entry', () => {
+    expect(authSecretRefusal(HTTPS, LONG_ENOUGH, KNOWN)).toBe('auth_secrets_set');
+    expect(authSecretRefusal(HTTPS, LONG_ENOUGH, `1:${EXAMPLE_AUTH_SECRET}`)).toBe(
+      'auth_secrets_set',
+    );
+    expect(authSecretRefusal(HTTPS, LONG_ENOUGH, `2:${'b'.repeat(44)},1:${LONG_ENOUGH}`)).toBe(
+      'auth_secrets_set',
+    );
+  });
+
+  it('is taken over https when it is empty, which the library reads as not set', () => {
+    expect(authSecretRefusal(HTTPS, LONG_ENOUGH, '')).toBeNull();
+    expect(authSecretRefusal(HTTPS, LONG_ENOUGH, undefined)).toBeNull();
+  });
+
+  it("leaves BETTER_AUTH_SECRET's refusals first, as before", () => {
+    expect(authSecretRefusal(HTTPS, EXAMPLE_AUTH_SECRET, `1:${'b'.repeat(44)}`)).toBe(
+      'auth_secret_example',
+    );
+    expect(authSecretRefusal(HTTPS, SHORT, KNOWN)).toBe('auth_secret_short');
+  });
+
+  it('changes nothing over http', () => {
+    expect(authSecretRefusal(HTTP, LONG_ENOUGH, KNOWN)).toBeNull();
+    expect(authSecretRefusal(HTTP, EXAMPLE_AUTH_SECRET, `1:${EXAMPLE_AUTH_SECRET}`)).toBeNull();
+  });
+
+  it("is read by authSettingsProblem, from the settings given or the process's", () => {
+    expect(
+      authSettingsProblem({
+        BETTER_AUTH_URL: HTTPS,
+        BETTER_AUTH_SECRET: LONG_ENOUGH,
+        BETTER_AUTH_SECRETS: KNOWN,
+      }),
+    ).toBe('auth_secrets_set');
+    vi.stubEnv('BETTER_AUTH_URL', HTTPS);
+    vi.stubEnv('BETTER_AUTH_SECRET', LONG_ENOUGH);
+    vi.stubEnv('BETTER_AUTH_SECRETS', KNOWN);
+    try {
+      expect(authSettingsProblem()).toBe('auth_secrets_set');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
+// E00-T07a tester, finding 2: a value pasted into a host's settings can carry a space or a line break
+// around it, and the library signs with the value as given. So the secret is judged without them: the
+// example with a newline is still the example, and 31 characters with a space are still 31.
+describe('a secret with whitespace around it', () => {
+  const AROUND = [
+    { name: 'a space after it', wrap: (secret: string) => `${secret} ` },
+    { name: 'a newline after it', wrap: (secret: string) => `${secret}\n` },
+    { name: 'a Windows line end after it', wrap: (secret: string) => `${secret}\r\n` },
+    { name: 'a tab before it', wrap: (secret: string) => `\t${secret}` },
+    { name: 'spaces on both sides', wrap: (secret: string) => `  ${secret}  ` },
+  ];
+
+  it.each(AROUND)("is .env.example's over https, with $name", ({ wrap }) => {
+    expect(authSecretRefusal(HTTPS, wrap(EXAMPLE_AUTH_SECRET))).toBe('auth_secret_example');
+    expect(
+      authSettingsProblem({
+        BETTER_AUTH_URL: HTTPS,
+        BETTER_AUTH_SECRET: wrap(EXAMPLE_AUTH_SECRET),
+      }),
+    ).toBe('auth_secret_example');
+  });
+
+  it.each(AROUND)(
+    'is short over https when the secret has 31 characters, with $name',
+    ({ wrap }) => {
+      expect(authSecretRefusal(HTTPS, wrap(SHORT))).toBe('auth_secret_short');
+    },
+  );
+
+  it('is taken over https when the secret itself is long enough, and over http as before', () => {
+    expect(authSecretRefusal(HTTPS, ` ${LONG_ENOUGH}\n`)).toBeNull();
+    expect(authSecretRefusal(HTTP, `${EXAMPLE_AUTH_SECRET}\n`)).toBeNull();
+    expect(authSecretRefusal(HTTP, `${SHORT} `)).toBeNull();
+  });
+});

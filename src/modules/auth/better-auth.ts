@@ -101,15 +101,17 @@ const refuseDontRememberMe = createAuthMiddleware(async (ctx) => {
 function createAuth() {
   const baseURL = requiredEnv('BETTER_AUTH_URL');
   const secret = requiredEnv('BETTER_AUTH_SECRET');
-  // Over https, never with .env.example's secret or a short one (auth-secret.ts). Thrown before the
-  // library exists, so it never starts with it and no session is made; getAuth() keeps nothing, so
-  // every later call is refused too. The error names the code, never the secret.
-  const refused = authSecretRefusal(baseURL, secret);
+  // Over https, never with .env.example's secret or a short one, nor with BETTER_AUTH_SECRETS, which
+  // the library reads from the environment itself and would sign with instead (auth-secret.ts).
+  // Thrown before the library exists, so it never starts with it and no session is made; getAuth()
+  // keeps nothing, so every later call is refused too. The error names the code, never a secret.
+  const refused = authSecretRefusal(baseURL, secret, process.env.BETTER_AUTH_SECRETS);
   if (refused !== null) {
     throw new Error(
       `${AUTH_SECRET_REFUSALS[refused]}, and BETTER_AUTH_URL is https: the auth library does not ` +
-        `start. Set a random secret of at least ${AUTH_SECRET_MIN_LENGTH} characters on the host, ` +
-        `for example from \`openssl rand -base64 32\` (${refused}).`,
+        `start. Set BETTER_AUTH_SECRET on the host to a random secret of at least ` +
+        `${AUTH_SECRET_MIN_LENGTH} characters, for example from \`openssl rand -base64 32\`, and ` +
+        `no BETTER_AUTH_SECRETS (${refused}).`,
     );
   }
   return betterAuth({

@@ -144,3 +144,68 @@ describe('with BETTER_AUTH_URL on http, as on this machine and in CI', () => {
     expect(await sessions()).toBe(before + 1);
   });
 });
+
+// E00-T07a tester, findings 1 and 2: on https the library never signs with a secret the check
+// refuses, whichever setting gives it. It reads BETTER_AUTH_SECRETS itself and signs with its first
+// entry in place of BETTER_AUTH_SECRET, so that list is refused whatever it holds (Chairside sets
+// none); and the secret is judged without the whitespace a value pasted into a host's settings can
+// carry around it, since the library signs with the value as given.
+describe('BETTER_AUTH_SECRETS, and whitespace around the secret', () => {
+  it.each([
+    {
+      name: 'BETTER_AUTH_SECRETS holding a short secret',
+      secret: LONG_ENOUGH_SECRET,
+      secrets: `1:${SHORT_SECRET}`,
+      code: 'auth_secrets_set',
+    },
+    {
+      name: "BETTER_AUTH_SECRETS holding .env.example's secret",
+      secret: LONG_ENOUGH_SECRET,
+      secrets: `1:${EXAMPLE_AUTH_SECRET}`,
+      code: 'auth_secrets_set',
+    },
+    {
+      name: "BETTER_AUTH_SECRET set to .env.example's secret and a space",
+      secret: `${EXAMPLE_AUTH_SECRET} `,
+      secrets: undefined,
+      code: 'auth_secret_example',
+    },
+    {
+      name: "BETTER_AUTH_SECRET set to .env.example's secret and a newline",
+      secret: `${EXAMPLE_AUTH_SECRET}\n`,
+      secrets: undefined,
+      code: 'auth_secret_example',
+    },
+  ])(
+    'refuses, on https, $name: the library never starts and no session is made',
+    async ({ secret, secrets, code }) => {
+      authSettings(HTTPS_ORIGIN, secret);
+      if (secrets !== undefined) vi.stubEnv('BETTER_AUTH_SECRETS', secrets);
+      const before = await sessions();
+
+      const refused = authError();
+      expect(refused?.message).toContain(`(${code})`);
+      for (const value of [SHORT_SECRET, EXAMPLE_AUTH_SECRET]) {
+        expect(refused?.message, 'the error never holds a secret').not.toContain(value);
+      }
+
+      const answer = await signIn(HTTPS_ORIGIN);
+      expect(answer).toBeInstanceOf(Error);
+      expect((answer as Error).message).toContain(`(${code})`);
+      expect(await sessions(), 'no session').toBe(before);
+
+      // Nothing was kept: every later use is refused too.
+      expect(authError()?.message).toContain(`(${code})`);
+    },
+  );
+
+  it('takes BETTER_AUTH_SECRETS over http as before: the library signs in with it', async () => {
+    authSettings(HTTP_ORIGIN, LONG_ENOUGH_SECRET);
+    vi.stubEnv('BETTER_AUTH_SECRETS', `1:${SHORT_SECRET}`);
+    const before = await sessions();
+    const answer = await signIn(HTTP_ORIGIN);
+    expect(answer).toBeInstanceOf(Response);
+    expect((answer as Response).status).toBe(200);
+    expect(await sessions()).toBe(before + 1);
+  });
+});

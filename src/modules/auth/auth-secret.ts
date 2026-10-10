@@ -4,7 +4,8 @@
  * would sign every session with a value anyone can read or guess. Over https, which is how a host
  * serves the app, such a secret is refused: the auth library never starts with it (better-auth.ts),
  * so no session is made, and the web's health check fails (src/app/api/health/route.ts, D-102).
- * Over http (this machine, CI) nothing changes (E00-T07a, E00-T02 review).
+ * So is BETTER_AUTH_SECRETS, a list the library reads itself and would sign with in place of
+ * BETTER_AUTH_SECRET. Over http (this machine, CI) nothing changes (E00-T07a, E00-T02 review).
  */
 
 /**
@@ -17,7 +18,7 @@ export const EXAMPLE_AUTH_SECRET = 'WvmU7awnhS+hURz48Xzur7L/WDwpIn2OzurTHxKrCr0=
 export const AUTH_SECRET_MIN_LENGTH = 32;
 
 /** Why a secret is refused over https, as a code: never the secret itself. */
-export type AuthSecretRefusal = 'auth_secret_example' | 'auth_secret_short';
+export type AuthSecretRefusal = 'auth_secret_example' | 'auth_secret_short' | 'auth_secrets_set';
 
 /** Why the auth library's settings cannot be used, as a code: one missing, or a refused secret. */
 export type AuthSettingsProblem = 'auth_settings_missing' | AuthSecretRefusal;
@@ -26,16 +27,33 @@ export type AuthSettingsProblem = 'auth_settings_missing' | AuthSecretRefusal;
 export const AUTH_SECRET_REFUSALS: Record<AuthSecretRefusal, string> = {
   auth_secret_example: "BETTER_AUTH_SECRET is .env.example's, which anyone can read",
   auth_secret_short: `BETTER_AUTH_SECRET is shorter than ${AUTH_SECRET_MIN_LENGTH} characters`,
+  auth_secrets_set:
+    'BETTER_AUTH_SECRETS is set, and the auth library would sign with its first entry, which ' +
+    'nothing checks, in place of BETTER_AUTH_SECRET',
 };
 
 /**
- * Why `secret` is refused for an app reached at `url`, or null: over https, the example secret or
- * one shorter than AUTH_SECRET_MIN_LENGTH. A URL's scheme has no case, so `HTTPS://` is https too.
+ * Why the auth library's secret is refused for an app reached at `url`, or null. Over https: when
+ * `secret` (BETTER_AUTH_SECRET) is the example or shorter than AUTH_SECRET_MIN_LENGTH, or when
+ * `secrets` (BETTER_AUTH_SECRETS, which the library reads from the environment itself) is set.
+ * A URL's scheme has no case, so `HTTPS://` is https too.
  */
-export function authSecretRefusal(url: string, secret: string): AuthSecretRefusal | null {
+export function authSecretRefusal(
+  url: string,
+  secret: string,
+  secrets?: string,
+): AuthSecretRefusal | null {
   if (!/^https:\/\//i.test(url)) return null;
-  if (secret === EXAMPLE_AUTH_SECRET) return 'auth_secret_example';
-  if (secret.length < AUTH_SECRET_MIN_LENGTH) return 'auth_secret_short';
+  // Judged without the whitespace around it: a value pasted into a host's settings can carry a space
+  // or a line break, and the library signs with the value as given (E00-T07a tester, finding 2).
+  const value = secret.trim();
+  if (value === EXAMPLE_AUTH_SECRET) return 'auth_secret_example';
+  if (value.length < AUTH_SECRET_MIN_LENGTH) return 'auth_secret_short';
+  // The library signs with the list's first entry in place of `secret`, and keeps the others to
+  // decrypt what they encrypted (better-auth 1.7.7, dist/context/create-context.mjs). Chairside sets
+  // no such list, so whatever it holds is refused; an empty one the library reads as not set, and so
+  // do we (E00-T07a tester, finding 1).
+  if (secrets) return 'auth_secrets_set';
   return null;
 }
 
@@ -49,5 +67,5 @@ export function authSettingsProblem(
   const url = env.BETTER_AUTH_URL;
   const secret = env.BETTER_AUTH_SECRET;
   if (!url || !secret) return 'auth_settings_missing';
-  return authSecretRefusal(url, secret);
+  return authSecretRefusal(url, secret, env.BETTER_AUTH_SECRETS);
 }
