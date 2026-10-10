@@ -47,7 +47,8 @@ into the runbook.
 
 ### E07-T03 · Canary, alerts and operator numbers
 - **Role:** builder · **Risk:** critical · **Depends on:** E02-T07, E03-T05
-- **Read:** `messaging` (Production checks) · `overview` (Things that keep it running) · D-013
+- **Read:** `messaging` (Production checks) · `overview` (Things that keep it running) · D-013,
+  D-075, D-102
 
 **Do.** Nightly canary job per clinic: every appointment tomorrow has a pending reminder or a
 recorded reason; otherwise alert the operator. Alerts for: failure-rate spike, cap reached,
@@ -56,7 +57,15 @@ sent, failed, skipped per clinic per day (counts only, no personal data). Next.j
 find Server Action" error, which any client can cause (E00-T08 tester note 5; D-075), is never an
 alert on its own.
 
-**Acceptance.** - [ ] Deleting a planned reminder in a test makes the canary alert. - [ ] Stopping the worker triggers the heartbeat alert. - [ ] Alerts contain ids and counts only.
+**Sentry** (EU, D-013), moved here from E00-T07 (owner, 2026-10-10: not now, D-102); until then
+errors are in the host's logs only. Wired in the web and the worker, inactive without its key.
+Before anything is sent it removes the logger's personal fields, request headers and cookies
+(Next.js hands a request's headers, the session cookie among them, to its error hook, D-075) and
+query strings. "Failed to find Server Action" and `The destination stream closed early` (a browser
+that left a page early, E01-T02b test) are not sent: anyone can cause either. A library, a service
+and its key: the owner's again when E07-T00 refines this task.
+
+**Acceptance.** - [ ] Deleting a planned reminder in a test makes the canary alert. - [ ] Stopping the worker triggers the heartbeat alert. - [ ] Alerts contain ids and counts only. - [ ] A deliberate test error reaches Sentry with no personal field, header or cookie in it; a multipart POST that names no action adds no event.
 
 ---
 

@@ -9,15 +9,17 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E00-T05b` is Ready: `/pipeline E00-T05b` (`handoffs/E00-T05b.md`)
-- **Decisions it waits on:** none (the owner answered on 2026-10-09, D-101)
+- **Next task to start:** `E00-T07a` is Ready: `/pipeline E00-T07a` (`handoffs/E00-T07a.md`)
+- **Decisions it waits on:** none (the owner answered on 2026-10-10, D-102)
 - **The first Monday run with the journeys** (2026-10-12) is the first in Firefox and WebKit on Linux, with the D-093 check's WebKit Back control (E00-T06b, `data`): the next architect pass reads it (D-100's "Revisit if")
 
 ## Next (in order)
 
-1. E00-T05b
-2. E00-T07
-3. The rest of E01, in the epic's own order (D-087); E00-T06c before the first journey that sets "now" (D-100)
+1. E00-T07a
+2. E00-T07b
+3. E00-T07c, once the owner has decided staging's cost ("Owner actions"); until then the rest of E01 goes first
+4. The rest of E01, in the epic's own order (D-087); E00-T06c before the first journey that sets "now" (D-100)
+5. E00-T12, before E02 (owner, 2026-10-03; D-102)
 
 ## Blocked
 
@@ -27,7 +29,7 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 
 ## E00 · Foundation (M0)
 
-Fully specified. A task becomes Ready when its dependencies are Done, except E00-T06c (an outline), refined with the first journey that sets "now" (D-100).
+Fully specified. A task becomes Ready when its dependencies are Done, except the outlines, refined before they start: E00-T06c with the first journey that sets "now" (D-100); E00-T07b, E00-T07c and E00-T12 (D-102).
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
@@ -47,10 +49,14 @@ Fully specified. A task becomes Ready when its dependencies are Done, except E00
 | E00-T04e | Tabs, the drawer and the dialog | builder | normal | **Done** | Merged by the owner (PR #37). `Tabs`, the drawer (`Sheet`) and `Dialog` in `src/ui/`, on `/dev/components`, a title always; the owner tried it. Leftovers → E01-T05 (a double click keeps the drawer open; a form in a drawer or dialog sends only itself, `message`), E01-T06, E00-T06b (one login per role and browser); one done by its tester, seven struck. See `handoffs/E00-T04e.md` |
 | E00-T05 | Seed data and clinic provisioning script | builder | normal | split (D-090) | Into E00-T05a and E00-T05b, the next two rows |
 | E00-T05a | Seed data: two clinics and a login for every role | builder | normal | **Done** | Merged by the owner (PR #27). `pnpm db:seed` and `db:reset` seed two clinics and a login for every role, under fixed ids (owner's answer (a)). Leftovers → E01-T01b, E03-T00 (`message`), `CLAUDE.md`, agent rule 5; six struck. See `handoffs/E00-T05a.md` |
-| E00-T05b | `clinic:create`: the operator's script for a new clinic | builder | critical | **Tested** | Refined in E00-T06b's Done pass (owner, D-101): the first owner chooses a password through a one-time link (3 days, only its hash stored) on `/login/set-password`; the script writes as the app role (migration 0004: `INSERT` on clinics and memberships); on a host it runs in the image, as the worker does (E00-T07). Refuses a time zone or a country the code does not know (E01-T02a); the logger's net drops plurals (E01-T02b, `data`). Reviewed at `7ef273d`: 1 required change (`data`: the logger's net still writes a personal plural that holds records, `names: [{ first }]`); fix round 1: such a plural's records keep only their ids. Tested at `98e098a`: every criterion met, no finding, two tests added, one `none` line on the Discovered list. Delta review of `7ef273d..4a0d239`: approved, 1 `none` suggestion (Discovered). Critical review of `main..5c479d2`: approved, no required change; one test added (a run that fails shows its error and no email, name or link); 2 suggestions (`data` → E04-T02's link, `none`), Discovered. See `handoffs/E00-T05b.md` |
+| E00-T05b | `clinic:create`: the operator's script for a new clinic | builder | critical | **Done** | Merged by the owner (PR #46). `main` green (run 38048731658). `pnpm clinic:create` writes as the app role (migration 0004) and prints a one-time link to `/login/set-password`, where the first owner chooses a password (D-101); the logger's plurals; the owner tried it. Leftovers → E00-T07c (the link out of the host's logs), E01-T08 (`message`: a zone stored as Intl names it), E00-T12 (new: the logger's net before E02), `security-privacy.md` (who may call `addMembership()` and `createSetupLink()`); two `data` lines → E04-T00; eight struck. See `handoffs/E00-T05b.md` |
 | E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | **Done** | Merged by the owner (PR #44). `main` green (run 37931330789). `pnpm test:e2e`: J1 with the keyboard alone and without JavaScript, axe-core, the D-093 check with its controls, in three browsers on `<db>_e2e`; CI runs Chromium after the build, the Monday run all three (D-100); four fix rounds, all for runs red without a fault. Leftovers: the `data` line → the first Monday run (Now) and E07-T00 (Safari by hand); three `none` lines → `README.md` and `test-strategy.md`; the owner's PATH, optional; nine struck. E00-T05b refined on the same branch (D-101). See `handoffs/E00-T06b.md` |
 | E00-T06c | A clock the end-to-end journeys set | builder | critical | Planned | Split from E00-T06b (D-100). Before the first journey that sets "now" (E01-T11's J2 or E02-T14's J3), refined with it |
-| E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | Planned | Owner: hosting accounts (Q-07). After E00-T05b, E00-T06b and E00-T09. The image runs the worker's TypeScript, and `clinic:create` the same way (D-101). A database that lowers Cyrillic, checked on staging (E01-T02a); a browser that left a page early is noise, never sent to Sentry (E01-T02b) |
+| E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | split (D-102) | Into E00-T07a … E00-T07c, the next three rows; Sentry → E07-T03 (owner, not now) |
+| E00-T07a | The image, the health check and the start-up refusals | builder | critical | Ready | From E00-T07 (D-102). One image for the web and `clinic:create`; `/api/health` for the host, never waiting on the worker; a login that gets past the policies, or the example secret on https, fails it (E00-T01, E00-T02 reviews). See `handoffs/E00-T07a.md` |
+| E00-T07b | The worker and its job queue | builder | critical | Planned | From E00-T07 (D-102). pg-boss (owner): its schema made by a migration, its tables global, a job's data ids only; the heartbeat job. Refined in E00-T07a's Done pass |
+| E00-T07c | Staging on Render | builder + owner | critical | Planned | From E00-T07 (D-102). Owner: staging's cost first ("Owner actions"), then the accounts (Q-07). A database that lowers Cyrillic (E01-T02a); the sign-in limit's client address (E00-T02); the setup link out of the host's logs (E00-T05b); the heartbeat's monitor. Refined in E00-T07b's Done pass |
+| E00-T12 | The logger's net before messaging | builder | normal | Planned | Before E02 (owner, 2026-10-03): `URL` and `Buffer` values, the messaging and link names, the plurals of whole names (E00-T01, E00-T05b; D-102) |
 
 ## E01 · Scheduling (M1)
 
@@ -69,7 +75,7 @@ Fully specified.
 | E01-T05 | Book an appointment (drawer) | builder | normal | Planned | The patient search keeps nothing in the browser (D-095); a double click keeps the drawer open; a form in a drawer or dialog sends only itself (E00-T04e) |
 | E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | The cancel dialog sends the cancel only (E00-T04e) |
 | E01-T07 | Calendar: week view | builder | low | Planned | |
-| E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | Planned | A time zone and a phone country the code knows (E01-T02a) |
+| E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | Planned | A time zone and a phone country the code knows (E01-T02a); a zone stored as Intl names it, never an offset, in `clinic:create` too (E00-T05b review, `message`) |
 | E01-T09 | Settings: providers and treatment types | builder | normal | Planned | |
 | E01-T10 | Today screen, first version | builder | normal | Planned | |
 | E01-T11 | Journey J2 and a hard look at scheduling | tester | normal | Planned | Owner: receptionist trial if possible (Q-09). E00-T06c first if J2 sets "now" (D-100) |
@@ -177,7 +183,7 @@ Outline. Needs E07-T00.
 | E07-T00 | Refine this epic | architect | low | Planned | |
 | E07-T01 | Audit log viewer and coverage check | builder | normal | Planned | |
 | E07-T02 | Backups and a real restore drill | owner + builder | critical | Planned | |
-| E07-T03 | Canary, alerts and operator numbers | builder | critical | Planned | |
+| E07-T03 | Canary, alerts and operator numbers | builder | critical | Planned | Sentry (EU), moved from E00-T07 (owner, not now; D-102) |
 | E07-T04 | Retention jobs | builder | critical | Planned | |
 | E07-T05 | Patient export and anonymise | builder | critical | Planned | |
 | E07-T06 | Security review pass | reviewer | critical | Planned | |
@@ -207,9 +213,11 @@ Outline. Needs E07-T00.
 - E01-T02a · Patients: the list and the search · merged 2026-10-08 (PR #39)
 - E01-T02b · Patients: add a patient · merged 2026-10-08 (PR #41)
 - E00-T06b · Playwright and the first end-to-end journey (J1) · merged 2026-10-09 (PR #44)
+- E00-T05b · `clinic:create`: the operator's script for a new clinic · merged 2026-10-10 (PR #46)
 
 ## Owner actions (standing)
 
 - **GitHub Actions budget (D-075):** when the free minutes run out, add a payment method and a small budget (for example $10 a month), then decide on GitHub Pro (R-34). Optional: in the repository's Settings → Actions, require actions pinned to a full commit SHA and allow only GitHub's and pnpm's actions
 - **Meta Business account, start now (long lead time):** create it, begin business verification, obtain one WhatsApp sending number for the product (D-055, D-056, R-28)
-- **E00-T02 test findings 5 and 7, still open:** finding 5 (rate-limit address: with E00-T07, and whether D-064 point 5 stands) and finding 7 (self-rename: E04, or switch the route off sooner). Both are on the Discovered list
+- **Owner decides, before E00-T07c: staging's cost on Render (D-102).** Render has no free worker, its free database is deleted after 30 days with no backups, and free services have no shell for `clinic:create`. Recommended: the smallest paid plans for the web, the worker and the database; or only the worker paid (the free web sleeps after 15 idle minutes, the free database is rebuilt every 30 days). The dashboard shows the price before you confirm
+- **E00-T02 test findings 5 and 7, still open:** finding 5 (the sign-in limit's client address is in E00-T07c; whether D-064 point 5, no per-account limit, stands: before E00-T07c) and finding 7 (self-rename: E04, or switch the route off sooner; on the Discovered list)

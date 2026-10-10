@@ -1896,3 +1896,29 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** E04-T00 gives invites their own token (`staff_invites.token_hash`,
   `data-model.md`) rather than this one; a page or action must create a clinic (none does in v1,
   D-042); the host cannot run a one-off command in the image.
+
+### D-102 · E00-T07 split in three; pg-boss now and Sentry later (owner); the web's health check never waits on the worker; E00-T12 for the logger's net
+- **Origin:** E00-T07's Ready pass, in E00-T05b's Done pass, 2026-10-10. **Owner, 2026-10-10:**
+  pg-boss is added (D-005), its tables shared by every clinic and a job's data ids only; Sentry not
+  now, errors stay in the host's logs until E07-T03; staging's cost decided later (Render has no
+  free worker, its free database is deleted after 30 days without backups, and free services have
+  no shell to run `clinic:create`). The rest is the architect's.
+- **What:**
+  - E00-T07 is split: **E00-T07a**, the image, `/api/health` and the start-up refusals, tried on
+    this machine; **E00-T07b**, the worker and pg-boss; **E00-T07c**, staging on Render (builder +
+    owner), once the owner has decided its cost. Sentry and its noise filters move to E07-T03;
+    D-013 stands, later.
+  - `/api/health` is the host's check of the web alone: the database answers, through a login that
+    cannot get past the policies, with an auth secret that is not the example's. It never waits on
+    the worker, which an external monitor watches (E00-T07c).
+  - pg-boss's schema is made by a migration, as the migration role, from the SQL pg-boss gives for
+    its pinned version; the worker runs it as the app role, with no migration, no schema change and
+    no run-time partitions. Its tables join `GLOBAL_TABLES` (`data-model.md` section 1).
+  - **E00-T12**, new: the logger's net before E02, from two E00-T01 lines (owner, 2026-10-03) and
+    E00-T05b's whole-name plurals.
+- **Why:** E00-T07 held four outcomes, three accounts and a deploy; its first two parts need no
+  account. A host restarts a web whose check fails, so a check that waited on the worker would take
+  the staff app down with it, while "if the worker is down, jobs wait" (`overview.md`). The app role
+  cannot make pg-boss's tables (`CLAUDE.md`, database roles).
+- **Revisit if:** the host treats a failed check otherwise (E00-T07c); pg-boss must change its
+  schema while it runs; the owner wants Sentry before the pilot.
