@@ -1444,54 +1444,90 @@ owner, D-102). Narrowing the proxy's matcher to staff routes (with the patient p
 ### E00-T07b · The worker and its job queue
 
 - **Role:** builder · **Risk:** critical (a migration and the app role's grants: pg-boss's schema;
-  the tenant wrapper in the worker) · **Depends on:** E00-T07a
-- **Read:** refined first, in E00-T07a's Done pass: `overview` (The shape; How tenant isolation
-  works) · `data-model` (Conventions; section 1) · `security` (Part 1, sections 1 and 6) · D-005,
-  D-060, D-071, D-077, D-102
+  production configuration: the worker's command in the image, and the login it refuses) ·
+  **Depends on:** E00-T07a (Done)
+- **Read:** `overview` (The shape; How tenant isolation works; Things that keep it running) ·
+  `data-model` (Conventions; section 1, the `pgboss` row) · `security` (Part 1, sections 1, 6 and 7)
+  · D-005, D-013, D-102, D-103, D-104 · the architect section of `handoffs/E00-T07b.md`
 
 **Why.** The worker does everything slow or timed: E02's planner and dispatcher, recalls, AI drafts
 (D-002, D-005). A heartbeat job through pg-boss shows that the queue fires on time, not only that
-the process lives (D-013). The second part of E00-T07 (D-102).
+the process lives (D-013); E00-T07c's monitor listens for it. The second part of E00-T07 (D-102).
 
-**Do.** An outline, refined against E00-T07a's image.
-- **pg-boss** (owner, D-102), its version pinned in a decision entry. Its schema is made by a
-  migration, as the migration role, from the SQL pg-boss gives for that version
-  (`getConstructionPlans`), read and committed like every migration; the app role gets on it only
-  what the worker needs, never a change to the schema. The worker starts pg-boss as the app role
-  without migrating or creating anything (`migrate: false`, `createSchema: false`), and without the
-  daily partitions its queue statistics would add while it runs (12.37.1: `persistQueueStats`, or
-  the install without partitions; queues not partitioned).
-- Its tables join `GLOBAL_TABLES` (no `clinic_id`, D-102), each with its reason; the meta-test
-  passes with them. A job's data holds ids and codes only (`security-privacy.md` section 1).
-- **`src/worker/`**: an entry point that starts pg-boss, schedules a repeating heartbeat job that
-  logs one line (codes and times) each run, and stops on SIGTERM: its job finished or handed back,
-  pg-boss stopped, the pool closed. A `pnpm worker` script; the image's worker command.
-- The worker's folder joins `chairside/database-access`'s lists: pg-boss there only, `withTenant`
-  for job handlers (D-071, D-077).
+**Do.**
+- **pg-boss 12.37.1**, exactly, and the peer it requires (owner, D-102; D-104). Nothing else new.
+- **Its schema, by one migration** (`pnpm db:generate --custom --name pgboss`, as 0004 was made):
+  the SQL `getConstructionPlans('pgboss')` gives, as the migration role, read and committed, with
+  two changes only: without its own `BEGIN;` and `COMMIT;` (the migrator runs every pending
+  migration in one transaction), and without the block that makes the two queue-statistics
+  partitions named after the day it runs (D-104). Then the grants: `USAGE` on the schema, and
+  `SELECT, INSERT, UPDATE, DELETE` on the tables the worker uses (the probe: `version`, `queue`,
+  `schedule`, `job`, `job_common`, `job_dependency`, `instance`), nothing that creates, changes or
+  drops. Its eleven tables join `GLOBAL_TABLES`, each with its reason.
+- **`src/db/queue.ts`**: the job queue as the app role, beside the other drivers (lint already keeps
+  pg-boss in `src/db/`: no lint change, D-104). It starts pg-boss from `DATABASE_URL`, with a small
+  pool of its own, `migrate: false`, no queue statistics, no reindexing and no partitioned queue;
+  logs its `'error'` events (a code, the error as a field); schedules and works a queue; and stops
+  it: a running job finished within a timeout shorter than the host's wait before it kills the
+  process, or handed back to the queue, and pg-boss's pool ended. It exports functions, never
+  pg-boss's object or class.
+- **A failed job keeps a code.** A handler's error is logged once through the logger, and pg-boss
+  gets `new Error('job_failed')` without a cause, so the job's row, in a table every clinic shares,
+  never holds the error's message, a database error's `detail`, or its cause (D-104). A job's data
+  holds ids and codes only (`security-privacy.md` section 1); the heartbeat's holds none.
+- **`src/worker/index.ts`**: first `databaseProblem()` (`src/db/health.ts`, the web's check,
+  E00-T07a): with a problem, one log line with its code, exit code 1, pg-boss never started. Then
+  the queue, and a heartbeat once a minute (`'* * * * *'`) that logs one line per run, codes and
+  times only (E00-T07c adds its ping). On SIGTERM or SIGINT: the queue stopped, our pool closed
+  (`closeDb()`), exit code 0. `pnpm worker` runs it with tsx, as `clinic:create`; the image as
+  `node --import tsx src/worker/index.ts` (D-103).
+- **Docs.** `docs/runbook.md`: run the worker from the image against the local database, its log
+  lines and codes, how it stops, and that a pg-boss upgrade is a new migration (D-104). `CLAUDE.md`
+  (folder structure, Commands) and `README.md`'s commands.
 
-**Out of scope.** Any real job (E02). Sending a job in the same transaction as a data change
-(E02-T06, D-005). The monitor and its ping (E00-T07c). Sentry (E07-T03).
+**Out of scope.** Any real job (E02). A job sent in the same transaction as a data change (E02-T06,
+D-005). `withTenant` in the worker and its lint entry: with the first job that opens a tenant
+transaction (E02, D-104). The monitor and its ping (E00-T07c). The login check by the session's
+login (E00-T07c). Queue statistics, warnings, partitioned queues, pg-boss's `TestClock`. Sentry
+(E07-T03).
 
-**Acceptance.** Refined in its Ready pass; at least:
-- [ ] The migration makes pg-boss's schema as the migration role; the app role reads and writes its
-      rows and can create, change or drop nothing in it (test).
-- [ ] The meta-test passes, pg-boss's tables on the allow-list, each with its reason.
-- [ ] Run as the app role, the worker fires the heartbeat on its schedule (a short one in the test)
-      and logs one line per run, with no personal data (test).
-- [ ] SIGTERM stops it, its pool closed (test); the image runs it (by hand, in the note).
-- [ ] `pnpm check`, `pnpm build` and `pnpm test:e2e` (all three browsers) pass.
+**Acceptance.**
+- [ ] The migration makes pg-boss's schema, version 45, as the migration role; the meta-test
+      passes with its eleven tables on `GLOBAL_TABLES`, each with its reason, and nothing else in
+      the meta-test or its allow-lists changed (integration tests).
+- [ ] The app role reads and writes the rows the worker needs, and can create, alter, drop or
+      truncate nothing in the `pgboss` schema (integration tests, as `database-roles.test.ts` does
+      for `public`).
+- [ ] As the app role, the queue starts, schedules, works and runs its maintenance with no `'error'`
+      event and no change to the schema (its tables, indexes and functions the same before and
+      after); pointed at a schema that is not there, or at another version, it does not start: the
+      worker logs one line with a code and exits with code 1 (integration tests).
+- [ ] The heartbeat fires on its schedule and logs one line per run, codes and times only
+      (integration test, a few seconds: pg-boss's `clock` option running ahead a minute at a time;
+      by hand in the image, two lines a minute apart).
+- [ ] A handler that throws, a database error with a `detail` among the cases, leaves `job_failed`
+      in its job's `output` and nothing of its error; the error is in one log line (integration
+      test).
+- [ ] With `DATABASE_URL` naming the migration role, or a database that does not answer, the worker
+      exits with code 1 after one log line with the code, pg-boss never started (integration tests).
+- [ ] SIGTERM and SIGINT stop it: a running job finishes or goes back to the queue, both pools end,
+      exit code 0 (test, in the test's own process: on Windows a child process gets no SIGTERM); in
+      the image, `docker stop` stops it the same way (by hand, its start time and memory in the
+      note: D-103's "Revisit if").
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---
 
 ### E00-T07c · Staging on Render
 
 - **Role:** builder + owner · **Risk:** critical (production configuration and secrets: the host,
-  its settings and its database; login: the client address the sign-in limit counts) · **Depends
-  on:** E00-T07a, E00-T07b · **Needs:** the owner's answer on staging's cost (board, "Owner
-  actions"), then the accounts; Q-07 (working assumption accepted for staging)
+  its settings and its database, the start-up refusals; login: the client address the sign-in limit
+  counts, the origins trusted for login, the clinic cookie) · **Depends on:** E00-T07a, E00-T07b ·
+  **Needs:** the owner's answer on staging's cost (board, "Owner actions"), then the accounts; Q-07
+  (working assumption accepted for staging)
 - **Read:** refined first, in E00-T07b's Done pass: `overview` (Environments; Things that keep it
-  running) · `security` (Part 1, sections 2, 7 and 9) · D-007, D-013, D-044, D-064, D-075, D-101,
-  D-102 · Q-07
+  running) · `security` (Part 1, sections 1, 2, 7 and 9) · D-007, D-013, D-044, D-063, D-064, D-075,
+  D-101, D-102, D-103 · Q-07
 
 **Why.** A walking skeleton in a real environment exposes deployment problems while the app is
 still tiny, and gives every later milestone a place to be demonstrated. The last part of E00-T07
@@ -1521,6 +1557,22 @@ it).
   would then hold a live link for 3 days. Find where a shell's or a job's output goes before the
   first staging clinic is made; the runbook says how to run it so that the link reaches only the
   operator's screen.
+- **The start-up refusals' last gaps** (E00-T07a's reviews, `data` ×3), closed before the host's
+  settings are written. They need no account: the Ready pass may make them a task of their own,
+  ahead of the host's part.
+  - The login check asks of the session's login, not of its current role (`src/db/health.ts`:
+    `pg_has_role(session_user, …)`): a superuser login whose role is set to the app role when it
+    connects (`?options=-c role=chairside_app` in `DATABASE_URL`, or `ALTER ROLE … SET role`)
+    answers 200 today, and one `SET ROLE NONE` then gets past the policies (critical review 1). The
+    web's check and the worker's start (E00-T07b) both use it.
+  - `BETTER_AUTH_TRUSTED_ORIGINS` is refused as `BETTER_AUTH_SECRETS` is, over http too: the auth
+    library reads it itself and trusts each origin in it for login requests beside
+    `BETTER_AUTH_URL`'s (against D-063), so an https host with an http `BETTER_AUTH_URL` and that
+    list makes sessions signed with any secret, their cookie without Secure (critical review 2). On
+    the host, `BETTER_AUTH_URL` is its https address.
+  - The clinic cookie is Secure exactly when the library's cookies are: `cookiesAreSecure()`
+    (`better-auth.ts`) reads `BETTER_AUTH_URL` as the library does (`readAsHttps()`,
+    `auth-secret.ts`), not by its `https://` prefix as written (E00-T07a review).
 - **The heartbeat's monitor** (D-013): an external check that alerts when the worker's heartbeat
   stops; the worker pings its URL each run. The service and its URL, a new secret setting, are the
   owner's (agent rule 4).
@@ -1529,6 +1581,14 @@ it).
   follows a deploy (D-075); `The destination stream closed early` is always noise (a browser that
   left a page early, E01-T02b test).
 - Whether CI builds the image too (a run's minutes, D-075), or a deploy is its first build.
+- **For the Ready pass: what the host's check and deploy must allow for** (E00-T07a, `none`).
+  `/api/health` waits up to 5 s for a pooled connection, so the host's timeout and failure count
+  decide whether a busy web is restarted. It answers 200 while `BETTER_AUTH_URL` is no URL the
+  library can use (every page then answers 500): a deploy that goes live on a passing check is put
+  live with it. The base image is a tag (`node:24-trixie-slim`), so two builds a week apart can
+  differ. A test reads every `BETTER_AUTH_SECRET=` in `docs/runbook.md` and expects
+  `.env.example`'s value (`auth-secret.test.ts`): the host's part of the runbook names the secret
+  without that pattern, and a documents-only pull request, which CI does not run, never writes it.
 
 **Owner action.** Before it starts: the answer on cost, a Render account with those plans, the
 monitor's account. During it: the secrets in Render's secret store (agents never see them), and
@@ -1548,6 +1608,13 @@ heartbeat.
 - [ ] The setup link appears in no log the host keeps (its log view, after a run).
 - [ ] Deploys happen from `main` automatically; a rollback is documented and was tried once.
 - [ ] No secret is in the repository or the image.
+- [ ] `/api/health` answers 503 (`database_login_past_policies`) for a superuser login whose role
+      is set to the app role when it connects, and the worker does not start with it; the app role
+      still answers 200 (integration tests).
+- [ ] With `BETTER_AUTH_TRUSTED_ORIGINS` set, over http or https, the auth library never starts,
+      no session is made, and `/api/health` answers 503 with its own code (tests).
+- [ ] With `BETTER_AUTH_URL` written ` https://…` or `HTTPS://…`, the clinic cookie is Secure
+      (test).
 - [ ] On the staging database the Cyrillic check answers `t` (the command and its answer in the
       note), and the runbook says how production's database is created and checked.
 - [ ] Staging holds synthetic data only.

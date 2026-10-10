@@ -47,7 +47,7 @@ One codebase, two running processes, one database.
 | Web framework | Next.js (App Router), React | D-002 |
 | Database | PostgreSQL, managed, EU | D-003 |
 | Queries and migrations | Drizzle ORM, SQL migrations | D-004 |
-| Background jobs | pg-boss (in Postgres) | D-005 |
+| Background jobs | pg-boss (in Postgres) | D-005, D-104 |
 | Login, sessions, 2FA | Better Auth | D-006 |
 | Hosting | Render, Frankfurt: web + worker + Postgres, one Docker image | D-007 |
 | UI | Tailwind CSS, shadcn/ui, demo tokens | D-009 |

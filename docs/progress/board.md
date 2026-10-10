@@ -9,17 +9,16 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E00-T07a` is Ready: `/pipeline E00-T07a` (`handoffs/E00-T07a.md`)
-- **Decisions it waits on:** none (the owner answered on 2026-10-10, D-102)
+- **Next task to start:** `E00-T07b` is Ready: `/pipeline E00-T07b` (`handoffs/E00-T07b.md`)
+- **Decisions it waits on:** none (the owner answered on 2026-10-10, D-102; D-104 is the architect's)
 - **The first Monday run with the journeys** (2026-10-12) is the first in Firefox and WebKit on Linux, with the D-093 check's WebKit Back control (E00-T06b, `data`): the next architect pass reads it (D-100's "Revisit if")
 
 ## Next (in order)
 
-1. E00-T07a
-2. E00-T07b
-3. E00-T07c, once the owner has decided staging's cost ("Owner actions"); until then the rest of E01 goes first
-4. The rest of E01, in the epic's own order (D-087); E00-T06c before the first journey that sets "now" (D-100)
-5. E00-T12, before E02 (owner, 2026-10-03; D-102)
+1. E00-T07b
+2. E00-T07c, once the owner has decided staging's cost ("Owner actions"); until then the rest of E01 goes first
+3. The rest of E01, in the epic's own order (D-087); E00-T06c before the first journey that sets "now" (D-100)
+4. E00-T12, before E02 (owner, 2026-10-03; D-102)
 
 ## Blocked
 
@@ -29,7 +28,7 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 
 ## E00 · Foundation (M0)
 
-Fully specified. A task becomes Ready when its dependencies are Done, except the outlines, refined before they start: E00-T06c with the first journey that sets "now" (D-100); E00-T07b, E00-T07c and E00-T12 (D-102).
+Fully specified. A task becomes Ready when its dependencies are Done, except the outlines, refined before they start: E00-T06c with the first journey that sets "now" (D-100); E00-T07c and E00-T12 (D-102).
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
@@ -53,9 +52,9 @@ Fully specified. A task becomes Ready when its dependencies are Done, except the
 | E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | **Done** | Merged by the owner (PR #44). `main` green (run 37931330789). `pnpm test:e2e`: J1 with the keyboard alone and without JavaScript, axe-core, the D-093 check with its controls, in three browsers on `<db>_e2e`; CI runs Chromium after the build, the Monday run all three (D-100); four fix rounds, all for runs red without a fault. Leftovers: the `data` line → the first Monday run (Now) and E07-T00 (Safari by hand); three `none` lines → `README.md` and `test-strategy.md`; the owner's PATH, optional; nine struck. E00-T05b refined on the same branch (D-101). See `handoffs/E00-T06b.md` |
 | E00-T06c | A clock the end-to-end journeys set | builder | critical | Planned | Split from E00-T06b (D-100). Before the first journey that sets "now" (E01-T11's J2 or E02-T14's J3), refined with it |
 | E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | split (D-102) | Into E00-T07a … E00-T07c, the next three rows; Sentry → E07-T03 (owner, not now) |
-| E00-T07a | The image, the health check and the start-up refusals | builder | critical | **Tested** | From E00-T07 (D-102). One image for the web and `clinic:create`; `/api/health` for the host, never waiting on the worker; a login that gets past the policies, or the example secret on https, fails it (E00-T01, E00-T02 reviews). Reviewed at `13bad31`: 1 required change (`data`: the runbook's secret), fixed in fix round 1. Back from the tester at `711582d`: 2 findings (`data` ×2): `BETTER_AUTH_SECRETS`, and the example secret with whitespace around it, get past the https refusal; 7 cases added. Both fixed in fix round 2 (`auth_secrets_set`; the secret judged without its whitespace). Tested at `3986468`: both fixed, no new finding; 2 cases added (the secret that signs the session). Delta review of `13bad31..05f2aae`: approved, no required change, 1 suggestion (`none`). Critical review of `main..aa4b10e`: 1 required change (`data`: a `BETTER_AUTH_URL` the auth library reads as https, with a space or line break before it or written `https:/host`, skips the refusals, and a session is signed with the example secret), 1 suggestion (`data`). Fixed in fix round 3 (the owner approved it): the scheme read with the URL parser the library uses; 80 cases. Tested at `b421185`: fixed, red without the fix (48 cases), no new finding; 1 case added (the check against the library's own reading, 1,225 forms). Delta review of `aa4b10e..814f924`: approved, no required change. Critical review of `aa4b10e..99ae331`: approved, no required change, 1 suggestion (`data`: `BETTER_AUTH_TRUSTED_ORIGINS`, → E00-T07c). See `handoffs/E00-T07a.md` |
-| E00-T07b | The worker and its job queue | builder | critical | Planned | From E00-T07 (D-102). pg-boss (owner): its schema made by a migration, its tables global, a job's data ids only; the heartbeat job. Refined in E00-T07a's Done pass |
-| E00-T07c | Staging on Render | builder + owner | critical | Planned | From E00-T07 (D-102). Owner: staging's cost first ("Owner actions"), then the accounts (Q-07). A database that lowers Cyrillic (E01-T02a); the sign-in limit's client address (E00-T02); the setup link out of the host's logs (E00-T05b); the heartbeat's monitor. Refined in E00-T07b's Done pass |
+| E00-T07a | The image, the health check and the start-up refusals | builder | critical | **Done** | Merged by the owner (PR #48). `main` green (run 38071390166). One image for the web and `clinic:create`, tsx in it (D-103); `/api/health` for the host, never waiting on the worker; a login past the policies, or over https as the auth library reads it the example secret, a short one or `BETTER_AUTH_SECRETS`, fails it; three fix rounds. Leftovers → E00-T07c (`data` ×3: the login check by the session's login, `BETTER_AUTH_TRUSTED_ORIGINS` refused, the clinic cookie's Secure; four `none` facts for its Ready pass), E00-T07b (a trap in the builder's notes); eight struck. See `handoffs/E00-T07a.md` |
+| E00-T07b | The worker and its job queue | builder | critical | Ready | From E00-T07 (D-102), refined in E00-T07a's Done pass (D-104). pg-boss 12.37.1 in `src/db/queue.ts`: its schema by a migration with fixed table names, never changed while it runs; a failed job keeps a code; the worker refuses a login past the policies; a heartbeat once a minute; SIGTERM stops it. See `handoffs/E00-T07b.md` |
+| E00-T07c | Staging on Render | builder + owner | critical | Planned | From E00-T07 (D-102). Owner: staging's cost first ("Owner actions"), then the accounts (Q-07). A database that lowers Cyrillic (E01-T02a); the sign-in limit's client address (E00-T02); the setup link out of the host's logs (E00-T05b); the start-up refusals' last gaps (E00-T07a, `data` ×3, no account needed); the heartbeat's monitor. Refined in E00-T07b's Done pass |
 | E00-T12 | The logger's net before messaging | builder | normal | Planned | Before E02 (owner, 2026-10-03): `URL` and `Buffer` values, the messaging and link names, the plurals of whole names (E00-T01, E00-T05b; D-102) |
 
 ## E01 · Scheduling (M1)
@@ -214,6 +213,7 @@ Outline. Needs E07-T00.
 - E01-T02b · Patients: add a patient · merged 2026-10-08 (PR #41)
 - E00-T06b · Playwright and the first end-to-end journey (J1) · merged 2026-10-09 (PR #44)
 - E00-T05b · `clinic:create`: the operator's script for a new clinic · merged 2026-10-10 (PR #46)
+- E00-T07a · The image, the health check and the start-up refusals · merged 2026-10-10 (PR #48)
 
 ## Owner actions (standing)
 
