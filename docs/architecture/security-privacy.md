@@ -19,10 +19,12 @@ This document has two parts: rules that code must follow, and the gate before re
 - The app's database role cannot bypass Row-Level Security, cannot change schema, cannot
   update or delete audit rows. On a host, the web's health check (`/api/health`) fails while
   `DATABASE_URL` logs in as a role that can get past the policies: a superuser, one with
-  `BYPASSRLS`, a table's owner or a member of one, so such a web never goes live (E00-T07a).
+  `BYPASSRLS`, a table's owner or a member of one, so such a web never goes live (E00-T07a); the
+  worker does not start with such a login (E00-T07b).
 - The job queue's tables (pg-boss, D-005) are shared by every clinic and have no policy: a job's
   data holds ids and codes only, never a patient's details, and its handler works inside its
-  clinic's tenant transaction (D-102).
+  clinic's tenant transaction (D-102). A failed job keeps a code: its error goes to the logger,
+  never into the job's row (D-104).
 - Cross-clinic lookups exist only as a few named database functions (list a user's clinics at
   login: `clinics_for_user`, D-062; resolve a link token; list clinics for the planner; claim due
   messages). Adding one is a critical change.

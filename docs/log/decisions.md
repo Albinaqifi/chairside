@@ -1947,3 +1947,24 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** the worker starts too slowly or uses too much memory under tsx (E00-T07b); the
   image's size (about 1 GB unpacked) matters on the host (E00-T07c: `output: 'standalone'`); Node.js
   runs our `@/` imports itself.
+
+### D-104 · pg-boss 12.37.1, kept in `src/db/` with the other drivers; its schema with fixed table names, never changed while it runs; a failed job keeps a code
+- **Origin:** E00-T07b's Ready pass, in E00-T07a's Done pass, 2026-10-10: architect choices inside
+  D-102 (owner: pg-boss now), from a probe of 12.37.1 as the app role (`handoffs/E00-T07b.md`).
+- **What:**
+  - pg-boss **12.37.1** exactly (schema version 45), with the peer it requires, `@opentelemetry/api`,
+    whose calls do nothing without a tracing SDK, and Chairside installs none.
+  - It lives in `src/db/queue.ts`: lint already allows a `pg-…` package only in `src/db/`. This
+    replaces D-077's "the worker's folder joins the list for pg-boss"; D-071's "the worker's job
+    handler joins these lists" moves to the first job that opens a tenant transaction (E02).
+  - Its migration is pg-boss's own SQL without its `BEGIN;`/`COMMIT;` and without the two
+    statistics partitions it names after the day it runs; the app role gets the rows of the tables
+    the worker uses. It runs with `migrate: false`, no statistics, no reindexing, no partitioned
+    queue, and always an `'error'` listener.
+  - A failed job keeps the code `job_failed`, never its error; the worker does not start while
+    `databaseProblem()` names a problem (E00-T07a).
+- **Why:** the app role cannot create tables, and pg-boss's defaults would try (statistics: two days
+  after the migration); a dated table name defeats the meta-test's allow-list; pg-boss keeps a
+  failed job's error for days, in a table every clinic shares.
+- **Revisit if:** pg-boss is upgraded (a new migration, from its `getMigrationPlans`); its statistics
+  are wanted; a job must be sent in a data change's transaction (E02-T06).
