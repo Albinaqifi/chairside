@@ -9,7 +9,7 @@ Scheduling for small dental clinics, with automatic patient reminders. What and 
 - **pnpm**: `npm install -g pnpm`. The project pins its exact version in `package.json` and
   pnpm switches to it by itself.
 - **Docker Desktop**, running: https://www.docker.com/products/docker-desktop. It runs the local
-  PostgreSQL database.
+  PostgreSQL database, and builds the app's image (`docs/runbook.md`).
 - **Git**.
 - **GitHub CLI** (`gh`), logged in with `gh auth login`: agents use it to open pull requests.
   On Windows: `winget install GitHub.cli`.

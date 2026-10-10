@@ -22,8 +22,12 @@ export interface SignedInUser {
  * the session, together with the cookie (D-067).
  */
 export const currentUser = cache(async (): Promise<SignedInUser | null> => {
+  // The request's headers before the auth library: while `next build` tries to prerender a page,
+  // reading them ends that try (the page is rendered for each request), so the library is never made
+  // there and the image is built without any setting (E00-T07a).
+  const requestHeaders = await headers();
   const result = await getAuth().api.getSession({
-    headers: await headers(),
+    headers: requestHeaders,
     query: { disableRefresh: true },
   });
   if (!result) return null;

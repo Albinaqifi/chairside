@@ -11,6 +11,12 @@ export {
   SIGN_IN_RATE_LIMIT,
   type Auth,
 } from './better-auth';
+export {
+  AUTH_SECRET_MIN_LENGTH,
+  authSettingsProblem,
+  EXAMPLE_AUTH_SECRET,
+  type AuthSettingsProblem,
+} from './auth-secret';
 export { activeMembership, addMembership, clinicsForUser, type Membership } from './memberships';
 export {
   can,

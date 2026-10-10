@@ -7,6 +7,7 @@ import { AUTH_COOKIE_PREFIX } from '@/lib/cookies';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { withoutQueryValues } from '@/lib/query-errors';
+import { AUTH_SECRET_MIN_LENGTH, AUTH_SECRET_REFUSALS, authSecretRefusal } from './auth-secret';
 import { recordLogin } from './login-audit';
 import { accounts, rateLimits, sessions, users, verifications } from './schema';
 
@@ -98,12 +99,25 @@ const refuseDontRememberMe = createAuthMiddleware(async (ctx) => {
 });
 
 function createAuth() {
+  const baseURL = requiredEnv('BETTER_AUTH_URL');
+  const secret = requiredEnv('BETTER_AUTH_SECRET');
+  // Over https, never with .env.example's secret or a short one (auth-secret.ts). Thrown before the
+  // library exists, so it never starts with it and no session is made; getAuth() keeps nothing, so
+  // every later call is refused too. The error names the code, never the secret.
+  const refused = authSecretRefusal(baseURL, secret);
+  if (refused !== null) {
+    throw new Error(
+      `${AUTH_SECRET_REFUSALS[refused]}, and BETTER_AUTH_URL is https: the auth library does not ` +
+        `start. Set a random secret of at least ${AUTH_SECRET_MIN_LENGTH} characters on the host, ` +
+        `for example from \`openssl rand -base64 32\` (${refused}).`,
+    );
+  }
   return betterAuth({
     appName: 'Chairside',
     // Also the only trusted origin for cookie-bearing requests, and what makes cookies Secure
     // (https). Required, so nothing is ever inferred from request headers.
-    baseURL: requiredEnv('BETTER_AUTH_URL'),
-    secret: requiredEnv('BETTER_AUTH_SECRET'),
+    baseURL,
+    secret,
     database: withSafeQueryErrors(
       drizzleAdapter(getDb(), {
         provider: 'pg',

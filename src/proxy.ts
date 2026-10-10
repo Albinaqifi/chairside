@@ -55,6 +55,8 @@ function isServerAction(request: NextRequest): boolean {
 }
 
 export const config = {
-  // Everything except the login page, the auth library's routes, Next.js internals and files.
-  matcher: ['/((?!login|api/auth|_next/static|_next/image|favicon\\.ico|.*\\..*).*)'],
+  // Everything except the login page, the auth library's routes, the host's health check, Next.js
+  // internals and files. The health check by its whole path (`$`), so `/api/healthz` or
+  // `/api/health/x` still comes here, as before (E00-T07a): it needs no session and sets no cookie.
+  matcher: ['/((?!login|api/auth|api/health$|_next/static|_next/image|favicon\\.ico|.*\\..*).*)'],
 };
