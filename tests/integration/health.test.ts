@@ -382,6 +382,73 @@ describe('GET /api/health: the auth secret, however it is given', () => {
   });
 });
 
+// E00-T07a critical review, required change 1: the check fails whenever the auth library would sign
+// with a refused secret over https, however BETTER_AUTH_URL is written. The library reads it with the
+// WHATWG URL parser (better-auth 1.7.7, dist/utils/url.mjs), to which a URL with a space or a line
+// break before it, written `https:/host`, `https:host` or `https:\host`, or with a tab inside its
+// scheme, is https. That the library then never starts: tests/integration/auth-secret.test.ts.
+describe('GET /api/health: a BETTER_AUTH_URL the auth library reads as https, however it is written', () => {
+  const SHORT = `MARKER-${'s'.repeat(AUTH_SECRET_MIN_LENGTH - 8)}`; // 31 characters
+  const STRONG = `MARKER-${'k'.repeat(37)}`; // 44 characters
+  const FORMS = [
+    { form: 'a space before it', url: ' https://chairside.example.test' },
+    { form: 'a line break before it', url: '\nhttps://chairside.example.test' },
+    { form: 'one slash', url: 'https:/chairside.example.test' },
+    { form: 'no slash', url: 'https:chairside.example.test' },
+    { form: 'a backslash', url: 'https:\\chairside.example.test' },
+    { form: 'a tab inside the scheme', url: 'ht\ttps://chairside.example.test' },
+  ];
+  const REFUSALS = [
+    {
+      refused: ".env.example's secret",
+      settings: { BETTER_AUTH_SECRET: EXAMPLE_AUTH_SECRET },
+      code: 'auth_secret_example',
+    },
+    {
+      refused: 'a secret of 31 characters',
+      settings: { BETTER_AUTH_SECRET: SHORT },
+      code: 'auth_secret_short',
+    },
+    {
+      refused: 'BETTER_AUTH_SECRETS set',
+      settings: { BETTER_AUTH_SECRET: STRONG, BETTER_AUTH_SECRETS: `1:${SHORT}` },
+      code: 'auth_secrets_set',
+    },
+  ];
+  const CASES = FORMS.flatMap((form) => REFUSALS.map((refusal) => ({ ...form, ...refusal })));
+
+  it.each(CASES)(
+    'answers 503 with $refused and a URL with $form, and logs no secret',
+    async ({ url, settings, code }) => {
+      const answer = await health({ BETTER_AUTH_URL: url, ...settings });
+      expectFailure(answer, code);
+      for (const value of [SHORT, STRONG, EXAMPLE_AUTH_SECRET]) {
+        expect(answer.loggedText).not.toContain(value);
+      }
+    },
+  );
+
+  it.each(FORMS)('answers 200 with a strong secret and a URL with $form', async ({ url }) => {
+    const answer = await health({ BETTER_AUTH_URL: url, BETTER_AUTH_SECRET: STRONG });
+    expect(answer.status).toBe(200);
+  });
+
+  it.each([
+    { form: 'a space before it', url: ` ${ORIGIN}` },
+    { form: 'a line break before it', url: `\n${ORIGIN}` },
+    { form: 'one slash', url: 'http:/localhost:3000' },
+  ])(
+    "answers 200 over http with $form and .env.example's secret, as on this machine",
+    async ({ url }) => {
+      const answer = await health({
+        BETTER_AUTH_URL: url,
+        BETTER_AUTH_SECRET: EXAMPLE_AUTH_SECRET,
+      });
+      expect(answer.status).toBe(200);
+    },
+  );
+});
+
 describe("the request proxy's matcher", () => {
   const proxied = (path: string) =>
     unstable_doesMiddlewareMatch({ config, url: `${ORIGIN}${path}` });

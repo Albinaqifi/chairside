@@ -259,3 +259,96 @@ describe('the secret that signs the session', () => {
     expect(signature).not.toBe(signedWith(LONG_ENOUGH_SECRET, token));
   });
 });
+
+// E00-T07a critical review, required change 1: the library reads BETTER_AUTH_URL with the WHATWG URL
+// parser and keeps the origin it makes, from which its cookies get Secure (better-auth 1.7.7,
+// dist/utils/url.mjs and dist/context/create-context.mjs). So a URL with a space or a line break
+// before it, written `https:/host`, `https:host` or `https:\host`, or with a tab inside its scheme, is
+// https to it, and each meets every refusal: the library never starts and the sign-in from https makes
+// no session. The control: with a strong secret the library starts with each form and reads it as
+// https (its session cookie `__Secure-` and Secure). Over http, however it is written, as before.
+describe('a BETTER_AUTH_URL the auth library reads as https, however it is written', () => {
+  const FORMS = [
+    { form: 'a space before it', url: ` ${HTTPS_ORIGIN}` },
+    { form: 'a line break before it', url: `\n${HTTPS_ORIGIN}` },
+    { form: 'one slash', url: 'https:/chairside.example.test' },
+    { form: 'no slash', url: 'https:chairside.example.test' },
+    { form: 'a backslash', url: 'https:\\chairside.example.test' },
+    { form: 'a tab inside the scheme', url: 'ht\ttps://chairside.example.test' },
+  ];
+  const REFUSALS = [
+    {
+      refused: "the example secret, .env.example's",
+      secret: EXAMPLE_AUTH_SECRET,
+      secrets: undefined,
+      code: 'auth_secret_example',
+    },
+    {
+      refused: 'a secret of 31 characters',
+      secret: SHORT_SECRET,
+      secrets: undefined,
+      code: 'auth_secret_short',
+    },
+    {
+      refused: 'BETTER_AUTH_SECRETS holding a short secret',
+      secret: LONG_ENOUGH_SECRET,
+      secrets: `1:${SHORT_SECRET}`,
+      code: 'auth_secrets_set',
+    },
+  ];
+  const CASES = FORMS.flatMap((form) => REFUSALS.map((refusal) => ({ ...form, ...refusal })));
+
+  it.each(CASES)(
+    'refuses $refused with $form: the library never starts and no session is made',
+    async ({ url, secret, secrets, code }) => {
+      authSettings(url, secret);
+      if (secrets !== undefined) vi.stubEnv('BETTER_AUTH_SECRETS', secrets);
+      const before = await sessions();
+
+      const refused = authError();
+      expect(refused?.message).toContain(`(${code})`);
+      for (const value of [SHORT_SECRET, EXAMPLE_AUTH_SECRET]) {
+        expect(refused?.message, 'the error never holds a secret').not.toContain(value);
+      }
+
+      const answer = await signIn(HTTPS_ORIGIN);
+      expect(answer).toBeInstanceOf(Error);
+      expect((answer as Error).message).toContain(`(${code})`);
+      expect(await sessions(), 'no session').toBe(before);
+
+      // Nothing was kept: every later use is refused too.
+      expect(authError()?.message).toContain(`(${code})`);
+    },
+  );
+
+  it.each(FORMS)(
+    'takes a strong secret with $form, which the library reads as https: a Secure session cookie',
+    async ({ url }) => {
+      authSettings(url, LONG_ENOUGH_SECRET);
+      const before = await sessions();
+      const answer = await signIn(HTTPS_ORIGIN);
+      expect(answer).toBeInstanceOf(Response);
+      expect((answer as Response).status).toBe(200);
+      expect(await sessions()).toBe(before + 1);
+
+      const cookie = (answer as Response).headers
+        .getSetCookie()
+        .find((set) => set.includes('session_token='));
+      expect(cookie, 'the cookie of a site served over https').toMatch(/^__Secure-/);
+      expect(cookie).toMatch(/;\s*Secure\s*(;|$)/i);
+    },
+  );
+
+  it.each([
+    { form: 'a space before it', url: ` ${HTTP_ORIGIN}` },
+    { form: 'a line break before it', url: `\n${HTTP_ORIGIN}` },
+    { form: 'one slash', url: 'http:/localhost:3000' },
+  ])('signs in over http with $form and the example secret, as before', async ({ url }) => {
+    authSettings(url, EXAMPLE_AUTH_SECRET);
+    const before = await sessions();
+    const answer = await signIn(HTTP_ORIGIN);
+    expect(answer).toBeInstanceOf(Response);
+    expect((answer as Response).status).toBe(200);
+    expect(await sessions()).toBe(before + 1);
+  });
+});

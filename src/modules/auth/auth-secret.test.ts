@@ -199,3 +199,78 @@ describe('a secret with whitespace around it', () => {
     expect(authSecretRefusal(HTTP, `${SHORT} `)).toBeNull();
   });
 });
+
+// E00-T07a critical review, required change 1: the auth library reads BETTER_AUTH_URL with the WHATWG
+// URL parser and keeps the origin it makes, from which its cookies get Secure (better-auth 1.7.7,
+// dist/utils/url.mjs and dist/context/create-context.mjs). That parser drops spaces and control
+// characters before the URL and tabs and line breaks anywhere in it, and reads `https:/host`,
+// `https:host` and `https:\host` as `https://host`: each is https to the library, so each meets every
+// refusal. Over http, however it is written, nothing changes. The library itself:
+// tests/integration/auth-secret.test.ts; the health check: tests/integration/health.test.ts.
+describe('a BETTER_AUTH_URL the auth library reads as https, however it is written', () => {
+  const FORMS = [
+    { name: 'a space before it', url: ` ${HTTPS}` },
+    { name: 'a line break before it', url: `\n${HTTPS}` },
+    { name: 'one slash', url: 'https:/chairside.example.test' },
+    { name: 'no slash', url: 'https:chairside.example.test' },
+    { name: 'a backslash', url: 'https:\\chairside.example.test' },
+    { name: 'a tab inside the scheme', url: 'ht\ttps://chairside.example.test' },
+  ];
+  const LIST = '1:MARKER-short-known'; // BETTER_AUTH_SECRETS: a version and a short secret
+
+  it.each(FORMS)('is https to the parser the library reads it with: $name', ({ url }) => {
+    expect(new URL(url).origin).toBe(HTTPS);
+  });
+
+  it.each(FORMS)(
+    'refuses the example secret, a short one and BETTER_AUTH_SECRETS: $name',
+    ({ url }) => {
+      expect(authSecretRefusal(url, EXAMPLE_AUTH_SECRET)).toBe('auth_secret_example');
+      expect(authSecretRefusal(url, SHORT)).toBe('auth_secret_short');
+      expect(authSecretRefusal(url, LONG_ENOUGH, LIST)).toBe('auth_secrets_set');
+    },
+  );
+
+  it.each(FORMS)('is read so by authSettingsProblem too: $name', ({ url }) => {
+    const settings = (secret: string, secrets?: string) =>
+      authSettingsProblem({
+        BETTER_AUTH_URL: url,
+        BETTER_AUTH_SECRET: secret,
+        BETTER_AUTH_SECRETS: secrets,
+      });
+    expect(settings(EXAMPLE_AUTH_SECRET)).toBe('auth_secret_example');
+    expect(settings(SHORT)).toBe('auth_secret_short');
+    expect(settings(LONG_ENOUGH, LIST)).toBe('auth_secrets_set');
+  });
+
+  it.each(FORMS)('takes a secret of 32 characters that is not the example: $name', ({ url }) => {
+    expect(authSecretRefusal(url, LONG_ENOUGH)).toBeNull();
+  });
+
+  it('still refuses a URL written https:// that the parser cannot read, as before', () => {
+    // The library does not start with such a URL either; the check refused it before and still does.
+    for (const url of ['https://', 'HTTPS://', 'https://chairside example.test']) {
+      expect(authSecretRefusal(url, EXAMPLE_AUTH_SECRET), url).toBe('auth_secret_example');
+      expect(authSecretRefusal(url, SHORT), url).toBe('auth_secret_short');
+      expect(authSecretRefusal(url, LONG_ENOUGH, LIST), url).toBe('auth_secrets_set');
+    }
+  });
+
+  it('changes nothing over http, however it is written', () => {
+    const forms = [
+      ` ${HTTP}`,
+      `\n${HTTP}`,
+      'http:/localhost:3000',
+      'http:localhost:3000',
+      'http:\\localhost:3000',
+      'HTTP://localhost:3000',
+      'ht\ttp://localhost:3000',
+    ];
+    for (const url of forms) {
+      expect(new URL(url).origin, JSON.stringify(url)).toBe(HTTP);
+      expect(authSecretRefusal(url, EXAMPLE_AUTH_SECRET), JSON.stringify(url)).toBeNull();
+      expect(authSecretRefusal(url, SHORT), JSON.stringify(url)).toBeNull();
+      expect(authSecretRefusal(url, LONG_ENOUGH, LIST), JSON.stringify(url)).toBeNull();
+    }
+  });
+});

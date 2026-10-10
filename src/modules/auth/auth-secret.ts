@@ -33,17 +33,31 @@ export const AUTH_SECRET_REFUSALS: Record<AuthSecretRefusal, string> = {
 };
 
 /**
- * Why the auth library's secret is refused for an app reached at `url`, or null. Over https: when
- * `secret` (BETTER_AUTH_SECRET) is the example or shorter than AUTH_SECRET_MIN_LENGTH, or when
- * `secrets` (BETTER_AUTH_SECRETS, which the library reads from the environment itself) is set.
- * A URL's scheme has no case, so `HTTPS://` is https too.
+ * Whether the auth library reads `url` (BETTER_AUTH_URL) as https. It reads it with the WHATWG URL
+ * parser and keeps the origin the parser makes, from which its cookies get Secure (better-auth 1.7.7,
+ * dist/utils/url.mjs and dist/context/create-context.mjs). That parser drops spaces and control
+ * characters before the URL and tabs and line breaks anywhere in it, reads the scheme without its
+ * case, and takes `https:/host`, `https:host` and `https:\host` for `https://host`: so the same parser
+ * decides here (E00-T07a critical review). `URL.parse` answers null for what it cannot read, and so
+ * never puts the value in an error. A URL written `https://` that it cannot read (`https://` alone)
+ * still counts, as before: the library does not start with it either.
+ */
+function readAsHttps(url: string): boolean {
+  return URL.parse(url)?.protocol === 'https:' || /^https:\/\//i.test(url);
+}
+
+/**
+ * Why the auth library's secret is refused for an app reached at `url`, or null. Over https, as the
+ * library reads `url` (readAsHttps): when `secret` (BETTER_AUTH_SECRET) is the example or shorter
+ * than AUTH_SECRET_MIN_LENGTH, or when `secrets` (BETTER_AUTH_SECRETS, which the library reads from
+ * the environment itself) is set.
  */
 export function authSecretRefusal(
   url: string,
   secret: string,
   secrets?: string,
 ): AuthSecretRefusal | null {
-  if (!/^https:\/\//i.test(url)) return null;
+  if (!readAsHttps(url)) return null;
   // Judged without the whitespace around it: a value pasted into a host's settings can carry a space
   // or a line break, and the library signs with the value as given (E00-T07a tester, finding 2).
   const value = secret.trim();
