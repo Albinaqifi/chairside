@@ -281,6 +281,62 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
     ]);
   });
 
+  // Tester (E00-T07b): "goes back to the queue" in full, as docs/runbook.md says: it runs again on
+  // the next start, and to its end.
+  it('runs a job handed back at a stop again on the next start', async () => {
+    const queue = freshQueue();
+    const started = signal();
+    expect(await startQueue({ timings: FAST })).toBeNull();
+    await scheduleJob(queue, '* * * * *');
+    await workJobs(queue, async (job) => {
+      started.resolve();
+      await new Promise((resolve) => job.signal.addEventListener('abort', resolve, { once: true }));
+    });
+    await started.promise;
+    await stopQueue(1_000);
+    const [handedBack] = await jobsOf(queue);
+    expect(handedBack).toMatchObject({ state: 'retry' });
+
+    const ran: string[] = [];
+    expect(await startQueue({ timings: FAST })).toBeNull(); // a host's restart
+    await workJobs(queue, (job) => {
+      ran.push(job.id);
+      return Promise.resolve();
+    });
+    await vi.waitFor(() => expect(ran).toContain(handedBack?.id), {
+      timeout: 15_000,
+      interval: 250,
+    });
+    await stopQueue();
+    const again = await migrator.query('select state, retry_count from pgboss.job where id = $1', [
+      handedBack?.id,
+    ]);
+    expect(again.rows).toEqual([{ state: 'completed', retry_count: 1 }]);
+    expect(lines().filter((line) => line.level !== 'info')).toEqual([]);
+  });
+
+  // Tester (E00-T07b): pg-boss keeps a row per worker in pgboss.instance, a table every clinic shares
+  // (tenant-allow-list.ts: "no connection string"), with the options the worker runs with.
+  it('keeps neither the connection string nor its password in its row of pgboss.instance', async () => {
+    expect(await startQueue({ timings: FAST })).toBeNull();
+    await workJobs(freshQueue(), () => Promise.resolve());
+    await sleep(2_000); // two of its heartbeats, which write the row again
+    const { rows } = await migrator.query<{ row: string }>(
+      'select row_to_json(i)::text as row from pgboss.instance i',
+    );
+    await stopQueue();
+
+    expect(rows).toHaveLength(1);
+    const row = rows[0]?.row ?? '';
+    const url = process.env.DATABASE_URL ?? '';
+    const password = decodeURIComponent(new URL(url).password);
+    // Compared as booleans, so a failure prints neither value. The password alone only when it is
+    // long enough to mean something: .env.example's, which CI uses, is.
+    expect(row.includes(url)).toBe(false);
+    expect(row.includes('://')).toBe(false);
+    expect(password.length >= 8 && row.includes(password)).toBe(false);
+  });
+
   it("logs pg-boss's errors with a code, as an error, and keeps running", async () => {
     const queue = freshQueue();
     const worked: string[] = [];

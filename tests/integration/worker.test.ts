@@ -6,7 +6,7 @@ import { closeDb } from '@/db/client';
 import { scheduleJob, stopQueue, workJobs, type QueueTimings } from '@/db/queue';
 import type { Clock } from '@/lib/clock';
 import { newId } from '@/lib/ids';
-import { logger } from '@/lib/logger';
+import { createLogger, logger } from '@/lib/logger';
 import { HEARTBEAT_QUEUE, runWorker, type WorkerOptions } from '@/worker';
 import { emptyJobQueue, migratorPool } from './fixtures';
 import { testDatabase } from './test-database';
@@ -44,6 +44,16 @@ function lines(): Line[] {
 
 function linesWith(code: string): Line[] {
   return lines().filter((line) => line.fields.code === code);
+}
+
+/** What the logger writes for those lines: each one given again to a logger made as the real one. */
+function written(): string {
+  const out: string[] = [];
+  const real = createLogger({ write: (text: string) => void out.push(text) });
+  for (const { level, fields, message } of lines()) {
+    real[level as (typeof LEVELS)[number]](fields, String(message));
+  }
+  return out.join('');
 }
 
 /** The worker a test started and has not stopped yet: afterEach stops it. */
@@ -104,6 +114,39 @@ describe('the worker refuses to start', { timeout: 60_000 }, () => {
           message: 'worker not started',
         },
       ]);
+    },
+  );
+
+  // Tester (E00-T07b): a URL the driver cannot read, or none, is refused the same way, and the line
+  // as the logger writes it holds no password: `new URL()` keeps its input in its error.
+  it.each([
+    { shape: 'not set', url: undefined },
+    {
+      shape: 'with a host no URL can hold',
+      url: `postgres://chairside_app:MARKER-worker-pw@[::1/${database.name}`,
+    },
+    {
+      shape: 'with a port past 65535',
+      url: `postgres://chairside_app:MARKER-worker-pw@localhost:99999/${database.name}`,
+    },
+  ])(
+    'when DATABASE_URL is $shape: one log line with the code, exit code 1, pg-boss never started, no password written',
+    async ({ url }) => {
+      vi.stubEnv('DATABASE_URL', url);
+      await closeDb();
+      const start = vi.spyOn(PgBoss.prototype, 'start');
+
+      expect(await startWorker()).toBe(1);
+      expect(start).not.toHaveBeenCalled();
+      expect(lines()).toEqual([
+        {
+          level: 'error',
+          fields: expect.objectContaining({ code: 'database_unreachable' }),
+          message: 'worker not started',
+        },
+      ]);
+      expect(written()).toContain('"code":"database_unreachable"');
+      expect(written()).not.toContain('MARKER-worker-pw');
     },
   );
 
@@ -264,6 +307,150 @@ describe('a stop signal', { timeout: 60_000 }, () => {
       ]);
     },
   );
+
+  // Tester (E00-T07b): the listeners are there from the start, so a signal before the queue runs
+  // is kept, and acted on once it does.
+  it('that comes while the worker starts is kept: it starts, then stops, ends both pools and exits with code 0', async () => {
+    const before = process.listenerCount('SIGTERM');
+    const ends = vi.spyOn(pg.Pool.prototype, 'end');
+    const run = startWorker();
+    process.emit('SIGTERM'); // before the database has answered its check
+
+    expect(await run).toBe(0);
+    running = undefined;
+    expectBothPoolsEnded(ends.mock.contexts as pg.Pool[]);
+    expect(process.listenerCount('SIGTERM')).toBe(before);
+    expect(lines().filter((line) => line.fields.code !== 'heartbeat')).toEqual([
+      { level: 'info', fields: { code: 'worker_started' }, message: 'worker started' },
+      {
+        level: 'info',
+        fields: { code: 'worker_stopping', signal: 'SIGTERM' },
+        message: 'worker stopping',
+      },
+      { level: 'info', fields: { code: 'worker_stopped' }, message: 'worker stopped' },
+    ]);
+  });
+});
+
+// Tester (E00-T07b): a host that starts the new worker before it stops the old one runs two at once.
+// This process runs one queue (src/db/queue.ts), so the second is a pg-boss of its own with the same
+// options; both read the same clock.
+describe('two workers at once', { timeout: 90_000 }, () => {
+  it('start together on empty queue tables, and send one heartbeat a minute between them', async () => {
+    await untilEarlyInAMinute();
+    let ahead = 0;
+    const clock: Clock = { now: () => new Date(Date.now() + ahead) };
+    const second = new PgBoss({
+      schema: 'pgboss',
+      max: 2,
+      migrate: false,
+      persistQueueStats: false,
+      persistWarnings: false,
+      reindex: false,
+      openTelemetry: { enabled: false },
+      connectionString: database.appUrl,
+      cronMonitorIntervalSeconds: 1,
+      cronWorkerIntervalSeconds: 1,
+      clock: {
+        now: () => clock.now().getTime(),
+        setTimeout: (run, ms) => setTimeout(run, ms),
+        clearTimeout: (timer) => clearTimeout(timer as NodeJS.Timeout),
+        setInterval: (run, ms) => setInterval(run, ms),
+        clearInterval: (timer) => clearInterval(timer as NodeJS.Timeout),
+      },
+    });
+    const secondErrors: unknown[] = [];
+    second.on('error', (error) => secondErrors.push(error));
+    let secondRuns = 0;
+    try {
+      const secondStarted = (async () => {
+        await second.start();
+        await second.createQueue(HEARTBEAT_QUEUE, { partition: false });
+        await second.schedule(HEARTBEAT_QUEUE, '* * * * *');
+        await second.work(HEARTBEAT_QUEUE, { pollingIntervalSeconds: 0.5 }, () => {
+          secondRuns += 1;
+          return Promise.resolve();
+        });
+      })();
+      void startWorker({ clock });
+      await secondStarted;
+      const jobs = async () =>
+        (
+          await migrator.query('select state, data, output from pgboss.job where name = $1', [
+            HEARTBEAT_QUEUE,
+          ])
+        ).rows;
+
+      await vi.waitFor(async () => expect(await jobs()).toHaveLength(1), {
+        timeout: 15_000,
+        interval: 100,
+      });
+      await sleep(3_000); // three more schedule passes of each, in the same minute
+      expect(await jobs()).toHaveLength(1);
+      ahead += 60_000;
+      await vi.waitFor(async () => expect(await jobs()).toHaveLength(2), {
+        timeout: 15_000,
+        interval: 100,
+      });
+      await sleep(3_000);
+      await vi.waitFor(
+        async () =>
+          expect(await jobs()).toEqual(
+            Array(2).fill({ state: 'completed', data: null, output: null }),
+          ),
+        { timeout: 5_000, interval: 100 },
+      );
+      expect(linesWith('heartbeat').length + secondRuns).toBe(2);
+      expect(secondErrors).toEqual([]);
+      expect(lines().filter((line) => line.level !== 'info')).toEqual([]);
+    } finally {
+      await second.stop({ graceful: false, close: true });
+    }
+  });
+});
+
+// Tester (E00-T07b): a database restart or failover ends the queue's connections under it.
+describe("when the database ends the queue's connections", { timeout: 90_000 }, () => {
+  it('logs queue_error lines with the code, keeps running, and the heartbeat goes on', async () => {
+    await untilEarlyInAMinute();
+    let ahead = 0;
+    const clock: Clock = { now: () => new Date(Date.now() + ahead) };
+    void startWorker({ clock });
+    await vi.waitFor(() => expect(linesWith('heartbeat')).toHaveLength(1), {
+      timeout: 15_000,
+      interval: 100,
+    });
+
+    // Only a superuser may end another role's connections.
+    const superuser = new pg.Pool({ connectionString: database.adminUrl, max: 1 });
+    try {
+      const ended = await superuser.query(
+        `select pg_terminate_backend(pid) from pg_stat_activity
+          where datname = $1 and application_name like 'pgboss:%'`,
+        [database.name],
+      );
+      expect(ended.rowCount).toBeGreaterThan(0);
+    } finally {
+      await superuser.end();
+    }
+    await vi.waitFor(() => expect(linesWith('queue_error').length).toBeGreaterThan(0), {
+      timeout: 10_000,
+      interval: 100,
+    });
+    ahead += 60_000;
+    await vi.waitFor(() => expect(linesWith('heartbeat')).toHaveLength(2), {
+      timeout: 20_000,
+      interval: 100,
+    });
+
+    for (const line of lines().filter((line) => line.level !== 'info')) {
+      expect(line).toMatchObject({
+        level: 'error',
+        fields: { code: 'queue_error', err: expect.any(Error) },
+        message: 'job queue error',
+      });
+    }
+  });
 });
 
 /** pg-boss's pool, its connections named `pgboss:…`, and the app's (client.ts) both ended. */
