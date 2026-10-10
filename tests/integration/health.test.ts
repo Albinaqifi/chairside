@@ -227,6 +227,108 @@ describe('GET /api/health', () => {
   });
 });
 
+// E00-T07a tester: the login check asks the roles themselves, never compares a name. Each case is a
+// login that is none of the roles above and still gets past the policies: through a member of the
+// migration role, through a role with BYPASSRLS or a superuser role (neither passes to a member, but a
+// member can SET ROLE to it), or by owning a table with Row-Level Security that the migration role
+// does not own. And a DATABASE_URL the database refuses, or that is no URL, never logs its password.
+describe('GET /api/health: logins found by asking the roles, and URLs it cannot use', () => {
+  /** Cluster-wide, so with names of their own; dropped afterwards. The groups cannot log in. */
+  const GROUP = 'chairside_health_tester_group';
+  const INDIRECT = 'chairside_health_tester_indirect';
+  const BYPASS_GROUP = 'chairside_health_tester_bypass_group';
+  const BYPASS_MEMBER = 'chairside_health_tester_bypass_member';
+  const SUPER_GROUP = 'chairside_health_tester_super_group';
+  const SUPER_MEMBER = 'chairside_health_tester_super_member';
+  const OWNER = 'chairside_health_tester_owner';
+  /** A schema of the test's own, so no other table changes owner; dropped before its owner. */
+  const PROBE_SCHEMA = 'chairside_health_tester_probe';
+
+  /** The test database as the superuser: the probe table is made there. */
+  let inTestDatabase: pg.Pool;
+
+  const roles = [GROUP, INDIRECT, BYPASS_GROUP, BYPASS_MEMBER, SUPER_GROUP, SUPER_MEMBER, OWNER];
+  async function dropAll(): Promise<void> {
+    await inTestDatabase.query(
+      `drop schema if exists ${pg.escapeIdentifier(PROBE_SCHEMA)} cascade`,
+    );
+    for (const name of [...roles].reverse()) {
+      await superuser.query(`drop role if exists ${pg.escapeIdentifier(name)}`);
+    }
+  }
+
+  beforeAll(async () => {
+    const url = new URL(database.adminUrl);
+    url.pathname = `/${database.name}`;
+    inTestDatabase = new pg.Pool({ connectionString: url.href, max: 1 });
+    await dropAll(); // left by a run that stopped halfway
+    const password = pg.escapeLiteral(ROLE_PASSWORD);
+    const id = (name: string) => pg.escapeIdentifier(name);
+    await superuser.query(`create role ${id(GROUP)} NOLOGIN INHERIT`);
+    await superuser.query(`grant chairside_migrator to ${id(GROUP)} with inherit true`);
+    await superuser.query(`create role ${id(INDIRECT)} LOGIN INHERIT password ${password}`);
+    await superuser.query(`grant ${id(GROUP)} to ${id(INDIRECT)} with inherit true`);
+    await superuser.query(`create role ${id(BYPASS_GROUP)} NOLOGIN BYPASSRLS`);
+    await superuser.query(`create role ${id(BYPASS_MEMBER)} LOGIN INHERIT password ${password}`);
+    await superuser.query(`grant ${id(BYPASS_GROUP)} to ${id(BYPASS_MEMBER)}`);
+    await superuser.query(`create role ${id(SUPER_GROUP)} NOLOGIN SUPERUSER`);
+    await superuser.query(`create role ${id(SUPER_MEMBER)} LOGIN INHERIT password ${password}`);
+    await superuser.query(`grant ${id(SUPER_GROUP)} to ${id(SUPER_MEMBER)}`);
+    await superuser.query(`create role ${id(OWNER)} LOGIN NOINHERIT password ${password}`);
+    await inTestDatabase.query(`create schema ${id(PROBE_SCHEMA)}`);
+    await inTestDatabase.query(`create table ${id(PROBE_SCHEMA)}.owned (id integer)`);
+    await inTestDatabase.query(`alter table ${id(PROBE_SCHEMA)}.owned enable row level security`);
+    await inTestDatabase.query(`alter table ${id(PROBE_SCHEMA)}.owned owner to ${id(OWNER)}`);
+  });
+
+  afterAll(async () => {
+    await dropAll();
+    await inTestDatabase.end();
+  });
+
+  it('answers 200 for a login of its own that owns nothing, as for the app role', async () => {
+    // The control for the cases below: a login is not refused for being another role than the app's.
+    const plain = 'chairside_health_tester_plain';
+    await superuser.query(`drop role if exists ${pg.escapeIdentifier(plain)}`);
+    await superuser.query(
+      `create role ${pg.escapeIdentifier(plain)} LOGIN password ${pg.escapeLiteral(ROLE_PASSWORD)}`,
+    );
+    try {
+      expect((await health({ DATABASE_URL: urlAs(plain, ROLE_PASSWORD) })).status).toBe(200);
+    } finally {
+      await closeDb();
+      await superuser.query(`drop role if exists ${pg.escapeIdentifier(plain)}`);
+    }
+  });
+
+  it.each([
+    { login: 'a member of a member of the migration role (indirect)', name: INDIRECT },
+    { login: 'a member of a role with BYPASSRLS, without it itself', name: BYPASS_MEMBER },
+    { login: 'a member of a superuser role, not a superuser itself', name: SUPER_MEMBER },
+    { login: 'the owner of a table with Row-Level Security in another schema', name: OWNER },
+  ])('answers 503 when DATABASE_URL names $login', async ({ name }) => {
+    const answer = await health({ DATABASE_URL: urlAs(name, ROLE_PASSWORD) });
+    expectFailure(answer, 'database_login_past_policies');
+    expect(answer.loggedText).not.toContain(ROLE_PASSWORD);
+  });
+
+  it('answers 503 when the database refuses the password, and logs no password', async () => {
+    const answer = await health({ DATABASE_URL: urlAs('chairside_app', ROLE_PASSWORD) });
+    expectFailure(answer, 'database_unreachable');
+    expect(answer.loggedText).not.toContain(ROLE_PASSWORD);
+  });
+
+  it('answers 503 when DATABASE_URL is no URL a client can read, and logs no password', async () => {
+    // A port past 65535: `new URL()` refuses it and puts its input, the password with it, in its
+    // error; the URL's parser must never let that reach the log line.
+    const answer = await health({
+      DATABASE_URL: `postgres://chairside_app:${ROLE_PASSWORD}@127.0.0.1:99999/${database.name}`,
+    });
+    expectFailure(answer, 'database_unreachable');
+    expect(answer.loggedText).not.toContain(ROLE_PASSWORD);
+  });
+});
+
 describe("the request proxy's matcher", () => {
   const proxied = (path: string) =>
     unstable_doesMiddlewareMatch({ config, url: `${ORIGIN}${path}` });
