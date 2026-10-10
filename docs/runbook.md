@@ -1,7 +1,8 @@
 # Runbook
 
-How the operator runs Chairside by hand. Started in E00-T05b (creating a clinic); E00-T07 adds the
-host's part: how to run a command in the app's image on staging, and where its output goes.
+How the operator runs Chairside by hand. Started in E00-T05b (creating a clinic); E00-T07a adds how
+to build the app's image and run it here, E00-T07c the host's part: how to run a command in the
+app's image on staging, and where its output goes.
 
 ## Create a clinic and its first owner
 
@@ -70,5 +71,5 @@ the owner's password until it is used or expires. Close the terminal window afte
 - **This machine:** against the local database in `.env`, to try it out. The link then starts with
   `http://localhost:3000`; `pnpm dev` serves the page.
 - **A host** (staging, later production): inside the app's image, as the worker runs, with
-  `--remote-database` (E00-T07 writes the steps). Never from a development machine against
+  `--remote-database` (E00-T07c writes the steps). Never from a development machine against
   production: production credentials never exist on one (D-044).

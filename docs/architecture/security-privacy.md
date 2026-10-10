@@ -18,6 +18,9 @@ This document has two parts: rules that code must follow, and the gate before re
   Never create a database connection or query outside them.
 - The app's database role cannot bypass Row-Level Security, cannot change schema, cannot
   update or delete audit rows.
+- The job queue's tables (pg-boss, D-005) are shared by every clinic and have no policy: a job's
+  data holds ids and codes only, never a patient's details, and its handler works inside its
+  clinic's tenant transaction (D-102).
 - Cross-clinic lookups exist only as a few named database functions (list a user's clinics at
   login: `clinics_for_user`, D-062; resolve a link token; list clinics for the planner; claim due
   messages). Adding one is a critical change.
@@ -30,6 +33,10 @@ This document has two parts: rules that code must follow, and the gate before re
   ever knows it. `clinic:create` prints one for a clinic's first owner (D-101). Its token has at
   least 128 random bits, only its SHA-256 hash is stored, it works once and for 3 days, and it sits
   after `#`, so no request log holds it; a used, expired or wrong link gets one and the same answer.
+- `addMembership()` and `createSetupLink()` (`src/modules/auth/`) make a member of any role and a
+  new password for any person. Only `clinic:create` calls them; a staff action that does (E04-T02)
+  declares `staff.manage`, the owner's alone, and its review checks every caller (E00-T05b critical
+  review).
 - 2FA is mandatory for owners and for anyone with the `export` or `import` permission.
 - Every server action declares the permission it needs; the wrapper checks it. Hiding a
   button in the UI is never the check.

@@ -545,7 +545,8 @@ Day / Week toggle.
 
 ### E01-T08 · Settings: clinic details, opening hours, closed days
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04e
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04e,
+  E00-T05b (`newClinicProblems()`)
 - **Read:** `scope` (Settings) · `design-ref` (demo lines 746–778; logic 1912–1919) · `data-model` (`clinics`, `clinic_hours`, `closed_days`)
 
 **Do.**
@@ -558,12 +559,21 @@ Day / Week toggle.
   (`isSupportedCountry`, D-097): the database checks neither, and a zone Intl does not know fails
   every page for the clinic's members, the login page and the clinic picker included (E01-T02a
   test, `slice`). Both are the user's own input, so the schema checks them at their fields (D-098).
+- **A zone stored as Intl names it** (E00-T05b review, `message`): Intl also knows a fixed offset
+  (`+01:00`) and a name typed in lower case. A clinic saved with `+01:00` never moves to summer
+  time, so its day and every send planned by the clock are an hour off for half the year. The check
+  refuses a zone Intl resolves to an offset and stores the name Intl resolves (`europe/skopje` →
+  `Europe/Skopje`); `Intl.supportedValuesOf('timeZone')` alone would also refuse `UTC` and
+  `Europe/Kyiv`. One check, in `tenancy`, for this form and for `clinic:create`
+  (`newClinicProblems()`, `src/modules/tenancy/create-clinic.ts`), so a zone typed there is stored
+  the same way.
 
 **Out of scope.** Staff tab (E04), Channels tab (E03), quiet hours UI (E03).
 
 **Acceptance.**
-- [ ] Changes are saved, validated (a time zone Intl knows, a phone country the phone package
-      supports, closing after opening) and audited.
+- [ ] Changes are saved, validated (a time zone Intl knows and names: `+01:00` refused,
+      `europe/skopje` saved as `Europe/Skopje`, `UTC` and `Europe/Kyiv` taken, in `clinic:create`
+      too; a phone country the phone package supports; closing after opening) and audited.
 - [ ] Front desk and dentist cannot open Settings (server refuses, not just hidden).
 - [ ] Changing the time zone changes how the calendar shows existing appointments (they keep their real moment).
 - [ ] Closed days and non-opening days show on the calendar.

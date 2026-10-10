@@ -7,18 +7,21 @@ clinics cannot see each other's data, and every change is checked automatically.
 Getting them right once, with tests, is cheaper than fixing them under features.
 
 Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → T04a → T04b → T05a → E01-T01a → E01-T01b
-→ T04c → T04d → T04e → E01-T02a → E01-T02b → T06b → T05b → T07, then the rest of E01 (D-087,
-D-090, D-091, D-093, D-096). T08 is the second half of T03 (split in D-071), so it sits right after
-T03 in this file. T06 is split in two (D-075): CI (T06a) comes first, Playwright and journey J1
+→ T04c → T04d → T04e → E01-T02a → E01-T02b → T06b → T05b → T07a → T07b → T07c, then the rest of
+E01, and T12 before E02 (D-087, D-090, D-091, D-093, D-096, D-102). T08 is the second half of T03
+(split in D-071), so it sits right after T03 in this file. T06 is split in two (D-075): CI (T06a) comes first, Playwright and journey J1
 (T06b) after T04 and T05a; the journeys' clock (T06c, D-100) comes before the first journey that
 sets "now", E01-T11's or E02-T14's. T09 and T10 come from E00-T08's review and test (D-076, D-077), T11 from
 E00-T10's (D-084). T04 is split in four (D-086), its last part again in two (D-093): tokens, fonts,
 texts and the login page (T04a), the staff shell (T04b), the form pattern (T04c), the form fields
 (T04d), tabs, the drawer and the dialog (T04e). T05 is split in two (D-090): the seed (T05a), and
-`clinic:create` (T05b), which staging needs. E01-T01a, E01-T01b, E01-T02a and E01-T02b come before
-T06b and T07, so a receptionist sees a patient list before Playwright and staging exist; T04c, T04d
+`clinic:create` (T05b), which staging needs. T07 is split in three (D-102): the image and the
+health check (T07a), the worker and its job queue (T07b), staging on Render (T07c), which waits for
+the owner's answer on its cost; Sentry moved to E07-T03 (owner). T12, the logger's net, comes from
+three Discovered lines of E00-T01 and E00-T05b (D-102). E01-T01a, E01-T01b, E01-T02a and E01-T02b
+come before T06b and T07, so a receptionist sees a patient list before Playwright and staging exist; T04c, T04d
 and T04e come before E01-T02a, which depends on them (D-087, D-093, D-096). The tasks sit in this
-file in the order before D-087, with T05a and T05b after T04e.
+file in the order before D-087, with T05a and T05b after T04e, and T12 last.
 
 ---
 
@@ -1368,67 +1371,221 @@ unless the test sets "now". Split from E00-T06b, whose J1 does not need it (D-10
 
 ---
 
-### E00-T07 · Staging: web, worker and database deployed
+### E00-T07a · The image, the health check and the start-up refusals
 
-- **Role:** builder + owner · **Risk:** critical · **Depends on:** E00-T05b, E00-T06b, E00-T09 · **Needs:** Q-07 (working assumption accepted for staging)
-- **Read:** `overview` (The shape; Environments; Things that keep it running) · `security` (Part 1, section 7) · D-005, D-007, D-013, D-075, D-077, D-090, D-101
+- **Role:** builder · **Risk:** critical (production configuration and secrets: the image, what it
+  holds, the auth secret's check, a login that gets past the policies; login: the proxy's matcher
+  and a route without a session) · **Depends on:** E00-T05b (`clinic:create`), E00-T06b (the
+  end-to-end checks), E00-T09, all Done
+- **Read:** `overview` (The shape; Environments; Things that keep it running) · `security` (Part 1,
+  sections 1, 2, 6, 7 and 8) · D-007, D-067, D-075, D-090, D-101, D-102 · the architect section of
+  `handoffs/E00-T07a.md`
 
-**Why.** A walking skeleton in a real environment exposes deployment problems while the app is
-still tiny, and gives every later milestone a place to be demonstrated.
+**Why.** Staging and production run one Docker image (D-007). The image, the host's health check
+and the two refusals that keep a misconfigured host from serving need no account: they are built
+and tried on this machine before a host exists. The first part of E00-T07 (D-102).
 
 **Do.**
-- One Dockerfile; the same image runs as `web` or `worker`.
-- **The image runs our TypeScript outside Next.js:** the worker, whose imports use `@/`, and
-  `pnpm clinic:create` the same way (E00-T05b, D-101), as a one-off command on the host with that
-  environment's settings and the script's explicit flag. tsx in the image or a bundle made at build
-  time is this task's choice, with a decision entry if it moves or adds a package (D-090). The owner
-  makes staging's first clinic with it.
-- Worker entry point: starts pg-boss, registers one repeating "heartbeat" job that logs and
-  pings an external monitor URL if configured, shuts down gracefully. The worker's folder joins
-  `chairside/database-access`'s lists: pg-boss, and `withTenant` for the job handler (D-071, D-077).
-- Infrastructure description for the host (web service, background worker, managed
-  PostgreSQL in Frankfurt), migrations run on deploy with the migration role. Next.js telemetry
-  off on staging (`NEXT_TELEMETRY_DISABLED=1`, D-075).
-- **The database lowers Cyrillic** (E01-T02a review, `speed`): the patient search compares
-  `lower()` of the name and of what is typed, and under a database character type of `C` or `POSIX`
-  `lower()` changes ASCII letters only, so a name typed in lower case is not found. Local and CI
-  cannot show it (both `en_US.utf8`). The database is created with `TEMPLATE template0` and a
-  character type that lowers Unicode (libc `en_US.UTF-8`, as locally, or the builtin provider's
-  `C.UTF-8`); the locale cannot change after `CREATE DATABASE`. Right after it is created, the check
-  `SELECT lower(U&'\0410\0403\040C\00C7\00CB') = U&'\0430\0453\045C\00E7\00EB';` answers `t`
-  (`SHOW lc_ctype` no longer exists from PostgreSQL 16); the runbook gives both, for production too
-  (E07-T09).
-- `/api/health`: checks the database and that the worker's heartbeat is recent.
-- Sentry (EU) wired in both processes with personal-data scrubbing on. The scrubbing also removes
-  request headers and cookies, so no session cookie or client address reaches Sentry: Next.js hands
-  a request's headers to its error hook. Inactive when no key is set. Next.js's "Failed to find
-  Server Action" error is not sent: anyone can cause it, without a session, by posting a multipart
-  form that names no server action (board, Discovered, E00-T08 tester note 5; D-075). Nor is
-  `The destination stream closed early`, which any browser causes by leaving a page before it has
-  loaded (E01-T02b test): sent, either would spend the Sentry quota on noise.
-- `docs/runbook.md` (E00-T05b starts it with how to create a clinic): how to deploy, roll back,
-  read logs, run a migration, and run `clinic:create` on the host. It says a "Failed to find Server
-  Action" log line is noise unless it follows a deploy, and that `The destination stream closed
-  early` is always noise.
+- **One image** (`Dockerfile`, `.dockerignore`): Node 24 and pnpm, as `package.json` names them. By
+  default it runs the web (`next start`); it also runs `clinic:create` with its flag (D-101). Every
+  setting comes from the environment it runs in: the image holds no `.env` file and no secret, and
+  is built without either. `NEXT_TELEMETRY_DISABLED=1` when it is built and when it runs (D-075).
+  tsx in the image or a bundle made at build time is this task's choice, with a decision entry if
+  a package moves or is added (D-090). E00-T07b adds the worker's command.
+- **The proxy in the app's process** (E00-T02 delta review): the request proxy reads and writes the
+  database (D-067), so it must run inside the web's Node.js process, never apart from it. The image
+  runs `next start`, where it does; the note cites Next.js's own docs for it.
+- **`/api/health`**, the host's check of the web (D-102): `GET` only, no session, no cookie set,
+  never cached. 200 when the database answers through `DATABASE_URL`, that login cannot get past
+  the policies, and the auth secret passes the check below; otherwise 503. The answer names no
+  reason; one log line names it with a code. It never waits on the worker: a host restarts a web
+  whose check fails, and the web stays up while the worker is down (`overview.md`). A login gets
+  past the policies when it is a superuser, has `BYPASSRLS`, or has the privileges of a table's
+  owner (E00-T01 review: a hosted `DATABASE_URL` that names the tables' owner switches every policy
+  off without an error). The query lives in `src/db/` (module rule 6), the route in
+  `src/app/api/health/route.ts`, on `ROUTE_HANDLERS` with its reason, and the proxy's matcher lets
+  `/api/health` through, every other path as before.
+- **The example secret refused** (E00-T02 review): when `BETTER_AUTH_URL` is `https://`, a
+  `BETTER_AUTH_SECRET` that is `.env.example`'s value or shorter than 32 characters is refused: the
+  auth library never starts with it, no session is made, and `/api/health` answers 503. Over
+  `http://` (this machine, CI) nothing changes.
+- **Docs.** `docs/runbook.md`: how to build the image and run the web and `clinic:create` from it
+  against the local database (E00-T07c adds the host's part). `CLAUDE.md`: the folder structure
+  (`src/app/api/health/`), and any command added, in Commands and in `README.md`.
 
-**Owner action.** Create the hosting, Sentry and monitor accounts; enter secrets in the host's
-secret store (agents never see them); run `clinic:create` on staging.
-
-**Out of scope.** Production environment (E07). Custom domain (Q-03). Any real job besides the heartbeat.
+**Out of scope.** The worker and pg-boss (E00-T07b). The host, its settings and database, the
+sign-in limit's client address, deploys, building the image in CI (E00-T07c). Sentry (E07-T03,
+owner, D-102). Narrowing the proxy's matcher to staff routes (with the patient pages, E02-T08).
 
 **Acceptance.**
-- [ ] Staging URL serves the login page over HTTPS; the owner of a clinic `clinic:create` made there,
-      run in the image on the host, chooses a password through its setup link and logs in (the seed
-      runs on this machine only, D-090).
-- [ ] The worker runs as its own process and the heartbeat job fires on schedule.
-- [ ] `/api/health` turns unhealthy when the worker is stopped (demonstrated).
-- [ ] A deliberate test error appears in Sentry with no personal fields in it.
-- [ ] A multipart POST that names no action, sent to staging without a session, adds no event in
-      Sentry; the deliberate test error still does.
+- [ ] `docker build` makes the image without a `.env`; run with the local database's settings, it
+      serves the login page and a seeded login reaches Today (by hand: the commands and what they
+      showed, in the note).
+- [ ] `clinic:create` run in the image against the local database makes a clinic and prints its
+      link with `--remote-database`, and without it refuses before it connects (by hand, in the
+      note).
+- [ ] The image holds no `.env` file, and its settings (`docker image inspect`) hold no
+      `DATABASE_URL`, `MIGRATION_DATABASE_URL`, `DATABASE_ADMIN_URL`, `POSTGRES_PASSWORD`,
+      `BETTER_AUTH_URL` or `BETTER_AUTH_SECRET`; `NEXT_TELEMETRY_DISABLED` is `1` (the commands and
+      their answers in the note).
+- [ ] `/api/health` answers 200 as the app role, and 503 when the database cannot be reached, when
+      `DATABASE_URL` names the migration role, a role with `BYPASSRLS` or a member of the migration
+      role that inherits its privileges, and with the example secret on https; a 503's answer names
+      no reason, its log line one code (integration tests).
+- [ ] `/api/health` needs no session, sets no cookie and is not cached (`Cache-Control:
+      no-store`); a `POST` to it is refused; a signed-out request for a staff page still goes to
+      `/login` (tests).
+- [ ] With `BETTER_AUTH_URL` on https, the example secret and a secret of 31 characters are refused
+      and no session is made; over http the seed's logins work as before (tests).
+- [ ] `pnpm check`, `pnpm build` and `pnpm test:e2e` (all three browsers) pass.
+
+---
+
+### E00-T07b · The worker and its job queue
+
+- **Role:** builder · **Risk:** critical (a migration and the app role's grants: pg-boss's schema;
+  the tenant wrapper in the worker) · **Depends on:** E00-T07a
+- **Read:** refined first, in E00-T07a's Done pass: `overview` (The shape; How tenant isolation
+  works) · `data-model` (Conventions; section 1) · `security` (Part 1, sections 1 and 6) · D-005,
+  D-060, D-071, D-077, D-102
+
+**Why.** The worker does everything slow or timed: E02's planner and dispatcher, recalls, AI drafts
+(D-002, D-005). A heartbeat job through pg-boss shows that the queue fires on time, not only that
+the process lives (D-013). The second part of E00-T07 (D-102).
+
+**Do.** An outline, refined against E00-T07a's image.
+- **pg-boss** (owner, D-102), its version pinned in a decision entry. Its schema is made by a
+  migration, as the migration role, from the SQL pg-boss gives for that version
+  (`getConstructionPlans`), read and committed like every migration; the app role gets on it only
+  what the worker needs, never a change to the schema. The worker starts pg-boss as the app role
+  without migrating or creating anything (`migrate: false`, `createSchema: false`), and without the
+  daily partitions its queue statistics would add while it runs (12.37.1: `persistQueueStats`, or
+  the install without partitions; queues not partitioned).
+- Its tables join `GLOBAL_TABLES` (no `clinic_id`, D-102), each with its reason; the meta-test
+  passes with them. A job's data holds ids and codes only (`security-privacy.md` section 1).
+- **`src/worker/`**: an entry point that starts pg-boss, schedules a repeating heartbeat job that
+  logs one line (codes and times) each run, and stops on SIGTERM: its job finished or handed back,
+  pg-boss stopped, the pool closed. A `pnpm worker` script; the image's worker command.
+- The worker's folder joins `chairside/database-access`'s lists: pg-boss there only, `withTenant`
+  for job handlers (D-071, D-077).
+
+**Out of scope.** Any real job (E02). Sending a job in the same transaction as a data change
+(E02-T06, D-005). The monitor and its ping (E00-T07c). Sentry (E07-T03).
+
+**Acceptance.** Refined in its Ready pass; at least:
+- [ ] The migration makes pg-boss's schema as the migration role; the app role reads and writes its
+      rows and can create, change or drop nothing in it (test).
+- [ ] The meta-test passes, pg-boss's tables on the allow-list, each with its reason.
+- [ ] Run as the app role, the worker fires the heartbeat on its schedule (a short one in the test)
+      and logs one line per run, with no personal data (test).
+- [ ] SIGTERM stops it, its pool closed (test); the image runs it (by hand, in the note).
+- [ ] `pnpm check`, `pnpm build` and `pnpm test:e2e` (all three browsers) pass.
+
+---
+
+### E00-T07c · Staging on Render
+
+- **Role:** builder + owner · **Risk:** critical (production configuration and secrets: the host,
+  its settings and its database; login: the client address the sign-in limit counts) · **Depends
+  on:** E00-T07a, E00-T07b · **Needs:** the owner's answer on staging's cost (board, "Owner
+  actions"), then the accounts; Q-07 (working assumption accepted for staging)
+- **Read:** refined first, in E00-T07b's Done pass: `overview` (Environments; Things that keep it
+  running) · `security` (Part 1, sections 2, 7 and 9) · D-007, D-013, D-044, D-064, D-075, D-101,
+  D-102 · Q-07
+
+**Why.** A walking skeleton in a real environment exposes deployment problems while the app is
+still tiny, and gives every later milestone a place to be demonstrated. The last part of E00-T07
+(D-102).
+
+**Do.** An outline. Its Ready pass settles with the owner the plans, the monitor, and how the
+deploy is checked before the merge (the pull request's branch deployed, or the owner's steps after
+it).
+- **Render** (D-007): a description of the web service, the worker and a managed PostgreSQL in
+  Frankfurt, both services from the one image; migrations on each deploy, as the migration role;
+  `NEXT_TELEMETRY_DISABLED=1` (D-075). The database's default user makes the migration and app
+  roles: a role made with `CREATE USER` is ours to manage, not Render's (Render's docs,
+  2026-10-10); the runbook gives the SQL.
+- **The database lowers Cyrillic** (E01-T02a review, `speed`): the patient search compares
+  `lower()` of the name and of what is typed, and under a character type of `C` or `POSIX`
+  `lower()` changes ASCII letters only. Render creates its databases with `en_US.UTF-8`, which
+  lowers Unicode (a Render community answer, 2026-10-10); right after it is created, the check
+  `SELECT lower(U&'\0410\0403\040C\00C7\00CB') = U&'\0430\0453\045C\00E7\00EB';` answers `t`
+  (`SHOW lc_ctype` no longer exists from PostgreSQL 16). The runbook gives the check, for
+  production too (E07-T09).
+- **The sign-in limit's client address** (E00-T02 tester finding 5, R-33): the auth library reads
+  `x-forwarded-for` only when it holds one address, and a client that sends a new one each time
+  picks its own counter. Set what Render sends (`advanced.ipAddress`). Whether a per-account limit
+  is added too is the owner's (D-064 point 5, board).
+- **The setup link stays out of the host's logs** (E00-T05b, `data`): `clinic:create` prints its
+  link on standard output, and a one-off command's output may be kept in the host's logs, which
+  would then hold a live link for 3 days. Find where a shell's or a job's output goes before the
+  first staging clinic is made; the runbook says how to run it so that the link reaches only the
+  operator's screen.
+- **The heartbeat's monitor** (D-013): an external check that alerts when the worker's heartbeat
+  stops; the worker pings its URL each run. The service and its URL, a new secret setting, are the
+  owner's (agent rule 4).
+- `docs/runbook.md`: deploy, roll back, read the logs, run a migration, make the roles, run
+  `clinic:create` on the host. "Failed to find Server Action" in the logs is noise unless it
+  follows a deploy (D-075); `The destination stream closed early` is always noise (a browser that
+  left a page early, E01-T02b test).
+- Whether CI builds the image too (a run's minutes, D-075), or a deploy is its first build.
+
+**Owner action.** Before it starts: the answer on cost, a Render account with those plans, the
+monitor's account. During it: the secrets in Render's secret store (agents never see them), and
+`clinic:create` on staging.
+
+**Out of scope.** Production (E07-T09). A custom domain (Q-03). Sentry (E07-T03). Any job but the
+heartbeat.
+
+**Acceptance.** Refined in its Ready pass; at least:
+- [ ] The staging URL serves the login page over HTTPS; the owner of a clinic that `clinic:create`
+      made there, run in the image on the host, chooses a password through its setup link and logs
+      in (the seed runs on this machine only, D-090).
+- [ ] The worker runs as its own process and its heartbeat fires on schedule; with the worker
+      stopped, the web stays healthy and the monitor reports the missed heartbeat (demonstrated).
+- [ ] A client that sends a new `X-Forwarded-For` on every try still meets the sign-in limit (429)
+      on staging.
+- [ ] The setup link appears in no log the host keeps (its log view, after a run).
 - [ ] Deploys happen from `main` automatically; a rollback is documented and was tried once.
 - [ ] No secret is in the repository or the image.
 - [ ] On the staging database the Cyrillic check answers `t` (the command and its answer in the
-      handoff note), and the runbook says how production's database is created and checked.
+      note), and the runbook says how production's database is created and checked.
 - [ ] Staging holds synthetic data only.
 
 **Milestone check (M0):** log in on staging; the isolation tests and meta-test are green in CI.
+
+---
+
+### E00-T12 · The logger's net before messaging
+
+- **Role:** builder · **Risk:** normal (the logger, `security` section 6: no area of
+  `test-strategy.md`'s table) · **Depends on:** E00-T05b (the plurals)
+- **Read:** refined first, before E02 (owner, 2026-10-03): `security` (Part 1, section 6) · D-102
+
+**Why.** The logger drops known personal fields as a safety net (`CLAUDE.md`, Logs). E02 brings
+link tokens, phone numbers under new names and message texts into the code; before it does, the net
+must know their shapes (owner, 2026-10-03: "handle before E02"). Three Discovered lines make this
+task (D-102).
+
+**Do.** An outline, refined before E02.
+- **Values, not only names** (E00-T01 tester finding 10): under any key, the logger writes a `URL`
+  object as its full address, a link token included, and a `Buffer` as bytes that decode back to
+  text.
+- **The names that matter for messaging and links** (E00-T01 tester, round 2): `toNumber`,
+  `fromNumber`, `waNumber`, `whatsappId`, `sender`, `referer`, `redirectUri`, `querystring`,
+  `values`, and free text such as `cancelReason`.
+- **The plurals of whole names** (E00-T05b, `data`): the net drops the plurals of the endings it
+  lists, not those of the names it matches whole: `dobs`, `ips`, `reasons`, `texts`, `comments` and
+  `identifiers` pass. Adding them would also drop `details`, the field the auth library's own log
+  lines carry (`better-auth.ts`): the Ready pass settles how those lines stay readable.
+
+**Out of scope.** An object's own `toJSON` under a personal plural (E00-T05b delta review, `none`: a
+review check, D-087). The error tracker (E07-T03).
+
+**Acceptance.** Refined in its Ready pass; at least:
+- [ ] A `URL` that holds a token and a `Buffer` that holds text, logged under any key, leave neither
+      in the line (`logger.test.ts`).
+- [ ] Each name above, and the plural of each name the net matches whole, is dropped; the other
+      `logger.test.ts` cases are unchanged.
+- [ ] The auth library's log lines still say what happened (test).
+- [ ] `pnpm check` passes.

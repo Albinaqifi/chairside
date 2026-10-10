@@ -58,7 +58,7 @@ One codebase, two running processes, one database.
 | WhatsApp / email (SMS addable) | Adapters; fake first; real ones chosen in E03 | D-010, D-055 |
 | AI | Anthropic API from the worker | D-011 |
 | Tests | Vitest, Playwright with axe-core, fast-check, real Postgres | D-012, D-100 |
-| Errors, logs | Sentry (EU), pino | D-013 |
+| Errors, logs | Sentry (EU, from E07-T03), pino | D-013, D-102 |
 | Code and CI | GitHub, GitHub Actions | D-014 |
 
 No Redis, no object storage, no microservices, no websockets in v1.
@@ -182,6 +182,7 @@ Production credentials never exist on a development machine or in an agent sessi
 ## Things that keep it running
 
 - Health endpoint for the host. Heartbeat ping from the worker to an external monitor.
-- Sentry for errors, with personal data stripped before sending.
+- Sentry for errors, with personal data stripped before sending: from E07-T03; until then errors
+  are in the host's logs (owner, D-102).
 - Nightly canary: every appointment tomorrow has a planned reminder or a recorded reason.
 - Daily database backups with point-in-time recovery; one restore drill before go-live.
