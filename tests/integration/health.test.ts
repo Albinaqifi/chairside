@@ -672,3 +672,78 @@ describe('GET /api/health: BETTER_AUTH_TRUSTED_ORIGINS', () => {
     expect(https.status).toBe(200);
   });
 });
+
+// E00-T07e tester: two more ways a role is set when the login connects, which the builder and the
+// review named untested: on the role for this database alone (`ALTER ROLE … IN DATABASE … SET role`),
+// and in the process's PGOPTIONS, which node-postgres sends as the connection's options when
+// DATABASE_URL holds none. Each makes current_user the app role while session_user stays the superuser
+// login; the check fails for each, and each answered 200 with the check before E00-T07e. The roles are
+// synthetic, their password a marker, and dropped again.
+describe('GET /api/health: a role set for this database alone, or by PGOPTIONS', () => {
+  const SUPER_IN_DATABASE = 'chairside_health_tester_super_in_db';
+  const SUPER_PLAIN = 'chairside_health_tester_super_plain';
+  const SET_APP_ROLE = '-c role=chairside_app';
+  const id = (name: string) => pg.escapeIdentifier(name);
+
+  async function dropAll(): Promise<void> {
+    for (const name of [SUPER_IN_DATABASE, SUPER_PLAIN]) {
+      await superuser.query(`drop role if exists ${id(name)}`);
+    }
+  }
+
+  beforeAll(async () => {
+    await dropAll(); // left by a run that stopped halfway
+    const password = pg.escapeLiteral(ROLE_PASSWORD);
+    await superuser.query(
+      `create role ${id(SUPER_IN_DATABASE)} LOGIN SUPERUSER password ${password}`,
+    );
+    await superuser.query(
+      `alter role ${id(SUPER_IN_DATABASE)} in database ${id(database.name)} ` +
+        `set role = 'chairside_app'`,
+    );
+    await superuser.query(`create role ${id(SUPER_PLAIN)} LOGIN SUPERUSER password ${password}`);
+  });
+
+  afterAll(dropAll);
+
+  /** Who a connection through `url` is, with the process's PGOPTIONS as they are now. */
+  async function connectedAs(url: string): Promise<{ login: string; role: string }> {
+    const client = new pg.Client({ connectionString: url });
+    await client.connect();
+    try {
+      const { rows } = await client.query<{ login: string; role: string }>(
+        'select session_user::text as login, current_user::text as role',
+      );
+      return rows[0]!;
+    } finally {
+      await client.end();
+    }
+  }
+
+  it('answers 503 for a superuser login whose role is set to the app role in this database alone', async () => {
+    const url = urlAs(SUPER_IN_DATABASE, ROLE_PASSWORD);
+    expect(await connectedAs(url), 'the app role, logged in as another').toEqual({
+      login: SUPER_IN_DATABASE,
+      role: 'chairside_app',
+    });
+    const answer = await health({ DATABASE_URL: url });
+    expectFailure(answer, 'database_login_past_policies');
+    expect(answer.loggedText).not.toContain(ROLE_PASSWORD);
+  });
+
+  it('answers 503 for a superuser login whose role is set to the app role by PGOPTIONS', async () => {
+    const url = urlAs(SUPER_PLAIN, ROLE_PASSWORD);
+    vi.stubEnv('PGOPTIONS', SET_APP_ROLE);
+    try {
+      expect(await connectedAs(url), 'the app role, logged in as another').toEqual({
+        login: SUPER_PLAIN,
+        role: 'chairside_app',
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    const answer = await health({ DATABASE_URL: url, PGOPTIONS: SET_APP_ROLE });
+    expectFailure(answer, 'database_login_past_policies');
+    expect(answer.loggedText).not.toContain(ROLE_PASSWORD);
+  });
+});
