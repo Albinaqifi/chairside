@@ -183,10 +183,10 @@ One JSON line per event, each with a `code`, never a patient's details:
 | Code | Level | When |
 |---|---|---|
 | `worker_started` | info | The database answered, the queue runs and the heartbeat is scheduled. |
-| `heartbeat` | info | Once a minute, within about half a minute after the minute turns (pg-boss looks at its schedules every 30 s), with `at`, the time it ran, and nothing else. |
+| `heartbeat` | info | Once a minute, about 35 s after the minute turns (pg-boss looks at its schedules every 30 s, then forwards the job through a queue it polls every 5 s), with `at`, the time it ran, and nothing else. One line per minute, never two. A minute whose job was forwarded just before a stop runs at the next start, however much later, so a restart logs one heartbeat at once (measured in E00-T07b). |
 | `worker_stopping` | info | A stop signal came: `signal` is `SIGTERM` or `SIGINT`. |
 | `worker_stopped` | info | The queue stopped and both of its connection pools closed; the process ends, exit code 0. |
-| `job_failed` | error | A job's handler threw. The error is in this line, with the queue and the job's id; the job's row keeps only `job_failed` (the queue's tables serve every clinic), and pg-boss runs it twice more. |
+| `job_failed` | error | A job's handler threw. The error is in this line, with the queue and the job's id, once per run; the job's row keeps only `job_failed` (the queue's tables serve every clinic), and pg-boss runs it twice more. A job whose handler runs past its queue's time limit (`expireInSeconds`, 900 s by default) is failed by pg-boss instead, so its row keeps pg-boss's own words — `handler execution exceeded 900s` with its stack, or `job timed out` — and the handler's own error, when it comes, is still a `job_failed` line of its own. |
 | `queue_error` | error | One of the queue's passes failed (a poll, a schedule, its upkeep); it tries again on the next. Many in a row: the database is gone, or a grant is missing. |
 | `worker_failed` | error | Something unexpected after the start, such as the heartbeat's schedule failing: the line holds the error, exit code 1. |
 
@@ -210,6 +210,12 @@ connections, logs `worker stopped` and ends with exit code 0. A job still runnin
 to the queue: its row says `retry`, with pg-boss's words "pg-boss shut down while active", and it runs
 again on the next start. On this machine a second signal while it stops ends it at once; in the image,
 where Node.js is process 1, a second one changes nothing, and the host kills it when its wait is over.
+
+Ctrl+C on `pnpm worker` on Windows stops the worker itself cleanly — both lines, exit code 0 — and
+then cmd asks "Terminate batch job (Y/N)?" and pnpm prints a red `ELIFECYCLE` line with a large
+negative exit code. Answer `Y`. That is pnpm's own shim for any script, not the worker: by then the
+worker has already logged `worker stopped` (E00-T07b test). `node --import tsx src/worker/index.ts`,
+which is how the image runs it, has neither.
 
 Render waits 30 s after its stop signal before it kills a process (E00-T07c checks it), which leaves
 the 20 s room. `docker stop` waits only 10 s: `docker stop --time 30 chairside-worker` gives it the

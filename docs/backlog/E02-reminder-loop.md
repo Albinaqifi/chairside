@@ -154,6 +154,14 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 - Worker: a repeating job every 5 minutes that plans for every clinic (inside each clinic's
   tenant context) for appointments in the planning window.
 - Channel choice per D-055: one row for the first usable channel in the rule's order (enabled, contact present and valid, not refused, `whatsapp_status` not `unavailable`); `unreachable` skip plus task when none fits.
+- **The job may be run twice at once, and must be safe for it** (E00-T07b, `message` ×2). Its
+  handler gets the job's `signal` (`src/db/queue.ts`): pg-boss aborts it when a stop has waited 20 s
+  and handed the job back, and again when the handler passes its queue's `expireInSeconds`
+  (900 s by default; `makeQueue()` sets none). In both cases the job is handed back with no retry
+  delay, so the same worker can take the retry at its next poll while a handler that ignores the
+  signal runs on: two runs of one job in one process. So: stop at the signal; give this queue an
+  `expireInSeconds` above its longest run; and plan the same rows twice without harm, which the
+  "do nothing on conflict" key already gives (D-005).
 
 **Out of scope.** Sending. Recall and no-show triggers.
 
@@ -164,6 +172,8 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 - [ ] Cancelling: pending messages cancelled. Restoring: planned again.
 - [ ] If the change transaction rolls back, no job and no message exists.
 - [ ] With the event hook disabled (simulating a missed event), the 5-minute tick still plans the reminder.
+- [ ] A planning job whose handler is still running when its retry is claimed leaves the row count
+      unchanged, and a handler that is signalled stops (integration test).
 - [ ] A skip is recorded with its reason and is queryable.
 - [ ] The planner for clinic A never reads or writes clinic B's rows (isolation test).
 
@@ -187,6 +197,15 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 - End-to-end tests can set the worker's "now" through the test clock control of E00-T06b, with the
   same guard (never on staging or production), so journey J3 (E02-T14) can move time forward
   (D-075).
+- **The job may be run twice at once, and must be safe for it** (E00-T07b, `message` ×2): the same
+  as E02-T06's item above — stop at the job's `signal`, give this queue an `expireInSeconds` above
+  its longest run, and send each message once however often the job runs (the `messages` row first,
+  `SKIP LOCKED` and the state machine, D-005).
+- **The queue's own warnings are logged** (E00-T07b review, `message`). Nothing listens to pg-boss's
+  `'warning'` events (`src/db/queue.ts`), so a queue backlog (`queue_backlog`, 10,000 waiting jobs
+  by default), a query slower than 30 s or a clock skew over 60 s writes no line: a dispatcher
+  falling behind would send reminders late with nothing in the log. Log each with a code and
+  pg-boss's message, never its `data`, which for a slow query holds the statement's values.
 
 **Out of scope.** Daily/monthly caps, allow-list, webhooks (E03). Frequency cap (E05).
 
@@ -202,6 +221,10 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 - [ ] With the kill switch off, nothing is claimed and nothing is lost.
 - [ ] Invalid state transitions are rejected by the state machine (all pairs tested).
 - [ ] The worker's test clock cannot be enabled on staging or production (test).
+- [ ] A job whose handler is still running when its retry is claimed sends nothing twice (integration
+      test, as E00-T07b's `queue.test.ts` makes the overlap happen).
+- [ ] A queue backlog over its warning size writes one line with a code and no statement values
+      (test).
 
 ---
 

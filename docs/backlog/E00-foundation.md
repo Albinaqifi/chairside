@@ -7,8 +7,8 @@ clinics cannot see each other's data, and every change is checked automatically.
 Getting them right once, with tests, is cheaper than fixing them under features.
 
 Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → T04a → T04b → T05a → E01-T01a → E01-T01b
-→ T04c → T04d → T04e → E01-T02a → E01-T02b → T06b → T05b → T07a → T07b → T07c, then the rest of
-E01, and T12 before E02 (D-087, D-090, D-091, D-093, D-096, D-102). T08 is the second half of T03
+→ T04c → T04d → T04e → E01-T02a → E01-T02b → T06b → T05b → T07a → T07b → T07d → T07e → T07c, then
+the rest of E01, and T12 before E02 (D-087, D-090, D-091, D-093, D-096, D-102, D-105). T08 is the second half of T03
 (split in D-071), so it sits right after T03 in this file. T06 is split in two (D-075): CI (T06a) comes first, Playwright and journey J1
 (T06b) after T04 and T05a; the journeys' clock (T06c, D-100) comes before the first journey that
 sets "now", E01-T11's or E02-T14's. T09 and T10 come from E00-T08's review and test (D-076, D-077), T11 from
@@ -16,8 +16,11 @@ E00-T10's (D-084). T04 is split in four (D-086), its last part again in two (D-0
 texts and the login page (T04a), the staff shell (T04b), the form pattern (T04c), the form fields
 (T04d), tabs, the drawer and the dialog (T04e). T05 is split in two (D-090): the seed (T05a), and
 `clinic:create` (T05b), which staging needs. T07 is split in three (D-102): the image and the
-health check (T07a), the worker and its job queue (T07b), staging on Render (T07c), which waits for
-the owner's answer on its cost; Sentry moved to E07-T03 (owner). T12, the logger's net, comes from
+health check (T07a), the worker and its job queue (T07b), staging on Render (T07c); Sentry moved to
+E07-T03 (owner). T07d and T07e come out of T07b's Done pass (D-105): T07d makes T07b's one
+timing-dependent test deterministic, which a red run on `main` showed, and T07e builds the three
+`data` start-up refusals that were T07c's, so they do not wait for a Render account. T07c itself
+keeps the host, its database, the monitor and the runbook, on the smallest paid plans (owner, D-105). T12, the logger's net, comes from
 three Discovered lines of E00-T01 and E00-T05b (D-102). E01-T01a, E01-T01b, E01-T02a and E01-T02b
 come before T06b and T07, so a receptionist sees a patient list before Playwright and staging exist; T04c, T04d
 and T04e come before E01-T02a, which depends on them (D-087, D-093, D-096). The tasks sit in this
@@ -1518,24 +1521,152 @@ login (E00-T07c). Queue statistics, warnings, partitioned queues, pg-boss's `Tes
 
 ---
 
+### E00-T07d · The job-past-its-time test does not depend on timing
+
+- **Role:** builder · **Risk:** normal (a test and nothing else: it touches no area of
+  `test-strategy.md`'s table. That table's last row, a test an agent would change, is not the
+  definition of a critical task, and rule 8's "let the owner decide" is already settled: the owner
+  asked for this change, D-105) · **Depends on:** E00-T07b (Done)
+- **Read:** D-104, D-105 · the architect section of `handoffs/E00-T07d.md`
+
+**Why.** The first run on `main` after E00-T07b was merged is red on one of its tests
+(38138989218), while the pull request's head, whose code is byte-identical, was green
+(38093609496). A flaky test on `main` turns later runs red for no reason and hides the next real
+failure, and the pipeline's CI wait stops on it. Nothing in the product is wrong (D-105).
+
+**Do.**
+- **Take the fixed count out of the one case.** In `tests/integration/queue.test.ts`, the case
+  "keeps only pg-boss's words in the row of a job whose handler runs past its time, and the
+  handler's error in one log line per attempt" waits for the handler to have run exactly three
+  times. Its queue has `expireInSeconds: 1` and no retry delay (`retry_delay` is 0 by default,
+  migration 0005), so pg-boss claims the retry at its next poll while the previous run's handler is
+  still ending: the run on `main` saw six runs, not three. That overlap is the behaviour the task's
+  own critical review wrote up, not a fault here.
+- **Keep both things the case proves:** the job's row holds pg-boss's own words
+  (`handler execution exceeded …`, or `job timed out`) and no marker from the handler, and the
+  handler's error is in one `job_failed` log line per run.
+- **The straightforward route:** give the test's queue a `retryDelay` longer than its
+  `expireInSeconds` in `pgboss.create_queue`'s policy (`retryDelay`, whole seconds, the column
+  `retry_delay`), so a run cannot start while the one before it is ending, and wait for the job's
+  state to be `failed` instead of for a number of runs. Another route is fine if it weakens
+  neither claim; the note says why it is deterministic.
+- **Never by weakening it** (rule 8): no `skip`, no loosened assertion, nothing removed. The case
+  must still go red when the behaviour it checks changes.
+- **No product code.** `src/db/queue.ts` and `src/worker/index.ts` do not change: the overlap is
+  real and it is E02's to handle (E02-T06, E02-T07, D-105), and no job exists yet.
+- **Run it more than once:** the file at least five times in a row, and the count in the note. It
+  failed on CI's machine, which is slower than this one.
+
+**Out of scope.** The overlap's cure in product code, and an `expireInSeconds` for the real queues
+(E02-T06, E02-T07). pg-boss's `'warning'` events (E02-T07). Any other case in the queue tests, and
+`docs/runbook.md`'s `job_failed` row, corrected in E00-T07b's Done pass.
+
+**Acceptance.**
+- [ ] The case passes five runs in a row of
+      `pnpm exec vitest run tests/integration/queue.test.ts` (the count in the note), and
+      `pnpm test:integration` passes once.
+- [ ] The case asserts no fixed number of handler runs, and still proves both of its claims: with
+      the handler's error passed to pg-boss in place of `job_failed` it fails, and with one run's
+      `job_failed` line dropped it fails (both tried and restored, named in the note).
+- [ ] `git diff --name-only main...HEAD` names nothing under `src/`.
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
+- [ ] The run on `main` after the merge is green (the owner merges; read in this task's Done pass).
+
+---
+
+### E00-T07e · The start-up refusals' last gaps
+
+- **Role:** builder · **Risk:** critical (login and sessions: which secret signs a session and which
+  origin may sign in; tenant isolation: the check that decides whether a host puts the web live;
+  production configuration) · **Depends on:** E00-T07a (Done), E00-T07b (Done), E00-T07d
+- **Read:** `security` (Part 1, sections 1, 2 and 7) · `overview` (Environments; Things that keep it
+  running) · D-063, D-064, D-102, D-103, D-105 · the three `data` items in
+  `handoffs/E00-T07a.md` (its critical review's suggestions 1 and 2, its review's suggestion on
+  `cookiesAreSecure()`) · the architect section of `handoffs/E00-T07e.md`
+
+**Why.** E00-T07a built the start-up refusals: a host never puts a web live whose database login
+gets past the Row-Level Security policies, and the auth library never signs a session with a secret
+anyone can read. Its own reviews then found three ways around them, each weighed `data`. They were
+E00-T07c's, where they waited for a Render account and for the rest of E01; they need neither, and
+E00-T07c's host settings are written against them (owner, D-105).
+
+**Do.**
+1. **The health check judges the login, not only its current role** (`src/db/health.ts`).
+   `LOGIN_PAST_POLICIES` asks `pg_has_role(current_user, …)`, and a role setting made at connection
+   (`?options=-c role=chairside_app` in `DATABASE_URL`, or `ALTER ROLE … SET role`) makes
+   `current_user` the app role: a superuser login answers 200 today, and one `SET ROLE NONE` then
+   puts every query past the policies (E00-T07a critical review 1; its tester's probe saw `/api/health`
+   200 and `withTenant` reading one clinic of two). Ask of the session's login too, so a login that
+   can reach a role past the policies fails the check however its role is set. Keep asking of the
+   roles themselves, never by comparing names, keep membership of any kind counting, and keep the
+   function throwing nothing. The worker's start uses the same check (E00-T07b), so it refuses such
+   a login too.
+2. **`BETTER_AUTH_TRUSTED_ORIGINS` is refused, over http as well as https**
+   (`src/modules/auth/auth-secret.ts`). The auth library reads that variable itself and trusts every
+   origin in it for login requests, beside `BETTER_AUTH_URL`'s, which D-063 does not allow: an https
+   host with an http `BETTER_AUTH_URL` and that list signs in from https with the example secret and
+   sets its cookie without Secure (E00-T07a critical review 2, its probe). Unlike `auth_secrets_set`,
+   which only applies over https, this one applies whatever `BETTER_AUTH_URL`'s scheme is, because
+   the scheme is exactly what it gets around. A new code beside the three in `AuthSecretRefusal`, its
+   text naming the variable and never its value; both callers already go through
+   `authSecretRefusal()`, so the auth library does not start and `/api/health` answers 503 with it.
+   An empty value is read as not set, as `BETTER_AUTH_SECRETS`' is.
+3. **The clinic cookie is Secure exactly when the library's own cookies are**
+   (`src/modules/auth/better-auth.ts`). `cookiesAreSecure()` tests `startsWith('https://')`, while
+   the library takes the origin the WHATWG parser makes and marks its cookies from that: a
+   `BETTER_AUTH_URL` written ` https://…`, `HTTPS://…`, `https:/host`, `https:host` or `https:\host`
+   gives the session cookie Secure and the clinic cookie none (E00-T07a review suggestion, left for
+   this task). Read it with `readAsHttps()` (`auth-secret.ts`, written in E00-T07a's fix round 3 for
+   exactly this reading), exported for it: one reader for both, so the two can no longer disagree.
+- **Docs.** `docs/runbook.md`: the new code in the health check's table, and
+  `database_login_past_policies`' row saying that a role setting at connection does not get round it.
+  `security-privacy.md` where the refusals are described. `.env.example` holds no
+  `BETTER_AUTH_TRUSTED_ORIGINS` and must not gain one.
+
+**Out of scope.** Render, its plans, its settings and its monitor, and everything else in E00-T07c.
+The sign-in limit's client address (E00-T07c). Any new refusal the reviews did not find. Changing
+what `/api/health` answers, its shape, or that it never waits on the worker (D-102). A per-account
+sign-in limit (D-064 point 5, the owner's). Giving `databaseProblem()`'s client an `'error'`
+listener: without one, a connection that drops during its single query ends the worker, which a host
+restarts, so the failure is loud, not silent (E00-T07b builder, known gap 3, weighed `none`).
+
+**Acceptance.**
+- [ ] `/api/health` answers 503 with `database_login_past_policies`, and one log line with that code,
+      for a superuser login whose role is set to the app role when it connects, and for the same
+      through `ALTER ROLE … SET role`; the app role's own login still answers 200, and the roles
+      `health.test.ts` already covers still answer as they did (integration tests).
+- [ ] The worker does not start with that same login: one line with the code, exit code 1, pg-boss
+      never started (integration test).
+- [ ] With `BETTER_AUTH_TRUSTED_ORIGINS` set, over http and over https, the auth library never
+      starts, no session row is made, a sign-in is refused, and `/api/health` answers 503 with the
+      new code and one log line that does not hold the value; an empty one changes nothing
+      (unit and integration tests).
+- [ ] With `BETTER_AUTH_URL` written each of the six ways E00-T07a's tests already list
+      (a space before it, a line break before it, `HTTPS://`, one slash, no slash, a backslash), the
+      clinic cookie carries Secure, and over http it does not (test).
+- [ ] Every start-up refusal E00-T07a built still refuses what it refused, and still takes what it
+      took (its unit and integration tests pass unchanged).
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
+
+---
+
 ### E00-T07c · Staging on Render
 
 - **Role:** builder + owner · **Risk:** critical (production configuration and secrets: the host,
-  its settings and its database, the start-up refusals; login: the client address the sign-in limit
-  counts, the origins trusted for login, the clinic cookie) · **Depends on:** E00-T07a, E00-T07b ·
-  **Needs:** the owner's answer on staging's cost (board, "Owner actions"), then the accounts; Q-07
-  (working assumption accepted for staging)
-- **Read:** refined first, in E00-T07b's Done pass: `overview` (Environments; Things that keep it
+  its settings and its database; login: the client address the sign-in limit counts) ·
+  **Depends on:** E00-T07a, E00-T07b, E00-T07e · **Needs:** a Render account on the plans the owner
+  chose (D-105) and the monitor's account; Q-07 (working assumption accepted for staging)
+- **Read:** refined when the owner has those accounts: `overview` (Environments; Things that keep it
   running) · `security` (Part 1, sections 1, 2, 7 and 9) · D-007, D-013, D-044, D-063, D-064, D-075,
-  D-101, D-102, D-103 · Q-07
+  D-101, D-102, D-103, D-105 · Q-07
 
 **Why.** A walking skeleton in a real environment exposes deployment problems while the app is
 still tiny, and gives every later milestone a place to be demonstrated. The last part of E00-T07
 (D-102).
 
-**Do.** An outline. Its Ready pass settles with the owner the plans, the monitor, and how the
-deploy is checked before the merge (the pull request's branch deployed, or the owner's steps after
-it).
+**Do.** An outline. Its Ready pass settles with the owner the monitor, and how the deploy is checked
+before the merge (the pull request's branch deployed, or the owner's steps after it). The plans are
+settled: the smallest paid plan for the web, the worker and the database (owner, D-105).
 - **Render** (D-007): a description of the web service, the worker and a managed PostgreSQL in
   Frankfurt, both services from the one image; migrations on each deploy, as the migration role;
   `NEXT_TELEMETRY_DISABLED=1` (D-075). The database's default user makes the migration and app
@@ -1557,25 +1688,19 @@ it).
   would then hold a live link for 3 days. Find where a shell's or a job's output goes before the
   first staging clinic is made; the runbook says how to run it so that the link reaches only the
   operator's screen.
-- **The start-up refusals' last gaps** (E00-T07a's reviews, `data` ×3), closed before the host's
-  settings are written. They need no account: the Ready pass may make them a task of their own,
-  ahead of the host's part.
-  - The login check asks of the session's login, not of its current role (`src/db/health.ts`:
-    `pg_has_role(session_user, …)`): a superuser login whose role is set to the app role when it
-    connects (`?options=-c role=chairside_app` in `DATABASE_URL`, or `ALTER ROLE … SET role`)
-    answers 200 today, and one `SET ROLE NONE` then gets past the policies (critical review 1). The
-    web's check and the worker's start (E00-T07b) both use it.
-  - `BETTER_AUTH_TRUSTED_ORIGINS` is refused as `BETTER_AUTH_SECRETS` is, over http too: the auth
-    library reads it itself and trusts each origin in it for login requests beside
-    `BETTER_AUTH_URL`'s (against D-063), so an https host with an http `BETTER_AUTH_URL` and that
-    list makes sessions signed with any secret, their cookie without Secure (critical review 2). On
-    the host, `BETTER_AUTH_URL` is its https address.
-  - The clinic cookie is Secure exactly when the library's cookies are: `cookiesAreSecure()`
-    (`better-auth.ts`) reads `BETTER_AUTH_URL` as the library does (`readAsHttps()`,
-    `auth-secret.ts`), not by its `https://` prefix as written (E00-T07a review).
+- **The start-up refusals' last gaps are E00-T07e** (D-105), built before this task, so the host's
+  settings are written against them. Here only what the host needs: `BETTER_AUTH_URL` is its own
+  https address, and no `BETTER_AUTH_TRUSTED_ORIGINS` is set.
 - **The heartbeat's monitor** (D-013): an external check that alerts when the worker's heartbeat
   stops; the worker pings its URL each run. The service and its URL, a new secret setting, are the
-  owner's (agent rule 4).
+  owner's (agent rule 4). What the monitor must allow for, measured in E00-T07b: on pg-boss's
+  default timings a heartbeat lands 35–36 s after its minute turns, not "within about half a
+  minute"; a forward made just before a stop runs at the next start, however late, so a restart logs
+  one heartbeat at once; and there is one job per occurrence, never two.
+- **The host's wait before it kills the worker.** `stopQueue()` waits up to 20 s for a running job
+  (`STOP_TIMEOUT_MS`, E00-T07b), which assumes the host waits longer. Read what Render actually
+  waits after SIGTERM and either confirm the 20 s or change it, and say the number in the runbook
+  (E00-T07b builder, known gap 2).
 - `docs/runbook.md`: deploy, roll back, read the logs, run a migration, make the roles, run
   `clinic:create` on the host. "Failed to find Server Action" in the logs is noise unless it
   follows a deploy (D-075); `The destination stream closed early` is always noise (a browser that
@@ -1608,13 +1733,6 @@ heartbeat.
 - [ ] The setup link appears in no log the host keeps (its log view, after a run).
 - [ ] Deploys happen from `main` automatically; a rollback is documented and was tried once.
 - [ ] No secret is in the repository or the image.
-- [ ] `/api/health` answers 503 (`database_login_past_policies`) for a superuser login whose role
-      is set to the app role when it connects, and the worker does not start with it; the app role
-      still answers 200 (integration tests).
-- [ ] With `BETTER_AUTH_TRUSTED_ORIGINS` set, over http or https, the auth library never starts,
-      no session is made, and `/api/health` answers 503 with its own code (tests).
-- [ ] With `BETTER_AUTH_URL` written ` https://…` or `HTTPS://…`, the clinic cookie is Secure
-      (test).
 - [ ] On the staging database the Cyrillic check answers `t` (the command and its answer in the
       note), and the runbook says how production's database is created and checked.
 - [ ] Staging holds synthetic data only.

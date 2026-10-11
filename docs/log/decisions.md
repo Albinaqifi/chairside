@@ -1968,3 +1968,33 @@ architecture), `changed` (differs from the original files), `process`.
   failed job's error for days, in a table every clinic shares.
 - **Revisit if:** pg-boss is upgraded (a new migration, from its `getMigrationPlans`); its statistics
   are wanted; a job must be sent in a data change's transaction (E02-T06).
+
+### D-105 · E00-T07b Done: its one timing-dependent test becomes E00-T07d, E00-T07c's three `data` refusals become E00-T07e, and staging runs on paid plans (owner)
+- **Origin:** E00-T07b's Done pass, 2026-10-11 (PR #50 merged). The first run on `main`
+  (38138989218) is red, and the owner answered three questions in that pass
+  (`handoffs/E00-T07b.md`, the architect's Done-pass section).
+- **What:**
+  - **`main` is red on one test, and that test is E00-T07d.** `queue.test.ts` › "keeps only
+    pg-boss's words in the row of a job whose handler runs past its time" asserts the handler ran
+    exactly three times; on `main` it ran six. The code is byte-identical to the pull request's head
+    (`782c5ed`, run 38093609496, green), so the expectation, not the product, depends on timing: the
+    retry is claimed while the previous run's handler is still ending, the overlap the task's own
+    critical review wrote up (its suggestion 1). **Owner, 2026-10-11:** a task of its own, first, and
+    its own pull request. Rule 8's "let the owner decide" is settled here, so its builder does not
+    stop again.
+  - **E00-T07c is split.** Its three `data` refusals from E00-T07a (the health check judging
+    `current_user`, `BETTER_AUTH_TRUSTED_ORIGINS` not refused, the clinic cookie's Secure read from
+    the `https://` prefix) become **E00-T07e**, which needs no Render account; E00-T07c keeps the
+    host, its database, the monitor and the runbook. Order: T07a → T07b → T07d → T07e → T07c. The id
+    E00-T07c and its title are unchanged, so every document that names it still points at staging.
+    **Owner, 2026-10-11:** yes, now, right after E00-T07d.
+  - **Staging runs on the smallest paid plans for the web, the worker and the database**
+    (**owner, 2026-10-11**), which closes the board's standing action: nothing sleeps, the database
+    keeps its data and its backups, and `clinic:create` can be run on the host.
+- **Why:** three `data` findings about login and tenant isolation were waiting behind a money
+  decision and the whole of E01; a flaky test on `main` turns later runs red and hides the next real
+  failure; a free Render database is deleted after 30 days, so staging's clinic would be remade every
+  month and `clinic:create` could not be run there at all.
+- **Revisit if:** E00-T07d finds the overlap is the product's fault after all (then E02-T06 and
+  E02-T07's folded-in work moves earlier); staging's bill is higher than the owner expects; a later
+  pg-boss gives a queue a retry delay by default.
