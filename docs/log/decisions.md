@@ -1998,3 +1998,27 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** E00-T07d finds the overlap is the product's fault after all (then E02-T06 and
   E02-T07's folded-in work moves earlier); staging's bill is higher than the owner expects; a later
   pg-boss gives a queue a retry delay by default.
+
+### D-106 · The red run on `main` was a second scheduled job at a minute boundary, not a retry overlap; the job-past-its-time case follows one job
+- **Origin:** E00-T07d, 2026-10-11, from a probe of pg-boss 12.37.1 against `<db>_test`
+  (`handoffs/E00-T07d.md`). It answers D-105's "Revisit if".
+- **What:**
+  - A pg-boss schedule (`* * * * *`, the only way a test sends a job today) sends a job **at every
+    minute boundary its queue is worked over**, besides the one it sends at once. So any case of
+    `tests/integration/queue.test.ts` whose window crosses a boundary gets a second job.
+  - Measured on a queue with `expireInSeconds: 1`: every job runs **exactly three times** (a claim
+    and its two retries; `pgboss.job.retry_count + 1` counts the claims), with a retry delay of 0 s
+    as with 3 s. So the six runs of the red run (38138989218) were **two jobs of three runs**, not
+    three attempts of two runs: the retry overlap D-105 named is not what reddened `main`, and a
+    `retryDelay` would not have fixed it.
+  - The case therefore follows **the first job its handler ran**, by that job's id: it waits for
+    pg-boss to have failed that job for good (after which no run of it can follow) and reads the
+    number of runs off `retry_count`. No count of runs is written in the test any more.
+  - **The overlap itself stays a real risk for E02** (E02-T06 and E02-T07's Do items, `message`): a
+    handler that *ignores* its abort signal does run on while its retry is claimed. Those items
+    stand unchanged; only the diagnosis of this one test's red run was wrong.
+- **Why:** a test that waits for a number of handler runs measures the wall clock, not the product;
+  the number of jobs a minute-cron sends is nobody's promise.
+- **Revisit if:** pg-boss's schedule sends occurrences differently (an upgrade); the file's other
+  cases, which all expect `jobsOf(queue)` to hold exactly one row, are made boundary-proof too (a
+  Discovered line of this task); E02 gives a test a way to send one job without a schedule.

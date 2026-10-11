@@ -370,6 +370,11 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
   // expireInSeconds (900 s, pg-boss's default; 1 s here). pg-boss then fails it in its own words, and
   // the handler's error, thrown afterwards, still reaches one log line and never the job's row, in a
   // table every clinic shares (security-privacy.md, section 1).
+  // E00-T07d: nothing in here counts runs of its own. A schedule sends a job at every minute boundary
+  // it is worked over, so a case that crosses one gets a second job: this one then saw six runs where
+  // it wanted three, and a run on `main` went red on it (D-105). It takes 1 s per run and no number
+  // of jobs is promised, so the case follows the first job its handler ran, by that job's id, and
+  // reads every count off pg-boss's own row for it.
   it("keeps only pg-boss's words in the row of a job whose handler runs past its time, and the handler's error in one log line per attempt", async () => {
     const queue = freshQueue();
     // Made first, as the migration role, with a 1 s limit: workJobs() leaves a queue that is there as
@@ -378,7 +383,12 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
       `select pgboss.create_queue($1, '{"policy": "standard", "expireInSeconds": 1}')`,
       [queue],
     );
-    const thrown: unknown[] = [];
+    const thrown: { jobId: string; error: unknown }[] = [];
+    /** What the handler threw on each run of one job, in the order it ran. */
+    const runsOf = (id: string) => thrown.filter((run) => run.jobId === id);
+    /** The failure lines the log holds for one job. */
+    const linesOf = (id: string) =>
+      lines().filter((line) => line.fields.code === JOB_FAILED && line.fields.jobId === id);
     expect(
       await startQueue({
         timings: {
@@ -393,33 +403,52 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
       // Past its time pg-boss aborts the job's signal; the handler fails only then.
       await new Promise((resolve) => job.signal.addEventListener('abort', resolve, { once: true }));
       const error = new Error(`${MARKER} late`, { cause: new Error(`${MARKER} cause`) });
-      thrown.push(error);
+      thrown.push({ jobId: job.id, error });
       throw error;
     });
-    // pg-boss runs a job three times (two retries, its default) before it fails for good.
-    await vi.waitFor(
+    // Waits until pg-boss has failed that first job for good: no run of it can follow, whatever the
+    // schedule sends afterwards, so every count below stands still from here on. Its last run's line
+    // is in the log by then: pg-boss aborts the signal before it writes the failure, and the handler
+    // throws on the abort itself, with no query in between.
+    const jobId = await vi.waitFor(
       async () => {
-        expect(thrown).toHaveLength(3);
-        expect(await jobsOf(queue)).toMatchObject([{ state: 'failed' }]);
+        const first = thrown[0];
+        expect(first).toBeDefined();
+        const row = (await jobsOf(queue)).find((job) => job.id === first?.jobId);
+        expect(row).toMatchObject({ state: 'failed' });
+        return first?.jobId ?? '';
       },
       { timeout: 30_000, interval: 250 },
     );
     await stopQueue();
 
-    const [job] = await jobsOf(queue);
+    const rows = await jobsOf(queue);
+    const job = rows.find((row) => row.id === jobId);
     // pg-boss's words, from whichever saw the time run out: the worker's timer, or the supervisor.
     expect(job?.output).toBeOneOf([
       expect.objectContaining({ name: 'Error', message: 'handler execution exceeded 1s' }),
       { value: { message: 'job timed out' } },
     ]);
-    expect(job?.row).not.toContain(MARKER);
-    expect(lines().filter((line) => line.fields.code === JOB_FAILED)).toEqual(
-      thrown.map((err) => ({
+    // No row of the queue holds a word the handler threw: not this job's, and not another job's.
+    expect(rows.filter((row) => row.row.includes(MARKER))).toEqual([]);
+    // One run per attempt pg-boss made of it (a first claim and its two retries, its default), the
+    // attempts counted from its own row: retry_count rises with every claim after the first.
+    const attempts = await migrator.query<{ runs: number }>(
+      'select retry_count + 1 as runs from pgboss.job where id = $1',
+      [jobId],
+    );
+    const runs = runsOf(jobId);
+    expect(runs).toHaveLength(attempts.rows[0]?.runs ?? 0);
+    // Each of those runs in one log line of its own, with the error that run threw.
+    expect(linesOf(jobId)).toEqual(
+      runs.map(({ error }) => ({
         level: 'error',
-        fields: { code: JOB_FAILED, queue, jobId: job?.id, err },
+        fields: { code: JOB_FAILED, queue, jobId, err: error },
         message: 'job failed',
       })),
     );
+    // And every failure line of the whole case belongs to a run: one line per run, never two.
+    expect(lines().filter((line) => line.fields.code === JOB_FAILED)).toHaveLength(thrown.length);
     expect(
       lines().filter((line) => line.level !== 'info' && line.fields.code !== JOB_FAILED),
     ).toEqual([]);
