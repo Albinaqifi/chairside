@@ -372,7 +372,7 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
   // table every clinic shares (security-privacy.md, section 1).
   // E00-T07d: nothing in here counts runs of its own. A schedule sends a job at every minute boundary
   // it is worked over, so a case that crosses one gets a second job: this one then saw six runs where
-  // it wanted three, and a run on `main` went red on it (D-105). It takes 1 s per run and no number
+  // it wanted three, and a run on `main` went red on it (D-106). It takes 1 s per run and no number
   // of jobs is promised, so the case follows the first job its handler ran, by that job's id, and
   // reads every count off pg-boss's own row for it.
   it("keeps only pg-boss's words in the row of a job whose handler runs past its time, and the handler's error in one log line per attempt", async () => {
