@@ -5,7 +5,10 @@
  * serves the app, such a secret is refused: the auth library never starts with it (better-auth.ts),
  * so no session is made, and the web's health check fails (src/app/api/health/route.ts, D-102).
  * So is BETTER_AUTH_SECRETS, a list the library reads itself and would sign with in place of
- * BETTER_AUTH_SECRET. Over http (this machine, CI) nothing changes (E00-T07a, E00-T02 review).
+ * BETTER_AUTH_SECRET. Over http (this machine, CI) any secret is taken (E00-T07a, E00-T02 review).
+ * BETTER_AUTH_TRUSTED_ORIGINS, a list of origins the library also reads itself and takes a sign-in
+ * from besides BETTER_AUTH_URL's, is refused over http as well: it is how a site served over https
+ * gets past an http BETTER_AUTH_URL, and so past every refusal above (E00-T07e).
  */
 
 /**
@@ -17,10 +20,14 @@ export const EXAMPLE_AUTH_SECRET = 'WvmU7awnhS+hURz48Xzur7L/WDwpIn2OzurTHxKrCr0=
 /** The shortest secret taken over https, in characters. */
 export const AUTH_SECRET_MIN_LENGTH = 32;
 
-/** Why a secret is refused over https, as a code: never the secret itself. */
-export type AuthSecretRefusal = 'auth_secret_example' | 'auth_secret_short' | 'auth_secrets_set';
+/**
+ * Why the auth library's settings are refused, as a code: never a secret or an origin itself. The
+ * secrets over https; BETTER_AUTH_TRUSTED_ORIGINS over http as well.
+ */
+export type AuthSecretRefusal =
+  'auth_secret_example' | 'auth_secret_short' | 'auth_secrets_set' | 'auth_trusted_origins_set';
 
-/** Why the auth library's settings cannot be used, as a code: one missing, or a refused secret. */
+/** Why the auth library's settings cannot be used, as a code: one missing, or one refused. */
 export type AuthSettingsProblem = 'auth_settings_missing' | AuthSecretRefusal;
 
 /** What each refusal means, for the error that stops the auth library; the code is added to it. */
@@ -30,6 +37,10 @@ export const AUTH_SECRET_REFUSALS: Record<AuthSecretRefusal, string> = {
   auth_secrets_set:
     'BETTER_AUTH_SECRETS is set, and the auth library would sign with its first entry, which ' +
     'nothing checks, in place of BETTER_AUTH_SECRET',
+  auth_trusted_origins_set:
+    'BETTER_AUTH_TRUSTED_ORIGINS is set, and the auth library would take a sign-in from each origin ' +
+    "in it besides BETTER_AUTH_URL's, while BETTER_AUTH_URL's scheme alone decides whether " +
+    'BETTER_AUTH_SECRET is checked and whether cookies are Secure',
 };
 
 /**
@@ -40,23 +51,34 @@ export const AUTH_SECRET_REFUSALS: Record<AuthSecretRefusal, string> = {
  * case, and takes `https:/host`, `https:host` and `https:\host` for `https://host`: so the same parser
  * decides here (E00-T07a critical review). `URL.parse` answers null for what it cannot read, and so
  * never puts the value in an error. A URL written `https://` that it cannot read (`https://` alone)
- * still counts, as before: the library does not start with it either.
+ * still counts, as before: the library does not start with it either. The clinic cookie is Secure by
+ * this same reading (cookiesAreSecure(), better-auth.ts), so it and the library's own cookies are
+ * Secure together, however the URL is written (E00-T07e).
  */
-function readAsHttps(url: string): boolean {
+export function readAsHttps(url: string): boolean {
   return URL.parse(url)?.protocol === 'https:' || /^https:\/\//i.test(url);
 }
 
 /**
- * Why the auth library's secret is refused for an app reached at `url`, or null. Over https, as the
- * library reads `url` (readAsHttps): when `secret` (BETTER_AUTH_SECRET) is the example or shorter
- * than AUTH_SECRET_MIN_LENGTH, or when `secrets` (BETTER_AUTH_SECRETS, which the library reads from
- * the environment itself) is set.
+ * Why the auth library's settings are refused for an app reached at `url`, or null. Over http as over
+ * https, when `trustedOrigins` (BETTER_AUTH_TRUSTED_ORIGINS, which the library reads from the
+ * environment itself) is set. Over https, as the library reads `url` (readAsHttps): when `secret`
+ * (BETTER_AUTH_SECRET) is the example or shorter than AUTH_SECRET_MIN_LENGTH, or when `secrets`
+ * (BETTER_AUTH_SECRETS, which the library also reads itself) is set.
  */
 export function authSecretRefusal(
   url: string,
   secret: string,
   secrets?: string,
+  trustedOrigins?: string,
 ): AuthSecretRefusal | null {
+  // The library takes a sign-in from each origin in this list besides BETTER_AUTH_URL's (better-auth
+  // 1.7.7, getTrustedOrigins() in dist/context/helpers.mjs), where D-063 allows BETTER_AUTH_URL's
+  // alone. With an http BETTER_AUTH_URL and an https origin in it, a site served over https signs in
+  // with a secret nothing checked, its cookies without Secure (E00-T07a critical review). So it is
+  // refused whatever BETTER_AUTH_URL's scheme, the very thing it gets around: decided before the
+  // https check. Chairside sets no such list; an empty one the library reads as not set, and so do we.
+  if (trustedOrigins) return 'auth_trusted_origins_set';
   if (!readAsHttps(url)) return null;
   // Judged without the whitespace around it: a value pasted into a host's settings can carry a space
   // or a line break, and the library signs with the value as given (E00-T07a tester, finding 2).
@@ -81,5 +103,5 @@ export function authSettingsProblem(
   const url = env.BETTER_AUTH_URL;
   const secret = env.BETTER_AUTH_SECRET;
   if (!url || !secret) return 'auth_settings_missing';
-  return authSecretRefusal(url, secret, env.BETTER_AUTH_SECRETS);
+  return authSecretRefusal(url, secret, env.BETTER_AUTH_SECRETS, env.BETTER_AUTH_TRUSTED_ORIGINS);
 }

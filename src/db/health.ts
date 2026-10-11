@@ -17,16 +17,24 @@ export type DatabaseProblem = 'database_unreachable' | 'database_login_past_poli
  * owner skips its policies, and can switch them off). Membership of any kind counts ('MEMBER'): one
  * that inherits has the owner's privileges at once ('USAGE'), one that does not can still SET ROLE to
  * it. A role is a member of itself. Asked of the roles themselves, never by comparing names.
+ *
+ * Asked of the login itself (`session_user`) and of the role the session is now (`current_user`). A
+ * role set when the login connects (`options=-c role=…` in DATABASE_URL, or `ALTER ROLE … SET role`)
+ * makes `current_user` that role, the app's for instance, while one `SET ROLE NONE` goes back to the
+ * login: so a superuser login set to the app role fails the check too (E00-T07a critical review,
+ * E00-T07e). The login cannot be hidden the same way: PostgreSQL ignores a `session_authorization`
+ * given when it connects, in the URL or on the role (PostgreSQL 18, tested in health.test.ts).
  */
 const LOGIN_PAST_POLICIES = `
+  with login(role_name) as (values (session_user), (current_user))
   select exists (
-           select 1 from pg_roles
-            where (rolsuper or rolbypassrls) and pg_has_role(current_user, oid, 'MEMBER')
+           select 1 from pg_roles, login
+            where (rolsuper or rolbypassrls) and pg_has_role(login.role_name, oid, 'MEMBER')
          )
       or exists (
-           select 1 from pg_class
+           select 1 from pg_class, login
             where relkind in ('r', 'p') and relrowsecurity
-              and pg_has_role(current_user, relowner, 'MEMBER')
+              and pg_has_role(login.role_name, relowner, 'MEMBER')
          ) as past_policies`;
 
 /**

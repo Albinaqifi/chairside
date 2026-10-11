@@ -4,7 +4,7 @@ import { chooseClinic } from '@/app/(auth)/choose-clinic/actions';
 import { refuse, userAction } from '@/app/_lib/actions';
 import { closeDb } from '@/db/client';
 import { logger } from '@/lib/logger';
-import { clinicsForUser, createStaffUser } from '@/modules/auth';
+import { clinicsForUser, createStaffUser, getAuth } from '@/modules/auth';
 import {
   insertClinic,
   insertMembership,
@@ -142,6 +142,109 @@ describe('chooseClinic, through userAction', () => {
     expect(vi.mocked(clinicsForUser)).not.toHaveBeenCalled();
     expect(request.set).toEqual([]);
   });
+});
+
+// E00-T07e (E00-T07a review): the clinic cookie is Secure exactly when the auth library's own cookies
+// are, however BETTER_AUTH_URL is written. The library reads it with the WHATWG URL parser, not by its
+// `https://` prefix as written, which the clinic cookie read before. For each form the library is made
+// with it, the person signs in from the origin it reads, and the picker sets the clinic cookie in that
+// session: the two cookies agree. The library's reading of every form: better-auth.test.ts.
+describe('the clinic cookie, Secure as the auth library reads BETTER_AUTH_URL', () => {
+  /** Taken by every refusal, so the library starts over https as well. */
+  const STRONG = `MARKER-${'k'.repeat(37)}`;
+  /** A person of this block's own, with an active membership in clinic A. */
+  const ownEmail = testEmail();
+  let nextAddress = 1;
+
+  beforeAll(async () => {
+    const { id } = await createStaffUser({
+      email: ownEmail,
+      name: 'Test Staff',
+      password: PASSWORD,
+    });
+    await insertMembership(admin, { clinicId: clinicA, userId: id, role: 'front_desk' });
+  });
+
+  /** The auth library is kept on globalThis (better-auth.ts): forgotten, it is made again. */
+  function forgetAuth(): void {
+    delete (globalThis as { chairsideAuth?: unknown }).chairsideAuth;
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    forgetAuth(); // the next test makes it with the tests' own settings
+  });
+
+  /** Signs the person in with the library made from `url`: its session cookie, and the Cookie header. */
+  async function signInWith(url: string): Promise<{ sessionCookie: string; cookie: string }> {
+    vi.stubEnv('BETTER_AUTH_URL', url);
+    vi.stubEnv('BETTER_AUTH_SECRET', STRONG);
+    forgetAuth();
+    const origin = new URL(url).origin;
+    const response = await getAuth().handler(
+      new Request(`${origin}/api/auth/sign-in/email`, {
+        method: 'POST',
+        headers: {
+          origin,
+          'content-type': 'application/json',
+          'x-forwarded-for': `10.31.1.${nextAddress++}`,
+        },
+        body: JSON.stringify({ email: ownEmail, password: PASSWORD }),
+      }),
+    );
+    expect(response.status, 'signed in').toBe(200);
+    const setCookies = response.headers.getSetCookie();
+    const sessionCookie = setCookies.find((set) => set.includes('session_token='));
+    expect(sessionCookie, 'a session cookie').toBeDefined();
+    return {
+      sessionCookie: sessionCookie!,
+      cookie: setCookies.map((set) => set.split(';')[0]!).join('; '),
+    };
+  }
+
+  /** The clinic cookie's `secure`, as the picker sets it in the session `cookie` names. */
+  async function clinicCookieSecure(cookie: string): Promise<unknown> {
+    request.cookie = cookie;
+    request.set = [];
+    expect(await redirectOf(chooseClinic(pickerForm(clinicA)))).toBe('/');
+    expect(request.set.map((set) => set.name)).toEqual(['chairside.clinic']);
+    return (request.set[0]?.options as { secure?: unknown } | undefined)?.secure;
+  }
+
+  const markedSecure = (setCookie: string) => /;\s*Secure\s*(;|$)/i.test(setCookie);
+
+  it.each([
+    { form: 'nothing around it', url: 'https://chairside.example.test' },
+    { form: 'a space before it', url: ' https://chairside.example.test' },
+    { form: 'a line break before it', url: '\nhttps://chairside.example.test' },
+    { form: 'HTTPS://', url: 'HTTPS://chairside.example.test' },
+    { form: 'one slash', url: 'https:/chairside.example.test' },
+    { form: 'no slash', url: 'https:chairside.example.test' },
+    { form: 'a backslash', url: 'https:\\chairside.example.test' },
+    { form: 'a tab inside the scheme', url: 'ht\ttps://chairside.example.test' },
+  ])(
+    'is Secure, as the session cookie is, for a BETTER_AUTH_URL written with $form',
+    async ({ url }) => {
+      const { sessionCookie, cookie } = await signInWith(url);
+      expect(sessionCookie, 'the library reads https').toMatch(/^__Secure-/);
+      expect(markedSecure(sessionCookie)).toBe(true);
+      expect(await clinicCookieSecure(cookie)).toBe(true);
+    },
+  );
+
+  it.each([
+    { form: 'nothing around it', url: 'http://localhost:3000' },
+    { form: 'a space before it', url: ' http://localhost:3000' },
+    { form: 'one slash', url: 'http:/localhost:3000' },
+  ])(
+    'is not Secure over http, as the session cookie is not, for a BETTER_AUTH_URL written with $form',
+    async ({ url }) => {
+      const { sessionCookie, cookie } = await signInWith(url);
+      expect(sessionCookie, 'the library reads http').not.toMatch(/^__Secure-/);
+      expect(markedSecure(sessionCookie)).toBe(false);
+      expect(await clinicCookieSecure(cookie)).toBe(false);
+    },
+  );
 });
 
 describe('userAction', () => {
