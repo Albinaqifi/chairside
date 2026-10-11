@@ -1523,6 +1523,12 @@ login (E00-T07c). Queue statistics, warnings, partitioned queues, pg-boss's `Tes
 
 ### E00-T07d · The job-past-its-time test does not depend on timing
 
+**As built** (Done 2026-10-11, PR #52; D-106, D-107): the red run was a second scheduled job at a
+minute boundary, not the retry overlap described below, so no `retryDelay`; every case of the queue
+test file follows the job its handler got, by id (the owner widened the task to the whole file in fix
+round 1). Criterion 2's first mutation rested on that diagnosis and never held, at `main` either: the
+three throwing cases catch it. The text below is the plan as it was.
+
 - **Role:** builder · **Risk:** normal (a test and nothing else: it touches no area of
   `test-strategy.md`'s table. That table's last row, a test an agent would change, is not the
   definition of a critical task, and rule 8's "let the owner decide" is already settled: the owner
@@ -1578,7 +1584,7 @@ failure, and the pipeline's CI wait stops on it. Nothing in the product is wrong
 
 - **Role:** builder · **Risk:** critical (login and sessions: which secret signs a session and which
   origin may sign in; tenant isolation: the check that decides whether a host puts the web live;
-  production configuration) · **Depends on:** E00-T07a (Done), E00-T07b (Done), E00-T07d
+  production configuration) · **Depends on:** E00-T07a (Done), E00-T07b (Done), E00-T07d (Done)
 - **Read:** `security` (Part 1, sections 1, 2 and 7) · `overview` (Environments; Things that keep it
   running) · D-063, D-064, D-102, D-103, D-105 · the three `data` items in
   `handoffs/E00-T07a.md` (its critical review's suggestions 1 and 2, its review's suggestion on

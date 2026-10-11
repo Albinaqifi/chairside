@@ -6,12 +6,14 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 **Why now:** appointments are what every message is about. And booking speed is the first
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
-Order: T01a → T01b → T02a → T02b, T04, T08, T09 (parallel-safe) → T03, T05 → T06 → T07, T10 →
-T11. With E00 (D-087, D-090, D-091, D-093, D-096): E00-T05a → T01a → T01b → E00-T04c → E00-T04d →
-E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 → T04, T08, T09 and the rest, so a
-receptionist sees a patient list before Playwright and staging exist. T01 is split in two (D-091):
-the schema and the provider link (T01a), the seed (T01b). T02 is split in two (D-096): the list and
-the search (T02a), adding a patient (T02b); editing a patient's details moved to T03, the profile.
+Order: T01a → T01b → T02a → T02b → T04a → T04b, T08, T09 (parallel-safe) → T03, T05 → T06 → T07,
+T10 → T11. With E00 (D-087, D-090, D-091, D-093, D-096, D-108): E00-T05a → T01a → T01b → E00-T04c →
+E00-T04d → E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 → T04a, T04b, T08, T09 and the
+rest, so a receptionist sees a patient list before Playwright and staging exist. T01 is split in two
+(D-091): the schema and the provider link (T01a), the seed (T01b). T02 is split in two (D-096): the
+list and the search (T02a), adding a patient (T02b); editing a patient's details moved to T03, the
+profile. T04 is split in two (D-108): the day view (T04a); the provider filter, a provider's own
+column, the "now" line and the reading on use (T04b).
 
 ---
 
@@ -399,47 +401,143 @@ put right. Editing came from E01-T02 (D-096): it shows the same record.
 
 ---
 
-### E01-T04 · Calendar: day view
+### E01-T04a · Calendar: the day view
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04e
-- **Read:** `scope` (Calendar) · `design-ref` (demo lines 215–283; logic 1812–1834; status colours 1377–1385; provider colours) · D-018, D-019, D-041
+- **Role:** builder · **Risk:** normal (a screen that reads: no table, policy, permission, wrapper
+  or login changes) · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04e (all Done)
+- **Read:** `scope` (Calendar) · `design-ref` (demo lines 215–283; logic 1812–1834, 1845–1846,
+  2092–2096; status colours 1377–1385; "Provider colours") · `data-model` (sections 1 and 2: opening
+  hours, closed days, providers, breaks, appointments) · D-015, D-018, D-019, D-020, D-098, D-108 ·
+  the architect section of `handoffs/E01-T04a.md`
 
-**Why.** The calendar is where the front desk lives.
+**Why.** The calendar is where the front desk lives: before anyone books (E01-T05) or moves
+(E01-T06) an appointment, they must see the day. Split from E01-T04 (D-108).
 
 **Do.**
-- Day view: one column per active provider with header (initials, name, chair label, % booked
-  against opening hours), hour labels, half-hour grid lines, appointment blocks placed by
-  time, provider breaks shown hatched, a "now" line on today.
-- Block styling by status as in the demo (confirmed normal, booked/no reply tagged, arrived
-  outlined, completed faded, cancelled and no-show struck through).
-- Provider colours in the theme: the four tints of `design-ref` "Provider colours" as formulas over
-  a hue set on the element from `providers.color_hue`, such as
+- **The page.** `/calendar` shows one day of the clinic: today in the clinic's zone, or the day its
+  address names (`?day=YYYY-MM-DD`; anything else shows today). Previous, Today and Next are links to
+  the day before, today and the day after; the address holds the day and nothing else. The title is
+  the day, a date of the calendar formatted in UTC (`CLAUDE.md`, Dates and times); the line under it
+  counts the day's appointments and its columns (the demo's `calSub`, without "waiting on a reply",
+  which needs E02).
+- **The read.** A `staffRead` naming `calendar.manage`, read by the page with `forPage`: for that
+  day, the providers in `sort_order` (the active ones, and an inactive one with an appointment that
+  day, so no appointment is ever hidden), each with its appointments that overlap the day and its
+  breaks of that weekday; the clinic's hours that weekday and the day's `closed_days` row; each
+  appointment's patient's name. Each table through a new function of its own module; the read puts
+  them together, since the patients module already reads scheduling's (module rule 1). No audit
+  row: a calendar is a list, not a record view (D-098).
+- **The clinic's zone, never the computer's.** The day runs from the clinic's local midnight to the
+  next; a block's place and its time come from its local start and end in that zone, so a day of 23
+  or 25 hours places each block at its local time. Times through next-intl's formatter (D-015).
+- **The grid** (demo lines 245–282, logic 1814–1831): a column per provider, its header the initials
+  (first letters of the name's first and last words) in a circle of its tint, the name, and
+  `chair · N% booked`; hour labels and half-hour lines; each appointment a block by its local start
+  and length, with its time, its patient's name, its title and a tag line: its note when it has one,
+  else its status's name, none for confirmed and completed (the demo's rule). By status: booked
+  tagged "Booked", confirmed plain, arrived outlined in the provider's strong tint, completed faded,
+  cancelled and no-show struck through on red; "No reply yet" needs a sent reminder (D-018) and comes
+  with E02-T12. Two blocks of one column that overlap (a cancelled visit rebooked, "book anyway",
+  D-020) sit side by side, each readable. Each break of the provider that weekday hatched, with its
+  label (D-018). A legend of the statuses under the grid. The grid runs from the clinic's earliest
+  opening to its latest closing in the week, in whole hours, widened to any appointment or break of
+  the day outside them; 08:00 to 18:00 when the clinic has no hours.
+- **Opening hours and % booked** (scope ✏️). Time outside the day's hours is shaded; a closed day (no
+  hours that weekday, or a `closed_days` row) is shaded whole and says so, with the closed day's label;
+  an appointment on it still shows. A column's % booked: the minutes of its appointments that are not
+  cancelled or a no-show, inside the day's hours, over the hours' minutes less the provider's breaks,
+  rounded; it may pass 100 when visits overlap; none on a closed day. A pure function, with its tests.
+- **Provider colours in the theme:** the four tints of `design-ref` "Provider colours" as formulas
+  over a hue set on the element from `providers.color_hue`, such as
   `--color-provider-tint: oklch(0.95 0.03 var(--provider-hue))`, in an `@theme inline` block. In a
   plain `@theme` block the variable is resolved on `:root`, where no hue is set, and gives no colour
-  (E00-T04a review).
-- Previous / Today / Next, provider filter chips (at least one always on), a dentist opens on their own column.
-  Their column is their membership's `provider_id`: `ClinicChoice` carries only the provider's
-  kind and `activeMembership()` no provider (E01-T01a, builder's known gap, `slice`). Read it in
-  the clinic's transaction, not through `clinics_for_user()` (D-091, "Revisit if"); T10 reads the same.
-- Data loaded for the visible day in the clinic's time zone; refreshes every 30 seconds and on window focus.
-  Times through next-intl's formatter, rows kept in state keyed by the page's clinic (`CLAUDE.md`,
-  D-098).
-- Clicking a block or an empty slot calls a handler (the drawers arrive in T05 and T06).
+  (E00-T04a review). The shade for outside hours is derived from a token the design has, named in
+  the note.
+- **The day helpers in one place** (D-108): `isCalendarDay`, `dayInZone`, `addDays` and `isoWeekday`
+  move from `src/db/seed/seed-day.ts` to `src/lib/calendar-day.ts` with their tests, none dropped; the
+  seed imports them from there, and `src/modules/patients/list.ts` drops its own `dayInZone` for it.
+  `CLAUDE.md`'s `src/lib/` line names the file.
 
-**Out of scope.** Booking, editing, week view, drag and drop.
+**Out of scope.** What a click on a block or an empty slot does (E01-T05 and E01-T06 add it, with
+their drawers); "New appointment" and the hint "Click an empty slot to book" (E01-T05); the Day / Week
+switch (E01-T07). The provider filter, a linked provider's own column, the "now" line and the reading
+on use (E01-T04b). "No reply yet" (E02-T12). Drag and drop (later). An index for the day's query
+(E07-T08). Adding the calendar to the accessibility check's pages, which hold no E01 screen yet.
 
 **Acceptance.**
-- [ ] The seeded day renders with the correct blocks in the correct columns and positions.
-- [ ] A day that crosses a daylight-saving change still shows appointments at the right local times (test).
-- [ ] An appointment changed in the database appears within the refresh interval without reloading.
-- [ ] Days outside opening hours and closed days are visibly marked.
-- [ ] Visual match with the demo's day view (screenshot comparison in the handoff note).
+- [ ] With the seed (`pnpm db:reset`), the front desk's calendar shows, on each day of the seeded
+      week, every Harbour Street appointment of that day in its provider's column, at its local start,
+      as long as it lasts, with its status's look, and the lunch breaks hatched; nothing of the other
+      clinic (the read's integration test with rows of two clinics; the screenshots).
+- [ ] Each block's place and time are its local start and length in the clinic's zone, also on the
+      days the clocks change and the day after each: 2026-03-29 and 2026-10-25 in Europe/Skopje,
+      2026-03-08 and 2026-11-01 in America/New_York, a zone behind UTC; there an appointment at 23:30
+      local is on its own day, not the next (tests that name their zones, whatever the computer's).
+- [ ] Two overlapping appointments of one column both show, side by side, and so does a cancelled one
+      with the visit rebooked in its place (test).
+- [ ] Time outside the day's hours is shaded; a weekday without hours and a `closed_days` date are
+      marked closed, the latter with its label (the seed's Monday after the week); an appointment on a
+      closed day still shows (test).
+- [ ] % booked: 0 with no appointments; a cancelled or no-show visit counts nothing; a visit partly
+      outside the hours counts its inside part; a break is not open time; overlapping visits may pass
+      100; a closed day shows none (unit tests).
+- [ ] Previous, Next and Today go a day back, a day on and to the clinic's today; a `?day=` that is
+      not a date of the calendar shows today; the address holds the day alone (test).
+- [ ] An inactive provider with an appointment that day has its column; one without has none
+      (integration test).
+- [ ] The four day helpers are defined once, in `src/lib/calendar-day.ts`, and every test case of
+      theirs still runs there (the note lists the moved cases).
+- [ ] Visual match with the demo's day view: screenshots of the seeded day beside the demo's in the
+      handoff note, and "Try it" steps for the owner.
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
+
+---
+
+### E01-T04b · Calendar: the filter, a provider's own column, the "now" line and a fresh day
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T04a
+- **Read:** `scope` (Navigation and roles; Calendar) · `design-ref` (demo lines 228–232, 273–275;
+  logic 2094–2096) · D-067, D-091, D-098, D-108 · refined in E01-T04a's Done pass
+
+**Why.** A dentist wants their own day, a receptionist the columns they book for, and both a day that
+is not stale when they look at it, without a screen that keeps itself signed in (owner, D-108). Split
+from E01-T04 (D-108).
+
+**Do.**
+- **The provider filter** (demo lines 228–232, logic 2094): a chip per column turns it off and on; the
+  last column on cannot be turned off. The choice holds while moving between days; kept in the page's
+  state, it is keyed by the page's clinic (D-098).
+- **A provider's own column.** A member whose membership is linked to a provider
+  (`memberships.provider_id`) opens the calendar on that column alone and can turn the others on; an
+  unlinked member opens on all. The link is read in the clinic's transaction, added to what
+  `activeMembership()` returns, not through `clinics_for_user()` (D-091, "Revisit if"); E01-T10 reads
+  the same.
+- **The "now" line** on today (demo lines 273–275): at the clinic's current time, moved each minute by
+  the browser without a request.
+- **A fresh day when used** (owner, D-108): the page reads its day again when the window regains focus
+  or becomes visible, or a pointer, a key or a touch is used on it, at most once every 30 seconds after
+  its last read; never on a timer. A session that has ended sends the next use to the login page.
+
+**Out of scope.** A refresh while nobody uses the page (D-108: E02 may ask again). Anything E01-T04a
+leaves out.
+
+**Acceptance.**
+- [ ] The chips hide and show their columns; the last one on stays on; the choice holds over
+      Previous, Next and Today.
+- [ ] The seed's dentist and hygienist open on their own columns, the owner and the front desk on all.
+- [ ] An appointment changed in the database shows on the next use of the page once 30 seconds have
+      passed since its last read; a page left alone for a minute sends no request (an end-to-end
+      check that counts requests).
+- [ ] With the session ended, the next use of the page shows the login page (end-to-end check).
+- [ ] The "now" line is at the clinic's time on today, moves within a minute without a request, and
+      is absent on any other day.
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---
 
 ### E01-T05 · Book an appointment (new-appointment drawer)
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T04, E01-T02b
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T04a, E01-T02b
 - **Read:** `scope` (New appointment drawer) · `design-ref` (demo lines 1323–1362; logic 1958–1964, 2116–2135) · `data-model` (`appointments`, "No double booking") · D-020, D-093, D-095 · `handoffs/E00-T04e.md` (the reviewer's suggestion 1, the tester's note 1)
 
 **Why.** The single most used action. It must be fast.
@@ -529,7 +627,7 @@ put right. Editing came from E01-T02 (D-096): it shows the same record.
 
 ### E01-T07 · Calendar: week view
 
-- **Role:** builder · **Risk:** low · **Depends on:** E01-T04
+- **Role:** builder · **Risk:** low · **Depends on:** E01-T04a, E01-T04b (its lanes follow the filter)
 - **Read:** `scope` (Calendar) · `design-ref` (demo lines 284–314; logic 1835–1845)
 
 **Do.** Week view with one lane per visible provider inside each day, appointment counts and
@@ -610,7 +708,7 @@ Day / Week toggle.
 
 ### E01-T10 · Today screen, first version
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T06
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T06, E01-T04b (the provider link)
 - **Read:** `scope` (Today) · `design-ref` (demo lines 62–137; logic 1783–1792)
 
 **Why.** The landing page: what does today look like?
@@ -618,7 +716,7 @@ Day / Week toggle.
 **Do.**
 - Greeting by role and time of day, date, buttons (Open calendar, New appointment).
 - Today's appointments list: time, patient, treatment, provider, status pill; counts in the
-  header. A dentist sees their own patients (their provider as E01-T04 reads it). Clicking a row
+  header. A dentist sees their own patients (their provider as E01-T04b reads it). Clicking a row
   opens the appointment drawer.
 - A layout slot for the right-hand panels that later epics add. **No fake panels.**
 

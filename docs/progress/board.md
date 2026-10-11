@@ -9,18 +9,16 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **`main` is red:** the first run after E00-T07b's merge (38138989218) failed on `pnpm test:integration`, on one timing-dependent test. The code is byte-identical to the pull request's green head, so nothing in the product is wrong; `E00-T07d` fixes the test (owner, 2026-10-11, D-105). Until it is merged, every run on `main` may be red
-- **Next task to start:** `E00-T07d` is in its fix rounds: fix round 2 (CI) is pushed, Tested with no findings, and its delta review approved it (`handoffs/E00-T07d.md`); then `E00-T07e`
-- **Decisions it waits on:** none. The owner answered E00-T07d's question on 2026-10-11: the whole queue test file (option 1, `handoffs/E00-T07d.md`), and D-105's three the same day
+- **Next task to start:** `E00-T07e` (Ready): `/pipeline E00-T07e`; then `E01-T04a` (Ready), as E00-T07c waits for the accounts
+- **Decisions it waits on:** none
 - **The first Monday run with the journeys** (2026-10-12) is the first in Firefox and WebKit on Linux, with the D-093 check's WebKit Back control (E00-T06b, `data`): the next architect pass reads it (D-100's "Revisit if")
 
 ## Next (in order)
 
-1. E00-T07d — it makes `main` green again (D-105)
-2. E00-T07e — the three `data` start-up refusals, out of E00-T07c (owner, D-105); no account needed
-3. E00-T07c, once the owner has the Render and monitor accounts ("Owner actions"); until then the rest of E01 goes first
-4. The rest of E01, in the epic's own order (D-087); E00-T06c before the first journey that sets "now" (D-100)
-5. E00-T12, before E02 (owner, 2026-10-03; D-102)
+1. E00-T07e — the three `data` start-up refusals, out of E00-T07c (owner, D-105); no account needed
+2. E00-T07c, once the owner has the Render and monitor accounts ("Owner actions"; not yet on 2026-10-11); until then the rest of E01 goes first
+3. The rest of E01, in the epic's own order (D-087): E01-T04a (Ready), then E01-T04b (refined in E01-T04a's Done pass, D-108); E00-T06c before the first journey that sets "now" (D-100)
+4. E00-T12, before E02 (owner, 2026-10-03; D-102)
 
 ## Blocked
 
@@ -56,8 +54,8 @@ Fully specified. A task becomes Ready when its dependencies are Done, except the
 | E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | split (D-102) | Into E00-T07a … E00-T07c, the next rows, with E00-T07d and E00-T07e added in E00-T07b's Done pass (D-105); Sentry → E07-T03 (owner, not now) |
 | E00-T07a | The image, the health check and the start-up refusals | builder | critical | **Done** | Merged by the owner (PR #48). `main` green (run 38071390166). One image for the web and `clinic:create`, tsx in it (D-103); `/api/health` for the host, never waiting on the worker; a login past the policies, or over https as the auth library reads it the example secret, a short one or `BETTER_AUTH_SECRETS`, fails it; three fix rounds. Leftovers → E00-T07c (`data` ×3: the login check by the session's login, `BETTER_AUTH_TRUSTED_ORIGINS` refused, the clinic cookie's Secure; four `none` facts for its Ready pass), E00-T07b (a trap in the builder's notes); eight struck. See `handoffs/E00-T07a.md` |
 | E00-T07b | The worker and its job queue | builder | critical | **Done** | Merged by the owner (PR #50). `main` **red** on one timing-dependent test of this task, fixed by E00-T07d (run 38138989218; the pull request's head was green, run 38093609496, same tree; D-105). pg-boss 12.37.1 in `src/db/queue.ts`: its schema by migration 0005 with fixed table names, never changed while it runs; a failed job keeps a code; the worker refuses a login past the policies; a heartbeat once a minute; SIGTERM stops it. Leftovers → E00-T07d (the red test), E02-T06 and E02-T07 (`message` ×3: the job's signal, `expireInSeconds`, the queue's warnings), E00-T07c (the monitor's timings, the host's stop wait), `docs/runbook.md` (two `none` corrections); one struck. See `handoffs/E00-T07b.md` |
-| E00-T07d | The job-past-its-time test does not depend on timing | builder | normal | **Tested** | Fix round 2 (CI, run 38153768052): the owner widened the task to the whole queue test file (option 1, 2026-10-11). Every case that counted its queue's jobs now follows the job its handler got, by id, so a second job a minute boundary sends (D-106) cannot turn it red: at a forced boundary the file at `6899fb1` fails 4 cases and this one none; with a second job put in each queue, 6 and none. Its tester: no findings, no test added; 10 runs of the file green (3 on a busy machine, 1 in `Pacific/Auckland`), its own boundary and extra-job probes green here and red at `6899fb1`. Its delta review: approved, no required change, 1 suggestion (`none`, D-106's wording, for the Done pass). Fix round 1 (CI): the file's first case red at a boundary, then outside the task; Blocked for the owner. New in E00-T07b's Done pass (owner, D-105). Review: no required change, 1 suggestion (`none`, done by its tester). Test: no findings, 1 test strengthened. A test only, no product code. See `handoffs/E00-T07d.md` |
-| E00-T07e | The start-up refusals' last gaps | builder | critical | **Ready** | Out of E00-T07c (owner, D-105): E00-T07a's three `data` findings — the health check judging `current_user`, `BETTER_AUTH_TRUSTED_ORIGINS` not refused, the clinic cookie's Secure read from the `https://` prefix. Needs no Render account. After E00-T07d. See `handoffs/E00-T07e.md` |
+| E00-T07d | The job-past-its-time test does not depend on timing | builder | normal | **Done** | Merged by the owner (PR #52). `main` green again (run 38169317311). Every case of `queue.test.ts` follows the job its handler got, by id, so a minute boundary's second job cannot turn it red (D-106; the owner widened it to the whole file, D-107); a test only, two fix rounds for CI. Leftovers → D-107 (D-106's wording; the convention in `test-strategy.md`), the epic section's "As built" line; `worker.test.ts`'s two stop cases a review check (D-107's "Revisit if"); four struck. See `handoffs/E00-T07d.md` |
+| E00-T07e | The start-up refusals' last gaps | builder | critical | **Ready** | Out of E00-T07c (owner, D-105): E00-T07a's three `data` findings — the health check judging `current_user`, `BETTER_AUTH_TRUSTED_ORIGINS` not refused, the clinic cookie's Secure read from the `https://` prefix. Needs no Render account. See `handoffs/E00-T07e.md` |
 | E00-T07c | Staging on Render | builder + owner | critical | Planned | From E00-T07 (D-102). The smallest paid plans for the web, the worker and the database (owner, 2026-10-11, D-105); owner: the Render and monitor accounts next ("Owner actions", Q-07). A database that lowers Cyrillic (E01-T02a); the sign-in limit's client address (E00-T02); the setup link out of the host's logs (E00-T05b); the heartbeat's monitor and its timings, and the host's wait against the worker's 20 s (E00-T07b). The refusals' last gaps are E00-T07e. Refined when the owner has the accounts |
 | E00-T12 | The logger's net before messaging | builder | normal | Planned | Before E02 (owner, 2026-10-03): `URL` and `Buffer` values, the messaging and link names, the plurals of whole names (E00-T01, E00-T05b; D-102) |
 
@@ -74,7 +72,9 @@ Fully specified.
 | E01-T02a | Patients: the list and the search | builder | critical | **Done** | Merged by the owner (PR #39). `main` green (run 37747287624). The list and its search at `/patients`, the clinic's zone for every page, every action tested as every member, migration 0003 (the trigram indexes gone), the logger's net (D-096, D-097). Leftovers → E01-T02b, E00-T05b, E00-T07, E01-T04, E01-T08, `CLAUDE.md` and `security-privacy.md` (D-098); two search lines and the owner's Latin/Cyrillic request on the Discovered list for later, a `data` line → E04-T00, E07-T00; the search's input to be renamed `text` in E01-T02b (owner); nine struck. See `handoffs/E01-T02a.md` |
 | E01-T02b | Patients: add a patient | builder | normal | **Done** | Merged by the owner (PR #41). `main` green (run 37806088255). `/patients/new` and `patients.create`: the phone read with the clinic's country, a likely duplicate named before Send, `patient.created`; the list's New patient and each render's rows; the logger's net, the search's input `text`; the owner tried it. Leftovers: four kept on the Discovered list (→ E01-T09, E01-T11, E04-T00), three related lines folded into two of them, two into tasks (E00-T05b: the logger's net, `data`; E00-T07: a noise line), four struck. See `handoffs/E01-T02b.md` |
 | E01-T03 | Patient profile, and editing a patient's details | builder | normal | Planned | Editing from E01-T02 (D-096) |
-| E01-T04 | Calendar: day view | builder | normal | Planned | Times through the formatter, rows keyed by clinic (E01-T02a, D-098) |
+| E01-T04 | Calendar: day view | builder | normal | split (D-108) | Into E01-T04a and E01-T04b, the next two rows |
+| E01-T04a | Calendar: the day view | builder | normal | **Ready** | From E01-T04 (D-108). The day from four modules in the clinic's zone (DST tested, a zone behind UTC), the grid with breaks, overlaps side by side, hours and closed days, % booked, Previous / Today / Next by `?day=`; the day helpers moved to `src/lib/` (no third copy). See `handoffs/E01-T04a.md` |
+| E01-T04b | Calendar: the filter, a provider's own column, the "now" line and a fresh day | builder | normal | Planned | From E01-T04 (D-108): read again when used, never on a timer, so the 30-minute sign-out holds (owner, 2026-10-11). Refined in E01-T04a's Done pass |
 | E01-T05 | Book an appointment (drawer) | builder | normal | Planned | The patient search keeps nothing in the browser (D-095); a double click keeps the drawer open; a form in a drawer or dialog sends only itself (E00-T04e) |
 | E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | The cancel dialog sends the cancel only (E00-T04e) |
 | E01-T07 | Calendar: week view | builder | low | Planned | |
@@ -219,6 +219,7 @@ Outline. Needs E07-T00.
 - E00-T05b · `clinic:create`: the operator's script for a new clinic · merged 2026-10-10 (PR #46)
 - E00-T07a · The image, the health check and the start-up refusals · merged 2026-10-10 (PR #48)
 - E00-T07b · The worker and its job queue · merged 2026-10-11 (PR #50)
+- E00-T07d · The job-past-its-time test does not depend on timing · merged 2026-10-11 (PR #52)
 
 ## Owner actions (standing)
 

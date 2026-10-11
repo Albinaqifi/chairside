@@ -12,7 +12,9 @@ Q-19).
    through the browser.
 2. **Real database in integration tests.** Constraints, Row-Level Security and `SKIP LOCKED`
    cannot be mocked honestly.
-3. **Time is an input.** Tests set "now"; nothing waits for a real clock.
+3. **Time is an input.** Tests set "now"; nothing waits for a real clock. Where a test cannot set
+   it (pg-boss's schedules run on the database's clock), it follows the job it means, by id, and
+   never counts a queue's jobs or runs (D-107).
 4. **Every bug gets a test first.** Reproduce it in a failing test, then fix.
 5. **A test that was weakened to pass is worse than no test.** (Agent rule 8.)
 6. **Synthetic data only**, from the seed generator.
