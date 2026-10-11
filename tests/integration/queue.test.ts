@@ -439,6 +439,11 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
     );
     const runs = runsOf(jobId);
     expect(runs).toHaveLength(attempts.rows[0]?.runs ?? 0);
+    // Tester (E00-T07d): and that number is pg-boss's retry default, three runs of this one job
+    // (retry_limit 2, migration 0005), so an upgrade that retried less is still red here. The runs
+    // of one job are deterministic once it has failed for good; the count that reddened `main`
+    // counted every job's runs, and a minute boundary sends a second job (D-106).
+    expect(runs).toHaveLength(3);
     // Each of those runs in one log line of its own, with the error that run threw.
     expect(linesOf(jobId)).toEqual(
       runs.map(({ error }) => ({
