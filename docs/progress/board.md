@@ -9,16 +9,18 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E00-T07b` is Ready: `/pipeline E00-T07b` (`handoffs/E00-T07b.md`)
-- **Decisions it waits on:** none (the owner answered on 2026-10-10, D-102; D-104 is the architect's)
+- **`main` is red:** the first run after E00-T07b's merge (38138989218) failed on `pnpm test:integration`, on one timing-dependent test. The code is byte-identical to the pull request's green head, so nothing in the product is wrong; `E00-T07d` fixes the test (owner, 2026-10-11, D-105). Until it is merged, every run on `main` may be red
+- **Next task to start:** `E00-T07d` is Ready: `/pipeline E00-T07d` (`handoffs/E00-T07d.md`), then `E00-T07e`
+- **Decisions it waits on:** none (the owner answered all three on 2026-10-11, D-105)
 - **The first Monday run with the journeys** (2026-10-12) is the first in Firefox and WebKit on Linux, with the D-093 check's WebKit Back control (E00-T06b, `data`): the next architect pass reads it (D-100's "Revisit if")
 
 ## Next (in order)
 
-1. E00-T07b
-2. E00-T07c, once the owner has decided staging's cost ("Owner actions"); until then the rest of E01 goes first
-3. The rest of E01, in the epic's own order (D-087); E00-T06c before the first journey that sets "now" (D-100)
-4. E00-T12, before E02 (owner, 2026-10-03; D-102)
+1. E00-T07d — it makes `main` green again (D-105)
+2. E00-T07e — the three `data` start-up refusals, out of E00-T07c (owner, D-105); no account needed
+3. E00-T07c, once the owner has the Render and monitor accounts ("Owner actions"); until then the rest of E01 goes first
+4. The rest of E01, in the epic's own order (D-087); E00-T06c before the first journey that sets "now" (D-100)
+5. E00-T12, before E02 (owner, 2026-10-03; D-102)
 
 ## Blocked
 
@@ -28,7 +30,7 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 
 ## E00 · Foundation (M0)
 
-Fully specified. A task becomes Ready when its dependencies are Done, except the outlines, refined before they start: E00-T06c with the first journey that sets "now" (D-100); E00-T07c and E00-T12 (D-102).
+Fully specified. A task becomes Ready when its dependencies are Done, except the outlines, refined before they start: E00-T06c with the first journey that sets "now" (D-100); E00-T07c, once the owner has its accounts (D-105), and E00-T12 (D-102).
 
 | Task | Title | Role | Risk | Status | Notes |
 |---|---|---|---|---|---|
@@ -51,10 +53,12 @@ Fully specified. A task becomes Ready when its dependencies are Done, except the
 | E00-T05b | `clinic:create`: the operator's script for a new clinic | builder | critical | **Done** | Merged by the owner (PR #46). `main` green (run 38048731658). `pnpm clinic:create` writes as the app role (migration 0004) and prints a one-time link to `/login/set-password`, where the first owner chooses a password (D-101); the logger's plurals; the owner tried it. Leftovers → E00-T07c (the link out of the host's logs), E01-T08 (`message`: a zone stored as Intl names it), E00-T12 (new: the logger's net before E02), `security-privacy.md` (who may call `addMembership()` and `createSetupLink()`); two `data` lines → E04-T00; eight struck. See `handoffs/E00-T05b.md` |
 | E00-T06b | Playwright and the first end-to-end journey (J1) | builder | normal | **Done** | Merged by the owner (PR #44). `main` green (run 37931330789). `pnpm test:e2e`: J1 with the keyboard alone and without JavaScript, axe-core, the D-093 check with its controls, in three browsers on `<db>_e2e`; CI runs Chromium after the build, the Monday run all three (D-100); four fix rounds, all for runs red without a fault. Leftovers: the `data` line → the first Monday run (Now) and E07-T00 (Safari by hand); three `none` lines → `README.md` and `test-strategy.md`; the owner's PATH, optional; nine struck. E00-T05b refined on the same branch (D-101). See `handoffs/E00-T06b.md` |
 | E00-T06c | A clock the end-to-end journeys set | builder | critical | Planned | Split from E00-T06b (D-100). Before the first journey that sets "now" (E01-T11's J2 or E02-T14's J3), refined with it |
-| E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | split (D-102) | Into E00-T07a … E00-T07c, the next three rows; Sentry → E07-T03 (owner, not now) |
+| E00-T07 | Staging: web, worker, database deployed | builder + owner | critical | split (D-102) | Into E00-T07a … E00-T07c, the next rows, with E00-T07d and E00-T07e added in E00-T07b's Done pass (D-105); Sentry → E07-T03 (owner, not now) |
 | E00-T07a | The image, the health check and the start-up refusals | builder | critical | **Done** | Merged by the owner (PR #48). `main` green (run 38071390166). One image for the web and `clinic:create`, tsx in it (D-103); `/api/health` for the host, never waiting on the worker; a login past the policies, or over https as the auth library reads it the example secret, a short one or `BETTER_AUTH_SECRETS`, fails it; three fix rounds. Leftovers → E00-T07c (`data` ×3: the login check by the session's login, `BETTER_AUTH_TRUSTED_ORIGINS` refused, the clinic cookie's Secure; four `none` facts for its Ready pass), E00-T07b (a trap in the builder's notes); eight struck. See `handoffs/E00-T07a.md` |
-| E00-T07b | The worker and its job queue | builder | critical | Tested | From E00-T07 (D-102), refined in E00-T07a's Done pass (D-104). pg-boss 12.37.1 in `src/db/queue.ts`: its schema by a migration with fixed table names, never changed while it runs; a failed job keeps a code; the worker refuses a login past the policies; a heartbeat once a minute; SIGTERM stops it. Review: no required changes, 1 suggestion (Discovered). Test: no findings, 8 tests added, two `none` lines (Discovered). Delta review of `3df9270..9ef295a`: approved, no required change. Critical review of `main..d0e81fa`: approved, no required change, 1 test added (a job past its time), 2 suggestions (Discovered). See `handoffs/E00-T07b.md` |
-| E00-T07c | Staging on Render | builder + owner | critical | Planned | From E00-T07 (D-102). Owner: staging's cost first ("Owner actions"), then the accounts (Q-07). A database that lowers Cyrillic (E01-T02a); the sign-in limit's client address (E00-T02); the setup link out of the host's logs (E00-T05b); the start-up refusals' last gaps (E00-T07a, `data` ×3, no account needed); the heartbeat's monitor. Refined in E00-T07b's Done pass |
+| E00-T07b | The worker and its job queue | builder | critical | **Done** | Merged by the owner (PR #50). `main` **red** on one timing-dependent test of this task, fixed by E00-T07d (run 38138989218; the pull request's head was green, run 38093609496, same tree; D-105). pg-boss 12.37.1 in `src/db/queue.ts`: its schema by migration 0005 with fixed table names, never changed while it runs; a failed job keeps a code; the worker refuses a login past the policies; a heartbeat once a minute; SIGTERM stops it. Leftovers → E00-T07d (the red test), E02-T06 and E02-T07 (`message` ×3: the job's signal, `expireInSeconds`, the queue's warnings), E00-T07c (the monitor's timings, the host's stop wait), `docs/runbook.md` (two `none` corrections); one struck. See `handoffs/E00-T07b.md` |
+| E00-T07d | The job-past-its-time test does not depend on timing | builder | normal | **Ready** | New in E00-T07b's Done pass (owner, D-105): `main` is red on one test that asserts a fixed number of handler runs. A test only, no product code; `/pipeline E00-T07d`. See `handoffs/E00-T07d.md` |
+| E00-T07e | The start-up refusals' last gaps | builder | critical | **Ready** | Out of E00-T07c (owner, D-105): E00-T07a's three `data` findings — the health check judging `current_user`, `BETTER_AUTH_TRUSTED_ORIGINS` not refused, the clinic cookie's Secure read from the `https://` prefix. Needs no Render account. After E00-T07d. See `handoffs/E00-T07e.md` |
+| E00-T07c | Staging on Render | builder + owner | critical | Planned | From E00-T07 (D-102). The smallest paid plans for the web, the worker and the database (owner, 2026-10-11, D-105); owner: the Render and monitor accounts next ("Owner actions", Q-07). A database that lowers Cyrillic (E01-T02a); the sign-in limit's client address (E00-T02); the setup link out of the host's logs (E00-T05b); the heartbeat's monitor and its timings, and the host's wait against the worker's 20 s (E00-T07b). The refusals' last gaps are E00-T07e. Refined when the owner has the accounts |
 | E00-T12 | The logger's net before messaging | builder | normal | Planned | Before E02 (owner, 2026-10-03): `URL` and `Buffer` values, the messaging and link names, the plurals of whole names (E00-T01, E00-T05b; D-102) |
 
 ## E01 · Scheduling (M1)
@@ -214,10 +218,11 @@ Outline. Needs E07-T00.
 - E00-T06b · Playwright and the first end-to-end journey (J1) · merged 2026-10-09 (PR #44)
 - E00-T05b · `clinic:create`: the operator's script for a new clinic · merged 2026-10-10 (PR #46)
 - E00-T07a · The image, the health check and the start-up refusals · merged 2026-10-10 (PR #48)
+- E00-T07b · The worker and its job queue · merged 2026-10-11 (PR #50)
 
 ## Owner actions (standing)
 
 - **GitHub Actions budget (D-075):** when the free minutes run out, add a payment method and a small budget (for example $10 a month), then decide on GitHub Pro (R-34). Optional: in the repository's Settings → Actions, require actions pinned to a full commit SHA and allow only GitHub's and pnpm's actions
 - **Meta Business account, start now (long lead time):** create it, begin business verification, obtain one WhatsApp sending number for the product (D-055, D-056, R-28)
-- **Owner decides, before E00-T07c: staging's cost on Render (D-102).** Render has no free worker, its free database is deleted after 30 days with no backups, and free services have no shell for `clinic:create`. Recommended: the smallest paid plans for the web, the worker and the database; or only the worker paid (the free web sleeps after 15 idle minutes, the free database is rebuilt every 30 days). The dashboard shows the price before you confirm
+- **Owner, before E00-T07c: the accounts (D-105).** The cost is decided: the smallest paid plan for the web, the worker and the database (owner, 2026-10-11). Still to do: create the Render account with those three services in Frankfurt, and the heartbeat monitor's account (Q-07). E00-T07c is refined once they exist
 - **E00-T02 test findings 5 and 7, still open:** finding 5 (the sign-in limit's client address is in E00-T07c; whether D-064 point 5, no per-account limit, stands: before E00-T07c) and finding 7 (self-rename: E04, or switch the route off sooner; on the Discovered list)
