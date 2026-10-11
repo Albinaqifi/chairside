@@ -53,6 +53,7 @@ Stack and reasons: `docs/architecture/overview.md`. First-time setup: `README.md
 | `pnpm db:reset` | Rebuild the local database from nothing: roles, database, every migration, then the seed. Refuses any non-local host, and URLs that do not all name the same host and port. |
 | `pnpm db:seed` | Add the seed (`src/db/seed/`): two invented clinics, a login for every role and a week of appointments, listed in `README.md`. The same guard as `db:reset`; a second run adds nothing. |
 | `pnpm clinic:create --name … --owner-email … --owner-name …` | The operator's script for a new clinic and its first owner (`src/db/clinic-create.ts`, D-101): writes as the app role, prints the one-time link where the owner chooses a password. On this machine; a database elsewhere only with `--remote-database`, on a host in the app's image. `docs/runbook.md`. |
+| `pnpm worker` | The worker (`src/worker/index.ts`, E00-T07b): the job queue (pg-boss) and a heartbeat a minute, against the database in `.env`; Ctrl+C stops it. Its log lines and its image command: `docs/runbook.md`. |
 | `pnpm db:migrate` | Apply pending migrations as the migration role. |
 | `pnpm db:generate --name <what>` | Generate a migration from changed `schema.ts` files. |
 | `pnpm build` · `pnpm start` | Production build · run it. |
@@ -106,7 +107,10 @@ src/proxy.ts          Moves the session forward and renews its cookie (D-067); n
                       a staff path never is one.
 src/modules/<name>/   All business logic. index.ts = public API, schema.ts = its tables.
 src/db/               Connection pool, withTenant, migrations/, migrate and reset scripts, the seed (seed/),
-                      `pnpm clinic:create` (clinic-create.ts), the health check's query (health.ts).
+                      `pnpm clinic:create` (clinic-create.ts), the health check's query (health.ts),
+                      the job queue (queue.ts: pg-boss stays in it and is never passed on, D-104).
+src/worker/           The worker's entry point (index.ts, D-103): the queue and its heartbeat, the start
+                      refusals, the stop on SIGTERM or SIGINT. Job handlers join it with E02.
 src/i18n/             next-intl's request configuration and the message file, en.json.
 src/lib/              Small shared pieces: clock, ids, logger, personal-fields.
 src/ui/               shadcn/ui components restyled to the tokens, the logo, the fonts, cn().
@@ -121,7 +125,7 @@ Dockerfile            The one image staging and production run (D-007, D-103): t
                       How to build and run it: `docs/runbook.md`.
 ```
 
-Create a folder only when it has content. Coming later: `src/worker` (E00-T07b).
+Create a folder only when it has content.
 
 ### Module rules (lint enforces them; `eslint-rules/architecture.test.ts` proves it)
 
@@ -245,9 +249,9 @@ task, unless product code on `main` would hit it today.
   `ctx.addIssue`, never by throwing: a thrown error is logged with its message, and `JSON.parse`,
   `BigInt()` and `new URL()` put their input in theirs.
 - Files Node runs directly (`src/db/migrate.ts`, `src/db/reset.ts`): import only packages and
-  relative `.ts` files, never `@/`. The seed (`src/db/seed/`) and `src/db/clinic-create.ts` run with
-  tsx and may import `@/` (D-090, D-101); tsx is a production dependency, so the image runs such a
-  script too, as `node --import tsx <file>` (D-103).
+  relative `.ts` files, never `@/`. The seed (`src/db/seed/`), `src/db/clinic-create.ts` and the
+  worker (`src/worker/index.ts`) run with tsx and may import `@/` (D-090, D-101); tsx is a production
+  dependency, so the image runs such a script too, as `node --import tsx <file>` (D-103).
 - Next.js 16 differs from older versions: read `node_modules/next/dist/docs/` before writing
   Next.js code. `AGENTS.md` holds the block `next dev` checks for; leave it.
 

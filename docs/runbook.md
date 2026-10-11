@@ -1,8 +1,9 @@
 # Runbook
 
 How the operator runs Chairside by hand. Started in E00-T05b (creating a clinic); E00-T07a added how
-to build the app's image and run it here; E00-T07c adds the host's part: how to run a command in the
-app's image on staging, and where its output goes.
+to build the app's image and run it here; E00-T07b the worker, its log lines and how it stops;
+E00-T07c adds the host's part: how to run a command in the app's image on staging, and where its
+output goes.
 
 ## Create a clinic and its first owner
 
@@ -78,9 +79,9 @@ the owner's password until it is used or expires. Close the terminal window afte
 ## Build the app's image and run it here
 
 Staging and production run one Docker image, made from `Dockerfile` (D-007, D-103). By default it
-runs the web (`next start`); with a command of its own it runs `clinic:create`; the worker's command
-comes with E00-T07b. The image holds no `.env` file and no secret, and is built without either: every
-setting comes from where it runs (`-e` below, the host's settings on a host).
+runs the web (`next start`); with a command of its own it runs `clinic:create` or the worker (below).
+The image holds no `.env` file and no secret, and is built without either: every setting comes from
+where it runs (`-e` below, the host's settings on a host).
 
 With Docker Desktop running, in the project's folder (the first build takes several minutes):
 
@@ -115,6 +116,22 @@ docker run --rm --network chairside_default -e DATABASE_URL=postgres://chairside
 
 It prints the clinic's id and the link, which opens on the web started above: the same
 `BETTER_AUTH_URL`.
+
+### Run the worker from the image
+
+The worker is the image's second process (D-102, D-103): the job queue, pg-boss, in the database's
+`pgboss` schema, and for now a heartbeat once a minute. It reads `DATABASE_URL` alone, the app's own
+login; no auth setting. The database must hold migration 0005 (`pnpm db:migrate`, or `pnpm db:reset`).
+On the database's network, as the web above, in any terminal:
+
+```
+docker run --rm --name chairside-worker --network chairside_default -e DATABASE_URL=postgres://chairside_app:local-app-password@db:5432/chairside chairside node --import tsx src/worker/index.ts
+```
+
+Within a few seconds it logs `worker started`, then a `heartbeat` line once a minute (below, "The
+worker"). Stop it with Ctrl+C, or `docker stop chairside-worker` from
+another window. On this machine without the image, `pnpm worker` runs the same against the database in
+`.env`.
 
 ### The health check: `/api/health`
 
@@ -151,3 +168,60 @@ answers `PATH`, `NODE_VERSION`, `YARN_VERSION`, `NEXT_TELEMETRY_DISABLED=1` and 
 dependencies, `src/` and `package.json`, `next.config.ts` and `tsconfig.json`; `.dockerignore` keeps
 every `.env` file, `.env.example` included, the end-to-end checks' session and the docs out of its
 build. It runs as the `node` user, never root.
+
+## The worker
+
+The second process beside the web (`src/worker/index.ts`, E00-T07b): the job queue, which E02's
+planner and dispatcher will use, and a heartbeat once a minute, which shows the queue fires on time,
+not only that the process lives. The monitor that listens for it comes with E00-T07c. How to start it:
+"Run the worker from the image" above, or `pnpm worker`.
+
+### Its log lines
+
+One JSON line per event, each with a `code`, never a patient's details:
+
+| Code | Level | When |
+|---|---|---|
+| `worker_started` | info | The database answered, the queue runs and the heartbeat is scheduled. |
+| `heartbeat` | info | Once a minute, within about half a minute after the minute turns (pg-boss looks at its schedules every 30 s), with `at`, the time it ran, and nothing else. |
+| `worker_stopping` | info | A stop signal came: `signal` is `SIGTERM` or `SIGINT`. |
+| `worker_stopped` | info | The queue stopped and both of its connection pools closed; the process ends, exit code 0. |
+| `job_failed` | error | A job's handler threw. The error is in this line, with the queue and the job's id; the job's row keeps only `job_failed` (the queue's tables serve every clinic), and pg-boss runs it twice more. |
+| `queue_error` | error | One of the queue's passes failed (a poll, a schedule, its upkeep); it tries again on the next. Many in a row: the database is gone, or a grant is missing. |
+| `worker_failed` | error | Something unexpected after the start, such as the heartbeat's schedule failing: the line holds the error, exit code 1. |
+
+It does not start, and ends with exit code 1 after one line, `worker not started`, with one of:
+
+| Code | What to fix |
+|---|---|
+| `database_unreachable` | The database did not answer through `DATABASE_URL`; the line holds the error. The queue never started. |
+| `database_login_past_policies` | `DATABASE_URL` logs in as a role that gets past the clinics' row rules, as for the web's health check above. Use `chairside_app`. The queue never started. |
+| `queue_not_installed` | The database has no `pgboss` schema: migration 0005 is not applied. Run the migrations. |
+| `queue_version_mismatch` | The `pgboss` schema is at another version than this pg-boss's (45): the code and the migrations disagree. Deploy them together. |
+| `queue_start_failed` | Anything else that stopped the queue starting; the line holds the error. |
+
+A host restarts a worker that ended, so a refusal repeats until it is fixed.
+
+### How it stops
+
+`docker stop` and a host's stop send SIGTERM; Ctrl+C sends SIGINT, on Windows too. Either way the
+worker logs `worker stopping`, takes no new job, waits up to 20 s for a job that is running, closes its
+connections, logs `worker stopped` and ends with exit code 0. A job still running after 20 s goes back
+to the queue: its row says `retry`, with pg-boss's words "pg-boss shut down while active", and it runs
+again on the next start. On this machine a second signal while it stops ends it at once; in the image,
+where Node.js is process 1, a second one changes nothing, and the host kills it when its wait is over.
+
+Render waits 30 s after its stop signal before it kills a process (E00-T07c checks it), which leaves
+the 20 s room. `docker stop` waits only 10 s: `docker stop --time 30 chairside-worker` gives it the
+host's 30 s.
+
+### Upgrading pg-boss
+
+pg-boss is pinned at 12.37.1, whose schema is version 45 (D-104). The worker runs it with
+`migrate: false`, so it never changes its schema itself, and the app role could not. An upgrade is a new
+migration in the same change: the SQL pg-boss's `getMigrationPlans('pgboss', 45)` gives, read and
+committed as 0005 was (without its own `BEGIN;` and `COMMIT;`, nothing named after a day), with the
+pinned version in `package.json`. A worker of the old version then refuses the new schema, and the new
+one the old, both with `queue_version_mismatch`: deploy the migration and the worker together.
+`src/db/pgboss-migration.test.ts` reads migration 0005 against the installed pg-boss, so it fails on an
+upgrade: the reminder, and the model for the new migration's own check.

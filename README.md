@@ -110,6 +110,7 @@ run `pnpm db:reset` to move it to the current week.
 | `pnpm db:reset` | Deletes the local database, builds it again from the migrations and fills it with the seed. |
 | `pnpm db:seed` | Adds the seed to the local database. A second run adds nothing. |
 | `pnpm clinic:create --name … --owner-email … --owner-name …` | Creates a clinic and its first owner, and prints the one-time link where the owner chooses their password. `docs/runbook.md` says how. |
+| `pnpm worker` | Runs the worker: the job queue and a heartbeat line once a minute. Ctrl+C stops it. `docs/runbook.md` lists its log lines. |
 | `pnpm format` | Fixes code formatting. |
 | `docker compose stop` | Stops the database. Your data stays until the next `db:reset`. |
 
