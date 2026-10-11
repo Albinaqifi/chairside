@@ -85,7 +85,7 @@ real patient data.
 | D11 | **"Opened" statuses** imply email tracking pixels, which the architecture's privacy rules exclude. | Only our own link opens are recorded. D-034. |
 | D12 | **Marketing consent from a spreadsheet column** ("Newsletter? yes" becomes "214 agreed to offers") with no proof. | The wizard requires the clinic to confirm it holds proof; otherwise consent is "unknown" = no. E04. |
 | D13 | **US formats and English only** in the demo; the architecture's examples are Serbian. | D-015, Q-01, Q-10. |
-| D14 | **"The calendar updates itself"** when a patient confirms. No mechanism was described. | Polling. D-041. |
+| D14 | **"The calendar updates itself"** when a patient confirms. No mechanism was described. | Polling. D-041. Since D-108 (owner): the calendar reads its day again when someone uses it, never on a timer, so a screen nobody uses still signs out. |
 | D15 | **Fonts loaded from Google** in the demo. | Self-hosted. D-009. |
 | D16 | **File storage** adds a service and a sub-processor for 10 MB spreadsheets. | Dropped in v1. D-008. |
 | D17 | **Moved or clinic-cancelled appointments:** does the patient get told? Neither file says. | Staff tell the patient in v1; automatic notices in v1.1. D-045. |

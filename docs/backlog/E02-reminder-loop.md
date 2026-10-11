@@ -271,7 +271,7 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 - [ ] GET of any patient page changes nothing in the database (asserted).
 - [ ] Confirm twice → one confirmation, same result page.
 - [ ] Cancel before the cut-off works; after it is refused with the "call us" page.
-- [ ] The calendar shows the new status within its refresh interval.
+- [ ] The calendar shows the new status the next time someone uses it (D-108: never on a timer).
 - [ ] The page makes no third-party request and sets no staff cookie.
 - [ ] Works at 320 px width; passes the automated accessibility check.
 - [ ] Audit rows show actor "patient via link".

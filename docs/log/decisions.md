@@ -2022,3 +2022,49 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** pg-boss's schedule sends occurrences differently (an upgrade); the file's other
   cases, which all expect `jobsOf(queue)` to hold exactly one row, are made boundary-proof too (a
   Discovered line of this task); E02 gives a test a way to send one job without a schedule.
+
+### D-107 · E00-T07d Done: every case of the queue test file follows its own job (owner); a test that pg-boss's clock drives never counts a queue
+- **Origin:** E00-T07d's Done pass, 2026-10-11 (PR #52 merged; `main` green, run 38169317311).
+  D-106's "Revisit if" is met: fix round 1 found the file's first case red at a minute boundary on
+  the task's own pull request (run 38153768052), and the owner widened the task to the whole file
+  (option 1, `handoffs/E00-T07d.md`).
+- **What:**
+  - Every case of `tests/integration/queue.test.ts` follows the job its handler got, by id; a job a
+    boundary adds is only checked to be waiting. No case reads its queue as one row.
+  - **D-106's wording, corrected here** (D-106 stays as written): "No count of runs is written in
+    the test any more" holds for a queue's runs. The job a case follows is pinned to three runs, a
+    claim and pg-boss's two default retries (`retry_limit` 2, migration 0005): deterministic, and it
+    pins that default.
+  - **A convention** (`test-strategy.md`, principle 3): a test whose jobs pg-boss sends on the
+    database's clock follows the job it means, by id, and never counts a queue's jobs or runs. A
+    review check.
+- **Why:** a count of a minute schedule's jobs measures the wall clock: the file went red about one
+  run in six to ten with nothing wrong, and a red run on `main` hides the next real failure (D-105).
+- **Revisit if:** `tests/integration/worker.test.ts`'s two stop-signal cases, which still read their
+  scheduled queue as one row (rare: fix round 2's probes of the same shape never met a second job),
+  go red with two jobs: they follow their job the same way; E02 gives a test a way to send one job
+  without a schedule (D-106).
+
+### D-108 · The calendar reads its day again when it is used, never on a timer (owner); E01-T04 split in two; the day helpers in one place
+- **Origin:** E01-T04's Ready pass, inside E00-T07d's Done pass, 2026-10-11 (`handoffs/E01-T04a.md`).
+  D-041's refresh every 30 seconds would keep a session alive on a screen nobody uses, which D-067
+  ("nothing renews the session in the background") and `security-privacy.md` section 2 (sessions
+  end after 30 minutes of inactivity, clinic computers are shared) do not allow.
+- **What:**
+  - **Owner, 2026-10-11:** the calendar reads its day again when someone uses it (the window
+    regains focus or becomes visible, a pointer, a key or a touch on the page), at most once every
+    30 seconds, and whenever the day changes. Never on a timer: a page nobody touches asks the server
+    nothing, so the 30-minute sign-out holds. This replaces D-041's mechanism; E02-T09's "within its
+    refresh interval" becomes "the next time someone uses the calendar".
+  - **E01-T04 is split in two:** E01-T04a, the day view (the day's data from four modules, the grid,
+    the hours, Previous / Today / Next), and E01-T04b, the provider filter, a linked provider's own
+    column, the "now" line and the reading on use. As one task, about 700 lines of product code,
+    against the Definition of Ready's 400.
+  - `isCalendarDay`, `dayInZone`, `addDays` and `isoWeekday` move to `src/lib/calendar-day.ts`; the
+    seed and the patients module use them from there (E01-T02a's leftover: no third copy).
+- **Why:** patient data safety beats a calendar that changes while nobody looks (`intent.md`, "How to
+  decide", 1); a timer that does not count as use needs the proxy to tell it apart, a change to login
+  for one screen; in E01 only staff change appointments, and the database refuses a double booking
+  (D-020).
+- **Revisit if:** E02 (patients confirm and cancel by link) needs a screen to change while nobody
+  touches it; the receptionist trial (Q-09) finds the calendar stale.
