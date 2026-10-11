@@ -18,6 +18,9 @@ import { emptyJobQueue, migratorPool, withoutGrant } from './fixtures';
 // reaches a test's handler through a schedule, as the heartbeat's do: the worker sends no other job
 // yet (E02). Each test has a queue of its own, and starts with the queue's tables empty. The worker
 // around it (its refusals, its heartbeat, its stop signals): worker.test.ts.
+// E00-T07d: a schedule sends a job at once, and another at every minute boundary its queue is worked
+// over (D-106), so no case counts the jobs of its queue: each follows the job its handler got first,
+// by that job's id, and any other is one a boundary sent.
 
 const migrator = migratorPool();
 
@@ -97,6 +100,17 @@ async function jobsOf(queue: string) {
 }
 
 /**
+ * Every job of a stopped queue but the ones its handler got (`named`) is waiting, untouched: one the
+ * schedule sent at a minute boundary inside the case (D-106), too late for the handler. The stop
+ * neither ran it nor failed it.
+ */
+function expectOthersWaiting(jobs: Awaited<ReturnType<typeof jobsOf>>, named: string[]): void {
+  for (const job of jobs.filter(({ id }) => !named.includes(id))) {
+    expect(job).toMatchObject({ state: 'created', data: null });
+  }
+}
+
+/**
  * The `pgboss` schema as the catalog describes it: every relation and its kind, every column with its
  * type, default and nullability, every index, constraint and function definition, and the enum's
  * values. Equal before and after a run: the run changed nothing in the schema.
@@ -134,7 +148,7 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
     });
     await vi.waitFor(
       async () => {
-        expect(worked).toHaveLength(1);
+        expect(worked.length).toBeGreaterThan(0);
         const { rows } = await migrator.query(
           `select q.monitor_claim_on is not null as monitored, q.maintain_on is not null as maintained,
                   v.cron_on is not null as scheduled, v.flow_on is not null as flowed
@@ -152,9 +166,13 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
 
     expect(lines().filter((line) => line.level !== 'info')).toEqual([]);
     expect(await schemaOfQueue()).toEqual(before);
-    expect(await jobsOf(queue)).toEqual([
-      expect.objectContaining({ id: worked[0], state: 'completed', data: null }),
-    ]);
+    // Every job the handler got, each once, completed and with no data (a schedule sends none): the
+    // schedule's first, and its next when a minute boundary fell inside the case.
+    const jobs = await jobsOf(queue);
+    expect(jobs.filter(({ id }) => worked.includes(id))).toEqual(
+      worked.map((id) => expect.objectContaining({ id, state: 'completed', data: null })),
+    );
+    expectOthersWaiting(jobs, worked);
     const instances = await migrator.query(
       'select stopped_on is not null as stopped from pgboss.instance',
     );
@@ -188,39 +206,52 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
     'keeps job_failed in the row of a job whose handler throws $thrown, and the error in one log line per attempt',
     async ({ fail }) => {
       const queue = freshQueue();
-      const thrown: unknown[] = [];
+      const thrown: { jobId: string; error: unknown }[] = [];
       expect(await startQueue({ timings: FAST })).toBeNull();
       await scheduleJob(queue, '* * * * *');
-      await workJobs(queue, async () => {
+      await workJobs(queue, async (job) => {
         try {
           await fail();
         } catch (error) {
-          thrown.push(error);
+          thrown.push({ jobId: job.id, error });
           throw error;
         }
       });
-      // pg-boss runs a job three times (two retries, its default) before it fails for good.
-      await vi.waitFor(
-        async () => expect(await jobsOf(queue)).toMatchObject([{ state: 'failed' }]),
-        {
-          timeout: 20_000,
-          interval: 250,
+      // pg-boss runs a job three times (two retries, its default) before it fails for good. Waits
+      // for the first job the handler ran to have failed for good, by its id.
+      const jobId = await vi.waitFor(
+        async () => {
+          const first = thrown[0];
+          expect(first).toBeDefined();
+          const row = (await jobsOf(queue)).find((job) => job.id === first?.jobId);
+          expect(row).toMatchObject({ state: 'failed' });
+          return first?.jobId ?? '';
         },
+        { timeout: 20_000, interval: 250 },
       );
       await stopQueue();
 
-      const [job] = await jobsOf(queue);
-      expect(job?.output).toEqual({ name: 'Error', message: JOB_FAILED });
-      expect(job?.row).not.toContain(MARKER);
-      expect(thrown).toHaveLength(3);
-      if (thrown[0] instanceof Error && 'detail' in thrown[0]) {
-        expect(thrown[0]).toMatchObject({ code: '23514', detail: expect.stringContaining(MARKER) });
+      const jobs = await jobsOf(queue);
+      expect(jobs.find((job) => job.id === jobId)?.output).toEqual({
+        name: 'Error',
+        message: JOB_FAILED,
+      });
+      // No row of the queue holds a word the handler threw: not this job's, and not another job's.
+      expect(jobs.filter((job) => job.row.includes(MARKER))).toEqual([]);
+      expect(thrown.filter((run) => run.jobId === jobId)).toHaveLength(3);
+      const firstError = thrown[0]?.error;
+      if (firstError instanceof Error && 'detail' in firstError) {
+        expect(firstError).toMatchObject({
+          code: '23514',
+          detail: expect.stringContaining(MARKER),
+        });
       }
+      // One line per run, of every job the handler ran, each with that run's job and error.
       const failures = lines().filter((line) => line.fields.code === JOB_FAILED);
       expect(failures).toEqual(
-        thrown.map((err) => ({
+        thrown.map((run) => ({
           level: 'error',
-          fields: { code: JOB_FAILED, queue, jobId: job?.id, err },
+          fields: { code: JOB_FAILED, queue, jobId: run.jobId, err: run.error },
           message: 'job failed',
         })),
       );
@@ -233,10 +264,12 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
   it('waits for a running job to finish before it stops, then ends its pool', async () => {
     const queue = freshQueue();
     const started = signal();
+    const ran: string[] = [];
     let finished = false;
     expect(await startQueue({ timings: FAST })).toBeNull();
     await scheduleJob(queue, '* * * * *');
-    await workJobs(queue, async () => {
+    await workJobs(queue, async (job) => {
+      ran.push(job.id);
       started.resolve();
       await sleep(1_500);
       finished = true;
@@ -246,7 +279,9 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
     await stopQueue(10_000);
 
     expect(finished).toBe(true);
-    expect(await jobsOf(queue)).toMatchObject([{ state: 'completed' }]);
+    const jobs = await jobsOf(queue);
+    expect(jobs.find((job) => job.id === ran[0])).toMatchObject({ state: 'completed' });
+    expectOthersWaiting(jobs, ran);
     const pools = ends.mock.contexts as pg.Pool[];
     expect(pools.filter((pool) => pool.options.application_name?.startsWith('pgboss:'))).toEqual([
       expect.objectContaining({ ended: true }),
@@ -256,10 +291,12 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
   it('hands a job still running when the timeout ends back to the queue, and aborts its signal', async () => {
     const queue = freshQueue();
     const started = signal();
+    const ran: string[] = [];
     let aborted = false;
     expect(await startQueue({ timings: FAST })).toBeNull();
     await scheduleJob(queue, '* * * * *');
     await workJobs(queue, async (job) => {
+      ran.push(job.id);
       started.resolve();
       await Promise.race([
         new Promise((resolve) => job.signal.addEventListener('abort', resolve, { once: true })),
@@ -276,9 +313,12 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
     expect(took).toBeLessThan(10_000);
     await vi.waitFor(() => expect(aborted).toBe(true));
     // Back in the queue: a retry the next start runs, with pg-boss's own words for why, no error.
-    expect(await jobsOf(queue)).toMatchObject([
-      { state: 'retry', output: { value: 'pg-boss shut down while active' } },
-    ]);
+    const jobs = await jobsOf(queue);
+    expect(jobs.find((job) => job.id === ran[0])).toMatchObject({
+      state: 'retry',
+      output: { value: 'pg-boss shut down while active' },
+    });
+    expectOthersWaiting(jobs, ran);
   });
 
   // Tester (E00-T07b): "goes back to the queue" in full, as docs/runbook.md says: it runs again on
@@ -286,15 +326,17 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
   it('runs a job handed back at a stop again on the next start', async () => {
     const queue = freshQueue();
     const started = signal();
+    const stopped: string[] = [];
     expect(await startQueue({ timings: FAST })).toBeNull();
     await scheduleJob(queue, '* * * * *');
     await workJobs(queue, async (job) => {
+      stopped.push(job.id);
       started.resolve();
       await new Promise((resolve) => job.signal.addEventListener('abort', resolve, { once: true }));
     });
     await started.promise;
     await stopQueue(1_000);
-    const [handedBack] = await jobsOf(queue);
+    const handedBack = (await jobsOf(queue)).find((job) => job.id === stopped[0]);
     expect(handedBack).toMatchObject({ state: 'retry' });
 
     const ran: string[] = [];
@@ -363,7 +405,12 @@ describe('the job queue as the app role', { timeout: 60_000 }, () => {
         { timeout: 20_000, interval: 250 },
       );
     });
-    await vi.waitFor(() => expect(worked).toHaveLength(1), { timeout: 20_000, interval: 250 });
+    // With the grant back it works the schedule's job (and the next, when a minute boundary fell
+    // inside the case).
+    await vi.waitFor(() => expect(worked.length).toBeGreaterThan(0), {
+      timeout: 20_000,
+      interval: 250,
+    });
   });
 
   // Critical review (E00-T07b): a job fails too when its handler runs past the queue's
