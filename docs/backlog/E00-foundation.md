@@ -7,8 +7,8 @@ clinics cannot see each other's data, and every change is checked automatically.
 Getting them right once, with tests, is cheaper than fixing them under features.
 
 Order: T01 → T02 → T03 → T08 → T06a → T09 → T10 → T11 → T04a → T04b → T05a → E01-T01a → E01-T01b
-→ T04c → T04d → T04e → E01-T02a → E01-T02b → T06b → T05b → T07a → T07b → T07d → T07e → T07c, then
-the rest of E01, and T12 before E02 (D-087, D-090, D-091, D-093, D-096, D-102, D-105). T08 is the second half of T03
+→ T04c → T04d → T04e → E01-T02a → E01-T02b → T06b → T05b → T07a → T07b → T07d → T07e → T07f → T07c,
+then the rest of E01, and T12 before E02 (D-087, D-090, D-091, D-093, D-096, D-102, D-105, D-109). T08 is the second half of T03
 (split in D-071), so it sits right after T03 in this file. T06 is split in two (D-075): CI (T06a) comes first, Playwright and journey J1
 (T06b) after T04 and T05a; the journeys' clock (T06c, D-100) comes before the first journey that
 sets "now", E01-T11's or E02-T14's. T09 and T10 come from E00-T08's review and test (D-076, D-077), T11 from
@@ -20,7 +20,10 @@ health check (T07a), the worker and its job queue (T07b), staging on Render (T07
 E07-T03 (owner). T07d and T07e come out of T07b's Done pass (D-105): T07d makes T07b's one
 timing-dependent test deterministic, which a red run on `main` showed, and T07e builds the three
 `data` start-up refusals that were T07c's, so they do not wait for a Render account. T07c itself
-keeps the host, its database, the monitor and the runbook, on the smallest paid plans (owner, D-105). T12, the logger's net, comes from
+keeps the host, its database, the monitor and the runbook, on the smallest paid plans (owner, D-105).
+T07f comes out of T07e's Done pass (D-109): the auth library's origin check stays on whatever the
+environment says; it needs no account but runs right before T07c, the rest of E01 going first until
+the accounts exist (owner). T12, the logger's net, comes from
 three Discovered lines of E00-T01 and E00-T05b (D-102). E01-T01a, E01-T01b, E01-T02a and E01-T02b
 come before T06b and T07, so a receptionist sees a patient list before Playwright and staging exist; T04c, T04d
 and T04e come before E01-T02a, which depends on them (D-087, D-093, D-096). The tasks sit in this
@@ -1656,11 +1659,71 @@ restarts, so the failure is loud, not silent (E00-T07b builder, known gap 3, wei
 
 ---
 
+### E00-T07f · The auth library's origin check stays on
+
+- **Role:** builder · **Risk:** critical (login and sessions: which site a sign-in or a sign-out may
+  come from, and the CSRF checks on the auth library's routes; production configuration: what a
+  host's settings may switch off) · **Depends on:** E00-T07e (Done)
+- **Read:** `security` (Part 1, sections 7 and 8) · D-063, D-105, D-109 · the architect section of
+  `handoffs/E00-T07f.md`
+
+**Why.** D-063 makes `BETTER_AUTH_URL` the only origin a sign-in may come from, and E00-T07e refuses
+the auth library's own list of other origins. better-auth 1.7.7 has one more way past that rule: it
+skips its origin check, and with it its CSRF checks, whenever `NODE_ENV` is `test` or `TEST` holds
+anything but `false` (even `0`), on a host too. A host whose settings carry either takes a sign-in or
+a sign-out from any site. Vitest sets both for every run, so no test has ever run the check.
+E00-T07e's review found it (`data`); the owner placed it right before staging (D-109).
+
+**Do.**
+1. **The checks are on whatever the environment says** (`src/modules/auth/better-auth.ts`,
+   `createAuth()`): `advanced.disableOriginCheck: false` and `advanced.disableCSRFCheck: false`, with a
+   comment that says why, in the voice of the rate limit's "On in every environment". The library
+   takes an explicit value before its own test detection; the CSRF switch is written too, so a later
+   version that stops tying it to the origin switch (its deprecation notice says one will) cannot
+   leave it to the environment. No start-up refusal and no new code: vitest sets `TEST`, and every
+   test runs with `NODE_ENV=test` (D-109).
+2. **Integration cases through the library's own handler**, as `auth-attacks.test.ts` sends its
+   requests; they run with `NODE_ENV=test` and `TEST=true`, the very settings that switch the check
+   off today, so each case fails without item 1. A sign-in with the right password is refused (403)
+   when its `Origin` names another site, when only its `Referer` does, and as a cross-site navigation
+   (`Sec-Fetch-Site: cross-site`, `Sec-Fetch-Mode: navigate`); none makes a session row or a
+   `user.logged_in` row. A sign-out carrying the session cookie with no `Origin`, or with
+   `Origin: null`, is refused and the session stays. From `BETTER_AUTH_URL`'s origin both work as
+   before. The library `createAuth()` makes answers `skipOriginCheck` and `skipCSRFCheck` false.
+   `auth-attacks.test.ts`'s opening comment says the library skips its origin check under test, which
+   is no longer true: correct it, a comment only, no case changes.
+- **Docs.** `security-privacy.md` section 7 (the only origin) and section 8 (CSRF protection): the
+  auth library's origin and CSRF checks stay on whatever `NODE_ENV` or `TEST` say (E00-T07f).
+
+**Out of scope.** A start-up refusal of `TEST` or `NODE_ENV` (above). Changing any existing test:
+none needs a header or anything else (the architect's probe). The library's other readings of the
+environment: each decides a default `createAuth()` already sets (the rate limit, the base URL, the
+secret, the cookies' Secure) or only how an error page looks; `getIP()`'s fallback to `127.0.0.1`
+under test or development counts more requests together, not fewer (the client address is
+E00-T07c's, R-33). `trustedOrigins` (E00-T07e refuses the list). Render and everything else in
+E00-T07c.
+
+**Acceptance.**
+- [ ] Through the library's handler, in the integration tests: a sign-in with the right password
+      from another site's `Origin`, from another site's `Referer` alone, and as a cross-site
+      navigation answers 403, with no session row and no `user.logged_in` row; a sign-out with the
+      session cookie and no `Origin`, or `Origin: null`, answers 403 and the session stays; from
+      `BETTER_AUTH_URL`'s origin a sign-in and a sign-out work as before.
+- [ ] The library `createAuth()` makes has `skipOriginCheck` and `skipCSRFCheck` false while
+      `NODE_ENV` is `test` and `TEST` is `true` (integration test); with item 1 taken out, the cases
+      above fail (shown once in the handoff note).
+- [ ] Every existing unit and integration test passes unchanged: no request gains a header, and
+      nothing is removed, skipped or loosened. That includes every start-up refusal of E00-T07a and
+      E00-T07e.
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
+
+---
+
 ### E00-T07c · Staging on Render
 
 - **Role:** builder + owner · **Risk:** critical (production configuration and secrets: the host,
   its settings and its database; login: the client address the sign-in limit counts) ·
-  **Depends on:** E00-T07a, E00-T07b, E00-T07e · **Needs:** a Render account on the plans the owner
+  **Depends on:** E00-T07a, E00-T07b, E00-T07e, E00-T07f · **Needs:** a Render account on the plans the owner
   chose (D-105) and the monitor's account; Q-07 (working assumption accepted for staging)
 - **Read:** refined when the owner has those accounts: `overview` (Environments; Things that keep it
   running) · `security` (Part 1, sections 1, 2, 7 and 9) · D-007, D-013, D-044, D-063, D-064, D-075,
@@ -1694,9 +1757,10 @@ settled: the smallest paid plan for the web, the worker and the database (owner,
   would then hold a live link for 3 days. Find where a shell's or a job's output goes before the
   first staging clinic is made; the runbook says how to run it so that the link reaches only the
   operator's screen.
-- **The start-up refusals' last gaps are E00-T07e** (D-105), built before this task, so the host's
-  settings are written against them. Here only what the host needs: `BETTER_AUTH_URL` is its own
-  https address, and no `BETTER_AUTH_TRUSTED_ORIGINS` is set.
+- **The start-up refusals' last gaps are E00-T07e** (D-105), and the auth library's origin check
+  E00-T07f (D-109), both built before this task, so the host's settings are written against them.
+  Here only what the host needs: `BETTER_AUTH_URL` is its own https address, and no
+  `BETTER_AUTH_TRUSTED_ORIGINS` is set.
 - **The heartbeat's monitor** (D-013): an external check that alerts when the worker's heartbeat
   stops; the worker pings its URL each run. The service and its URL, a new secret setting, are the
   owner's (agent rule 4). What the monitor must allow for, measured in E00-T07b: on pg-boss's

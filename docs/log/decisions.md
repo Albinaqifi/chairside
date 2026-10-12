@@ -2068,3 +2068,24 @@ architecture), `changed` (differs from the original files), `process`.
   (D-020).
 - **Revisit if:** E02 (patients confirm and cancel by link) needs a screen to change while nobody
   touches it; the receptionist trial (Q-09) finds the calendar stale.
+
+### D-109 · E00-T07e Done: the auth library's origin and CSRF checks stay on whatever the environment says, as E00-T07f, right before staging (owner)
+- **Origin:** E00-T07e's Done pass, 2026-10-12 (PR #54 merged; `main` green, run 38190640837), from
+  its review's `data` line. The detail: E00-T07f's section and `handoffs/E00-T07f.md`.
+- **What:**
+  - better-auth 1.7.7 skips its origin check, and with it its CSRF checks, while `NODE_ENV` is `test`
+    or `TEST` holds anything but `false` (even `0`), on a host too: a sign-in is then taken from any
+    site, which D-063's "the only trusted origin" does not allow. Vitest sets both, so no test runs
+    the check today.
+  - **E00-T07f** gives `createAuth()` the library's own two switches, `advanced.disableOriginCheck`
+    and `disableCSRFCheck`, as `false`: an explicit value comes before the library's test detection,
+    so the checks run on every host and in every test. No fifth start-up refusal: vitest sets `TEST`
+    and runs every test with `NODE_ENV=test` (architect).
+  - **Owner, 2026-10-12:** E00-T07f runs right before E00-T07c, once the owner has the Render
+    accounts; the rest of E01 goes first. Order: T07e → T07f → T07c.
+- **Why:** the same hole as `BETTER_AUTH_TRUSTED_ORIGINS` (E00-T07e) through two other settings; one
+  change closes both, where a refusal would refuse the tests; no host exists before staging, and
+  staging holds invented data only.
+- **Revisit if:** a later better-auth decides these checks another way (its notice says
+  `disableOriginCheck` will stop switching the CSRF check); E01 is done before the accounts exist
+  (then the owner places E00-T07f again).
