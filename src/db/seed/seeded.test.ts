@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import type { CalendarDay } from './seed-day';
+import type { CalendarDay } from '@/lib/calendar-day';
 import { SEED_FILES, type SeedFile } from './seed-files';
 import { seededId } from './seeded';
 

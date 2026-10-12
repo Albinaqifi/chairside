@@ -4,7 +4,8 @@ import { closeDb } from '@/db/client';
 import { seedDatabase, seedDayOf, type SeedSummary } from '@/db/seed';
 import { scheduling } from '@/db/seed/02-scheduling';
 import { isFakeEmail, isFakePhone } from '@/db/seed/fake-data';
-import { addDays, isoWeekday, seedWeek } from '@/db/seed/seed-day';
+import { seedWeek } from '@/db/seed/seed-day';
+import { addDays, isoWeekday } from '@/lib/calendar-day';
 import {
   SEED_PASSWORD,
   SEEDED_CLINICS,

@@ -113,7 +113,8 @@ src/db/               Connection pool, withTenant, migrations/, migrate and rese
 src/worker/           The worker's entry point (index.ts, D-103): the queue and its heartbeat, the start
                       refusals, the stop on SIGTERM or SIGINT. Job handlers join it with E02.
 src/i18n/             next-intl's request configuration and the message file, en.json.
-src/lib/              Small shared pieces: clock, ids, logger, personal-fields.
+src/lib/              Small shared pieces: clock, ids, logger, personal-fields, calendar-day (a day
+                      `YYYY-MM-DD`: isCalendarDay, dayInZone, addDays, isoWeekday; D-108).
 src/ui/               shadcn/ui components restyled to the tokens, the logo, the fonts, cn().
 tests/integration/    Tests against real PostgreSQL, including the tenant meta-test.
 tests/e2e/            End-to-end journeys and checks in real browsers (Playwright, playwright.config.ts):
