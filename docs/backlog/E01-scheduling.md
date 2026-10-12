@@ -497,42 +497,69 @@ on use (E01-T04b). "No reply yet" (E02-T12). Drag and drop (later). An index for
 
 ### E01-T04b · Calendar: the filter, a provider's own column, the "now" line and a fresh day
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T04a
+- **Role:** builder · **Risk:** normal (a screen: the membership's provider, read in the clinic's
+  transaction, only picks the columns shown first; no table, policy, permission, wrapper, proxy or
+  session change) · **Depends on:** E01-T04a (Done)
 - **Read:** `scope` (Navigation and roles; Calendar) · `design-ref` (demo lines 228–232, 273–275;
-  logic 2094–2096) · D-067, D-091, D-098, D-108 · refined in E01-T04a's Done pass
+  logic 2094–2096) · D-049 (the 24-hour clock), D-067, D-091, D-098, D-108 · the architect section of
+  `handoffs/E01-T04b.md`
 
 **Why.** A dentist wants their own day, a receptionist the columns they book for, and both a day that
 is not stale when they look at it, without a screen that keeps itself signed in (owner, D-108). Split
-from E01-T04 (D-108).
+from E01-T04 (D-108). With two answers of the owner on E01-T04a's day view (2026-10-12): the 24-hour
+clock, as D-049 and the demo have it, before booking (E01-T05) adds times to choose; no lunch on a
+closed day.
 
 **Do.**
-- **The provider filter** (demo lines 228–232, logic 2094): a chip per column turns it off and on; the
-  last column on cannot be turned off. The choice holds while moving between days; kept in the page's
-  state, it is keyed by the page's clinic (D-098).
+- **The provider filter** (demo lines 228–232, logic 2094): a chip per column of the day, the
+  provider's short name (`providers.short_name`) beside a dot of its strong tint, a button whose
+  pressed state says whether its column shows; a click turns the column off or on. At least one column
+  of the day always shows: its last one on cannot be turned off, and a day on which the choice would
+  show none shows all. The choice holds over Previous, Today and Next; it is the page's state, keyed by
+  the page's clinic (D-098), so a reload starts again. The line under the title counts the columns
+  shown and their appointments.
 - **A provider's own column.** A member whose membership is linked to a provider
   (`memberships.provider_id`) opens the calendar on that column alone and can turn the others on; an
-  unlinked member opens on all. The link is read in the clinic's transaction, added to what
-  `activeMembership()` returns, not through `clinics_for_user()` (D-091, "Revisit if"); E01-T10 reads
-  the same.
-- **The "now" line** on today (demo lines 273–275): at the clinic's current time, moved each minute by
-  the browser without a request.
+  unlinked member opens on all. The link is read by the calendar's read in the clinic's transaction,
+  added to what `activeMembership()` returns, not through `clinics_for_user()` (D-091, "Revisit if");
+  E01-T10 reads the same.
+- **The "now" line** on today (demo lines 273–275): a line with a dot at its start, at the clinic's
+  current time in its zone, by the browser's clock, moved each minute by the browser without a request.
+  None on any other day, nor while the time is outside the grid.
 - **A fresh day when used** (owner, D-108): the page reads its day again when the window regains focus
   or becomes visible, or a pointer, a key or a touch is used on it, at most once every 30 seconds after
-  its last read; never on a timer. A session that has ended sends the next use to the login page.
+  its last read; never on a timer. The filter's choice survives the read. A session that has ended
+  sends the next use to the login page.
+- **No break on a closed day** (owner, 2026-10-12): a day with a `closed_days` row or without hours
+  shows no break; its appointments still show.
+- **The 24-hour clock** (D-049; owner, 2026-10-12): every time of day on every page as "09:00" and
+  "14:30", the calendar's hour labels as "08:00"; set once, for every page and client component, where
+  the request's configuration is (`src/i18n/request.ts`), not at each call. Dates stay as they are
+  ("Monday, October 12"). The tests that expect "9:00 AM" expect the 24-hour time instead: the format
+  only, no case removed or loosened (agent rule 8; the owner's answer). `CLAUDE.md`'s "Dates and times"
+  says so.
 
-**Out of scope.** A refresh while nobody uses the page (D-108: E02 may ask again). Anything E01-T04a
-leaves out.
+**Out of scope.** A refresh while nobody uses the page (D-108: E02 may ask again). The calendar in the
+accessibility check and in a journey (E01-T11). Times in messages (E02-T03). Anything E01-T04a leaves
+out: a click on a block or a slot (E01-T05, E01-T06), the week view (E01-T07).
 
 **Acceptance.**
-- [ ] The chips hide and show their columns; the last one on stays on; the choice holds over
-      Previous, Next and Today.
-- [ ] The seed's dentist and hygienist open on their own columns, the owner and the front desk on all.
+- [ ] The chips hide and show their columns, each a button that says whether its column shows; the
+      last one on stays on; a day on which the choice would show none shows all; the choice holds over
+      Previous, Next and Today; the line under the title counts what shows (tests).
+- [ ] The seed's dentist and hygienist open on their own columns and can turn the others on; the owner
+      and the front desk open on all (an integration test of the read as each; a test of the page).
 - [ ] An appointment changed in the database shows on the next use of the page once 30 seconds have
-      passed since its last read; a page left alone for a minute sends no request (an end-to-end
-      check that counts requests).
+      passed since its last read, and not on a use before; a page left alone for a minute sends no
+      request (an end-to-end check that counts requests, the browser's clock moved by Playwright).
 - [ ] With the session ended, the next use of the page shows the login page (end-to-end check).
-- [ ] The "now" line is at the clinic's time on today, moves within a minute without a request, and
-      is absent on any other day.
+- [ ] The "now" line is at the clinic's time on today, moves within a minute without a request, and is
+      absent on any other day and outside the grid (tests, the browser's clock set, a zone behind UTC
+      among them).
+- [ ] A closed day, by its `closed_days` row or without hours, shows no break and still shows its
+      appointments (test).
+- [ ] Every time of day is in the 24-hour clock: the calendar's blocks and hour labels, the patient
+      list's next visit, on the server and in the browser; dates unchanged (tests).
 - [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---
@@ -825,7 +852,10 @@ still shows them, E01-T04a).
 - **Read:** `test-strategy` (End-to-end journeys; Tenant isolation; Permissions) · all E01 handoff notes
 
 **Do.**
-- Playwright journey **J2** (front-desk day).
+- Playwright journey **J2** (front-desk day), through the calendar: it books, moves and changes
+  statuses there and finds each change on the day's grid (E01-T04a has no journey of its own,
+  `slice`). The accessibility check (E00-T06b) on every page J2 opens, as on J1's: no E01 screen is in
+  it yet (E01-T04a and E01-T08a left theirs out).
 - Exploratory testing of the whole epic: wrong roles, the second clinic, double clicks,
   keyboard-only booking, odd times (23:30, across midnight), daylight-saving dates, very long names.
 - Time five bookings of an existing patient by keyboard and report the median.
