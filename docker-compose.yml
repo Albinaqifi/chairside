@@ -1,6 +1,9 @@
 # Local development database. Staging and production use a managed PostgreSQL (D-007).
 # Start: docker compose up -d --wait   Stop: docker compose stop
-name: chairside
+# A second checkout of this repository on the same machine gives its container a name and a port
+# of its own through COMPOSE_PROJECT_NAME and DB_PORT in its .env (README.md, "Two checkouts on
+# one machine"); unset, as in the first checkout and in CI, these are `chairside` and 5433.
+name: ${COMPOSE_PROJECT_NAME:-chairside}
 
 services:
   db:
@@ -9,7 +12,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env first (see README.md)}
     ports:
       # Port 5433 on this machine only, so it does not clash with a locally installed PostgreSQL.
-      - '127.0.0.1:5433:5432'
+      - '127.0.0.1:${DB_PORT:-5433}:5432'
     volumes:
       - db-data:/var/lib/postgresql
     healthcheck:

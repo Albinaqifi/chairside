@@ -114,6 +114,26 @@ run `pnpm db:reset` to move it to the current week.
 | `pnpm format` | Fixes code formatting. |
 | `docker compose stop` | Stops the database. Your data stays until the next `db:reset`. |
 
+## Two checkouts on one machine
+
+Two copies of the repository can work side by side, for two tasks at once, when the second one
+gets its own database container and its own ports. Nothing else is shared: `pnpm install` and
+`pnpm build` are per folder, the Playwright browsers are installed once for the machine.
+
+1. Clone the repository again, into another folder (or `git pull` in a clone you already have).
+2. Copy the first checkout's `.env` into it, then edit the copy:
+   - in the three database URLs, replace `5433` with `5434` (all three must name the same port);
+   - add, without the leading `# `, the four lines at the end of `.env.example`:
+     `COMPOSE_PROJECT_NAME=chairside-b`, `DB_PORT=5434`, `E2E_APP_PORT=3200`, `E2E_DEV_PORT=3201`.
+3. In the second folder: `pnpm install`, `docker compose up -d --wait`, `pnpm db:reset`.
+
+`docker compose` reads that folder's `.env`, so the second checkout gets a container called
+`chairside-b-db-1` on port 5434 with a data volume of its own, and its `pnpm test:e2e` runs on
+ports 3200 and 3201. The first checkout changes nothing and keeps `chairside`, 5433, 3100 and 3101.
+
+Only one `pnpm dev` runs at a time: both checkouts use port 3000, and login trusts only the address
+in `BETTER_AUTH_URL`. Each checkout's `docker compose stop` stops only its own container.
+
 ## If something goes wrong
 
 - **`POSTGRES_PASSWORD` is missing** when starting Docker: step 3 was skipped. Create `.env`.
@@ -126,8 +146,8 @@ run `pnpm db:reset` to move it to the current week.
 - **`pnpm dev` answers "not found" for a page that exists:** Next.js sometimes starts that way on
   Windows. Save the page's file (no change needed), or stop and start `pnpm dev` again.
 - **Cannot connect to the database:** start Docker Desktop, then `docker compose up -d --wait`.
-- **Port 5433 is already in use:** another program uses it. Stop that program, or change the
-  port in `docker-compose.yml` and in the three database URLs in `.env`.
+- **Port 5433 is already in use:** another program uses it. Stop that program, or set `DB_PORT` in
+  `.env` to a free port and use that port in the three database URLs there too.
 
 ## Working on this project
 
