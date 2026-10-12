@@ -310,6 +310,145 @@ test.describe('a fresh day when the page is used (acceptance 3)', () => {
     }
   });
 
+  /** Adds a "Checkup" at 09:00 on `day` with the seeded dentist, for one check; returns its id. */
+  async function addCheckup(day: string): Promise<string> {
+    const { rows } = await db.query<{ id: string }>(
+      `select id from patients where clinic_id = $1 order by id limit 1`,
+      [SEEDED_CLINICS.harbourStreet],
+    );
+    const patientId = rows[0]?.id;
+    if (!patientId) throw new Error('The seeded clinic has no patient.');
+    const { rows: added } = await db.query<{ id: string }>(
+      `insert into appointments (id, clinic_id, patient_id, provider_id, title, starts_at, ends_at,
+                                 status, source, created_by)
+       values (gen_random_uuid(), $1, $2, $3, 'Checkup', $4, $5, 'booked', 'staff', $6)
+       returning id`,
+      [
+        SEEDED_CLINICS.harbourStreet,
+        patientId,
+        SEEDED_PROVIDERS.harbourStreetDentist,
+        skopje(day, '09:00'),
+        skopje(day, '09:30'),
+        SEEDED_PEOPLE.frontDesk.id,
+      ],
+    );
+    const id = added[0]?.id;
+    if (!id) throw new Error('The appointment was not added.');
+    return id;
+  }
+
+  test('Back from another page to a day read a minute before: the first use reads it; Back a moment after its read: no read', async ({
+    page,
+  }, testInfo: TestInfo) => {
+    // E01-T04b tester, after fix round 1: Back from Patients draws the calendar anew (a remount), with
+    // the day Next.js's router kept. Each browser's own day, which no other check writes on.
+    const own: Record<string, { day: string; title: string }> = {
+      chromium: { day: '2031-03-26', title: 'Wednesday, March 26, 2031' },
+      firefox: { day: '2031-03-27', title: 'Thursday, March 27, 2031' },
+      webkit: { day: '2031-03-28', title: 'Friday, March 28, 2031' },
+    };
+    const days = own[testInfo.project.name];
+    if (!days) throw new Error(`No day for the browser ${testInfo.project.name}.`);
+    const id = await addCheckup(days.day);
+    const heading = page.getByRole('heading', { level: 1 });
+    const block = page.locator('li[data-status]');
+    const patients = page
+      .getByRole('navigation', { name: messages.shell.navigation })
+      .getByRole('link', { name: messages.nav.patients, exact: true });
+    try {
+      await page.clock.install();
+      await page.goto(`${APP}/calendar?day=${days.day}`);
+      await expect(block).toContainText('Checkup');
+      await hydrated(page, chips(page).first());
+      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+      const sent = countRequests(page);
+
+      // Patients, then Back at once: the day was read a moment ago, so a use does not read it.
+      await patients.click();
+      await expect(page).toHaveURL(`${APP}/patients`);
+      await page.goBack();
+      await expect(heading).toHaveText(days.title);
+      await hydrated(page, chips(page).first());
+      await usePage(page);
+      await page.waitForTimeout(500);
+      expect(sent.reads(), 'no read of a day read a moment ago').toBe(0);
+
+      // Patients, the appointment changed, a minute on, Back: the first use reads the day, once.
+      await patients.click();
+      await expect(page).toHaveURL(`${APP}/patients`);
+      await db.query(`update appointments set title = 'Filling' where id = $1`, [id]);
+      await page.clock.fastForward(60_000);
+      await page.goBack();
+      await expect(heading).toHaveText(days.title);
+      await expect(block).toContainText('Checkup');
+      await hydrated(page, chips(page).first());
+      await usePage(page);
+      await expect(block).toContainText('Filling');
+      expect(sent.reads(), 'Back from Patients: one read on the first use').toBe(1);
+      await usePage(page);
+      await page.waitForTimeout(500);
+      expect(sent.reads(), 'no second read right after it').toBe(1);
+      await page.waitForLoadState('networkidle');
+    } finally {
+      await db.query(`delete from appointments where id = $1`, [id]);
+    }
+  });
+
+  test('a day read on use, then Next and Back: it shows that read and counts 30 seconds from it, not from Back', async ({
+    page,
+  }, testInfo: TestInfo) => {
+    // E01-T04b tester, after fix round 1: Back to a day a read on use brought shows that read's day,
+    // as old as that read. Each browser's own day, which no other check writes on.
+    const own: Record<string, { day: string; next: string; title: string }> = {
+      chromium: { day: '2031-03-07', next: '2031-03-08', title: 'Friday, March 7, 2031' },
+      firefox: { day: '2031-03-10', next: '2031-03-11', title: 'Monday, March 10, 2031' },
+      webkit: { day: '2031-03-14', next: '2031-03-15', title: 'Friday, March 14, 2031' },
+    };
+    const days = own[testInfo.project.name];
+    if (!days) throw new Error(`No day for the browser ${testInfo.project.name}.`);
+    const id = await addCheckup(days.day);
+    const heading = page.getByRole('heading', { level: 1 });
+    const block = page.locator('li[data-status]');
+    try {
+      await page.clock.install();
+      await page.goto(`${APP}/calendar?day=${days.day}`);
+      await expect(block).toContainText('Checkup');
+      await hydrated(page, chips(page).first());
+      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+      const sent = countRequests(page);
+
+      // A read on use 31 seconds after the page's read brings "Filling".
+      await db.query(`update appointments set title = 'Filling' where id = $1`, [id]);
+      await page.clock.fastForward(31_000);
+      await usePage(page);
+      await expect(block).toContainText('Filling');
+      expect(sent.reads(), 'one read on use').toBe(1);
+
+      // Changed again; Next; 20 seconds on; Back: the day that read brought, 20 seconds old, so a use
+      // does not read it.
+      await db.query(`update appointments set title = 'Crown' where id = $1`, [id]);
+      await dayLink(page, t.nextDay).click();
+      await expect(page).toHaveURL(`${APP}/calendar?day=${days.next}`);
+      await page.clock.fastForward(20_000);
+      await page.goBack();
+      await expect(heading).toHaveText(days.title);
+      await expect(block).toContainText('Filling');
+      await usePage(page);
+      await page.waitForTimeout(500);
+      expect(sent.reads(), 'no read 20 seconds after the last').toBe(1);
+      await expect(block).toContainText('Filling');
+
+      // 31 seconds after that read: the next use reads it, once, and "Crown" shows.
+      await page.clock.fastForward(11_000);
+      await usePage(page);
+      await expect(block).toContainText('Crown');
+      expect(sent.reads(), 'one read 31 seconds after the last').toBe(2);
+      await page.waitForLoadState('networkidle');
+    } finally {
+      await db.query(`delete from appointments where id = $1`, [id]);
+    }
+  });
+
   test('with the session ended, the next use shows the login page (acceptance 4)', async ({
     page,
     context,
