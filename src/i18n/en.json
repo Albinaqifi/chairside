@@ -155,6 +155,16 @@
       "saving": "Saving…",
       "saved": "Clinic details saved.",
       "timeZoneUnknown": "Chairside cannot use this time zone. Choose another time zone from the list."
+    },
+    "hours": {
+      "tab": "Opening hours",
+      "intro": "Switch on each weekday the clinic opens, and choose when it opens and closes: the closing time comes after the opening time. The calendar shades the hours the clinic is closed.",
+      "opens": "Opens",
+      "closes": "Closes",
+      "noTime": "Not set",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Opening hours saved."
     }
   },
   "placeholder": {

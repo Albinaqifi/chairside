@@ -23,3 +23,5 @@ export {
 } from './clinic-details';
 export { clinicCountries, clinicCurrencies } from './create-clinic';
 export { clinicTimeZones, isClinicTimeZoneName, knownTimeZone } from './time-zone';
+// E01-T08b: the week's opening hours, saved from Settings.
+export { saveOpeningHours, type SaveHoursResult } from './hours';

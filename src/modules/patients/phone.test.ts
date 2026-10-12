@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readPhone } from './phone';
+import { phoneWithCountryCode, readPhone } from './phone';
 
 // E01-T02b, acceptance 1 and 2: a phone typed at the desk, read with the clinic's own country. The
 // numbers stored come from the seed's made-up block (+389 70 00x xxx, src/db/seed/fake-data.ts);
@@ -67,5 +67,24 @@ describe("readPhone: a clinic country the package does not support is the clinic
 
   it('whatever was typed: the country is checked first', () => {
     expect(() => readPhone('', 'XX')).toThrow(Error);
+  });
+});
+
+// E01-T08b, acceptance 5: the clinic's own phone on Settings, with its country code (D-111).
+describe('phoneWithCountryCode: a stored number with its country code, whatever the country', () => {
+  it('the international form, which reads the same with every phone country', () => {
+    expect(phoneWithCountryCode('+38970001402')).toBe('+389 70 001 402');
+    expect(phoneWithCountryCode('+442079460001')).toBe('+44 20 7946 0001');
+    for (const country of ['MK', 'GB', 'RS', 'AL']) {
+      expect(readPhone(phoneWithCountryCode('+38970001402'), country), country).toBe(
+        '+38970001402',
+      );
+    }
+  });
+
+  it('a possible number the package does not know keeps its code; one it cannot read, as stored', () => {
+    expect(phoneWithCountryCode('+38999123456')).toMatch(/^\+389 /);
+    expect(readPhone(phoneWithCountryCode('+38999123456'), 'GB')).toBe('+38999123456');
+    expect(phoneWithCountryCode('+3')).toBe('+3');
   });
 });

@@ -12,7 +12,10 @@ import type { Choice, ZoneChoices } from './clinic-choices';
 /** The clinic's details as the form starts with them: the stored values, '' for none. */
 export interface ClinicDetailsValues {
   name: string;
-  /** As the clinic writes it (phoneAsWritten, D-097), never in E.164. */
+  /**
+   * With its country code (`+389 70 001 402`, phoneWithCountryCode, D-111), never in E.164: it reads
+   * the same whatever phone country the same save chooses.
+   */
   phone: string;
   address: string;
   email: string;

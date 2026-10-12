@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { refuse, staffAction, staffRead } from '@/app/_lib/actions';
 import * as patients from '@/modules/patients';
 import * as tenancy from '@/modules/tenancy';
+import { hoursFieldNames, minutesOfTimeValue, WEEKDAY_FIELDS } from './opening-hours';
 
 /*
  * Settings (E01-T08a): the owner's alone (settings.manage, scope-v1.md). The page reads the clinic's
@@ -106,5 +107,100 @@ export const saveClinicDetails = staffAction(
     if (!saved.ok) return refuse(saved.code);
     refresh();
     return { changes: { fields: saved.changed } };
+  },
+);
+
+/*
+ * The Opening hours tab (E01-T08b): three flat fields a weekday (./opening-hours.ts), each declared,
+ * so a problem shows at its field. Every check is the input's alone, so all are the schema's (D-098):
+ * an open weekday needs both times, each a time of the day, the closing after the opening. A closed
+ * weekday's times are not read, whatever was sent for them: its selects are disabled, so a browser
+ * sends none.
+ */
+
+/** A switch's field: Radix's hidden checkbox sends "on" when on, nothing when off. */
+const switchField = z.literal('on').optional();
+/**
+ * A time's field: read only for an open weekday, below, so anything is taken here, and nothing too
+ * (a disabled select is not sent).
+ */
+const timeField = z.unknown().optional();
+
+const openingHoursInput = z
+  .object(
+    Object.fromEntries(
+      WEEKDAY_FIELDS.flatMap(({ key }) => {
+        const names = hoursFieldNames(key);
+        return [
+          [names.open, switchField],
+          [names.opens, timeField],
+          [names.closes, timeField],
+        ] as const;
+      }),
+    ),
+  )
+  .transform((sent, ctx) => {
+    const week: tenancy.OpeningHours[] = [];
+    for (const { weekday, key } of WEEKDAY_FIELDS) {
+      const names = hoursFieldNames(key);
+      if (sent[names.open] !== 'on') continue;
+      const opens = timeOf(sent[names.opens], names.opens, ctx);
+      const closes = timeOf(sent[names.closes], names.closes, ctx);
+      if (opens === null || closes === null) continue;
+      if (closes <= opens) {
+        ctx.addIssue({ code: 'custom', path: [names.closes], message: names.closes });
+        continue;
+      }
+      week.push({ weekday, opens, closes });
+    }
+    return week;
+  });
+
+/**
+ * An open weekday's time, in minutes from midnight; or null, with the problem at its field: none
+ * chosen, '' or not sent (the form shows "Fill this in."), or no time of the day.
+ */
+function timeOf(value: unknown, field: string, ctx: z.RefinementCtx): number | null {
+  if (value === undefined || value === '') {
+    ctx.addIssue({ code: 'custom', path: [field], message: field });
+    return null;
+  }
+  const minutes = typeof value === 'string' ? minutesOfTimeValue(value) : null;
+  if (minutes === null) {
+    ctx.addIssue({ code: 'invalid_format', format: 'time', path: [field], message: field });
+  }
+  return minutes;
+}
+
+/**
+ * The clinic's opening hours, for the Settings page (forPage): a row per weekday it opens, by
+ * weekday. Nothing in it is a patient's: no audit row.
+ */
+export const readOpeningHours = staffRead(
+  { permission: 'settings.manage', input: z.object({}) },
+  async ({ tx }) => tenancy.openingHours(tx),
+);
+
+/**
+ * Saves the week's opening hours (tenancy.saveOpeningHours: the hours and nothing else), with one
+ * audit row, clinic.hours_updated, about the clinic, whose metadata names the weekdays changed (ISO
+ * numbers), never their times. When it is done, the page the owner is on is rendered again
+ * (refresh()), and the calendar's next read shows the new hours.
+ */
+export const saveOpeningHours = staffAction(
+  {
+    permission: 'settings.manage',
+    input: openingHoursInput,
+    audit: {
+      action: 'clinic.hours_updated',
+      entityType: 'clinic',
+      entityId: ({ staff }) => staff.clinic.clinicId,
+      metadata: { result: 'changes' },
+    },
+  },
+  async ({ input, tx, now }) => {
+    const saved = await tenancy.saveOpeningHours(tx, input, now);
+    refresh();
+    return { changes: { weekdays: saved.changed } };
   },
 );
