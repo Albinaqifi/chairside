@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { firstChoice, shownColumns } from '@/app/(staff)/calendar/filter';
+import { ownProvider, readDay } from '@/app/(staff)/calendar/read-day';
 import { membershipExtras, navigationFor } from '@/app/(staff)/navigation';
 import { closeDb } from '@/db/client';
+import { withTenant } from '@/db/tenant';
 import { seedDatabase, seedDayOf, type SeedSummary } from '@/db/seed';
 import { scheduling } from '@/db/seed/02-scheduling';
 import { isFakeEmail, isFakePhone } from '@/db/seed/fake-data';
@@ -350,5 +353,32 @@ describe('the scheduling seed (E01-T01b)', () => {
     const today = seedDayOf(undefined);
     const weeks = [seedWeek(today), seedWeek(addDays(today, -1))];
     expect(weeks).toContainEqual(rows.map((row) => row.day));
+  });
+});
+
+// E01-T04b, acceptance 2: the calendar's read as each seeded login of Harbour Street, in the clinic's
+// own transaction, as the read's handler runs it (src/app/(staff)/calendar/actions.ts): the seeded
+// dentist and hygienist open on their own columns, the owner and the front desks on all three. The
+// day is any weekday: the three seeded providers are active, so each has a column every day. The
+// read through the page and as the browser calls it: tests/integration/calendar-own-column.test.ts.
+describe('the calendar each seeded login of Harbour Street opens on (E01-T04b)', () => {
+  const { harbourStreetDentist, harbourStreetSecondDentist, harbourStreetHygienist } =
+    SEEDED_PROVIDERS;
+  const ALL = [harbourStreetDentist, harbourStreetSecondDentist, harbourStreetHygienist];
+
+  it.each([
+    { who: 'the dentist', id: SEEDED_PEOPLE.dentist.id, opensOn: [harbourStreetDentist] },
+    { who: 'the hygienist', id: SEEDED_PEOPLE.hygienist.id, opensOn: [harbourStreetHygienist] },
+    { who: 'the owner', id: SEEDED_PEOPLE.owner.id, opensOn: ALL },
+    { who: 'the front desk', id: SEEDED_PEOPLE.frontDesk.id, opensOn: ALL },
+    { who: 'the front desk with import', id: SEEDED_PEOPLE.frontDeskImport.id, opensOn: ALL },
+  ])('$who', async ({ id, opensOn }) => {
+    const read = await withTenant(SEEDED_CLINICS.harbourStreet, async (tx) => ({
+      view: await readDay(tx, '2026-10-26', new Date('2026-10-26T09:00:00Z')),
+      ownProviderId: await ownProvider(tx, id),
+    }));
+    expect(read.view.columns.map((column) => column.providerId)).toEqual(ALL);
+    const columns = read.view.columns.map((column) => column.providerId);
+    expect(shownColumns(firstChoice(read.ownProviderId), columns)).toEqual(opensOn);
   });
 });

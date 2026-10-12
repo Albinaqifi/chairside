@@ -4,6 +4,7 @@ import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { FrameClinic } from '@/app/_lib/frame-clinic';
 import messages from '@/i18n/en.json';
+import { LOCALE } from '@/i18n/locale';
 import type { PatientList as List } from '@/modules/patients';
 import { PatientList } from './patient-list';
 
@@ -21,7 +22,7 @@ function render(props: { canImport: boolean; canAdd?: boolean }): string {
   const list: ReactNode = createElement(PatientList, { initial: INITIAL, ...props });
   const frame: ComponentProps<typeof FrameClinic> = { clinicId: CLINIC, children: list };
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
-    locale: 'en',
+    locale: LOCALE,
     messages,
     timeZone: 'Europe/Skopje',
     children: createElement(FrameClinic, frame),

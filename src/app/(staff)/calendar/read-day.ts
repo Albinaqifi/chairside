@@ -1,5 +1,6 @@
 import type { TenantTransaction } from '@/db/tenant';
 import { dayInZone, isoWeekday, type CalendarDay } from '@/lib/calendar-day';
+import { activeMembership } from '@/modules/auth';
 import { patientNames } from '@/modules/patients';
 import { appointmentsOnDay, breaksOnWeekday, listProviders } from '@/modules/scheduling';
 import { clinicPlace, closedDaysBetween, openingHours } from '@/modules/tenancy';
@@ -45,4 +46,14 @@ export async function readDay(
       return { ...appointment, patient };
     }),
   });
+}
+
+/**
+ * The provider this person's membership in the clinic of the transaction is linked to, whose column
+ * the calendar opens on (E01-T04b), or null. Read in the clinic's own transaction from the auth
+ * module, not through clinics_for_user() (D-091, "Revisit if"); E01-T10 reads the same. It only
+ * picks the columns shown first: no permission comes from it.
+ */
+export async function ownProvider(tx: TenantTransaction, userId: string): Promise<string | null> {
+  return (await activeMembership(tx, userId))?.providerId ?? null;
 }

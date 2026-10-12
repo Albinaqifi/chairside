@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FormAnswer } from '@/app/_lib/form-answer';
 import { FrameClinic } from '@/app/_lib/frame-clinic';
 import messages from '@/i18n/en.json';
+import { LOCALE } from '@/i18n/locale';
 import type { LikelyDuplicate } from '@/modules/patients';
 import { DuplicateWarning, NewPatientForm } from './new-patient-form';
 
@@ -45,7 +46,7 @@ beforeEach(() => {
 function render(element: ReactNode, timeZone = 'Europe/Skopje'): string {
   const frame: ComponentProps<typeof FrameClinic> = { clinicId: CLINIC, children: element };
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
-    locale: 'en',
+    locale: LOCALE,
     messages,
     timeZone,
     children: createElement(FrameClinic, frame),

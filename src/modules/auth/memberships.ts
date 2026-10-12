@@ -21,6 +21,11 @@ export interface Membership {
   role: Role;
   extraPermissions: ExtraPermission[];
   status: 'active' | 'disabled';
+  /**
+   * The provider whose calendar column is the person's own (memberships.provider_id, E01-T01a), or
+   * null. The calendar opens on that column (E01-T04b); no permission comes from it.
+   */
+  providerId: string | null;
 }
 
 /**
@@ -55,7 +60,9 @@ export async function clinicsForUser(userId: string): Promise<ClinicChoice[]> {
 
 /**
  * The user's active membership in the clinic of this transaction, or null. Row-Level Security
- * means a transaction for clinic A can only ever find a membership in clinic A.
+ * means a transaction for clinic A can only ever find a membership in clinic A. With its linked
+ * provider (E01-T04b): read here, in the clinic's own transaction, not through clinics_for_user()
+ * (D-091, "Revisit if").
  */
 export async function activeMembership(
   tx: TenantTransaction,
@@ -74,6 +81,7 @@ export async function activeMembership(
     role: toRole(row.role),
     extraPermissions: toExtraPermissions(row.extraPermissions),
     status: row.status === 'disabled' ? 'disabled' : 'active',
+    providerId: row.providerId,
   };
 }
 

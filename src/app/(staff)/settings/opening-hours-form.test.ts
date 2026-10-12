@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FormAnswer } from '@/app/_lib/form-answer';
 import { FrameClinic } from '@/app/_lib/frame-clinic';
 import messages from '@/i18n/en.json';
+import { LOCALE } from '@/i18n/locale';
 import { weekValues } from './opening-hours';
 import { OpeningHoursForm } from './opening-hours-form';
 
@@ -56,7 +57,7 @@ function renderForm(answer?: FormAnswer<unknown>, timeZone = 'Pacific/Auckland')
     children: createElement(OpeningHoursForm, { week: WEEK }),
   };
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
-    locale: 'en',
+    locale: LOCALE,
     messages,
     timeZone,
     children: createElement(FrameClinic, frame),
@@ -195,7 +196,7 @@ describe("the Opening hours tab's form, as the server sends it (E01-T08b)", () =
 
   it("each time's label is the formatter's, in UTC: no zone moves a time of the clinic's clock", () => {
     const opens = selectNamed(renderForm(), 'wednesdayOpens');
-    const format = createFormatter({ locale: 'en', timeZone: 'Pacific/Auckland' });
+    const format = createFormatter({ locale: LOCALE, timeZone: 'Pacific/Auckland' });
     const label = (hours: number, minutes: number) =>
       format.dateTime(new Date(Date.UTC(2000, 0, 1, hours, minutes)), {
         hour: 'numeric',
@@ -215,7 +216,7 @@ describe("the Opening hours tab's form, as the server sends it (E01-T08b)", () =
   it.each(['America/New_York', 'Pacific/Pago_Pago'])(
     'in a clinic zone behind UTC (%s): each weekday by its own name, each time by its own label',
     (timeZone) => {
-      const local = createFormatter({ locale: 'en', timeZone });
+      const local = createFormatter({ locale: LOCALE, timeZone });
       // What the zone alone would say: the day before.
       expect(local.dateTime(new Date(Date.UTC(2024, 0, 1)), { weekday: 'long' })).toBe('Sunday');
       const html = renderForm(undefined, timeZone);

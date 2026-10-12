@@ -43,7 +43,7 @@ describe("every request's configuration (src/i18n/request.ts)", () => {
     request.staff = staff;
     request.read.mockResolvedValue({ ok: true, value: 'Pacific/Auckland' });
     expect(await configuration()).toEqual({
-      locale: 'en',
+      locale: 'en-u-hc-h23',
       messages,
       timeZone: 'Pacific/Auckland',
     });
@@ -51,7 +51,7 @@ describe("every request's configuration (src/i18n/request.ts)", () => {
   });
 
   it('signed out, or before a clinic is chosen: a fixed zone, and nothing read', async () => {
-    expect(await configuration()).toEqual({ locale: 'en', messages, timeZone: 'UTC' });
+    expect(await configuration()).toEqual({ locale: 'en-u-hc-h23', messages, timeZone: 'UTC' });
     expect(NO_CLINIC_TIME_ZONE).toBe('UTC');
     expect(request.read).not.toHaveBeenCalled();
   });

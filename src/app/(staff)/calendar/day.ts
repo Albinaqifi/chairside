@@ -98,6 +98,8 @@ export type Block = AppointmentBlock | BreakBlock;
 export interface Column {
   providerId: string;
   name: string;
+  /** The provider's short name (`providers.short_name`): its chip in the filter (E01-T04b). */
+  shortName: string;
   initials: string;
   chairLabel: string;
   hue: number;
@@ -127,10 +129,20 @@ export interface CalendarDayView {
 }
 
 /**
+ * What the calendar's read gives (./actions.ts): the day, and the provider the reader's membership
+ * is linked to (`memberships.provider_id`), whose column the calendar opens on (E01-T04b), or null.
+ */
+export interface CalendarRead {
+  view: CalendarDayView;
+  ownProviderId: string | null;
+}
+
+/**
  * The day laid out: a column for each active provider, and for an inactive one with an appointment
- * that day, so no appointment is ever hidden; their breaks; the grid from the clinic's earliest
- * opening to its latest closing in the week, widened to the day's blocks; what is outside the day's
- * hours; each column's % booked.
+ * that day, so no appointment is ever hidden; their breaks, none on a closed day (owner, 2026-10-12,
+ * E01-T04b: no lunch on a day the clinic is closed); the grid from the clinic's earliest opening to
+ * its latest closing in the week, widened to the day's blocks; what is outside the day's hours; each
+ * column's % booked.
  */
 export function layoutDay(rows: DayRows): CalendarDayView {
   const hours = rows.hours.find((found) => found.weekday === rows.weekday);
@@ -146,7 +158,7 @@ export function layoutDay(rows: DayRows): CalendarDayView {
     (provider) => provider.active || withVisits.has(provider.id),
   );
   const shown = new Set(providers.map((provider) => provider.id));
-  const breaks = rows.breaks.filter((found) => shown.has(found.providerId));
+  const breaks = closed === null ? rows.breaks.filter((found) => shown.has(found.providerId)) : [];
   const grid = gridSpan(rows.hours, [
     ...rows.appointments.map((appointment) => spanOf(appointment)),
     ...breaks.map((found) => spanOf(found)),
@@ -214,6 +226,7 @@ function columnOf(
   return {
     providerId: provider.id,
     name: provider.name,
+    shortName: provider.shortName,
     initials: initialsOf(provider.name),
     chairLabel: provider.chairLabel,
     hue: provider.colorHue,

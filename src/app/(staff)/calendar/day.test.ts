@@ -471,3 +471,64 @@ describe('the day the address asks for (acceptance 6)', () => {
     expect(askedDay(value)).toBeNull();
   });
 });
+
+// E01-T04b: no break on a closed day (owner, 2026-10-12): the clinic is closed, so no lunch shows,
+// while its appointments still do; the grid is then not widened to a break either.
+describe('no break on a closed day (E01-T04b)', () => {
+  const breakBlocks = (view: ReturnType<typeof layoutDay>) =>
+    view.columns.flatMap((column) => column.blocks.filter((block) => block.kind === 'break'));
+
+  it('a closed_days date: no break in any column; its appointment still shows', () => {
+    const [p, q] = [provider(1), provider(2)];
+    const booked = visit(p.id, 9 * H, 9 * H + 30);
+    const view = layoutDay(
+      rows({
+        day: '2026-11-02',
+        closedDay: { date: '2026-11-02', label: 'Staff training day' },
+        providers: [p, q],
+        appointments: [booked],
+        breaks: [lunch(p.id), lunch(q.id, 13 * H, 14 * H)],
+      }),
+    );
+    expect(breakBlocks(view)).toEqual([]);
+    expect(appointmentBlocks(view).map((block) => block.id)).toEqual([booked.id]);
+  });
+
+  it('a weekday without hours: no break; its appointment still shows', () => {
+    const p = provider(1);
+    const booked = visit(p.id, 10 * H, 10 * H + 45);
+    const view = layoutDay(
+      rows({ day: '2026-10-31', weekday: 6, appointments: [booked], breaks: [lunch(p.id)] }),
+    );
+    expect(view.closed).toEqual({ why: 'no_hours' });
+    expect(breakBlocks(view)).toEqual([]);
+    expect(appointmentBlocks(view).map((block) => block.id)).toEqual([booked.id]);
+  });
+
+  it('a break outside the hours no longer widens the grid of a closed day', () => {
+    const p = provider(1);
+    const view = layoutDay(
+      rows({
+        day: '2026-11-02',
+        closedDay: { date: '2026-11-02', label: 'Staff training day' },
+        breaks: [lunch(p.id, 19 * H, 20 * H)],
+      }),
+    );
+    expect(view.grid).toEqual({ from: 8 * H, to: 18 * H });
+  });
+
+  it('an open day keeps its breaks', () => {
+    const p = provider(1);
+    const view = layoutDay(rows({ breaks: [lunch(p.id)] }));
+    expect(breakBlocks(view).map((block) => [block.from, block.to])).toEqual([[12 * H, 13 * H]]);
+  });
+});
+
+describe("a column's short name, its chip in the filter (E01-T04b)", () => {
+  it("is the provider's short_name", () => {
+    const view = layoutDay(
+      rows({ providers: [provider(1), provider(2, { name: 'Arben Kodra', shortName: 'Kodra' })] }),
+    );
+    expect(view.columns.map((column) => column.shortName)).toEqual(['Dr. Planinska', 'Kodra']);
+  });
+});

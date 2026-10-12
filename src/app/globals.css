@@ -108,6 +108,9 @@
   --color-break-light: oklch(0.965 0.004 95);
   --color-break-dark: oklch(0.94 0.004 95);
   --color-outside-hours: oklch(0.965 0.004 95);
+  /* Added in E01-T04b: the calendar's "now" line and its dot (demo line 274, oklch(0.6 0.15 25)):
+     the red's dot, a shade from it. */
+  --color-now-line: var(--color-red-dot);
 
   /* Text sizes: the base size and its line height, section headings (weight 600) and page
      headings (serif, 28–34 px). Added: labels and small print (the demo's labels), the wordmark
@@ -137,6 +140,9 @@
   --radius-pill: 99px;
   --radius-toast: 12px;
   --radius-checkbox: 5px;
+  /* Added in E01-T04b: the dot of a provider's chip in the calendar's filter (demo line 230), 3 px
+     on its 9 px. */
+  --radius-dot: 3px;
 
   /* Added in E00-T04c: the toast's shadow (demo line 1365), in the text colour's hue. Added in
      E00-T04e: the drawer's, cast to its left (demo line 1196), the toast's hue and lighter. The only

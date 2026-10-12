@@ -49,6 +49,8 @@ Legend: ✅ in v1 as designed · ✏️ in v1 but changed · ⏳ later · ❌ no
 - ✏️ Lunch and breaks come from provider breaks, not from appointments. (D-018)
 - ✏️ Overlap: warning plus an explicit "book anyway" (D-020). The database enforces the rest.
 - ✏️ "% booked" per column is computed from opening hours.
+- ✏️ A filter chip turned off keeps its name in the muted text and fades its dot only; the demo
+  fades the whole chip, whose name would then be too faint to read (WCAG AA). E01-T04b.
 - ⏳ Drag and drop to move (v1 moves through the drawer).
 - ❌ "slot re-filled from waitlist" tags.
 
