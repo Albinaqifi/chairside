@@ -1,18 +1,12 @@
+import './tests/e2e/load-env.ts';
 import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { e2eDatabase } from './tests/e2e/e2e-database.ts';
 import { APP, APP_PORT, DEV, DEV_PORT, e2eEnv, FRONT_DESK_SESSION } from './tests/e2e/servers.ts';
 
 // The end-to-end journeys (E00-T06b, D-100): `pnpm build`, then `pnpm test:e2e`, with the database
-// up. CLAUDE.md, "CI", says how CI runs them and how to run them on Windows.
-
-// Local settings come from .env (see .env.example), as for the other tests. Variables already set,
-// as in CI, win.
-try {
-  process.loadEnvFile();
-} catch {
-  // No .env file: e2eDatabase() below says what is missing.
-}
+// up. CLAUDE.md, "CI", says how CI runs them and how to run them on Windows. Local settings come
+// from .env, loaded by the first import above (load-env.ts).
 
 // On Windows, Playwright stops the servers with `taskkill`, called by its name. Where PATH lacks
 // System32 (the owner's machine, 2026-10-08), the call fails without a word, both servers keep

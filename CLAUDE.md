@@ -80,7 +80,8 @@ machine, with the database up:
 The journeys on Windows (and anywhere): the browsers once, `pnpm exec playwright install chromium
 firefox webkit` (about 500 MB, again after a Playwright upgrade); then, with the database up,
 `pnpm build` (the journeys run the build in `.next`, so build again after a change) and
-`pnpm test:e2e`. It starts `next start` on port 3100 and `next dev` on port 3101, both on
+`pnpm test:e2e`. It starts `next start` on port 3100 and `next dev` on port 3101 (a second checkout
+on the same machine sets `E2E_APP_PORT` and `E2E_DEV_PORT`, `README.md`), both on
 `<db>_e2e`, never the development database; stop `pnpm dev` first (Next.js runs one `next dev` per
 folder). A failed journey keeps its trace: `pnpm exec playwright show-trace test-results/<test>/trace.zip`.
 

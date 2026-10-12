@@ -1,3 +1,4 @@
+import './load-env.ts';
 import path from 'node:path';
 import type { E2eDatabase } from './e2e-database.ts';
 
@@ -10,12 +11,26 @@ import type { E2eDatabase } from './e2e-database.ts';
  *   writes its output to `.next/dev`, beside the build, so both run at once.
  * Both are `localhost`, never 127.0.0.1: the auth library trusts only the origin BETTER_AUTH_URL
  * names, and the session cookie, set for `localhost`, reaches both ports.
+ * The ports are 3100 and 3101 unless .env names others: a second checkout of this repository on
+ * the same machine sets E2E_APP_PORT and E2E_DEV_PORT (README.md, "Two checkouts on one machine"),
+ * so two runs never fight over one port.
  */
 
-export const APP_PORT = 3100;
-export const DEV_PORT = 3101;
+export const APP_PORT = port('E2E_APP_PORT', 3100);
+export const DEV_PORT = port('E2E_DEV_PORT', 3101);
 export const APP = `http://localhost:${APP_PORT}`;
 export const DEV = `http://localhost:${DEV_PORT}`;
+
+/** The port a variable names, or the default when it is unset or empty. */
+function port(variable: string, fallback: number): number {
+  const value = process.env[variable];
+  if (value === undefined || value === '') return fallback;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1 || number > 65535) {
+    throw new Error(`${variable} must be a port number`);
+  }
+  return number;
+}
 
 /**
  * Signs the session cookies of both servers, which must share it for one session to work on both.
