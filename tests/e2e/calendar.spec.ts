@@ -220,6 +220,96 @@ test.describe('a fresh day when the page is used (acceptance 3)', () => {
     }
   });
 
+  test('a day Back or Forward shows again is as old as its read: the first use 30 seconds after that read reads it, not a use before', async ({
+    page,
+  }, testInfo: TestInfo) => {
+    // E01-T04b tester, finding 1: Next.js's router keeps a day it showed and shows it again on Back
+    // and Forward, without a request. Each browser's own day, and the day after it, which no other
+    // check writes on.
+    const own: Record<string, { day: string; next: string; title: string }> = {
+      chromium: { day: '2031-03-17', next: '2031-03-18', title: 'Monday, March 17, 2031' },
+      firefox: { day: '2031-03-19', next: '2031-03-20', title: 'Wednesday, March 19, 2031' },
+      webkit: { day: '2031-03-24', next: '2031-03-25', title: 'Monday, March 24, 2031' },
+    };
+    const days = own[testInfo.project.name];
+    if (!days) throw new Error(`No day for the browser ${testInfo.project.name}.`);
+    const { rows } = await db.query<{ id: string }>(
+      `select id from patients where clinic_id = $1 order by id limit 1`,
+      [SEEDED_CLINICS.harbourStreet],
+    );
+    const patientId = rows[0]?.id;
+    if (!patientId) throw new Error('The seeded clinic has no patient.');
+    const {
+      rows: [added],
+    } = await db.query<{ id: string }>(
+      `insert into appointments (id, clinic_id, patient_id, provider_id, title, starts_at, ends_at,
+                                 status, source, created_by)
+       values (gen_random_uuid(), $1, $2, $3, 'Checkup', $4, $5, 'booked', 'staff', $6)
+       returning id`,
+      [
+        SEEDED_CLINICS.harbourStreet,
+        patientId,
+        SEEDED_PROVIDERS.harbourStreetDentist,
+        skopje(days.day, '09:00'),
+        skopje(days.day, '09:30'),
+        SEEDED_PEOPLE.frontDesk.id,
+      ],
+    );
+    const heading = page.getByRole('heading', { level: 1 });
+    const block = page.locator('li[data-status]');
+    const answered = () =>
+      page.waitForResponse((response) => {
+        const request = response.request();
+        return request.method() === 'POST' && request.headers()['next-action'] !== undefined;
+      });
+    try {
+      await page.clock.install();
+      await page.goto(`${APP}/calendar?day=${days.day}`);
+      await expect(block).toContainText('Checkup');
+      await hydrated(page, chips(page).first());
+      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+      const sent = countRequests(page);
+
+      // Next, then Back a moment later: the day shown again was read a second ago, so a use does not
+      // read it.
+      await dayLink(page, t.nextDay).click();
+      await expect(page).toHaveURL(`${APP}/calendar?day=${days.next}`);
+      await page.goBack();
+      await expect(heading).toHaveText(days.title);
+      await usePage(page);
+      await page.waitForTimeout(500);
+      expect(sent.reads(), 'no read of a day read a second ago').toBe(0);
+
+      // Forward to the next day, the appointment changed, a minute on, Back: the day shown again is
+      // the one read a minute before, and the first use reads it.
+      await page.goForward();
+      await expect(page).toHaveURL(`${APP}/calendar?day=${days.next}`);
+      await db.query(`update appointments set title = 'Filling' where id = $1`, [added?.id]);
+      await page.clock.fastForward(60_000);
+      await page.goBack();
+      await expect(heading).toHaveText(days.title);
+      await expect(block).toContainText('Checkup');
+      await usePage(page);
+      await expect(block).toContainText('Filling');
+      expect(sent.reads(), 'Back: one read on the first use').toBe(1);
+      await usePage(page);
+      expect(sent.reads(), 'no second read right after it').toBe(1);
+
+      // Forward: the next day, read over a minute ago, is read on the first use too.
+      await page.goForward();
+      await expect(page).toHaveURL(`${APP}/calendar?day=${days.next}`);
+      const read = answered();
+      await usePage(page);
+      await read;
+      expect(sent.reads(), 'Forward: one read on the first use').toBe(2);
+      await usePage(page);
+      expect(sent.reads(), 'no second read right after it').toBe(2);
+      await page.waitForLoadState('networkidle');
+    } finally {
+      await db.query(`delete from appointments where id = $1`, [added?.id]);
+    }
+  });
+
   test('with the session ended, the next use shows the login page (acceptance 4)', async ({
     page,
     context,

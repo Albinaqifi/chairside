@@ -10,10 +10,17 @@ import type { CalendarDayView, CalendarRead } from './day';
 import { DayCalendar } from './day-calendar';
 import { firstChoice, shownColumns, toggleColumn, type ColumnChoice } from './filter';
 import { MINUTE_MS, nowLineMinute, untilNextMinute } from './now-line';
-import { readAgain, readIsDue, USE_EVENTS } from './read-on-use';
+import { readAgain, readIsDue, readTimeOf, USE_EVENTS } from './read-on-use';
 
 /** Why the day could not be read again: shown above the grid until a read works. */
 type Problem = 'clinic_changed' | 'failed';
+
+/**
+ * When each day the calendar showed was read, by the browser's clock (./read-on-use.ts, readTimeOf).
+ * Outside the component, so it outlives a render for another day and a remount (Back from another
+ * page); weak, so a day Next.js's router lets go of goes from here too. Written only in the browser.
+ */
+const readTimes = new WeakMap<CalendarDayView, number>();
 
 /**
  * The calendar's day in the browser (E01-T04b): the day the page read, drawn by DayCalendar, with
@@ -53,10 +60,12 @@ export function CalendarScreen({
   const lastReadAt = useRef(0);
   const reading = useRef(false);
 
-  // Each render of the page is a read of the day: the next may come 30 seconds after it.
+  // The next read may come 30 seconds after the read of the day shown: a day the page rendered was
+  // read when the browser first drew it, a day a read on use brought when that read started. A day
+  // Back or Forward shows again is the same day, so it keeps its time (readTimes).
   useEffect(() => {
-    lastReadAt.current = Date.now();
-  }, [initial.view]);
+    lastReadAt.current = readTimeOf(readTimes, view, Date.now());
+  }, [view]);
 
   useEffect(() => {
     const after = initial.view;
@@ -70,6 +79,7 @@ export function CalendarScreen({
         try {
           const answer = await readAgain(readCalendarDay, clinicId, asked);
           if (answer.kind === 'read') {
+            readTimes.set(answer.read.view, at);
             setRead({ after, view: answer.read.view });
             setProblem(null);
           } else {

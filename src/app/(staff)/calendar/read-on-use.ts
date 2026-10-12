@@ -29,6 +29,25 @@ export function readIsDue(lastReadAt: number, now: number): boolean {
   return now - lastReadAt >= READ_AGAIN_AFTER_MS || now < lastReadAt;
 }
 
+/**
+ * When the day the calendar shows was read, by the browser's clock: the time kept for that day, else
+ * `now`, kept for it from then on. The calendar keeps the time a read on use started for the day it
+ * brought, and a day the page rendered is kept the first time the browser draws it. Keyed by the
+ * day itself, as the page got it: Next.js's router keeps a day it showed and shows the same one again
+ * on Back and Forward, without a request, so such a day is as old as its read, never as fresh as its
+ * drawing (E01-T04b tester, finding 1).
+ */
+export function readTimeOf<Day extends object>(
+  times: WeakMap<Day, number>,
+  day: Day,
+  now: number,
+): number {
+  const kept = times.get(day);
+  if (kept !== undefined) return kept;
+  times.set(day, now);
+  return now;
+}
+
 export type ReadAnswer =
   /** The day as it is now. */
   | { kind: 'read'; read: CalendarRead }

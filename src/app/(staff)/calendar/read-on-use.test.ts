@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ActionResult } from '@/app/_lib/actions';
 import type { CalendarRead } from './day';
-import { readAgain, readIsDue, READ_AGAIN_AFTER_MS, USE_EVENTS } from './read-on-use';
+import { readAgain, readIsDue, readTimeOf, READ_AGAIN_AFTER_MS, USE_EVENTS } from './read-on-use';
 
 // E01-T04b (D-108): when the calendar reads its day again, and each answer of the read as the
 // calendar shows it. The read is a stand-in that answers as told; the real one is checked in
@@ -45,6 +45,38 @@ describe('a read is due 30 seconds after the last one started, never sooner', ()
 
   it('at once when the browser’s clock was set back since', () => {
     expect(readIsDue(last, last - 1)).toBe(true);
+  });
+});
+
+describe('when the day shown was read (tester finding 1: Back and Forward)', () => {
+  const first = Date.parse('2026-10-26T09:00:00Z');
+
+  it('a day drawn the first time: now, kept from then on', () => {
+    const times = new WeakMap<object, number>();
+    const day = { ...READ.view };
+    expect(readTimeOf(times, day, first)).toBe(first);
+    expect(times.get(day)).toBe(first);
+  });
+
+  it('the same day drawn again (Back, Forward): the time of its read, not now', () => {
+    const times = new WeakMap<object, number>();
+    const day = { ...READ.view };
+    readTimeOf(times, day, first);
+    expect(readTimeOf(times, day, first + 60_000)).toBe(first);
+    expect(readIsDue(readTimeOf(times, day, first + 60_000), first + 60_000)).toBe(true);
+  });
+
+  it('a day a read on use brought: the time that read started', () => {
+    const times = new WeakMap<object, number>();
+    const day = { ...READ.view };
+    times.set(day, first + 31_000);
+    expect(readTimeOf(times, day, first + 40_000)).toBe(first + 31_000);
+  });
+
+  it('another day, even with the same rows: a read of its own', () => {
+    const times = new WeakMap<object, number>();
+    readTimeOf(times, { ...READ.view }, first);
+    expect(readTimeOf(times, { ...READ.view }, first + 5_000)).toBe(first + 5_000);
   });
 });
 
