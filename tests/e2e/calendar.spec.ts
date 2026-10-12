@@ -1,4 +1,12 @@
-import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
+import {
+  expect,
+  test,
+  type Locator,
+  type Page,
+  type Request,
+  type Route,
+  type TestInfo,
+} from '@playwright/test';
 import pg from 'pg';
 import { SEEDED_CLINICS, SEEDED_PEOPLE, SEEDED_PROVIDERS } from '@/db/seed/seeded';
 import messages from '@/i18n/en.json' with { type: 'json' };
@@ -269,5 +277,205 @@ test.describe('the "now" line (acceptance 5), the browser in a zone behind UTC',
     await hydrated(page, chips(page).first());
     await expect(page.getByText('17:00', { exact: true })).toBeVisible();
     await expect(line(page)).toHaveCount(0);
+  });
+});
+
+// E01-T04b tester: what the checks above leave out. Focus and a visible window as uses; the two
+// notices of a read that gives no day (a failed request, another tab's clinic); a pointer resting on
+// the page while the "now" line moves under it; and the 24-hour clock drawn by the browser itself, at
+// midnight, on the calendar and in the patient list's rows a search brings.
+
+/** The calendar's read on use: a POST to the calendar's address (its only server action). */
+const isRead = (request: Request) =>
+  request.method() === 'POST' && new URL(request.url()).pathname === '/calendar';
+
+/** Opens the calendar on `day`, hydrated, its clock paused a second on; counts from then. */
+async function openPaused(page: Page, day: string): Promise<ReturnType<typeof countRequests>> {
+  await page.clock.install();
+  await page.goto(`${APP}/calendar?day=${day}`);
+  await hydrated(page, chips(page).first());
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+  return countRequests(page);
+}
+
+test.describe('a fresh day: the other uses, and a read that gives no day (tester)', () => {
+  test('the window regaining focus, or becoming visible, reads the day: once 30 seconds after the last read', async ({
+    page,
+  }) => {
+    const sent = await openPaused(page, MONDAY);
+    const answered = () => page.waitForResponse((response) => isRead(response.request()));
+
+    await page.clock.fastForward(20_000);
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForTimeout(500);
+    expect(sent.reads(), 'no read before 30 seconds').toBe(0);
+
+    await page.clock.fastForward(11_000);
+    const afterFocus = answered();
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await afterFocus;
+    expect(sent.reads(), 'focus: one read').toBe(1);
+    await page.waitForLoadState('networkidle');
+
+    await page.clock.fastForward(31_000);
+    const afterVisible = answered();
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await afterVisible;
+    expect(sent.reads(), 'a visible window: one read more').toBe(2);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('a read that fails says so above the grid; the next use 30 seconds later reads again and clears it', async ({
+    page,
+  }) => {
+    const sent = await openPaused(page, MONDAY);
+    const failing = (route: Route) =>
+      isRead(route.request()) ? route.abort('connectionfailed') : route.fallback();
+    await page.route(`${APP}/calendar**`, failing);
+
+    await page.clock.fastForward(31_000);
+    await usePage(page);
+    await expect(page.getByText(t.readFailed)).toBeVisible();
+    // The day is still drawn, as the page read it.
+    await expect(columns(page)).toHaveCount(3);
+    expect(sent.reads()).toBe(1);
+
+    await page.unroute(`${APP}/calendar**`, failing);
+    await page.clock.fastForward(31_000);
+    await usePage(page);
+    await expect(page.getByText(t.readFailed)).toHaveCount(0);
+    expect(sent.reads()).toBe(2);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('another tab switched clinic: the read says so with a reload, and the day stays as read', async ({
+    page,
+  }) => {
+    const sent = await openPaused(page, MONDAY);
+    // The server sees the call as another tab's switch makes it: the request resolves to another
+    // clinic than the one the call names (D-069). The frame's id is replaced in the call's body by
+    // the second seeded clinic's, which the front desk does not belong to.
+    let replaced = 0;
+    await page.route(`${APP}/calendar**`, async (route) => {
+      const request = route.request();
+      if (!isRead(request)) return route.fallback();
+      const body = request.postData() ?? '';
+      if (body.includes(SEEDED_CLINICS.harbourStreet)) replaced++;
+      await route.continue({
+        postData: body.replaceAll(SEEDED_CLINICS.harbourStreet, SEEDED_CLINICS.soncogled),
+      });
+    });
+
+    await page.clock.fastForward(31_000);
+    await usePage(page);
+    await expect(page.getByText(t.clinicChanged)).toBeVisible();
+    await expect(page.getByRole('button', { name: messages.form.reload })).toBeVisible();
+    expect(replaced, 'the call named the frame clinic').toBe(1);
+    expect(sent.reads()).toBe(1);
+    await expect(columns(page)).toHaveCount(3);
+    await page.waitForLoadState('networkidle');
+  });
+});
+
+test.describe('a pointer resting on the page (tester, D-108)', () => {
+  test.use({ timezoneId: 'America/New_York' });
+
+  test('while the "now" line moves under it for three minutes, the page sends nothing', async ({
+    page,
+  }) => {
+    await page.clock.install({ time: skopje(MONDAY, '09:59') });
+    await page.goto(`${APP}/calendar?day=${MONDAY}`);
+    await hydrated(page, chips(page).first());
+    await page.clock.pauseAt(skopje(MONDAY, '10:00'));
+    const line = page.locator('[data-now-line]');
+    await expect(line).toHaveCount(1);
+
+    // The pointer comes to rest a few pixels under the line, in the first column: that move is a
+    // use, and may read the day once.
+    const box = await line.boundingBox();
+    if (!box) throw new Error('The "now" line has no box.');
+    await page.mouse.move(box.x + 40, box.y + 3);
+    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle');
+    const sent = countRequests(page);
+
+    for (let minute = 1; minute <= 3; minute++) {
+      await page.clock.runFor(60_000);
+      // Real time for the browser to draw the moved line, and to do what it does under a pointer.
+      await page.waitForTimeout(1_000);
+    }
+    const moved = await line.boundingBox();
+    expect(moved?.y, 'the line moved under the pointer').toBeGreaterThan(box.y + 4);
+    expect(sent.all, 'nothing sent while the pointer rests').toEqual([]);
+  });
+});
+
+test.describe('the 24-hour clock drawn by the browser, at midnight (acceptance 7, tester)', () => {
+  /** A weekday of each browser's own, so the three runs never share a row. */
+  const MIDNIGHT_DAY: Record<string, { day: string; next: string }> = {
+    chromium: { day: '2031-03-11', next: 'Tue, Mar 11, 00:30' },
+    firefox: { day: '2031-03-12', next: 'Wed, Mar 12, 00:30' },
+    webkit: { day: '2031-03-13', next: 'Thu, Mar 13, 00:30' },
+  };
+
+  let db: pg.Pool;
+  test.beforeAll(() => {
+    db = new pg.Pool({ connectionString: e2eDatabase().migratorUrl, max: 1 });
+  });
+  test.afterAll(async () => {
+    await db.end();
+  });
+
+  test('a visit at 00:30: "00:30" in the rows a search brings, "00:00" and "00:30" on the calendar', async ({
+    page,
+  }, testInfo: TestInfo) => {
+    const own = MIDNIGHT_DAY[testInfo.project.name];
+    if (!own) throw new Error(`No day for the browser ${testInfo.project.name}.`);
+    // An invented patient of this browser's own, found by a name no other row has.
+    const lastName = `Clock${testInfo.project.name}`;
+    const {
+      rows: [patient],
+    } = await db.query<{ id: string }>(
+      `insert into patients (id, clinic_id, first_name, last_name, language)
+       values (gen_random_uuid(), $1, 'Marker', $2, 'en') returning id`,
+      [SEEDED_CLINICS.harbourStreet, lastName],
+    );
+    try {
+      await db.query(
+        `insert into appointments (id, clinic_id, patient_id, provider_id, title, starts_at, ends_at,
+                                   status, source, created_by)
+         values (gen_random_uuid(), $1, $2, $3, 'Checkup', $4, $5, 'booked', 'staff', $6)`,
+        [
+          SEEDED_CLINICS.harbourStreet,
+          patient?.id,
+          SEEDED_PROVIDERS.harbourStreetHygienist,
+          skopje(own.day, '00:30'),
+          skopje(own.day, '01:00'),
+          SEEDED_PEOPLE.frontDesk.id,
+        ],
+      );
+
+      // The rows a search brings are drawn in the browser, by its own Intl.
+      await page.goto(`${APP}/patients`);
+      const search = page.getByLabel(messages.patients.search);
+      await hydrated(page, search);
+      await search.fill(lastName);
+      const row = page.getByRole('row').filter({ hasText: lastName });
+      await expect(row).toHaveCount(1);
+      await expect(row.getByRole('cell').nth(2)).toHaveText(own.next);
+
+      await page.goto(`${APP}/calendar?day=${own.day}`);
+      await hydrated(page, chips(page).first());
+      const block = page.locator('li[data-status]');
+      await expect(block).toHaveCount(1);
+      await expect(block).toContainText('00:30');
+      await expect(block).not.toContainText(/AM|PM|24:30/);
+      await expect(page.getByText('00:00', { exact: true })).toBeVisible();
+      await page.waitForLoadState('networkidle');
+    } finally {
+      await db.query(`delete from appointments where patient_id = $1`, [patient?.id]);
+      await db.query(`delete from patients where id = $1`, [patient?.id]);
+    }
   });
 });
