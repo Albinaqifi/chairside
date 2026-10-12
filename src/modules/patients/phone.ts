@@ -22,6 +22,16 @@ export function phoneAsWritten(e164: string, country: string): string {
 }
 
 /**
+ * A stored number (E.164) with its country code, in the international form (`+389 70 001 402`),
+ * whatever the clinic's country: the clinic's own phone on Settings (E01-T08b, D-111), which reads
+ * the same with any phone country the same save may choose. A number the package cannot read is
+ * shown as stored. Only the server formats: the metadata never reaches the browser.
+ */
+export function phoneWithCountryCode(e164: string): string {
+  return parsePhoneNumberFromString(e164)?.formatInternational() ?? e164;
+}
+
+/**
  * The invisible marks a copied number carries (Unicode's format characters): WhatsApp, Teams and
  * Outlook wrap a number in direction marks, which the package reads as letters, and trim() keeps.
  */

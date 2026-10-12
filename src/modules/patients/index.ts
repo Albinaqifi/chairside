@@ -23,3 +23,4 @@ export { patientNames, type PatientName } from './names';
 // E01-T08a: the clinic's own phone on Settings is read and shown as a patient's is (D-097). Here, as
 // `patients` imports `tenancy`, which so cannot import them back.
 export { phoneAsWritten, readPhone } from './phone';
+export { phoneWithCountryCode } from './phone'; // E01-T08b: the clinic's phone on Settings (D-111)

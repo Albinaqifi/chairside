@@ -16,6 +16,7 @@ import PatientsPage from '@/app/(staff)/patients/page';
 import { PatientList } from '@/app/(staff)/patients/patient-list';
 import { PlaceholderPage } from '@/app/(staff)/placeholder-page';
 import { ClinicDetailsForm } from '@/app/(staff)/settings/clinic-details-form';
+import { OpeningHoursForm } from '@/app/(staff)/settings/opening-hours-form';
 import SettingsPage from '@/app/(staff)/settings/page';
 import { Sidebar } from '@/app/(staff)/sidebar';
 import VisitPage from '@/app/(staff)/visit/page';
@@ -408,5 +409,68 @@ describe('the Settings page (E01-T08a)', () => {
       });
       expect(forms[0]?.props.choices.timeZones.areas.length).toBeGreaterThan(5);
     }
+  });
+
+  // E01-T08b, acceptance 1 and 5: the Opening hours tab's form keyed by the clinic and filled from
+  // its rows, a weekday off the 15-minute steps as it is stored; the Clinic tab's phone with its
+  // country code (D-111). The page's values, as the forms are handed them.
+  it('an owner: the Opening hours form keyed by the clinic, filled from its rows; the phone with its country code', async () => {
+    request.cookie = await signInCookie(
+      await memberAs('owner', [firstClinic, secondClinic]),
+      PASSWORD,
+      freshAddress(),
+    );
+    await admin.query(`update clinics set phone = '+38970001402' where id = $1`, [firstClinic]);
+    await admin.query('delete from clinic_hours where clinic_id = any($1)', [
+      [firstClinic, secondClinic],
+    ]);
+    for (const [clinicId, weekday, opens, closes] of [
+      [firstClinic, 1, '08:10', '18:00'],
+      [firstClinic, 3, '09:00', '13:00'],
+      [secondClinic, 2, '07:00', '15:00'],
+    ] as const) {
+      await insertRow(admin, 'clinic_hours', {
+        id: newId(),
+        clinic_id: clinicId,
+        weekday,
+        opens,
+        closes,
+      });
+    }
+    const open = { firstClinic: ['monday', 'wednesday'], secondClinic: ['tuesday'] };
+    for (const [chosen, days] of [
+      [firstClinic, open.firstClinic],
+      [secondClinic, open.secondClinic],
+    ] as const) {
+      request.clinic = chosen;
+      const page = await SettingsPage();
+      const forms = elementsOf<ComponentProps<typeof OpeningHoursForm>>(page, OpeningHoursForm);
+      expect(forms.map((form) => form.key)).toEqual([chosen]);
+      const week = forms[0]?.props.week ?? [];
+      expect(week.map((day) => day.key)).toEqual([
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+        'sunday',
+      ]);
+      expect(week.filter((day) => day.open).map((day) => day.key)).toEqual(days);
+    }
+    request.clinic = firstClinic;
+    const page = await SettingsPage();
+    const week = elementsOf<ComponentProps<typeof OpeningHoursForm>>(page, OpeningHoursForm)[0]
+      ?.props.week;
+    expect(week?.[0]).toEqual({
+      weekday: 1,
+      key: 'monday',
+      open: true,
+      opens: '08:10',
+      closes: '18:00',
+    });
+    expect(week?.[1]).toEqual({ weekday: 2, key: 'tuesday', open: false, opens: '', closes: '' });
+    const details = elementsOf<ComponentProps<typeof ClinicDetailsForm>>(page, ClinicDetailsForm);
+    expect(details[0]?.props.values).toMatchObject({ phone: '+389 70 001 402', country: 'MK' });
   });
 });
