@@ -9,14 +9,13 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next tasks to start, side by side:** `E01-T04a` (Ready), `/pipeline E01-T04a` in this checkout, and `E01-T08a` (Ready), `/pipeline E01-T08a` in the clone. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
-- **Two tasks run in parallel** (owner, 2026-10-12, D-110): E01-T04a in the main checkout, E01-T08a in a clone (`README.md`, "Two checkouts on one machine"). Each edits only its own board row and its own handoff note (a Discovered line goes in that note meanwhile); the second to merge rebases on `main` first
-- **Decisions they wait on:** none
+- **Next task to start:** `E01-T04b` (Ready), `/pipeline E01-T04b`. Also due: E01-T08a's Done pass, `/architect E01-T08a` (PR #59 is merged), which refines E01-T08b. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
+- **Decisions it waits on:** none
 
 ## Next (in order)
 
 1. E00-T07f, then E00-T07c, once the owner has the Render and monitor accounts ("Owner actions"; not yet on 2026-10-11): E00-T07f needs no account but goes right before staging (owner, D-109); until then the rest of E01 goes first
-2. The rest of E01, in the epic's own order (D-087): E01-T04a and E01-T08a (both Ready, side by side, D-110), then E01-T04b (refined in E01-T04a's Done pass, D-108), E01-T08b (refined once E01-T04a and E01-T08a are Done) and E01-T09; E00-T06c before the first journey that sets "now" (D-100)
+2. The rest of E01, in the epic's own order (D-087): E01-T04b (Ready), E01-T08b (refined in E01-T08a's Done pass) and E01-T09; E00-T06c before the first journey that sets "now" (D-100)
 3. E00-T12, before E02 (owner, 2026-10-03; D-102)
 
 ## Blocked
@@ -73,8 +72,8 @@ Fully specified.
 | E01-T02b | Patients: add a patient | builder | normal | **Done** | Merged by the owner (PR #41). `main` green (run 37806088255). `/patients/new` and `patients.create`: the phone read with the clinic's country, a likely duplicate named before Send, `patient.created`; the list's New patient and each render's rows; the logger's net, the search's input `text`; the owner tried it. Leftovers: four kept on the Discovered list (→ E01-T09, E01-T11, E04-T00), three related lines folded into two of them, two into tasks (E00-T05b: the logger's net, `data`; E00-T07: a noise line), four struck. See `handoffs/E01-T02b.md` |
 | E01-T03 | Patient profile, and editing a patient's details | builder | normal | Planned | Editing from E01-T02 (D-096) |
 | E01-T04 | Calendar: day view | builder | normal | split (D-108) | Into E01-T04a and E01-T04b, the next two rows |
-| E01-T04a | Calendar: the day view | builder | normal | **Tested** | From E01-T04 (D-108). `/calendar`: the day from four modules in the clinic's zone (DST tested in Skopje and New York), the grid with breaks, overlaps side by side, hours and closed days, % booked, Previous / Today / Next by `?day=`; the day helpers in `src/lib/calendar-day.ts`. Two questions for the owner, none blocking. Review: no required changes, 1 `none` suggestion. Tester: no finding; 8 cases added (the day's two midnights, a clinic far ahead of UTC). See `handoffs/E01-T04a.md` |
-| E01-T04b | Calendar: the filter, a provider's own column, the "now" line and a fresh day | builder | normal | Planned | From E01-T04 (D-108): read again when used, never on a timer, so the 30-minute sign-out holds (owner, 2026-10-11). Refined in E01-T04a's Done pass |
+| E01-T04a | Calendar: the day view | builder | normal | **Done** | Merged by the owner (PR #58). `main` green (run 38275749941). `/calendar`: the clinic's day in its zone from four modules (DST tested in Skopje and New York), the grid with breaks, overlaps side by side, hours and closed days, % booked, Previous / Today / Next by `?day=`; the day helpers in `src/lib/calendar-day.ts`; the owner tried it. Leftovers → E01-T04b (owner: the 24-hour clock on every page, D-049; no lunch on a closed day), E01-T11 (a journey through the calendar); the closed-day notice kept (owner); two struck. See `handoffs/E01-T04a.md` |
+| E01-T04b | Calendar: the filter, a provider's own column, the "now" line and a fresh day | builder | normal | **Ready** | From E01-T04 (D-108): read again when used, never on a timer, so the 30-minute sign-out holds (owner). Refined in E01-T04a's Done pass, with two of the owner's answers on the day view (2026-10-12): the 24-hour clock on every page (D-049), no lunch on a closed day. See `handoffs/E01-T04b.md` |
 | E01-T05 | Book an appointment (drawer) | builder | normal | Planned | The patient search keeps nothing in the browser (D-095); a double click keeps the drawer open; a form in a drawer or dialog sends only itself (E00-T04e) |
 | E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | The cancel dialog sends the cancel only (E00-T04e) |
 | E01-T07 | Calendar: week view | builder | low | Planned | |
@@ -83,7 +82,7 @@ Fully specified.
 | E01-T08b | Settings: opening hours and closed days | builder | normal | Planned | From E01-T08 (D-110): after E01-T04a, whose reads it uses and whose calendar its criteria check. Refined once E01-T04a and E01-T08a are Done |
 | E01-T09 | Settings: providers and treatment types | builder | normal | Planned | |
 | E01-T10 | Today screen, first version | builder | normal | Planned | |
-| E01-T11 | Journey J2 and a hard look at scheduling | tester | normal | Planned | Owner: receptionist trial if possible (Q-09). E00-T06c first if J2 sets "now" (D-100) |
+| E01-T11 | Journey J2 and a hard look at scheduling | tester | normal | Planned | Owner: receptionist trial if possible (Q-09). E00-T06c first if J2 sets "now" (D-100). J2 through the calendar, and the accessibility check on its pages (E01-T04a) |
 
 ## E02 · Reminder loop (M2)
 
@@ -223,6 +222,7 @@ Outline. Needs E07-T00.
 - E00-T07b · The worker and its job queue · merged 2026-10-11 (PR #50)
 - E00-T07d · The job-past-its-time test does not depend on timing · merged 2026-10-11 (PR #52)
 - E00-T07e · The start-up refusals' last gaps · merged 2026-10-12 (PR #54)
+- E01-T04a · Calendar: the day view · merged 2026-10-12 (PR #58)
 
 ## Owner actions (standing)
 
