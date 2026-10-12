@@ -6,12 +6,12 @@
 // every database that is not on this machine, before it connects.
 import pg from 'pg';
 import { closeDb } from '@/db/client';
+import { dayInZone, isCalendarDay, type CalendarDay } from '@/lib/calendar-day';
 import { systemClock, type Clock } from '@/lib/clock';
 import { withoutQueryValues } from '@/lib/query-errors';
 import { createStaffUser } from '@/modules/auth';
 import { checkLocalTargets, connectionTarget, type LocalDatabaseUrls } from '../reset';
 import { requiredEnv } from '../required-env';
-import { dayInZone, isCalendarDay, type CalendarDay } from './seed-day';
 import {
   SEED_FILES,
   type SeedFile,

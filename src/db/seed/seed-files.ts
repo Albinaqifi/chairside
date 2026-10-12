@@ -1,7 +1,7 @@
+import type { CalendarDay } from '@/lib/calendar-day';
 import type { ExtraPermission, Role } from '@/modules/auth';
 import { clinicsAndStaff } from './01-clinics-and-staff';
 import { scheduling } from './02-scheduling';
-import type { CalendarDay } from './seed-day';
 
 /**
  * Every seed file, in the order they run. Each schema task appends its own file, after the ones

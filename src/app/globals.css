@@ -6,7 +6,7 @@
  * font families, text sizes and radii are switched off, so a class outside these tokens gives no
  * style at all. Tokens the design reference lacks are marked "added"; the handoff note of the task
  * that added them names them (handoffs/E00-T04a.md, handoffs/E00-T04b.md, handoffs/E00-T04c.md,
- * handoffs/E00-T04d.md, handoffs/E00-T04e.md, handoffs/E01-T02a.md).
+ * handoffs/E00-T04d.md, handoffs/E00-T04e.md, handoffs/E01-T02a.md, handoffs/E01-T04a.md).
  *
  * A text size, radius, shadow, tracking or animation token added here is also named in src/ui/cn.ts:
  * tailwind-merge knows only Tailwind's own scales, so without it cn() reads `text-<new size>` as a
@@ -98,6 +98,17 @@
   --color-status-deceased-fg: var(--color-status-completed-fg);
   --color-status-deceased-bg: var(--color-status-completed-bg);
 
+  /* Added in E01-T04a: the calendar's day (demo lines 245–282, logic 1814–1831). A cancelled visit
+     or a no-show, struck through on red: the demo's background and edge for it (logic line 1823),
+     the red's hue made lighter. A break, hatched: the demo's two stripes (logic line 1822), the page
+     background's hue, a step and two steps darker. Time outside the day's hours, shaded: the page
+     background (`bg`, 0.985) a step darker, as light as the break's lighter stripe. */
+  --color-cancelled-block: oklch(0.975 0.01 25);
+  --color-cancelled-block-edge: oklch(0.9 0.03 25);
+  --color-break-light: oklch(0.965 0.004 95);
+  --color-break-dark: oklch(0.94 0.004 95);
+  --color-outside-hours: oklch(0.965 0.004 95);
+
   /* Text sizes: the base size and its line height, section headings (weight 600) and page
      headings (serif, 28–34 px). Added: labels and small print (the demo's labels), the wordmark
      (demo line 28), and the letter spacing of the wordmark and the 28 px headings. Added in
@@ -160,6 +171,36 @@
 @theme inline {
   --font-sans: var(--font-onest), system-ui, sans-serif;
   --font-serif: var(--font-source-serif), serif;
+
+  /* Added in E01-T04a: a provider's four tints (design-reference.md, "Provider colours"; the demo's
+     C(), logic line 1375), of the hue the calendar sets on a provider's element as --provider-hue,
+     from providers.color_hue. Inline, so a class reads the hue where it is used: a plain @theme
+     block resolves the variable on :root, where no hue is set, and gives no colour. */
+  --color-provider-tint: oklch(0.95 0.03 var(--provider-hue));
+  --color-provider-edge: oklch(0.86 0.05 var(--provider-hue));
+  --color-provider-strong: oklch(0.6 0.1 var(--provider-hue));
+  --color-provider-ink: oklch(0.3 0.05 var(--provider-hue));
+}
+
+/*
+ * Added in E01-T04a: the calendar's half-hour lines (demo line 254), a line in the border colour
+ * every --calendar-half-hour from the top of a column; and a break's hatching (demo logic line
+ * 1822), the two stripes above.
+ */
+@utility half-hour-lines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--color-border) 0 1px,
+    transparent 1px var(--calendar-half-hour)
+  );
+}
+
+@utility hatched {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-break-light) 0 6px,
+    var(--color-break-dark) 6px 12px
+  );
 }
 
 /* The page, as the demo's page styles set it (lines 13–22). The font comes from --font-sans. */

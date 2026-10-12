@@ -110,6 +110,26 @@
       "addAnyway": "Check the list first. Add patient still adds a new patient."
     }
   },
+  "appointmentStatus": {
+    "booked": "Booked",
+    "confirmed": "Confirmed",
+    "arrived": "In the chair",
+    "completed": "Done",
+    "cancelled": "Cancelled",
+    "no_show": "No-show"
+  },
+  "calendar": {
+    "dayNavigation": "Choose the day",
+    "previousDay": "Previous day",
+    "today": "Today",
+    "nextDay": "Next day",
+    "summary": "{appointments, plural, one {# appointment} other {# appointments}} · {chairs, plural, one {# chair} other {# chairs}}",
+    "closedDay": "Closed: {label}",
+    "closedWeekday": "Closed: no opening hours on {weekday}",
+    "chairAndLoad": "{chair} · {percent}% booked",
+    "noProviders": "No providers yet. Each provider gets a column here.",
+    "legend": "Statuses"
+  },
   "languages": {
     "en": "English"
   },
