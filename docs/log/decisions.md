@@ -2135,3 +2135,22 @@ architecture), `changed` (differs from the original files), `process`.
   are made covers every name, the clinic's, a patient's, a provider's.
 - **Revisit if:** a clinic wants its number shown as it writes it (then keep a phone nobody touched by
   what the page showed); Meta's documents give other limits (E03-T03 checks them).
+
+### D-112 · E01-T08b Done: E01-T08c beside E01-T05, booking ahead of E01-T09 and E01-T03 (owner); the second to merge is checked on the merged tree
+- **Origin:** E01-T08b's Done pass, 2026-10-13 (PR #62; `handoffs/E01-T08b.md`, `handoffs/E01-T08c.md`).
+  **Owner, 2026-10-13:** E01-T08c runs in the clone beside E01-T05 in the main checkout, under D-110's
+  rules (the board's line). The rest is the architect's.
+- **What:**
+  - **E01-T05 moves up:** booking runs beside E01-T08c, ahead of E01-T09 and E01-T03 in the epic's
+    order. It depends only on Done tasks (E01-T04a, E01-T02b) and books with the seed's treatment
+    types, which E01-T09 makes editable later. E01-T04b's Done pass makes it Ready.
+  - **The second to merge** has `main` merged into its branch, never rebased (no force-push, agent
+    rule 14), and passes `pnpm check` on the merged tree before it is pushed. This replaces D-110's
+    "rebases on `main`".
+- **Why:** booking is the most used action and the one a receptionist judges first (R-09); the two
+  tasks write different modules (`scheduling`, `tenancy`), their likely meeting points the message file
+  and the permission test. In the second round git merged `main` with no conflict and the tree did not
+  type-check (an E01-T08b test against E01-T04b's locale, fixed in `43db241`): a clean merge is not a
+  checked one.
+- **Revisit if:** a merge costs more than the parallel run saves (then one task at a time, and the
+  board's line goes); E01-T05 needs a setting that only E01-T09 makes.

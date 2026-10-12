@@ -7,17 +7,18 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
 Order: T01a → T01b → T02a → T02b → T04a and T08a side by side (two checkouts, D-110) → T04b and T08b
-side by side (D-111) → T08c, T09 → T03, T05 → T06 → T07, T10 → T11. With E00 (D-087, D-090, D-091,
-D-093, D-096, D-108, D-110, D-111): E00-T05a → T01a → T01b → E00-T04c → E00-T04d → E00-T04e → T02a →
-T02b → E00-T06b → E00-T05b → E00-T07 → T04a and T08a → T04b and T08b → T08c, T09 and the rest, so a
-receptionist sees a patient list before Playwright and staging exist. T01 is split in two (D-091): the
-schema and the provider link (T01a), the seed (T01b). T02 is split in two (D-096): the list and the
-search (T02a), adding a patient (T02b); editing a patient's details moved to T03, the profile. T04 is
-split in two (D-108): the day view (T04a); the provider filter, a provider's own column, the "now" line
-and the reading on use (T04b). T08 is split in two (D-110): the Settings page and the clinic's details
-(T08a), beside T04a; the opening hours and closed days (T08b), after T04a, whose calendar shows them.
-T08b is split again (D-111): the opening hours (T08b), beside T04b; the closed days (T08c), on the
-same tab, after it.
+side by side (D-111) → T05 and T08c side by side (D-112) → T09, T03 → T06 → T07, T10 → T11. With E00
+(D-087, D-090, D-091, D-093, D-096, D-108, D-110, D-111, D-112): E00-T05a → T01a → T01b → E00-T04c →
+E00-T04d → E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 → T04a and T08a → T04b and T08b →
+T05 and T08c → T09 and the rest, so a receptionist sees a patient list before Playwright and staging
+exist. T01 is split in two (D-091): the schema and the provider link (T01a), the seed (T01b). T02 is
+split in two (D-096): the list and the search (T02a), adding a patient (T02b); editing a patient's
+details moved to T03, the profile. T04 is split in two (D-108): the day view (T04a); the provider
+filter, a provider's own column, the "now" line and the reading on use (T04b). T08 is split in two
+(D-110): the Settings page and the clinic's details (T08a), beside T04a; the opening hours and closed
+days (T08b), after T04a, whose calendar shows them. T08b is split again (D-111): the opening hours
+(T08b), beside T04b; the closed days (T08c), on the same tab, after it. T05, booking, moves up beside
+T08c, ahead of T09 and T03 (owner, D-112).
 
 ---
 
@@ -823,48 +824,62 @@ journey (E01-T11).
 
 - **Role:** builder · **Risk:** normal (a list and two small forms on a table the app role already
   writes, migration 0002: no table, migration, policy, permission, wrapper or login change) ·
-  **Depends on:** E01-T08b (the Opening hours tab it joins), E01-T04a (Done)
-- **Read:** `scope` (Settings; Calendar) · `data-model` (`closed_days`) · D-029, D-098, D-111 · the
-  architect section of `handoffs/E01-T08c.md` (its Ready pass, in E01-T08b's Done pass)
+  **Depends on:** E01-T08b (the Opening hours tab it joins), E01-T04a (both Done). Runs beside
+  E01-T05, in the second checkout (owner, D-112)
+- **Read:** `scope` (Settings; Calendar) · `data-model` (`closed_days`) · D-029, D-098, D-111, D-112 ·
+  the architect section of `handoffs/E01-T08c.md`
 
 **Why.** A holiday closes the clinic for the day: the calendar shows it closed (E01-T04a), and quiet
-hours count it as a quiet day, so no reminder goes out on it (D-029). Today only the database can add
-one. Split from E01-T08b (D-111).
+hours will count it as a quiet day, so no reminder goes out on it (D-029, E03-T06). Today only the
+database can add one. Split from E01-T08b (D-111).
 
 **Do.**
-- **Closed days**, on the Opening hours tab under the week: the clinic's closed days from its today
-  on, by date, each with its label and a Remove button; one added by its date (the browser's own date
-  field) and a label.
+- **Closed days**, on the Opening hours tab under the week, outside the week's form (a form holds no
+  other form): the clinic's closed days from its today on, by date, each with its label and a Remove
+  button, or one line when none is ahead; one added by its date (the browser's own date field) and a
+  label. A client component keyed by the page's clinic (D-098), its rows read with `settings.manage`,
+  as the week is. After an add, its two fields are empty again. The section's line says what a closed
+  day does today, the calendar shows it closed, and nothing about messages, which come later (E02,
+  E03-T06).
 - A closed day is a calendar date, never a moment: shown from `YYYY-MM-DD` in UTC (`CLAUDE.md`, Dates
-  and times); the clinic's today from `dayInZone()` (`src/lib/calendar-day.ts`) and the wrapper's
-  `now`.
+  and times); the clinic's today from `dayInZone()` (`src/lib/calendar-day.ts`) with the clinic's zone
+  (`tenancy.clinicPlace()`) and the wrapper's `now`. Today itself may be added and removed.
 - **The checks:** a date that is no date (`isCalendarDay`) and an empty label (trimmed, at most 100
-  characters) are the schema's, at their fields. A date already closed, and one before the clinic's
-  today, are the handler's refusals, shown above the button with a text that names the date (D-098);
-  so is a Remove of a day no longer closed (removed in another tab).
-- **The writes** (`tenancy`): add one, remove one by its date. Each audited, `clinic.closed_day_added`
-  or `clinic.closed_day_removed`, its entity the clinic, its metadata the date, never the label (free
-  text). Each Remove is its own small `StaffForm` (the date hidden, the button its Send), so it sends
-  the frame's clinic and answers one way (D-092).
+  characters) are the schema's, at their fields. A date already closed (`already_closed`) and one
+  before the clinic's today (`in_the_past`) are the handler's refusals, shown above the button with a
+  text that names the Date field (D-098; a refusal's text is fixed per code, so it never repeats the
+  date typed); so is a Remove of a day no longer closed (`not_closed`: removed in another tab) or of one
+  before the clinic's today. A date before today is refused before any query: `isCalendarDay` takes
+  `0000-01-01`, which PostgreSQL does not.
+- **The writes** (`tenancy`): add one, an insert that does nothing when the clinic has the date already
+  (its unique key, migration 0002), answered `already_closed`, so a date closed meanwhile in another tab
+  is the same refusal, never a failure; remove one by its date, none removed answered `not_closed`. No
+  lock on the clinic's row: the key settles two adds at once. Each audited,
+  `clinic.closed_day_added` or `clinic.closed_day_removed`, its entity the clinic, its metadata the
+  date, never the label (free text). Each Remove is its own small `StaffForm` (the date hidden, the
+  button its Send), so it sends the frame's clinic and answers one way (D-092). When one is done, the
+  page is rendered again (`refresh()`, as the other saves): the list, and the calendar's next read.
 
-**Out of scope.** Past closed days: not listed, not added. A half day (a closed day closes the whole
-day). Moving or warning about the appointments on a day closed later (the calendar still shows them).
-Quiet hours (E03-T06), which read the closed days. The page in the accessibility check and in a
-journey (E01-T11).
+**Out of scope.** Past closed days: not listed, added or removed. A half day (a closed day closes the
+whole day). Moving or warning about the appointments on a day closed later (the calendar still shows
+them). Quiet hours (E03-T06), which read the closed days. Any change to the calendar, which shows a
+closed day already (E01-T04a) and which E01-T05 changes beside this task (D-112). The page in the
+accessibility check and in a journey (E01-T11).
 
 **Acceptance.**
-- [ ] A closed day added and removed, one audit row each; a date that is no date and an empty label
-      shown at their fields; a date already closed and one before the clinic's today refused above the
-      button, naming the date, with nothing saved; a Remove of a day no longer closed refused (tests).
-- [ ] A dentist, a hygienist and the front desk can neither add nor remove one: each action answers
-      `forbidden` (the permission test).
+- [ ] A closed day added and removed, one audit row each, naming the date and never the label; a date
+      that is no date, and an empty or too long label, shown at their fields; a date already closed and
+      one before the clinic's today refused above the button, with nothing saved; a Remove of a day no
+      longer closed, or of one before the clinic's today, refused (tests).
+- [ ] A dentist, a hygienist and the front desk can neither read, add nor remove closed days: each
+      action answers `forbidden` (`src/app/action-permissions.test.ts`).
 - [ ] A change touches its own clinic's closed days only: another clinic's row for the same date
       unchanged (integration test, two clinics).
 - [ ] A closed day added in Settings shows on the calendar's day (its read: closed, with its label),
       and removing it opens the day again (integration test).
 - [ ] In a zone behind UTC (tests that name `America/New_York`): at 22:00 on the 14th there (the 15th
-      in UTC), the 14th is still the clinic's today, listed and accepted; a closed day shows on its own
-      date, never the day before.
+      in UTC), the 14th is still the clinic's today, listed and accepted, and the 13th refused; a closed
+      day shows on its own date, never the day before.
 - [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---
