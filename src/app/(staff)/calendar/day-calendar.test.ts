@@ -229,8 +229,9 @@ describe('the hours of the grid', () => {
   it.each(['Europe/Skopje', 'America/New_York'])(
     'in %s: a label for each whole hour, from the grid’s first',
     (zone) => {
-      const labels = [...render(monday(), zone).matchAll(/top:([\d.]+)px">(\d+ [AP]M)</g)].map(
-        ([, top, label]) => `${label} at ${top}`,
+      // The space before AM or PM may be a narrow one, as some versions of Intl write it.
+      const labels = [...render(monday(), zone).matchAll(/top:([\d.]+)px">(\d+\s[AP]M)</g)].map(
+        ([, top, label = '']) => `${label.replace(/\s/, ' ')} at ${top}`,
       );
       expect(labels).toEqual([
         '8 AM at 0',
