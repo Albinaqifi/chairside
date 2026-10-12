@@ -7,7 +7,12 @@ import { AUTH_COOKIE_PREFIX } from '@/lib/cookies';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { withoutQueryValues } from '@/lib/query-errors';
-import { AUTH_SECRET_MIN_LENGTH, AUTH_SECRET_REFUSALS, authSecretRefusal } from './auth-secret';
+import {
+  AUTH_SECRET_MIN_LENGTH,
+  AUTH_SECRET_REFUSALS,
+  authSecretRefusal,
+  readAsHttps,
+} from './auth-secret';
 import { recordLogin } from './login-audit';
 import { accounts, rateLimits, sessions, users, verifications } from './schema';
 
@@ -102,10 +107,24 @@ function createAuth() {
   const baseURL = requiredEnv('BETTER_AUTH_URL');
   const secret = requiredEnv('BETTER_AUTH_SECRET');
   // Over https, never with .env.example's secret or a short one, nor with BETTER_AUTH_SECRETS, which
-  // the library reads from the environment itself and would sign with instead (auth-secret.ts).
-  // Thrown before the library exists, so it never starts with it and no session is made; getAuth()
-  // keeps nothing, so every later call is refused too. The error names the code, never a secret.
-  const refused = authSecretRefusal(baseURL, secret, process.env.BETTER_AUTH_SECRETS);
+  // the library reads from the environment itself and would sign with instead; over http too, never
+  // with BETTER_AUTH_TRUSTED_ORIGINS, which it also reads itself and would take a sign-in from
+  // (auth-secret.ts). Thrown before the library exists, so it never starts with them and no session
+  // is made; getAuth() keeps nothing, so every later call is refused too. The error names the code,
+  // never a secret or an origin.
+  const refused = authSecretRefusal(
+    baseURL,
+    secret,
+    process.env.BETTER_AUTH_SECRETS,
+    process.env.BETTER_AUTH_TRUSTED_ORIGINS,
+  );
+  if (refused === 'auth_trusted_origins_set') {
+    throw new Error(
+      `${AUTH_SECRET_REFUSALS[refused]}: the auth library does not start, over http as over ` +
+        `https. Remove BETTER_AUTH_TRUSTED_ORIGINS from the host's settings: BETTER_AUTH_URL is ` +
+        `the only origin a sign-in may come from (${refused}).`,
+    );
+  }
   if (refused !== null) {
     throw new Error(
       `${AUTH_SECRET_REFUSALS[refused]}, and BETTER_AUTH_URL is https: the auth library does not ` +
@@ -185,7 +204,12 @@ export function getAuth(): Auth {
   return state.chairsideAuth;
 }
 
-/** True when the app is reached over https, so cookies we set ourselves are marked Secure too. */
+/**
+ * True when the app is reached over https, so cookies we set ourselves are marked Secure too. Read as
+ * the auth library reads BETTER_AUTH_URL (readAsHttps, auth-secret.ts), so the clinic cookie is Secure
+ * exactly when the library's own are, however the URL is written: ` https://…`, `HTTPS://…` and
+ * `https:/host` too (E00-T07a review, E00-T07e).
+ */
 export function cookiesAreSecure(): boolean {
-  return requiredEnv('BETTER_AUTH_URL').startsWith('https://');
+  return readAsHttps(requiredEnv('BETTER_AUTH_URL'));
 }

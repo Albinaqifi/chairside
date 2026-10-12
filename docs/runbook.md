@@ -145,15 +145,17 @@ reason: the web's log then has one line `health check failed` with a `code`:
 | `auth_secret_example` | `BETTER_AUTH_URL` is https and `BETTER_AUTH_SECRET` is `.env.example`'s, with or without spaces or a line break around it. Set a random one, for example from `openssl rand -base64 32`. |
 | `auth_secret_short` | `BETTER_AUTH_URL` is https and `BETTER_AUTH_SECRET` is shorter than 32 characters, spaces and line breaks around it not counted. The same fix. |
 | `auth_secrets_set` | `BETTER_AUTH_URL` is https and `BETTER_AUTH_SECRETS` is set: the auth library's own list of secrets, which it would sign with in place of `BETTER_AUTH_SECRET`, and which nothing checks. Chairside uses `BETTER_AUTH_SECRET` alone: remove `BETTER_AUTH_SECRETS`. |
+| `auth_trusted_origins_set` | `BETTER_AUTH_TRUSTED_ORIGINS` is set, over http or https: the auth library's own list of origins it would take a sign-in from besides `BETTER_AUTH_URL`'s, so a site served over https could sign in past an http `BETTER_AUTH_URL`. `BETTER_AUTH_URL` is the only one (D-063): remove `BETTER_AUTH_TRUSTED_ORIGINS`, and make `BETTER_AUTH_URL` the address people use. |
 | `database_unreachable` | The database did not answer through `DATABASE_URL`. The line holds the error: the host, the port, a refused login. |
-| `database_login_past_policies` | `DATABASE_URL` logs in as a role that gets past the clinics' row rules: a superuser, a role with `BYPASSRLS`, the tables' owner (the migration role) or a member of it. Use the app's own login, `chairside_app`. |
+| `database_login_past_policies` | `DATABASE_URL` logs in as a role that gets past the clinics' row rules: a superuser, a role with `BYPASSRLS`, the tables' owner (the migration role) or a member of it. A role set when it connects (`options=-c role=chairside_app` in the URL, or `ALTER ROLE … SET role`) does not get round it: one `SET ROLE NONE` goes back to the login, so the login itself is judged. Use the app's own login, `chairside_app`. |
 
 It never waits on the worker: a host restarts a web whose check fails, and the web must stay up while
-the worker is down. With a refused secret the web serves no page at all (500, the same error in its
-log): the auth library does not start, so no session is ever signed with a secret anyone can read. To
-see it here, run the web as above with `-e BETTER_AUTH_URL=https://chairside.example.test` in place of
-the http one; its secret is already `.env.example`'s: `/api/health` answers 503 and the log names
-`auth_secret_example`. Over http (this machine, CI) any secret is taken, as before.
+the worker is down. With a refused secret, or with `BETTER_AUTH_TRUSTED_ORIGINS` set, the web serves no
+page at all (500, the same error in its log): the auth library does not start, so no session is ever
+signed with a secret anyone can read, nor taken from another origin. To see it here, run the web as
+above with `-e BETTER_AUTH_URL=https://chairside.example.test` in place of the http one; its secret is
+already `.env.example`'s: `/api/health` answers 503 and the log names `auth_secret_example`. Over http
+(this machine, CI) any secret is taken, as before; `BETTER_AUTH_TRUSTED_ORIGINS` is refused there too.
 
 ### What the image holds
 
@@ -195,7 +197,7 @@ It does not start, and ends with exit code 1 after one line, `worker not started
 | Code | What to fix |
 |---|---|
 | `database_unreachable` | The database did not answer through `DATABASE_URL`; the line holds the error. The queue never started. |
-| `database_login_past_policies` | `DATABASE_URL` logs in as a role that gets past the clinics' row rules, as for the web's health check above. Use `chairside_app`. The queue never started. |
+| `database_login_past_policies` | `DATABASE_URL` logs in as a role that gets past the clinics' row rules, however its role is set when it connects, as for the web's health check above. Use `chairside_app`. The queue never started. |
 | `queue_not_installed` | The database has no `pgboss` schema: migration 0005 is not applied. Run the migrations. |
 | `queue_version_mismatch` | The `pgboss` schema is at another version than this pg-boss's (45): the code and the migrations disagree. Deploy them together. |
 | `queue_start_failed` | Anything else that stopped the queue starting; the line holds the error. |

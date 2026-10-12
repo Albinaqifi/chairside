@@ -20,7 +20,9 @@ This document has two parts: rules that code must follow, and the gate before re
   update or delete audit rows. On a host, the web's health check (`/api/health`) fails while
   `DATABASE_URL` logs in as a role that can get past the policies: a superuser, one with
   `BYPASSRLS`, a table's owner or a member of one, so such a web never goes live (E00-T07a); the
-  worker does not start with such a login (E00-T07b).
+  worker does not start with such a login (E00-T07b). A role set when the login connects
+  (`options=-c role=…` in the URL, or `ALTER ROLE … SET role`) does not get round it: the check
+  asks of the login itself too, to which one `SET ROLE NONE` goes back (E00-T07e).
 - The job queue's tables (pg-boss, D-005) are shared by every clinic and have no policy: a job's
   data holds ids and codes only, never a patient's details, and its handler works inside its
   clinic's tenant transaction (D-102). A failed job keeps a code: its error goes to the logger,
@@ -115,10 +117,17 @@ This document has two parts: rules that code must follow, and the gate before re
   secret or one shorter than 32 characters, spaces and line breaks around it not counted, nor while
   `BETTER_AUTH_SECRETS` is set, a list it would sign with in that secret's place; so no session is
   made, and the health check fails (E00-T07a).
+- `BETTER_AUTH_URL` is the only origin a sign-in may come from (D-063). The auth library also reads
+  `BETTER_AUTH_TRUSTED_ORIGINS` itself and would take a sign-in from each origin in it, which lets a
+  site served over https get past an http `BETTER_AUTH_URL`, and so past every refusal above: over
+  http as over https, the library never starts while it is set (an empty one is not set), and the
+  health check fails (E00-T07e). `.env.example` never holds it.
 
 ### 8. Web basics
 - HTTPS everywhere, secure and http-only cookies, CSRF protection on every state-changing
-  request, security headers (content security policy, frame denial).
+  request, security headers (content security policy, frame denial). A cookie the app sets itself
+  (the clinic picker's) is Secure exactly when the auth library's own are: both read
+  `BETTER_AUTH_URL` as the WHATWG URL parser does, however it is written (E00-T07e).
 - All input parsed with Zod at the edge. All output escaped by React; no raw HTML from data.
 - A form never puts its fields in the URL: it posts to a URL named in its `action`, or takes a
   function as its action. The login form's submit button stays disabled until the page's script

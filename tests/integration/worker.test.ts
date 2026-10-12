@@ -1,7 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import pg from 'pg';
 import { PgBoss } from 'pg-boss';
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { closeDb } from '@/db/client';
 import { scheduleJob, stopQueue, workJobs, type QueueTimings } from '@/db/queue';
 import type { Clock } from '@/lib/clock';
@@ -193,6 +193,76 @@ describe('the worker refuses to start', { timeout: 60_000 }, () => {
     },
   );
 });
+
+// E00-T07e (E00-T07a critical review 1): the worker's start asks the web's check (databaseProblem()),
+// which judges the login itself too, not only the role the session is now. So a superuser login whose
+// role is set to the app role when it connects, in DATABASE_URL or on the role, starts no worker: one
+// `SET ROLE NONE` would put the job handlers past the clinics' policies. The role is synthetic, its
+// password a marker, and dropped again; the check's every login shape: health.test.ts.
+describe(
+  'the worker refuses a login whose role is set when it connects',
+  { timeout: 60_000 },
+  () => {
+    const SUPER_SETS_ROLE = 'chairside_worker_super_sets_role';
+    const PASSWORD = 'MARKER-worker-pw-sets-role';
+    let superuser: pg.Pool;
+
+    beforeAll(async () => {
+      superuser = new pg.Pool({ connectionString: database.adminUrl, max: 1 });
+      const name = pg.escapeIdentifier(SUPER_SETS_ROLE);
+      await superuser.query(`drop role if exists ${name}`); // left by a run that stopped halfway
+      await superuser.query(
+        `create role ${name} LOGIN SUPERUSER password ${pg.escapeLiteral(PASSWORD)}`,
+      );
+      await superuser.query(`alter role ${name} set role = 'chairside_app'`);
+    });
+
+    afterAll(async () => {
+      await superuser.query(`drop role if exists ${pg.escapeIdentifier(SUPER_SETS_ROLE)}`);
+      await superuser.end();
+    });
+
+    it.each([
+      {
+        login: 'a superuser login whose role is set to the app role in DATABASE_URL',
+        url: () => {
+          const url = new URL(database.adminUrl);
+          url.pathname = `/${database.name}`;
+          url.searchParams.set('options', '-c role=chairside_app');
+          return url.href;
+        },
+      },
+      {
+        login:
+          'a superuser login whose role is set to the app role on the role (ALTER ROLE … SET role)',
+        url: () => {
+          const url = new URL(database.appUrl);
+          url.username = SUPER_SETS_ROLE;
+          url.password = PASSWORD;
+          return url.href;
+        },
+      },
+    ])(
+      'when DATABASE_URL names $login: one log line with the code, exit code 1, pg-boss never started',
+      async ({ url }) => {
+        vi.stubEnv('DATABASE_URL', url());
+        await closeDb();
+        const start = vi.spyOn(PgBoss.prototype, 'start');
+
+        expect(await startWorker()).toBe(1);
+        expect(start).not.toHaveBeenCalled();
+        expect(lines()).toEqual([
+          {
+            level: 'error',
+            fields: expect.objectContaining({ code: 'database_login_past_policies' }),
+            message: 'worker not started',
+          },
+        ]);
+        expect(written()).not.toContain(PASSWORD);
+      },
+    );
+  },
+);
 
 describe('the heartbeat', { timeout: 90_000 }, () => {
   it('runs once a minute of the clock pg-boss reads, and logs one line per run: its code and time only', async () => {

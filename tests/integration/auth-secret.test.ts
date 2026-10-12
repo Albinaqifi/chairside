@@ -352,3 +352,87 @@ describe('a BETTER_AUTH_URL the auth library reads as https, however it is writt
     expect(await sessions()).toBe(before + 1);
   });
 });
+
+// E00-T07e (E00-T07a critical review 2): better-auth 1.7.7 reads BETTER_AUTH_TRUSTED_ORIGINS itself and
+// takes a sign-in from each origin in it besides BETTER_AUTH_URL's (getTrustedOrigins(),
+// dist/context/helpers.mjs), where D-063 allows BETTER_AUTH_URL's alone. The review's probe: with an
+// http BETTER_AUTH_URL and the example secret, a sign-in from https answered 403, and 200, with a cookie
+// neither `__Secure-` nor Secure, once the list named that origin. So the list is refused over http as
+// over https: the library never starts, no session is made, and the error names the code and the
+// setting, never the list. An empty one the library reads as not set, and so do we.
+describe('BETTER_AUTH_TRUSTED_ORIGINS', () => {
+  const MARKER = 'marker-listed-8e1c';
+  /** The https origin of the probe, and one more that no text may hold. */
+  const LISTED = `${HTTPS_ORIGIN},https://${MARKER}.example.test`;
+
+  it.each([
+    {
+      over: "http, with the example secret, .env.example's (the review's probe)",
+      url: HTTP_ORIGIN,
+      secret: EXAMPLE_AUTH_SECRET,
+    },
+    { over: 'http, with a secret of 32 characters', url: HTTP_ORIGIN, secret: LONG_ENOUGH_SECRET },
+    {
+      over: 'https, with a secret of 32 characters',
+      url: HTTPS_ORIGIN,
+      secret: LONG_ENOUGH_SECRET,
+    },
+    {
+      over: 'https written with one slash, with a secret of 32 characters',
+      url: 'https:/chairside.example.test',
+      secret: LONG_ENOUGH_SECRET,
+    },
+  ])(
+    'is refused over $over: the library never starts and no session is made',
+    async ({ url, secret }) => {
+      authSettings(url, secret);
+      vi.stubEnv('BETTER_AUTH_TRUSTED_ORIGINS', LISTED);
+      const before = await sessions();
+
+      const refused = authError();
+      expect(refused?.message).toContain('(auth_trusted_origins_set)');
+      expect(refused?.message, 'it names the setting').toContain('BETTER_AUTH_TRUSTED_ORIGINS');
+      for (const value of [MARKER, 'chairside.example.test', EXAMPLE_AUTH_SECRET, secret]) {
+        expect(refused?.message, 'the error never holds the list or a secret').not.toContain(value);
+      }
+
+      // From the listed https origin, as in the probe, and from BETTER_AUTH_URL's own.
+      for (const from of [HTTPS_ORIGIN, HTTP_ORIGIN]) {
+        const answer = await signIn(from);
+        expect(answer).toBeInstanceOf(Error);
+        expect((answer as Error).message).toContain('(auth_trusted_origins_set)');
+      }
+      expect(await sessions(), 'no session').toBe(before);
+
+      // Nothing was kept: every later use is refused too.
+      expect(authError()?.message).toContain('(auth_trusted_origins_set)');
+    },
+  );
+
+  // The library skips its origin check when NODE_ENV is test (auth-attacks.test.ts), so what the list
+  // would let through is not seen here: that the library trusts each origin in it, from the library
+  // itself: src/modules/auth/auth-secret.test.ts.
+  it('changes nothing over http when it is empty: the library starts and signs in as before', async () => {
+    authSettings(HTTP_ORIGIN, EXAMPLE_AUTH_SECRET);
+    vi.stubEnv('BETTER_AUTH_TRUSTED_ORIGINS', '');
+    const before = await sessions();
+    const answer = await signIn(HTTP_ORIGIN);
+    expect(answer).toBeInstanceOf(Response);
+    expect((answer as Response).status).toBe(200);
+    expect(await sessions()).toBe(before + 1);
+  });
+
+  it('changes nothing over https when it is empty: a strong secret signs in with a Secure cookie', async () => {
+    authSettings(HTTPS_ORIGIN, LONG_ENOUGH_SECRET);
+    vi.stubEnv('BETTER_AUTH_TRUSTED_ORIGINS', '');
+    const before = await sessions();
+    const answer = await signIn(HTTPS_ORIGIN);
+    expect(answer).toBeInstanceOf(Response);
+    expect((answer as Response).status).toBe(200);
+    expect(await sessions()).toBe(before + 1);
+    const cookie = (answer as Response).headers
+      .getSetCookie()
+      .find((set) => set.includes('session_token='));
+    expect(cookie).toMatch(/^__Secure-/);
+  });
+});

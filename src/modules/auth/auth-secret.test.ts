@@ -342,3 +342,121 @@ describe('BETTER_AUTH_URL, as the auth library itself reads it', () => {
     }
   });
 });
+
+// E00-T07e (E00-T07a critical review 2): the auth library reads BETTER_AUTH_TRUSTED_ORIGINS itself and
+// takes a sign-in from each origin in it besides BETTER_AUTH_URL's (better-auth 1.7.7,
+// getTrustedOrigins() in dist/context/helpers.mjs), where D-063 allows BETTER_AUTH_URL's alone. With an
+// http BETTER_AUTH_URL and an https origin in it, a site served over https signs in past every refusal
+// above. So it is refused over http as over https, whatever it holds; an empty one the library reads as
+// not set, and so do we. The library refusing to start, and no session: the integration test
+// auth-secret.test.ts; the health check's 503: health.test.ts.
+describe("BETTER_AUTH_TRUSTED_ORIGINS, the auth library's own list of origins", () => {
+  /** The https origin the critical review's probe listed, beside an http BETTER_AUTH_URL. */
+  const LISTED = 'https://chairside.example.test';
+  const LIST = '1:MARKER-short-known'; // BETTER_AUTH_SECRETS: a version and a short secret
+  const URLS = [
+    HTTP,
+    ` ${HTTP}`,
+    'http:/localhost:3000',
+    'HTTP://localhost:3000',
+    HTTPS,
+    ` ${HTTPS}`,
+    `\n${HTTPS}`,
+    'HTTPS://chairside.example.test',
+    'https:/chairside.example.test',
+    'https:chairside.example.test',
+    'https:\\chairside.example.test',
+  ];
+
+  it('is refused over http and over https, however BETTER_AUTH_URL is written, whatever the secrets', () => {
+    for (const url of URLS) {
+      for (const secret of [LONG_ENOUGH, EXAMPLE_AUTH_SECRET, SHORT]) {
+        expect(authSecretRefusal(url, secret, undefined, LISTED), JSON.stringify(url)).toBe(
+          'auth_trusted_origins_set',
+        );
+      }
+      expect(authSecretRefusal(url, LONG_ENOUGH, LIST, LISTED), JSON.stringify(url)).toBe(
+        'auth_trusted_origins_set',
+      );
+    }
+  });
+
+  it('is refused whatever it holds: Chairside sets no such list', () => {
+    for (const listed of [
+      LISTED,
+      `${LISTED},https://second.example.test`,
+      HTTP, // BETTER_AUTH_URL's own origin
+      '*.example.test',
+      ' ',
+      ',',
+    ]) {
+      expect(authSecretRefusal(HTTP, LONG_ENOUGH, undefined, listed), JSON.stringify(listed)).toBe(
+        'auth_trusted_origins_set',
+      );
+    }
+  });
+
+  it('changes nothing when it is empty, which the library reads as not set', () => {
+    expect(authSecretRefusal(HTTP, EXAMPLE_AUTH_SECRET, undefined, '')).toBeNull();
+    expect(authSecretRefusal(HTTP, SHORT, LIST, '')).toBeNull();
+    expect(authSecretRefusal(HTTPS, LONG_ENOUGH, undefined, '')).toBeNull();
+    expect(authSecretRefusal(HTTPS, EXAMPLE_AUTH_SECRET, undefined, '')).toBe(
+      'auth_secret_example',
+    );
+    expect(authSecretRefusal(HTTPS, SHORT, undefined, '')).toBe('auth_secret_short');
+    expect(authSecretRefusal(HTTPS, LONG_ENOUGH, LIST, '')).toBe('auth_secrets_set');
+  });
+
+  it("is read by authSettingsProblem, from the settings given or the process's", () => {
+    const settings = (listed: string | undefined) =>
+      authSettingsProblem({
+        BETTER_AUTH_URL: HTTP,
+        BETTER_AUTH_SECRET: EXAMPLE_AUTH_SECRET,
+        BETTER_AUTH_TRUSTED_ORIGINS: listed,
+      });
+    expect(settings(LISTED)).toBe('auth_trusted_origins_set');
+    expect(settings('')).toBeNull();
+    expect(settings(undefined)).toBeNull();
+    vi.stubEnv('BETTER_AUTH_URL', HTTP);
+    vi.stubEnv('BETTER_AUTH_SECRET', EXAMPLE_AUTH_SECRET);
+    vi.stubEnv('BETTER_AUTH_TRUSTED_ORIGINS', LISTED);
+    try {
+      expect(authSettingsProblem()).toBe('auth_trusted_origins_set');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('is named in its refusal, which holds no origin', () => {
+    const text = AUTH_SECRET_REFUSALS.auth_trusted_origins_set;
+    expect(text).toContain('BETTER_AUTH_TRUSTED_ORIGINS');
+    expect(text).not.toMatch(/https?:/i);
+  });
+
+  it('is set by no .env.example, which would refuse every login on this machine', () => {
+    const file = readFileSync(new URL('../../../.env.example', import.meta.url), 'utf8');
+    expect(parseEnv(file)).not.toHaveProperty('BETTER_AUTH_TRUSTED_ORIGINS');
+  });
+
+  it('is read by the library itself: it trusts each origin in it, and an empty one not at all', async () => {
+    // The control for the cases above: the list is what the library trusts besides BETTER_AUTH_URL.
+    async function trusted(listed: string | undefined): Promise<string[]> {
+      vi.stubEnv('BETTER_AUTH_TRUSTED_ORIGINS', listed);
+      try {
+        const auth = betterAuth({
+          baseURL: HTTP,
+          secret: LONG_ENOUGH,
+          database: memoryAdapter({}),
+          telemetry: { enabled: false },
+          logger: { disabled: true },
+        });
+        return (await auth.$context).trustedOrigins;
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    }
+    expect(await trusted(LISTED)).toEqual([HTTP, LISTED]);
+    expect(await trusted('')).toEqual([HTTP]);
+    expect(await trusted(undefined)).toEqual([HTTP]);
+  });
+});
