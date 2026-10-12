@@ -7,6 +7,7 @@ import { closeDb } from '@/db/client';
 import { withTenant } from '@/db/tenant';
 import { newId } from '@/lib/ids';
 import { clinicsForUser, createStaffUser, getAuth } from '@/modules/auth';
+import * as tenancy from '@/modules/tenancy';
 import {
   appPool,
   captureOutput,
@@ -530,6 +531,76 @@ describe('run again with the same owner email (acceptance 5)', () => {
 
     expect((await setPassword(tokenOf(printedLink(output)), PASSWORD)).status).toBe(200);
     expect((await signIn(clinic.ownerEmail, PASSWORD)).status).toBe(200);
+  });
+});
+
+// E01-T08a, acceptance 2 (D-110): the zone by a name both the database and Intl know. What the name
+// alone settles is refused before the script connects (src/db/clinic-create.test.ts); a name only the
+// database can refuse is refused after it connects, before anything is written, and a name it knows
+// is stored as it spells it.
+describe('clinic:create and the time zone (E01-T08a)', () => {
+  const withZone = (clinic: ClinicCreateInput, zone: string) => [
+    ...commandLine(clinic),
+    '--time-zone',
+    zone,
+  ];
+
+  it('Europe/Kiev, which Intl knows and the database does not: refused, naming --time-zone, nothing written', async () => {
+    const { rows: known } = await admin.query(
+      `select 1 from pg_timezone_names where name = 'Europe/Kiev'`,
+    );
+    expect(
+      known,
+      'the postgres:18 image knows Europe/Kiev again: this case needs a name it lacks (D-110, "Revisit if")',
+    ).toEqual([]);
+    const clinic = newClinic();
+    const before = await rowCounts();
+    const { output, result } = await captureOutput(() =>
+      runClinicCreate(withZone(clinic, 'Europe/Kiev')),
+    );
+    expect(result).toBe(1);
+    expect(output).toContain('Refused, nothing written:');
+    expect(output).toContain('--time-zone must be');
+    expect(output).not.toContain('/login/set-password#');
+    expect(await rowCounts()).toEqual(before);
+    const { rows } = await admin.query('select 1 from users where email = $1', [clinic.ownerEmail]);
+    expect(rows, 'no person made').toEqual([]);
+  });
+
+  it.each([
+    { given: 'europe/skopje', stored: 'Europe/Skopje' },
+    { given: 'UTC', stored: 'UTC' },
+    { given: 'Europe/Kyiv', stored: 'Europe/Kyiv' },
+  ])('$given: the clinic made, its zone stored as $stored', async ({ given, stored }) => {
+    const clinic = newClinic();
+    const { result } = await captureOutput(() => runClinicCreate(withZone(clinic, given)));
+    expect(result).toBe(0);
+    const [owned] = await clinicsForUser(await userIdOf(clinic.ownerEmail));
+    const { rows } = await admin.query('select timezone from clinics where id = $1', [
+      owned!.clinicId,
+    ]);
+    expect(rows).toEqual([{ timezone: stored }]);
+  });
+
+  it('createClinic itself refuses a zone the database does not know, inside its transaction: an Error, nothing written', async () => {
+    const clinicId = newId();
+    await expect(
+      withTenant(clinicId, (tx) =>
+        tenancy.createClinic(
+          tx,
+          {
+            name: 'Kiev Dental',
+            timeZone: 'Europe/Kiev',
+            country: 'UA',
+            currency: 'UAH',
+            locale: 'en',
+          },
+          new Date(),
+        ),
+      ),
+    ).rejects.toThrow(/timeZone/);
+    const { rows } = await admin.query('select 1 from clinics where id = $1', [clinicId]);
+    expect(rows).toEqual([]);
   });
 });
 

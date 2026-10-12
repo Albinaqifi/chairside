@@ -19,7 +19,7 @@ pnpm clinic:create --name "Lakeside Dental" --owner-email owner@example.test --o
 |---|---|
 | `--name` | The clinic's name, as its staff will see it. Required. |
 | `--owner-email`, `--owner-name` | The first owner's email (their login) and name. Required. |
-| `--time-zone` | IANA name. `Europe/Skopje` when left out. |
+| `--time-zone` | A region's IANA name that the database and the app both know (`Europe/Skopje`, `America/Argentina/Buenos_Aires`), or `UTC`; in any case, stored as the database spells it (`europe/skopje` → `Europe/Skopje`). Never an offset such as `+01:00` (the database reads it as an hour west of UTC, the app as an hour east, and it never moves to summer time) nor an `Etc/` zone; and `Europe/Kyiv`, not the old `Europe/Kiev`, which the database does not know (D-110). The owner can change it later on Settings. `Europe/Skopje` when left out. |
 | `--country` | Two capital letters, as the phone package knows them (`GB`, not `UK`). `MK` when left out. |
 | `--currency` | Three capital letters. `MKD` when left out. |
 | `--locale` | `en`, the only language the app has texts in (D-053). |
@@ -35,10 +35,12 @@ What it does, in this order:
    database's clinic rules bind it as they bind every page. It reads only the app's settings:
    `DATABASE_URL`, `BETTER_AUTH_URL` (the address the link starts with: it must be the address the
    owner will open) and `BETTER_AUTH_SECRET`.
-3. Makes the owner, without a password: nobody can log in as them yet.
-4. Makes the link, then the clinic, the owner's place in it, and one line in the clinic's audit log
+3. Asks the database whether it knows the time zone by that name. A zone it does not know is refused
+   as an option is, naming `--time-zone`; nothing is written.
+4. Makes the owner, without a password: nobody can log in as them yet.
+5. Makes the link, then the clinic, the owner's place in it, and one line in the clinic's audit log
    (`clinic.created`).
-5. Prints the clinic's id and the link.
+6. Prints the clinic's id and the link.
 
 ### The link
 

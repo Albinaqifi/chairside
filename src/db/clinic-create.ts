@@ -48,7 +48,12 @@ const FIELDS: Record<Field, { option: string; mustBe: string }> = {
   name: { option: '--name', mustBe: "the clinic's name, not empty" },
   ownerEmail: { option: '--owner-email', mustBe: "the owner's email address" },
   ownerName: { option: '--owner-name', mustBe: "the owner's name, not empty" },
-  timeZone: { option: '--time-zone', mustBe: 'a time zone Intl knows, such as Europe/Skopje' },
+  timeZone: {
+    option: '--time-zone',
+    mustBe:
+      "a time zone by its region's name that the database and the app both know, such as " +
+      'Europe/Skopje, or UTC: never an offset or an Etc/ zone',
+  },
   country: {
     option: '--country',
     mustBe: 'a country the phone package supports: two capital letters, such as MK (GB, not UK)',
@@ -188,8 +193,11 @@ export function clinicCreateTargetProblem(
   return null;
 }
 
-/** Why a run made nothing: a person with the owner's email is there already. */
-export type ClinicCreateRefusal = 'owner_has_clinic' | 'owner_has_password';
+/**
+ * Why a run made nothing: the database does not know the time zone by that name (D-110), or a
+ * person with the owner's email is there already.
+ */
+export type ClinicCreateRefusal = 'time_zone_unknown' | 'owner_has_clinic' | 'owner_has_password';
 
 export type ClinicCreateResult =
   | {
@@ -211,9 +219,12 @@ export type ClinicCreateResult =
  * a transaction that fails leaves the person and an unprinted link nobody has, which expires. A
  * second run with the same owner email takes that person up and finishes the work.
  *
- * Refused, with nothing written: an owner email whose person is already in a clinic (a second run:
- * no second clinic, and no second live link, which could reset a password already chosen), or whose
- * person has a password. `now` is the run's moment: the link's 3 days, the rows' times.
+ * Refused, with nothing written: a time zone the database does not know (tenancy.knownTimeZone(),
+ * asked first, in a transaction of its own for the new clinic, which reads no row: createClinic()
+ * asks again in the one that writes, and stores the zone as the database spells it); an owner email
+ * whose person is already in a clinic (a second run: no second clinic, and no second live link,
+ * which could reset a password already chosen), or whose person has a password. `now` is the run's
+ * moment: the link's 3 days, the rows' times.
  */
 export async function createClinicWithOwner(
   input: ClinicCreateInput,
@@ -223,6 +234,12 @@ export async function createClinicWithOwner(
   if (problems.length > 0) {
     throw new Error(`createClinicWithOwner: ${problems.join(', ')} cannot be used`);
   }
+  const clinicId = newId();
+  const zoneKnown = await withTenant(
+    clinicId,
+    async (tx) => (await tenancy.knownTimeZone(tx, input.timeZone)) !== null,
+  );
+  if (!zoneKnown) return { ok: false, refusal: 'time_zone_unknown' };
   const found = await findStaffUser(input.ownerEmail);
   if (found && (await clinicsForUser(found.id)).length > 0) {
     return { ok: false, refusal: 'owner_has_clinic' };
@@ -232,7 +249,6 @@ export async function createClinicWithOwner(
   const userId =
     found?.id ?? (await createStaffUser({ email: input.ownerEmail, name: input.ownerName })).id;
   const link = await createSetupLink(userId, now);
-  const clinicId = newId();
   await withTenant(clinicId, async (tx) => {
     const { name, timeZone, country, currency, locale } = input;
     await tenancy.createClinic(tx, { name, timeZone, country, currency, locale }, now);
@@ -251,6 +267,8 @@ export async function createClinicWithOwner(
 }
 
 const REFUSALS: Record<ClinicCreateRefusal, string> = {
+  // As an option refused before the run connects: what was given is not repeated.
+  time_zone_unknown: `Refused, nothing written:\n  ${FIELDS.timeZone.option} must be ${FIELDS.timeZone.mustBe}.`,
   owner_has_clinic:
     'Nothing was written: the person with this owner email is already in a clinic. A second run ' +
     'makes no second person, clinic or link. A link that expired unused: docs/runbook.md.',

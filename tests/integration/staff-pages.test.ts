@@ -15,6 +15,7 @@ import NewPatientPage from '@/app/(staff)/patients/new/page';
 import PatientsPage from '@/app/(staff)/patients/page';
 import { PatientList } from '@/app/(staff)/patients/patient-list';
 import { PlaceholderPage } from '@/app/(staff)/placeholder-page';
+import { ClinicDetailsForm } from '@/app/(staff)/settings/clinic-details-form';
 import SettingsPage from '@/app/(staff)/settings/page';
 import { Sidebar } from '@/app/(staff)/sidebar';
 import VisitPage from '@/app/(staff)/visit/page';
@@ -53,8 +54,10 @@ vi.mock('next/headers', () => ({
 }));
 
 // The pages' texts come from next-intl, which only a running Next.js configures: each is its key.
+// E01-T08a: the Settings page names its countries and currencies in the request's locale.
 vi.mock('next-intl/server', () => ({
   getTranslations: () => Promise.resolve((key: string) => key),
+  getLocale: () => Promise.resolve('en'),
 }));
 
 /** Every staff page, by the path it is served at. */
@@ -68,17 +71,38 @@ const PAGES: Record<string, () => Promise<ReactNode>> = {
   '/settings': SettingsPage,
 };
 
+/**
+ * Where a page sent the person with Next.js's redirect(), 'not found' when it answered with
+ * notFound() (E01-T08a: Settings, to anyone but an owner), or undefined when it rendered.
+ */
+async function outcomeOf(call: Promise<unknown>): Promise<string | undefined> {
+  try {
+    return await redirectOf(call);
+  } catch (error) {
+    if ((error as { digest?: unknown } | null)?.digest === 'NEXT_HTTP_ERROR_FALLBACK;404') {
+      return 'not found';
+    }
+    throw error;
+  }
+}
+
 /** Where each page, and the layout around them, sent the person; undefined where it rendered. */
 async function whereEachGoes(): Promise<Record<string, string | undefined>> {
   const outcome: Record<string, string | undefined> = {};
-  for (const [path, page] of Object.entries(PAGES)) outcome[path] = await redirectOf(page());
-  outcome.layout = await redirectOf(StaffLayout({ children: null }));
+  for (const [path, page] of Object.entries(PAGES)) outcome[path] = await outcomeOf(page());
+  outcome.layout = await outcomeOf(StaffLayout({ children: null }));
   return outcome;
 }
 
 /** The same answer for every page and the layout. */
 const everywhere = (answer: string | undefined) =>
   Object.fromEntries([...Object.keys(PAGES), 'layout'].map((key) => [key, answer]));
+
+/**
+ * What a front-desk member gets: every page and the layout render, but Settings, the owner's
+ * alone, answers "not found" (E01-T08a; the owner's yes to this change, 2026-10-12).
+ */
+const forFrontDesk = () => ({ ...everywhere(undefined), '/settings': 'not found' });
 
 const admin = migratorPool();
 let firstClinic: string;
@@ -149,13 +173,13 @@ describe('every staff page checks the session itself (E00-T04b, acceptance 4)', 
 
   it('a member of one clinic: every page and the layout render', async () => {
     request.cookie = await signInCookie(oneClinic.email, PASSWORD, freshAddress());
-    expect(await whereEachGoes()).toEqual(everywhere(undefined));
+    expect(await whereEachGoes()).toEqual(forFrontDesk());
   });
 
   it('a member of two clinics who chose one: every page and the layout render', async () => {
     request.cookie = await signInCookie(twoClinics.email, PASSWORD, freshAddress());
     request.clinic = secondClinic;
-    expect(await whereEachGoes()).toEqual(everywhere(undefined));
+    expect(await whereEachGoes()).toEqual(forFrontDesk());
   });
 });
 
@@ -222,7 +246,10 @@ describe('the frame names the clinic of the request, and each page the clinic it
       request.clinic = chosen;
       expect(await frameOfLayout()).toEqual({ frame: chosen, sidebars: [chosen] });
       for (const [path, page] of Object.entries(PAGES)) {
-        expect(await pageClinicsOf(page), path).toEqual([chosen]);
+        // Settings is the owner's alone: "not found" for this front-desk member (E01-T08a). Its
+        // frame check as an owner is below.
+        if (path === '/settings') expect(await outcomeOf(page()), path).toBe('not found');
+        else expect(await pageClinicsOf(page), path).toEqual([chosen]);
       }
       const components = await ComponentsPage();
       const ids = elementsOf<{ clinicId: unknown }>(components, PageClinic).map(
@@ -315,6 +342,71 @@ describe('the new-patient page (E01-T02b)', () => {
       );
       expect(clinics).toEqual([chosen]);
       expect(elementsOf(page, NewPatientForm).map((form) => form.key)).toEqual([chosen]);
+    }
+  });
+});
+
+// E01-T08a, acceptance 3: Settings is the owner's alone (settings.manage). Anyone else gets "not
+// found", as the new-patient page answers; the owner gets the page, with PageClinic for the clinic it
+// was rendered for and the Clinic tab's form keyed by that clinic, filled from its row (D-098).
+
+describe('the Settings page (E01-T08a)', () => {
+  /** A synthetic member with this role in the given clinics, named with a role word; their email. */
+  async function memberAs(role: string, clinics: string[]): Promise<string> {
+    const email = testEmail();
+    const { id } = await createStaffUser({ email, name: 'Owner', password: PASSWORD });
+    for (const clinicId of clinics) await insertMembership(admin, { clinicId, userId: id, role });
+    return email;
+  }
+
+  it.each(['dentist', 'hygienist', 'front_desk'])(
+    'as a %s of the clinic: not found, and the frame still renders',
+    async (role) => {
+      request.cookie = await signInCookie(
+        await memberAs(role, [firstClinic]),
+        PASSWORD,
+        freshAddress(),
+      );
+      expect(await outcomeOf(SettingsPage())).toBe('not found');
+      expect(await outcomeOf(StaffLayout({ children: null }))).toBeUndefined();
+    },
+  );
+
+  it('signed out: to the login page; an owner of two clinics who has not chosen one: to the picker', async () => {
+    expect(await outcomeOf(SettingsPage())).toBe('/login');
+    request.cookie = await signInCookie(
+      await memberAs('owner', [firstClinic, secondClinic]),
+      PASSWORD,
+      freshAddress(),
+    );
+    expect(await outcomeOf(SettingsPage())).toBe('/choose-clinic');
+  });
+
+  it('an owner of two clinics who chose one: PageClinic and the form, keyed by that clinic, filled from its row', async () => {
+    request.cookie = await signInCookie(
+      await memberAs('owner', [firstClinic, secondClinic]),
+      PASSWORD,
+      freshAddress(),
+    );
+    for (const chosen of [firstClinic, secondClinic]) {
+      request.clinic = chosen;
+      const page = await SettingsPage();
+      const clinics = elementsOf<{ clinicId: unknown }>(page, PageClinic).map(
+        (e) => e.props.clinicId,
+      );
+      expect(clinics).toEqual([chosen]);
+      const forms = elementsOf<ComponentProps<typeof ClinicDetailsForm>>(page, ClinicDetailsForm);
+      expect(forms.map((form) => form.key)).toEqual([chosen]);
+      const { rows } = await admin.query<{ name: string }>(
+        'select name from clinics where id = $1',
+        [chosen],
+      );
+      expect(forms[0]?.props.values).toMatchObject({
+        name: rows[0]?.name,
+        timeZone: 'Europe/Skopje',
+        country: 'MK',
+      });
+      expect(forms[0]?.props.choices.timeZones.areas.length).toBeGreaterThan(5);
     }
   });
 });
