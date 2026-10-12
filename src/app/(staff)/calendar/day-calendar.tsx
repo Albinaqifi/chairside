@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useFormatter, useTranslations } from 'next-intl';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { CalendarDay } from '@/lib/calendar-day';
 import type { AppointmentStatus } from '@/modules/scheduling';
 import { cn } from '@/ui/cn';
@@ -59,8 +59,14 @@ const STRUCK: ReadonlySet<AppointmentStatus> = new Set(['cancelled', 'no_show'])
 /** No tag line for these, unless a note: the demo's rule (logic line 1827). */
 const UNTAGGED: ReadonlySet<AppointmentStatus> = new Set(['confirmed', 'completed']);
 
-/** A visit's time: its hour and minute in the clinic's zone, which next-intl's provider holds. */
+/**
+ * A visit's time: its hour and minute in the clinic's zone, which next-intl's provider holds, in the
+ * 24-hour clock its locale carries (src/i18n/locale.ts): "09:00".
+ */
 const TIME = { hour: 'numeric', minute: '2-digit' } as const;
+
+/** An hour of the grid, "08:00": no moment, so in UTC (CLAUDE.md, Dates and times). */
+const HOUR_LABEL = { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' } as const;
 
 const NAV_LINK =
   'flex items-center px-3 py-2 text-text outline-none hover:bg-bg hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus focus-visible:outline-solid';
@@ -70,17 +76,43 @@ export function dayHref(day: CalendarDay): string {
   return `/calendar?day=${day}`;
 }
 
+export interface DayCalendarProps {
+  view: CalendarDayView;
+  /**
+   * The providers whose columns show, from the filter's choice (./filter.ts); every column when left
+   * out, a day drawn without the filter.
+   */
+  shown?: readonly string[];
+  /**
+   * Turns a provider's column off or on: a chip's click. The chips show only with it, as nothing
+   * else could turn a column off; the page's calendar always passes it (./calendar-screen.tsx).
+   */
+  onToggle?: (providerId: string) => void;
+  /** The "now" line's minute of the day on the clinic's clock (./now-line.ts), or null for none. */
+  nowMinute?: number | null;
+  /** Shown under the line that counts what shows: a read on use that did not work. */
+  notice?: ReactNode;
+}
+
 /**
  * The calendar's day (E01-T04a, demo lines 215–283): Previous, Today and Next, the day as the title,
- * the count of its appointments and columns, then a column per provider on an hour grid, and the
- * statuses' legend. Rendered on the server; nothing on it is clicked yet (E01-T05, E01-T06). Every
- * moment is shown in the clinic's zone (next-intl's formatter, D-015); the day, the hours of the
- * grid and the weekday are no moments, so they are formatted in UTC (CLAUDE.md, Dates and times).
+ * the provider filter's chips (E01-T04b), the count of the appointments and columns shown, then a
+ * column per provider shown on an hour grid, with the "now" line on today (E01-T04b), and the
+ * statuses' legend. Drawn from what ./calendar-screen.tsx holds: the filter's choice and the clock
+ * are the browser's. Nothing on it is clicked yet but the chips (E01-T05, E01-T06). Every moment is
+ * shown in the clinic's zone (next-intl's formatter, D-015); the day, the hours of the grid and the
+ * weekday are no moments, so they are formatted in UTC (CLAUDE.md, Dates and times).
  *
  * A closed day says so above the grid, with its label (the demo has no closed day: a layout proposed
  * for the owner in the handoff note).
  */
-export function DayCalendar({ view }: { view: CalendarDayView }) {
+export function DayCalendar({
+  view,
+  shown,
+  onToggle,
+  nowMinute = null,
+  notice = null,
+}: DayCalendarProps) {
   const t = useTranslations();
   const format = useFormatter();
   const date = new Date(view.day);
@@ -92,35 +124,56 @@ export function DayCalendar({ view }: { view: CalendarDayView }) {
     year: sameYear ? undefined : 'numeric',
     timeZone: 'UTC',
   });
+  const showing = new Set(shown ?? view.columns.map((column) => column.providerId));
+  const columns = view.columns.filter((column) => showing.has(column.providerId));
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <nav
-          aria-label={t('calendar.dayNavigation')}
-          className="flex overflow-hidden rounded-control border border-border-strong bg-surface"
-        >
-          <Link
-            href={dayHref(view.previous)}
-            aria-label={t('calendar.previousDay')}
-            className={NAV_LINK}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <nav
+            aria-label={t('calendar.dayNavigation')}
+            className="flex overflow-hidden rounded-control border border-border-strong bg-surface"
           >
-            <ChevronLeft aria-hidden="true" className="size-4" />
-          </Link>
-          <Link href="/calendar" className={cn(NAV_LINK, 'border-x border-border font-medium')}>
-            {t('calendar.today')}
-          </Link>
-          <Link href={dayHref(view.next)} aria-label={t('calendar.nextDay')} className={NAV_LINK}>
-            <ChevronRight aria-hidden="true" className="size-4" />
-          </Link>
-        </nav>
-        <h1 className="font-serif text-heading tracking-heading">{title}</h1>
+            <Link
+              href={dayHref(view.previous)}
+              aria-label={t('calendar.previousDay')}
+              className={NAV_LINK}
+            >
+              <ChevronLeft aria-hidden="true" className="size-4" />
+            </Link>
+            <Link href="/calendar" className={cn(NAV_LINK, 'border-x border-border font-medium')}>
+              {t('calendar.today')}
+            </Link>
+            <Link href={dayHref(view.next)} aria-label={t('calendar.nextDay')} className={NAV_LINK}>
+              <ChevronRight aria-hidden="true" className="size-4" />
+            </Link>
+          </nav>
+          <h1 className="font-serif text-heading tracking-heading">{title}</h1>
+        </div>
+        {onToggle && view.columns.length > 0 && (
+          <div
+            role="group"
+            aria-label={t('calendar.providerFilter')}
+            className="flex flex-wrap gap-1.5"
+          >
+            {view.columns.map((column) => (
+              <ProviderChip
+                key={column.providerId}
+                column={column}
+                on={showing.has(column.providerId)}
+                onToggle={onToggle}
+              />
+            ))}
+          </div>
+        )}
       </div>
       <p className="-mt-1.5 mb-3 text-small text-muted">
         {t('calendar.summary', {
-          appointments: view.appointmentCount,
-          chairs: view.columns.length,
+          appointments: columns.reduce((sum, column) => sum + appointmentsOf(column), 0),
+          chairs: columns.length,
         })}
       </p>
+      {notice}
       {view.closed && (
         <p className="mb-3 rounded-control border border-border bg-outside-hours px-3 py-2">
           {view.closed.why === 'closed_day'
@@ -130,7 +183,7 @@ export function DayCalendar({ view }: { view: CalendarDayView }) {
               })}
         </p>
       )}
-      <DayGrid view={view} />
+      <DayGrid view={view} columns={columns} nowMinute={nowMinute} />
       <ul
         aria-label={t('calendar.legend')}
         className="mt-3 flex flex-wrap gap-4 text-small text-muted"
@@ -146,8 +199,56 @@ export function DayCalendar({ view }: { view: CalendarDayView }) {
   );
 }
 
-/** The grid: the columns' headers, the hours, and each column's shading, lines and blocks. */
-function DayGrid({ view }: { view: CalendarDayView }) {
+/**
+ * A provider's chip in the filter (demo lines 228–232): its short name beside a dot of its strong
+ * tint, a button whose pressed state says whether its column shows. On, on the provider's tint and
+ * edge; off, plain, its name in the muted text and its dot faded (the demo fades the whole chip,
+ * whose text would then be too faint to read: WCAG AA).
+ */
+function ProviderChip({
+  column,
+  on,
+  onToggle,
+}: {
+  column: Column;
+  on: boolean;
+  onToggle: (providerId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={() => onToggle(column.providerId)}
+      className={cn(
+        'flex items-center gap-1.75 rounded-pill border px-2.75 py-1.5 text-small font-medium whitespace-nowrap outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus focus-visible:outline-solid',
+        on
+          ? 'border-provider-edge bg-provider-tint text-text'
+          : 'border-border bg-surface text-muted',
+      )}
+      style={cssVariables({ '--provider-hue': String(column.hue) })}
+    >
+      <span
+        aria-hidden="true"
+        className={cn('size-2.25 rounded-dot bg-provider-strong', !on && 'opacity-60')}
+      />
+      {column.shortName}
+    </button>
+  );
+}
+
+/**
+ * The grid: the headers of the columns shown, the hours, each column's shading, lines and blocks,
+ * and the "now" line across the columns at its minute (demo lines 273–275), drawn over them.
+ */
+function DayGrid({
+  view,
+  columns,
+  nowMinute,
+}: {
+  view: CalendarDayView;
+  columns: readonly Column[];
+  nowMinute: number | null;
+}) {
   const t = useTranslations();
   const format = useFormatter();
   const { grid } = view;
@@ -157,7 +258,7 @@ function DayGrid({ view }: { view: CalendarDayView }) {
     <div className="overflow-hidden rounded-card border border-border bg-surface">
       <div className="flex border-b border-border">
         <div className="w-14.5 shrink-0" />
-        {view.columns.map((column) => (
+        {columns.map((column) => (
           <ColumnHeader key={column.providerId} column={column} />
         ))}
         {view.columns.length === 0 && (
@@ -174,14 +275,11 @@ function DayGrid({ view }: { view: CalendarDayView }) {
               className="absolute right-2.5 -translate-y-1.75 text-caption text-muted tabular-nums"
               style={{ top: px(hour * 60 - grid.from) }}
             >
-              {format.dateTime(new Date(Date.UTC(2000, 0, 1, hour)), {
-                hour: 'numeric',
-                timeZone: 'UTC',
-              })}
+              {format.dateTime(new Date(Date.UTC(2000, 0, 1, hour)), HOUR_LABEL)}
             </div>
           ))}
         </div>
-        {view.columns.map((column) => (
+        {columns.map((column) => (
           <div
             key={column.providerId}
             className="relative min-w-0 flex-1 border-l border-border"
@@ -210,9 +308,24 @@ function DayGrid({ view }: { view: CalendarDayView }) {
             </ul>
           </div>
         ))}
+        {nowMinute !== null && columns.length > 0 && (
+          <div
+            aria-hidden="true"
+            data-now-line=""
+            className="pointer-events-none absolute right-0 left-13 h-0.5 bg-now-line"
+            style={{ top: px(nowMinute - grid.from) }}
+          >
+            <div className="absolute -top-1 -left-1 size-2.5 rounded-pill bg-now-line" />
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+/** How many appointments a column holds, of every status: the line under the title counts them. */
+function appointmentsOf(column: Column): number {
+  return column.blocks.filter((block) => block.kind === 'appointment').length;
 }
 
 /** A column's header: the initials in a circle of the provider's tint, the name, the chair and % booked. */

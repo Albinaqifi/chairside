@@ -4,6 +4,7 @@ import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { FrameClinic } from '@/app/_lib/frame-clinic';
 import messages from '@/i18n/en.json';
+import { LOCALE } from '@/i18n/locale';
 import type { PatientList as List, PatientRow } from '@/modules/patients';
 import { PatientList, PatientTable } from './patient-list';
 
@@ -35,7 +36,7 @@ function row(fields: Partial<PatientRow> = {}): PatientRow {
 function render(element: ReactNode, timeZone = 'Europe/Skopje'): string {
   const frame: ComponentProps<typeof FrameClinic> = { clinicId: CLINIC, children: element };
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
-    locale: 'en',
+    locale: LOCALE,
     messages,
     timeZone,
     children: createElement(FrameClinic, frame),
@@ -177,9 +178,9 @@ describe("a visit's date and time, in the clinic's time zone whatever the comput
   });
 
   it.each([
-    { zone: 'Europe/Skopje', last: 'Mar 13, 2026', next: 'Fri, Oct 9, 10:00 AM' },
-    { zone: 'Pacific/Auckland', last: 'Mar 13, 2026', next: 'Fri, Oct 9, 9:00 PM' },
-    { zone: 'UTC', last: 'Mar 12, 2026', next: 'Fri, Oct 9, 8:00 AM' },
+    { zone: 'Europe/Skopje', last: 'Mar 13, 2026', next: 'Fri, Oct 9, 10:00' },
+    { zone: 'Pacific/Auckland', last: 'Mar 13, 2026', next: 'Fri, Oct 9, 21:00' },
+    { zone: 'UTC', last: 'Mar 12, 2026', next: 'Fri, Oct 9, 08:00' },
   ])('a clinic in $zone: $last, and $next', ({ zone, last, next }) => {
     const shown = text(render(createElement(PatientTable, { query: '', rows: [visits] }), zone));
     expect(shown).toContain(` ${last} ${next} `);

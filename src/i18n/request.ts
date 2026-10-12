@@ -2,6 +2,7 @@ import { getRequestConfig } from 'next-intl/server';
 import { settledStaff } from '@/app/_lib/auth';
 import { clinicTimeZone } from '@/app/_lib/clinic-time-zone';
 import messages from './en.json';
+import { LOCALE } from './locale';
 
 /**
  * The zone of a page that belongs to no clinic: the login page and the clinic picker, which show no
@@ -28,10 +29,11 @@ export async function requestTimeZone(): Promise<string> {
  * (D-053), so one message file and no locale routing. next-intl needs no middleware then, and gets
  * none: the request proxy is src/proxy.ts (D-067). next.config.ts finds this file by its path. The
  * time zone set here reaches client components through the root layout's NextIntlClientProvider,
- * so the server and the browser show a visit at the same time, whatever their computers' zones.
+ * so the server and the browser show a visit at the same time, whatever their computers' zones. The
+ * locale carries the 24-hour clock for every page and client component (./locale.ts, E01-T04b).
  */
 export default getRequestConfig(async () => ({
-  locale: 'en',
+  locale: LOCALE,
   messages,
   timeZone: await requestTimeZone(),
 }));

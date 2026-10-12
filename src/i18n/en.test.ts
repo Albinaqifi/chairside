@@ -2,6 +2,7 @@ import { createTranslator } from 'next-intl';
 import { describe, expect, it } from 'vitest';
 import { ROLES } from '@/modules/auth';
 import messages from './en.json';
+import { LOCALE } from './locale';
 
 /** Every text of the message file under its full key, such as ['login.title', 'Log in · Chairside']. */
 function texts(node: unknown, prefix = ''): [string, string][] {
@@ -28,7 +29,7 @@ describe('the message file, src/i18n/en.json', () => {
   it('holds only messages next-intl can format: a broken one would fail its page', () => {
     const errors: string[] = [];
     const t = createTranslator({
-      locale: 'en',
+      locale: LOCALE,
       messages,
       onError: (error) => errors.push(error.code),
     });

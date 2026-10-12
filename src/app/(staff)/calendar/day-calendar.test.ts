@@ -3,10 +3,11 @@ import { createElement, type ComponentProps } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import messages from '@/i18n/en.json';
+import { LOCALE } from '@/i18n/locale';
 import type { AppointmentStatus, DayAppointment, Provider } from '@/modules/scheduling';
 import type { OpeningHours } from '@/modules/tenancy';
 import { layoutDay, type CalendarDayView, type DayRows } from './day';
-import { DayCalendar, dayHref } from './day-calendar';
+import { DayCalendar, dayHref, type DayCalendarProps } from './day-calendar';
 
 // E01-T04a: the calendar's day as the server sends it, with next-intl's provider as the root layout
 // gives it: the message file and the clinic's zone (src/i18n/request.ts). Each case names the zone
@@ -85,7 +86,7 @@ function monday(fields: Partial<DayRows> = {}): CalendarDayView {
 
 function render(view: CalendarDayView, timeZone: string): string {
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
-    locale: 'en',
+    locale: LOCALE,
     messages,
     timeZone,
     children: createElement(DayCalendar, { view }),
@@ -204,7 +205,7 @@ describe("each visit at its local start, as long as it lasts, its time in the cl
     const [block] = blocks(html);
     // One pixel under its start, three above its end (demo logic line 1821).
     expect(block?.attributes).toContain('top:88px;height:40.5px');
-    expect(text(block?.inside ?? '')).toContain(' 9:00 AM Ana Brezovska ');
+    expect(text(block?.inside ?? '')).toContain(' 09:00 Ana Brezovska ');
   });
 
   it('New York, behind UTC: a visit at 23:30 on its own day, at 23:30', () => {
@@ -221,7 +222,7 @@ describe("each visit at its local start, as long as it lasts, its time in the cl
     const [block] = blocks(html);
     // The grid runs from 08:00 to midnight: 15.5 hours down.
     expect(block?.attributes).toContain(`top:${15.5 * 87 + 1}px`);
-    expect(text(block?.inside ?? '')).toContain(' 11:30 PM Ana Brezovska ');
+    expect(text(block?.inside ?? '')).toContain(' 23:30 Ana Brezovska ');
   });
 });
 
@@ -229,21 +230,21 @@ describe('the hours of the grid', () => {
   it.each(['Europe/Skopje', 'America/New_York'])(
     'in %s: a label for each whole hour, from the grid’s first',
     (zone) => {
-      // The space before AM or PM may be a narrow one, as some versions of Intl write it.
-      const labels = [...render(monday(), zone).matchAll(/top:([\d.]+)px">(\d+\s[AP]M)</g)].map(
-        ([, top, label = '']) => `${label.replace(/\s/, ' ')} at ${top}`,
+      // The 24-hour clock (E01-T04b, D-049): "08:00", as the format alone changed.
+      const labels = [...render(monday(), zone).matchAll(/top:([\d.]+)px">(\d\d:\d\d)</g)].map(
+        ([, top, label = '']) => `${label} at ${top}`,
       );
       expect(labels).toEqual([
-        '8 AM at 0',
-        '9 AM at 87',
-        '10 AM at 174',
-        '11 AM at 261',
-        '12 PM at 348',
-        '1 PM at 435',
-        '2 PM at 522',
-        '3 PM at 609',
-        '4 PM at 696',
-        '5 PM at 783',
+        '08:00 at 0',
+        '09:00 at 87',
+        '10:00 at 174',
+        '11:00 at 261',
+        '12:00 at 348',
+        '13:00 at 435',
+        '14:00 at 522',
+        '15:00 at 609',
+        '16:00 at 696',
+        '17:00 at 783',
       ]);
     },
   );
@@ -316,9 +317,7 @@ describe("a visit's look by its status, and its tag line (the demo's rule)", () 
   });
 
   it('each shows its time, its patient and its title', () => {
-    expect(text(byStatus.get('arrived')?.inside ?? '')).toContain(
-      ' 10:00 AM Ana Brezovska Filling ',
-    );
+    expect(text(byStatus.get('arrived')?.inside ?? '')).toContain(' 10:00 Ana Brezovska Filling ');
   });
 
   it('a note is the tag, whatever the status; the status is then read out', () => {
@@ -456,3 +455,181 @@ function rowsOf(view: CalendarDayView): DayRows {
     appointments: [],
   };
 }
+
+// E01-T04b: what the browser's calendar (./calendar-screen.tsx) hands the day: the filter's choice
+// and its chips, the "now" line's minute. Drawn here as the server draws them.
+
+const LUMI: Provider = {
+  ...PLANINSKA,
+  id: '01970000-0000-7000-8000-000000000103',
+  name: 'Vesna Lumi',
+  shortName: 'Lumi',
+  chairLabel: 'Chair 3',
+  colorHue: 140,
+};
+
+function renderWith(props: Omit<DayCalendarProps, 'view'>, view: CalendarDayView): string {
+  const provider: ComponentProps<typeof NextIntlClientProvider> = {
+    locale: LOCALE,
+    messages,
+    timeZone: 'Europe/Skopje',
+    children: createElement(DayCalendar, { view, ...props }),
+  };
+  return renderToString(createElement(NextIntlClientProvider, provider));
+}
+
+/** The filter's chips, each with its attributes and what it holds. */
+function chipButtons(html: string): { attributes: string; inside: string }[] {
+  const group = html.match(/<div role="group" aria-label="Columns shown"[^>]*>([\s\S]*?)<\/div>/);
+  return [...(group?.[1] ?? '').matchAll(/<button([^>]*)>([\s\S]*?)<\/button>/g)].map(
+    ([, attributes = '', inside = '']) => ({ attributes, inside }),
+  );
+}
+
+/** Each chip of the filter: its pressed state and its text. */
+function chips(html: string): { pressed: string | undefined; text: string }[] {
+  return chipButtons(html).map(({ attributes, inside }) => ({
+    pressed: attributes.match(/aria-pressed="(\w+)"/)?.[1],
+    text: text(inside).trim(),
+  }));
+}
+
+/** The names of the columns drawn, in order. */
+function columnNames(html: string): string[] {
+  return [...html.matchAll(/id="calendar-column-[^"]+"[^>]*>([^<]*)</g)].map(
+    ([, name]) => name ?? '',
+  );
+}
+
+describe('the provider filter: a chip per column of the day (E01-T04b)', () => {
+  const three = monday({
+    providers: [PLANINSKA, { ...KODRA, shortName: 'Dr. Kodra' }, LUMI],
+    appointments: [
+      visit(PLANINSKA, '2026-10-26T08:00:00Z', 9 * H, 30),
+      visit(KODRA, '2026-10-26T08:00:00Z', 9 * H, 30, 'cancelled'),
+      visit(KODRA, '2026-10-26T09:00:00Z', 10 * H, 30),
+      visit(LUMI, '2026-10-26T10:00:00Z', 11 * H, 30),
+    ],
+  });
+  const toggle = () => undefined;
+
+  it("each the provider's short name, a button pressed when its column shows", () => {
+    const html = renderWith({ shown: [PLANINSKA.id, LUMI.id], onToggle: toggle }, three);
+    expect(chips(html)).toEqual([
+      { pressed: 'true', text: 'Dr. Planinska' },
+      { pressed: 'false', text: 'Dr. Kodra' },
+      { pressed: 'true', text: 'Lumi' },
+    ]);
+    expect(chipButtons(html).every(({ attributes }) => attributes.includes('type="button"'))).toBe(
+      true,
+    );
+  });
+
+  it("a dot of the provider's strong tint, faded when off; the chip on the provider's tint when on", () => {
+    const [on, off] = chipButtons(renderWith({ shown: [PLANINSKA.id], onToggle: toggle }, three));
+    expect(on?.attributes).toContain('bg-provider-tint');
+    expect(on?.attributes).toContain('--provider-hue:195');
+    expect(on?.inside).toMatch(/<span aria-hidden="true" class="[^"]*bg-provider-strong"/);
+    expect(off?.attributes).not.toContain('bg-provider-tint');
+    expect(off?.attributes).toContain('text-muted');
+    expect(off?.attributes).toContain('--provider-hue:290');
+    expect(off?.inside).toMatch(/bg-provider-strong opacity-60/);
+  });
+
+  it('only the columns shown are drawn, in the day’s order', () => {
+    const html = renderWith({ shown: [LUMI.id, PLANINSKA.id], onToggle: toggle }, three);
+    expect(columnNames(html)).toEqual(['Elena Planinska', 'Vesna Lumi']);
+    expect(text(html)).not.toContain('Arben Kodra');
+  });
+
+  it('the line under the title counts the columns shown and their appointments', () => {
+    expect(text(renderWith({ shown: [KODRA.id], onToggle: toggle }, three))).toContain(
+      ' 2 appointments · 1 chair ',
+    );
+    expect(text(renderWith({ shown: [PLANINSKA.id, LUMI.id], onToggle: toggle }, three))).toContain(
+      ' 2 appointments · 2 chairs ',
+    );
+    expect(text(renderWith({ onToggle: toggle }, three))).toContain(' 4 appointments · 3 chairs ');
+  });
+
+  it('every column, and no chip, without a choice and a toggle', () => {
+    const html = render(three, 'Europe/Skopje');
+    expect(columnNames(html)).toEqual(['Elena Planinska', 'Arben Kodra', 'Vesna Lumi']);
+    expect(chips(html)).toEqual([]);
+  });
+
+  it('a clinic without providers has no chips', () => {
+    expect(chips(renderWith({ onToggle: toggle }, monday({ providers: [] })))).toEqual([]);
+  });
+});
+
+describe('the "now" line (E01-T04b, demo lines 273–275)', () => {
+  /** The line's attributes, if drawn. */
+  const line = (html: string) => tags(html, 'div').find((div) => div.has('data-now-line')) ?? null;
+
+  it('at its minute on the grid, 87 px an hour from the grid’s first, over the columns', () => {
+    const at = line(renderWith({ nowMinute: 10 * H + 40 }, monday()));
+    expect(at?.get('aria-hidden')).toBe('true');
+    expect(at?.get('style')).toBe(`top:${(2 * H + 40) * 1.45}px`);
+    expect(at?.get('class')).toContain('bg-now-line');
+  });
+
+  it('none without a minute: another day, outside the grid, or on the server', () => {
+    expect(line(renderWith({ nowMinute: null }, monday()))).toBeNull();
+    expect(line(render(monday(), 'Europe/Skopje'))).toBeNull();
+  });
+
+  it('none on a clinic without providers: no column to cross', () => {
+    expect(line(renderWith({ nowMinute: 10 * H }, monday({ providers: [] })))).toBeNull();
+  });
+});
+
+describe('a closed day shows no break and still its appointments (E01-T04b)', () => {
+  const lunch = {
+    id: 'lunch',
+    providerId: PLANINSKA.id,
+    startMinute: 12 * H,
+    endMinute: 13 * H,
+    label: 'Lunch',
+  };
+
+  it.each([
+    {
+      what: 'a closed_days date',
+      fields: {
+        day: '2026-11-02',
+        closedDay: { date: '2026-11-02', label: 'Staff training day' },
+        appointments: [visit(PLANINSKA, '2026-11-02T08:00:00Z', 9 * H, 30)],
+      },
+    },
+    {
+      what: 'a weekday without hours',
+      fields: {
+        day: '2026-10-31',
+        weekday: 6,
+        appointments: [visit(PLANINSKA, '2026-10-31T08:00:00Z', 10 * H, 30)],
+      },
+    },
+  ])('$what', ({ fields }) => {
+    const html = render(monday({ ...fields, breaks: [lunch] }), 'Europe/Skopje');
+    expect(html).not.toContain('data-break');
+    expect(text(html)).not.toContain(' Lunch ');
+    expect(blocks(html)).toHaveLength(1);
+  });
+
+  it('an open day still shows its break', () => {
+    expect(text(render(monday({ breaks: [lunch] }), 'Europe/Skopje'))).toContain(' Lunch ');
+  });
+});
+
+describe('the 24-hour clock (E01-T04b, D-049): times of day, never the dates', () => {
+  it.each([
+    { zone: 'Europe/Skopje', at: '2026-10-26T13:30:00Z', from: 14 * H + 30, time: '14:30' },
+    { zone: 'America/New_York', at: '2026-10-26T13:05:00Z', from: 9 * H + 5, time: '09:05' },
+  ])('in $zone: $time; the title stays "Monday, October 26"', ({ zone, at, from, time }) => {
+    const html = render(monday({ appointments: [visit(PLANINSKA, at, from, 30)] }), zone);
+    expect(text(blocks(html)[0]?.inside ?? '')).toContain(` ${time} Ana Brezovska `);
+    expect(html).toMatch(/<h1[^>]*>Monday, October 26<\/h1>/);
+    expect(text(html)).not.toMatch(/\b[AP]M\b/);
+  });
+});

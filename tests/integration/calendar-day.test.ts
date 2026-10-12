@@ -367,6 +367,16 @@ describe('a closed day (acceptance 4)', () => {
     expect(view.closed).toEqual({ why: 'no_hours' });
     expect(visits(column(view, a.planinska).blocks).map((v) => v.from)).toEqual([10 * H]);
   });
+
+  // E01-T04b (owner, 2026-10-12): no lunch on a day the clinic is closed.
+  it("a closed_days Monday shows none of the providers' Monday breaks", async () => {
+    const open = await read(a.clinic, '2026-10-26');
+    const closed = await read(a.clinic, '2026-11-02');
+    const breakCount = (view: CalendarDayView) =>
+      view.columns.flatMap((c) => c.blocks).filter((block) => block.kind === 'break').length;
+    expect(breakCount(open)).toBeGreaterThan(0);
+    expect(breakCount(closed)).toBe(0);
+  });
 });
 
 describe('an inactive provider (acceptance 7)', () => {

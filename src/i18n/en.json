@@ -128,7 +128,10 @@
     "closedWeekday": "Closed: no opening hours on {weekday}",
     "chairAndLoad": "{chair} · {percent}% booked",
     "noProviders": "No providers yet. Each provider gets a column here.",
-    "legend": "Statuses"
+    "legend": "Statuses",
+    "providerFilter": "Columns shown",
+    "readFailed": "This day could not be read again, so it may be out of date. It is tried again the next time you use the page.",
+    "clinicChanged": "The clinic was changed in another tab. Reload the page to go on in the clinic chosen there."
   },
   "languages": {
     "en": "English"

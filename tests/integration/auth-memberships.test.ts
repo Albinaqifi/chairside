@@ -12,6 +12,7 @@ import {
   PG,
   testEmail,
 } from './fixtures';
+import { insertProvider } from './scheduling-fixtures';
 
 // Which clinic a signed-in user acts for, and that they only ever see that clinic's data.
 
@@ -159,6 +160,24 @@ describe('a disabled membership', () => {
     });
     await withTenant(clinicA, async (tx) => {
       expect(await activeMembership(tx, oneDisabled)).toMatchObject({ role: 'dentist' });
+    });
+  });
+});
+
+// E01-T04b: the calendar opens on a linked member's own column, read with the membership in the
+// clinic's own transaction (D-091, "Revisit if").
+describe("the active membership's provider", () => {
+  it('is the provider the membership is linked to, in that clinic only; null when linked to none', async () => {
+    const [linked, ofProvider] = [await createUser(), await insertClinic(admin)];
+    const provider = await insertProvider(admin, ofProvider, 'hygienist');
+    await insertMembership(admin, { clinicId: ofProvider, userId: linked, providerId: provider });
+    await insertMembership(admin, { clinicId: clinicA, userId: linked, role: 'owner' });
+    await withTenant(ofProvider, async (tx) => {
+      expect(await activeMembership(tx, linked)).toMatchObject({ providerId: provider });
+    });
+    await withTenant(clinicA, async (tx) => {
+      expect(await activeMembership(tx, linked)).toMatchObject({ providerId: null });
+      expect(await activeMembership(tx, inBoth)).toMatchObject({ providerId: null });
     });
   });
 });

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FormAnswer } from '@/app/_lib/form-answer';
 import { FrameClinic } from '@/app/_lib/frame-clinic';
 import messages from '@/i18n/en.json';
+import { LOCALE } from '@/i18n/locale';
 import {
   ClinicDetailsForm,
   type ClinicDetailsChoices,
@@ -76,7 +77,7 @@ function renderForm(answer?: FormAnswer<unknown>): string {
     children: createElement(ClinicDetailsForm, { values: VALUES, choices: CHOICES }),
   };
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
-    locale: 'en',
+    locale: LOCALE,
     messages,
     timeZone: 'Europe/Skopje',
     children: createElement(FrameClinic, frame),

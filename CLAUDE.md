@@ -112,14 +112,15 @@ src/db/               Connection pool, withTenant, migrations/, migrate and rese
                       the job queue (queue.ts: pg-boss stays in it and is never passed on, D-104).
 src/worker/           The worker's entry point (index.ts, D-103): the queue and its heartbeat, the start
                       refusals, the stop on SIGTERM or SIGINT. Job handlers join it with E02.
-src/i18n/             next-intl's request configuration and the message file, en.json.
+src/i18n/             next-intl's request configuration, the locale (locale.ts: English, the 24-hour
+                      clock) and the message file, en.json.
 src/lib/              Small shared pieces: clock, ids, logger, personal-fields, calendar-day (a day
                       `YYYY-MM-DD`: isCalendarDay, dayInZone, addDays, isoWeekday; D-108).
 src/ui/               shadcn/ui components restyled to the tokens, the logo, the fonts, cn().
 tests/integration/    Tests against real PostgreSQL, including the tenant meta-test.
 tests/e2e/            End-to-end journeys and checks in real browsers (Playwright, playwright.config.ts):
                       J1, the accessibility check, the D-093 check (E00-T06b), the setup link's page
-                      (E00-T05b).
+                      (E00-T05b), the calendar's filter, reading on use and "now" line (E01-T04b).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 Dockerfile            The one image staging and production run (D-007, D-103): the web by default,
@@ -232,7 +233,10 @@ task, unless product code on `main` would hit it today.
   birth, a closed day) is no moment: it stays a `YYYY-MM-DD` string until shown, then is formatted
   from `new Date('YYYY-MM-DD')` with `timeZone: 'UTC'`, and tested in a zone behind UTC, where the
   day before would show (D-098). A test of such code names the zones it runs in and never relies on
-  the computer's: CI runs once, in UTC (D-099).
+  the computer's: CI runs once, in UTC (D-099). Every time of day is in the 24-hour clock ("09:00",
+  "14:30"; D-049), set once by the locale `en-u-hc-h23` (`src/i18n/locale.ts`, E01-T04b) for every
+  page and client component, never at a call; dates stay English ("Monday, October 12"). A test that
+  renders a time gives next-intl's provider `LOCALE` from there.
 - Styles: a component takes colours, fonts and radii only from the theme in `src/app/globals.css`
   (`bg-primary`, `font-serif`, `rounded-card`); Tailwind's own palette, font families, text sizes
   and radii are switched off. A token the design reference lacks is added there, derived from one it

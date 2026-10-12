@@ -1,8 +1,8 @@
 import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PageClinic } from '@/app/_lib/frame-clinic';
-import type { CalendarDayView } from '@/app/(staff)/calendar/day';
-import { DayCalendar } from '@/app/(staff)/calendar/day-calendar';
+import { CalendarScreen } from '@/app/(staff)/calendar/calendar-screen';
+import type { CalendarDayView, CalendarRead } from '@/app/(staff)/calendar/day';
 import CalendarPage from '@/app/(staff)/calendar/page';
 import { closeDb } from '@/db/client';
 import { dayInZone } from '@/lib/calendar-day';
@@ -67,10 +67,11 @@ async function page(
   const shown = await CalendarPage({
     searchParams: Promise.resolve(day === undefined ? {} : { day }),
   });
-  const views = elementsOf<{ view: CalendarDayView }>(shown, DayCalendar);
+  // E01-T04b: the page hands the read to the calendar in the browser, which draws the day.
+  const views = elementsOf<{ initial: CalendarRead }>(shown, CalendarScreen);
   expect(views).toHaveLength(1);
   return {
-    view: views[0]!.props.view,
+    view: views[0]!.props.initial.view,
     clinics: elementsOf<{ clinicId: unknown }>(shown, PageClinic).map((e) => e.props.clinicId),
   };
 }
