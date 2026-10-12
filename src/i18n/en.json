@@ -113,6 +113,27 @@
   "languages": {
     "en": "English"
   },
+  "settings": {
+    "sections": "Parts of Settings",
+    "clinic": {
+      "tab": "Clinic",
+      "name": "Clinic name",
+      "phone": "Phone",
+      "address": "Address",
+      "email": "Email",
+      "timeZone": "Time zone",
+      "timeZoneHint": "Every date and time in Chairside is shown in this time zone.",
+      "language": "Language",
+      "currency": "Currency",
+      "currencyChoice": "{name} ({code})",
+      "country": "Phone country",
+      "countryHint": "A phone number written without + and its country code is read as a number of this country.",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Clinic details saved.",
+      "timeZoneUnknown": "Chairside cannot use this time zone. Choose another time zone from the list."
+    }
+  },
   "placeholder": {
     "title": "Coming soon",
     "description": "This part of Chairside is still being built."

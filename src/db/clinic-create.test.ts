@@ -270,6 +270,30 @@ describe('refused before it connects, each with a message naming the option (acc
   });
 });
 
+// E01-T08a, acceptance 2 (D-110): a zone by its name, never an offset or a fixed zone, refused before
+// anything connects. A name the database does not know (Europe/Kiev) is refused after it connects,
+// before anything is written: tests/integration/clinic-create.test.ts.
+describe('the time zone: refused before it connects, naming --time-zone (E01-T08a)', () => {
+  it.each([
+    { what: 'an offset', zone: '+01:00', typed: '+01' },
+    { what: 'an offset without its colon', zone: '+0100', typed: '+0100' },
+    { what: 'a fixed zone', zone: 'Etc/GMT-1', typed: 'GMT-1' },
+  ])('$what', async ({ zone, typed }) => {
+    await expectRefusedBeforeConnecting(withOption('--time-zone', zone), '--time-zone must be');
+    const refusal = written.join('\n').replace(USAGE, '');
+    expect(refusal).not.toContain(typed);
+  });
+
+  it('takes a name in any case, UTC and Europe/Kyiv, as given: the database spells it when it stores it', () => {
+    for (const zone of ['europe/skopje', 'UTC', 'Europe/Kyiv']) {
+      expect(parseClinicCreateArgs(withOption('--time-zone', zone)), zone).toMatchObject({
+        kind: 'create',
+        input: { timeZone: zone },
+      });
+    }
+  });
+});
+
 describe('where it runs: refused before it connects (acceptance 6)', () => {
   it('a database that is not on this machine, without --remote-database', async () => {
     vi.stubEnv('DATABASE_URL', REMOTE_APP_URL);

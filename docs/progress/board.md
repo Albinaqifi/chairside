@@ -79,7 +79,7 @@ Fully specified.
 | E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | The cancel dialog sends the cancel only (E00-T04e) |
 | E01-T07 | Calendar: week view | builder | low | Planned | |
 | E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | split (D-110) | Into E01-T08a and E01-T08b, the next two rows |
-| E01-T08a | Settings: the page and the clinic's details | builder | normal | **Ready** | From E01-T08 (D-110), beside E01-T04a in a clone (owner). Owner only; a zone the database and Intl both know, by its name, never an offset, in `clinic:create` too (E00-T05b review, `message`); the save never touches `status`; `staff-pages.test.ts` changes for `/settings` (owner, 2026-10-12). See `handoffs/E01-T08a.md` |
+| E01-T08a | Settings: the page and the clinic's details | builder | normal | **Built** | From E01-T08 (D-110), beside E01-T04a in a clone (owner). Branch `task/E01-T08a-settings-clinic-details`. `/settings` for the owner, the Clinic tab's eight details saved with one `clinic.updated` row; the zone by a name the database and Intl both know, in `clinic:create` too; `status` and `settings` untouched. Five Discovered lines in the note (one `message`). See `handoffs/E01-T08a.md` |
 | E01-T08b | Settings: opening hours and closed days | builder | normal | Planned | From E01-T08 (D-110): after E01-T04a, whose reads it uses and whose calendar its criteria check. Refined once E01-T04a and E01-T08a are Done |
 | E01-T09 | Settings: providers and treatment types | builder | normal | Planned | |
 | E01-T10 | Today screen, first version | builder | normal | Planned | |

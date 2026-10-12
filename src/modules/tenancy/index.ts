@@ -9,3 +9,16 @@ export {
   type NewClinic,
   type NewClinicField,
 } from './create-clinic';
+// E01-T08a: the Settings page's details, the values its checks take, and the zone both PostgreSQL
+// and Intl know by its name (D-110), for Settings and `pnpm clinic:create`.
+export {
+  CLINIC_DETAIL_FIELDS,
+  clinicDetails,
+  saveClinicDetails,
+  type ClinicDetailField,
+  type ClinicDetails,
+  type SaveDetailsRefusal,
+  type SaveDetailsResult,
+} from './clinic-details';
+export { clinicCountries, clinicCurrencies } from './create-clinic';
+export { clinicTimeZones, isClinicTimeZoneName, knownTimeZone } from './time-zone';
