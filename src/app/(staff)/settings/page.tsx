@@ -4,13 +4,15 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { currentStaff } from '@/app/_lib/auth';
 import { PageClinic } from '@/app/_lib/frame-clinic';
 import { can } from '@/modules/auth';
-import { phoneAsWritten } from '@/modules/patients';
+import { phoneWithCountryCode } from '@/modules/patients';
 import * as tenancy from '@/modules/tenancy';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs';
 import { membershipExtras } from '../navigation';
-import { readClinicSettings } from './actions';
+import { readClinicSettings, readOpeningHours } from './actions';
 import { countryChoices, currencyChoices, languageChoices, zoneChoices } from './clinic-choices';
 import { ClinicDetailsForm } from './clinic-details-form';
+import { weekValues } from './opening-hours';
+import { OpeningHoursForm } from './opening-hours-form';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations();
@@ -19,15 +21,16 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * Settings (E01-T08a, demo lines 746–757): the owner's alone (settings.manage, scope-v1.md). Anyone
- * else is answered "not found", as the new-patient page answers; the read and the save check the
- * permission themselves too (security-privacy.md, section 2). Its tabs hold one now, Clinic: each
- * later tab comes with its task (Opening hours E01-T08b, Providers and Treatment types E01-T09, Staff
- * E04-T02, Message channels E03-T06), none shown before.
+ * else is answered "not found", as the new-patient page answers; the reads and the saves check the
+ * permission themselves too (security-privacy.md, section 2). Its tabs hold two now, Clinic and
+ * Opening hours (E01-T08b): each later tab comes with its task (Providers and Treatment types
+ * E01-T09, Staff E04-T02, Message channels E03-T06), none shown before.
  *
- * Everything the form starts with is made here, on the server: the phone as the clinic writes it and
- * the countries, which the phone package gives (D-097), and every name the selects show. The form is
+ * Everything the forms start with is made here, on the server: the phone with its country code
+ * (D-111), so a phone country changed in the same save leaves the number as it was, and the
+ * countries, which the phone package gives (D-097), and every name the selects show. Each form is
  * keyed by the clinic the page was rendered for (D-098): a render for another clinic, after another
- * tab chose one, starts a form filled with that clinic's row, never one holding the first's.
+ * tab chose one, starts a form filled with that clinic's rows, never one holding the first's.
  */
 export default async function SettingsPage() {
   const staff = await currentStaff();
@@ -35,6 +38,8 @@ export default async function SettingsPage() {
   const read = await readClinicSettings.forPage({});
   if (!read.ok) throw new Error(`The clinic's settings could not be read (${read.error.code}).`);
   const { details, timeZones } = read.value;
+  const hours = await readOpeningHours.forPage({});
+  if (!hours.ok) throw new Error(`The opening hours could not be read (${hours.error.code}).`);
   const [nav, t, languageName, locale] = await Promise.all([
     getTranslations('nav'),
     getTranslations('settings'),
@@ -48,6 +53,7 @@ export default async function SettingsPage() {
       <Tabs defaultValue="clinic">
         <TabsList aria-label={t('sections')}>
           <TabsTrigger value="clinic">{t('clinic.tab')}</TabsTrigger>
+          <TabsTrigger value="hours">{t('hours.tab')}</TabsTrigger>
         </TabsList>
         <TabsContent value="clinic">
           <div className="rounded-card border border-border bg-surface px-5.5 py-5">
@@ -55,7 +61,7 @@ export default async function SettingsPage() {
               key={staff.clinic.clinicId}
               values={{
                 name: details.name,
-                phone: details.phone === null ? '' : phoneAsWritten(details.phone, details.country),
+                phone: details.phone === null ? '' : phoneWithCountryCode(details.phone),
                 address: details.address ?? '',
                 email: details.email ?? '',
                 timeZone: details.timeZone,
@@ -77,6 +83,11 @@ export default async function SettingsPage() {
                 countries: countryChoices(tenancy.clinicCountries(), details.country, locale),
               }}
             />
+          </div>
+        </TabsContent>
+        <TabsContent value="hours">
+          <div className="rounded-card border border-border bg-surface px-5.5 py-5">
+            <OpeningHoursForm key={staff.clinic.clinicId} week={weekValues(hours.value)} />
           </div>
         </TabsContent>
       </Tabs>

@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Staff } from '@/app/_lib/auth';
 import { logger } from '@/lib/logger';
-import { readClinicSettings, saveClinicDetails } from './actions';
+import {
+  readClinicSettings,
+  readOpeningHours,
+  saveClinicDetails,
+  saveOpeningHours,
+} from './actions';
 
 // E01-T08a, acceptance 1 and 2 (the form's side): what the Settings actions take from the Clinic
 // tab's form and hand the tenancy module, what they answer, and the audit row they ask for. They are
@@ -37,6 +42,9 @@ const tenancy = vi.hoisted(() => ({
   saveClinicDetails: vi.fn(),
   clinicDetails: vi.fn(),
   clinicTimeZones: vi.fn(),
+  // E01-T08b: the Opening hours tab's read and save.
+  openingHours: vi.fn(),
+  saveOpeningHours: vi.fn(),
 }));
 vi.mock('@/modules/tenancy', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/modules/tenancy')>()),
@@ -87,6 +95,9 @@ beforeEach(() => {
   audit.record.mockClear();
   tenancy.saveClinicDetails.mockReset();
   tenancy.saveClinicDetails.mockResolvedValue({ ok: true, changed: ['name'] });
+  tenancy.saveOpeningHours.mockReset();
+  tenancy.saveOpeningHours.mockResolvedValue({ changed: [1] });
+  tenancy.openingHours.mockReset();
   cache.refresh.mockReset();
   vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 });
@@ -388,6 +399,272 @@ describe("readClinicSettings: the page's read", () => {
       value: { details, timeZones: ['Europe/Skopje', 'UTC'] },
     });
     expect(tenancy.clinicDetails).toHaveBeenCalledWith(TX);
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+});
+
+// E01-T08b, acceptance 5 (the action's side): the Clinic tab shows the phone with its country code
+// (D-111), so a phone country changed in the same save reads the same number; a number typed without
+// its code is still read with the form's new country.
+describe('saveClinicDetails: the phone as the page now shows it, with its country code (E01-T08b)', () => {
+  it('left as shown while the phone country changes: the same number goes to the module', async () => {
+    await saveClinicDetails(
+      CLINIC,
+      sent({ phone: '+389 70 001 402', country: 'GB', timeZone: 'Europe/London' }),
+    );
+    expect(tenancy.saveClinicDetails).toHaveBeenCalledExactlyOnceWith(
+      TX,
+      expect.objectContaining({ phone: '+38970001402', country: 'GB' }),
+      expect.any(Date),
+    );
+  });
+
+  it('typed without its code: read with the new phone country', async () => {
+    await saveClinicDetails(CLINIC, sent({ phone: '020 7946 0001', country: 'GB' }));
+    expect(tenancy.saveClinicDetails).toHaveBeenCalledWith(
+      TX,
+      expect.objectContaining({ phone: '+442079460001', country: 'GB' }),
+      expect.any(Date),
+    );
+  });
+});
+
+// E01-T08b, acceptance 1 and 2 (the form's side): what saveOpeningHours takes from the Opening hours
+// tab and hands tenancy.saveOpeningHours, what it refuses at which field before any transaction, and
+// the audit row it asks for. The module's work against real rows is in
+// tests/integration/opening-hours.test.ts.
+
+const WORKING_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
+
+/**
+ * The tab's data as the browser sends it: Monday to Friday open 08:00–18:00, the weekend closed (its
+ * selects disabled, so not sent), with these fields in place of those, or left out when undefined.
+ */
+function hoursSent(fields: Record<string, string | undefined> = {}): FormData {
+  const all: Record<string, string | undefined> = {};
+  for (const day of WORKING_WEEK) {
+    all[`${day}Open`] = 'on';
+    all[`${day}Opens`] = '08:00';
+    all[`${day}Closes`] = '18:00';
+  }
+  Object.assign(all, fields);
+  const data = new FormData();
+  for (const [name, value] of Object.entries(all)) {
+    if (value !== undefined) data.append(name, value);
+  }
+  return data;
+}
+
+const WEEKDAYS_8_TO_18 = [1, 2, 3, 4, 5].map((weekday) => ({ weekday, opens: 480, closes: 1080 }));
+
+describe('saveOpeningHours: what it hands tenancy.saveOpeningHours', () => {
+  it('each open weekday, Monday first, its times in minutes from midnight; a closed one not at all', async () => {
+    expect(await saveOpeningHours(CLINIC, hoursSent())).toEqual({
+      ok: true,
+      value: { changes: { weekdays: [1] } },
+    });
+    expect(tenancy.saveOpeningHours).toHaveBeenCalledExactlyOnceWith(
+      TX,
+      WEEKDAYS_8_TO_18,
+      expect.any(Date),
+    );
+  });
+
+  it('a weekday switched off: closed, whatever its selects sent', async () => {
+    await saveOpeningHours(
+      CLINIC,
+      hoursSent({ fridayOpen: undefined, fridayOpens: '', fridayCloses: 'not a time' }),
+    );
+    expect(tenancy.saveOpeningHours).toHaveBeenCalledWith(
+      TX,
+      WEEKDAYS_8_TO_18.slice(0, 4),
+      expect.any(Date),
+    );
+  });
+
+  it('a time off the 15-minute steps, as a stored one is offered, and the end of the day', async () => {
+    await saveOpeningHours(
+      CLINIC,
+      hoursSent({
+        mondayOpens: '08:10',
+        tuesdayOpens: '08:10:30',
+        wednesdayCloses: '24:00',
+        sundayOpen: 'on',
+        sundayOpens: '00:00',
+        sundayCloses: '23:45',
+      }),
+    );
+    expect(tenancy.saveOpeningHours).toHaveBeenCalledWith(
+      TX,
+      [
+        { weekday: 1, opens: 490, closes: 1080 },
+        { weekday: 2, opens: 490.5, closes: 1080 },
+        { weekday: 3, opens: 480, closes: 1440 },
+        { weekday: 4, opens: 480, closes: 1080 },
+        { weekday: 5, opens: 480, closes: 1080 },
+        { weekday: 7, opens: 0, closes: 1425 },
+      ],
+      expect.any(Date),
+    );
+  });
+
+  it('every weekday closed: an empty week', async () => {
+    const closed = Object.fromEntries(WORKING_WEEK.map((day) => [`${day}Open`, undefined]));
+    await saveOpeningHours(CLINIC, hoursSent(closed));
+    expect(tenancy.saveOpeningHours).toHaveBeenCalledWith(TX, [], expect.any(Date));
+  });
+});
+
+describe('saveOpeningHours: what the input alone settles is refused at its field, before any transaction (D-098)', () => {
+  it.each([
+    { what: 'an open weekday with no opening', fields: { mondayOpens: '' }, path: 'mondayOpens' },
+    {
+      what: 'an open weekday whose opening was not sent',
+      fields: { mondayOpens: undefined },
+      path: 'mondayOpens',
+    },
+    {
+      what: 'an open weekday with no closing',
+      fields: { tuesdayCloses: '' },
+      path: 'tuesdayCloses',
+    },
+    {
+      what: 'a weekday switched on with neither time',
+      fields: { saturdayOpen: 'on' },
+      path: 'saturdayOpens',
+    },
+    {
+      what: 'closing at its opening',
+      fields: { wednesdayOpens: '09:00', wednesdayCloses: '09:00' },
+      path: 'wednesdayCloses',
+    },
+    {
+      what: 'closing before its opening',
+      fields: { thursdayOpens: '18:00', thursdayCloses: '08:00' },
+      path: 'thursdayCloses',
+    },
+    {
+      what: 'opening at the end of the day',
+      fields: { fridayOpens: '24:00', fridayCloses: '24:00' },
+      path: 'fridayCloses',
+    },
+  ])('$what: invalid_input at $path, nothing handed on', async ({ fields, path }) => {
+    const result = await saveOpeningHours(CLINIC, hoursSent(fields));
+    if (result.ok || !('issues' in result.error)) throw new Error('expected invalid_input');
+    expect(result.error.issues[0]?.path).toEqual([path]);
+    expect(db.opened).toBe(0);
+    expect(tenancy.saveOpeningHours).not.toHaveBeenCalled();
+  });
+
+  it.each(['8:00', '25:00', '08:60', 'noon', '08:00 '])(
+    'a time %j that is no time of the day: invalid_format at its field',
+    async (time) => {
+      expect(await saveOpeningHours(CLINIC, hoursSent({ mondayOpens: time }))).toEqual({
+        ok: false,
+        error: {
+          code: 'invalid_input',
+          issues: [{ path: ['mondayOpens'], code: 'invalid_format' }],
+        },
+      });
+      expect(db.opened).toBe(0);
+    },
+  );
+
+  it('a switch sent with anything but "on": at the switch', async () => {
+    const result = await saveOpeningHours(CLINIC, hoursSent({ mondayOpen: 'off' }));
+    if (result.ok || !('issues' in result.error)) throw new Error('expected invalid_input');
+    expect(result.error.issues.map((issue) => issue.path)).toEqual([['mondayOpen']]);
+    expect(tenancy.saveOpeningHours).not.toHaveBeenCalled();
+  });
+
+  it('a field sent twice: at that field, never internal', async () => {
+    const data = hoursSent();
+    data.append('mondayOpen', 'on');
+    const result = await saveOpeningHours(CLINIC, data);
+    if (result.ok || !('issues' in result.error)) throw new Error('expected invalid_input');
+    expect(result.error.issues.map((issue) => issue.path)).toEqual([['mondayOpen']]);
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('every problem at once, each at its field', async () => {
+    const result = await saveOpeningHours(
+      CLINIC,
+      hoursSent({
+        mondayOpens: '',
+        tuesdayCloses: '07:00',
+        wednesdayOpens: 'noon',
+        sundayOpen: 'on',
+        sundayOpens: '10:00',
+      }),
+    );
+    if (result.ok || !('issues' in result.error)) throw new Error('expected invalid_input');
+    expect(result.error.issues).toEqual([
+      { path: ['mondayOpens'], code: 'custom' },
+      { path: ['tuesdayCloses'], code: 'custom' },
+      { path: ['wednesdayOpens'], code: 'invalid_format' },
+      { path: ['sundayCloses'], code: 'custom' },
+    ]);
+    expect(db.opened).toBe(0);
+  });
+});
+
+describe('saveOpeningHours: its answer, its audit row and the page rendered again', () => {
+  it('done: one audit row clinic.hours_updated about the clinic, naming the weekdays changed; the page refreshed', async () => {
+    tenancy.saveOpeningHours.mockResolvedValue({ changed: [1, 3] });
+    expect(await saveOpeningHours(CLINIC, hoursSent())).toEqual({
+      ok: true,
+      value: { changes: { weekdays: [1, 3] } },
+    });
+    expect(audit.record).toHaveBeenCalledExactlyOnceWith(TX, {
+      at: expect.any(Date),
+      actorType: 'user',
+      actorId: USER,
+      action: 'clinic.hours_updated',
+      entityType: 'clinic',
+      entityId: CLINIC,
+      metadata: { weekdays: [1, 3] },
+    });
+    expect(cache.refresh).toHaveBeenCalledOnce();
+  });
+
+  it('a save that changed nothing: still its one audit row, with no weekday named', async () => {
+    tenancy.saveOpeningHours.mockResolvedValue({ changed: [] });
+    expect(await saveOpeningHours(CLINIC, hoursSent())).toMatchObject({ ok: true });
+    expect(audit.record).toHaveBeenCalledExactlyOnceWith(
+      TX,
+      expect.objectContaining({ action: 'clinic.hours_updated', metadata: { weekdays: [] } }),
+    );
+  });
+
+  it('a refused input: no audit row, no refresh', async () => {
+    await saveOpeningHours(CLINIC, hoursSent({ mondayOpens: '' }));
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(cache.refresh).not.toHaveBeenCalled();
+  });
+
+  it('sent for another clinic than the request is in: clinic_changed, before any transaction', async () => {
+    expect(await saveOpeningHours('01970000-0000-7000-8000-0000000000d9', hoursSent())).toEqual({
+      ok: false,
+      error: { code: 'clinic_changed' },
+    });
+    expect(db.opened).toBe(0);
+    expect(tenancy.saveOpeningHours).not.toHaveBeenCalled();
+  });
+
+  it('a clinic id or a weekday among the fields is no input: the module gets the week alone', async () => {
+    const data = hoursSent();
+    data.append('clinicId', '01970000-0000-7000-8000-0000000000d9');
+    data.append('weekday', '8');
+    await saveOpeningHours(CLINIC, data);
+    expect(tenancy.saveOpeningHours).toHaveBeenCalledWith(TX, WEEKDAYS_8_TO_18, expect.any(Date));
+  });
+});
+
+describe("readOpeningHours: the page's read", () => {
+  it('the hours as the module gives them, with no audit row', async () => {
+    tenancy.openingHours.mockResolvedValue(WEEKDAYS_8_TO_18);
+    expect(await readOpeningHours.forPage({})).toEqual({ ok: true, value: WEEKDAYS_8_TO_18 });
+    expect(tenancy.openingHours).toHaveBeenCalledWith(TX);
     expect(audit.record).not.toHaveBeenCalled();
   });
 });
