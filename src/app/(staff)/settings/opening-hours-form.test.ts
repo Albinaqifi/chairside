@@ -45,8 +45,11 @@ beforeEach(() => {
   form.state = undefined;
 });
 
-/** The form with the answer given, as the server sends it, in a staff frame. */
-function renderForm(answer?: FormAnswer<unknown>): string {
+/**
+ * The form with the answer given, as the server sends it, in a staff frame, under the clinic's zone
+ * (one far ahead of UTC unless a test names another).
+ */
+function renderForm(answer?: FormAnswer<unknown>, timeZone = 'Pacific/Auckland'): string {
   if (answer) form.state = { answer, attempt: 1 };
   const frame: ComponentProps<typeof FrameClinic> = {
     clinicId: CLINIC,
@@ -55,7 +58,7 @@ function renderForm(answer?: FormAnswer<unknown>): string {
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
     locale: 'en',
     messages,
-    timeZone: 'Pacific/Auckland',
+    timeZone,
     children: createElement(FrameClinic, frame),
   };
   return renderToString(createElement(NextIntlClientProvider, provider));
@@ -204,6 +207,33 @@ describe("the Opening hours tab's form, as the server sends it (E01-T08b)", () =
     expect(opens.texts['13:45']).toBe(label(13, 45));
     expect(opens.texts['00:00']).toBe(label(0, 0));
   });
+
+  // E01-T08b tester: a weekday is no moment either. In a zone ahead of UTC (above) its name would be
+  // right with or without the formatter's UTC; in one behind UTC, the first of January 2024 at
+  // midnight UTC is still Sunday the 31st there, so every weekday would be named for the day before
+  // (CLAUDE.md, "Dates and times": tested in a zone behind UTC).
+  it.each(['America/New_York', 'Pacific/Pago_Pago'])(
+    'in a clinic zone behind UTC (%s): each weekday by its own name, each time by its own label',
+    (timeZone) => {
+      const local = createFormatter({ locale: 'en', timeZone });
+      // What the zone alone would say: the day before.
+      expect(local.dateTime(new Date(Date.UTC(2024, 0, 1)), { weekday: 'long' })).toBe('Sunday');
+      const html = renderForm(undefined, timeZone);
+      expect(tags(html, 'div').flatMap((div) => div.get('aria-label') ?? [])).toEqual(DAYS);
+      const switches = tags(html, 'button').filter((button) => button.get('role') === 'switch');
+      expect(switches.map((s) => labelFor(html, s.get('id') ?? ''))).toEqual(DAYS);
+      const utc = (hours: number, minutes: number) =>
+        local.dateTime(new Date(Date.UTC(2000, 0, 1, hours, minutes)), {
+          hour: 'numeric',
+          minute: '2-digit',
+          timeZone: 'UTC',
+        });
+      const opens = selectNamed(html, 'wednesdayOpens');
+      expect(opens.texts['08:10']).toBe(utc(8, 10));
+      expect(opens.texts['00:00']).toBe(utc(0, 0));
+      expect(opens.texts['23:45']).toBe(utc(23, 45));
+    },
+  );
 
   it('a problem at a time: at its field, as every staff form shows one (D-098)', () => {
     const html = renderForm({
