@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { isValidElement, type ReactNode } from 'react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import StaffLayout from '@/app/(staff)/layout';
@@ -5,7 +6,7 @@ import { readClinicSettings, saveClinicDetails } from '@/app/(staff)/settings/ac
 import { Sidebar } from '@/app/(staff)/sidebar';
 import type { Staff } from '@/app/_lib/auth';
 import { closeDb } from '@/db/client';
-import { withTenant } from '@/db/tenant';
+import { withTenant, type TenantTransaction } from '@/db/tenant';
 import { requestTimeZone } from '@/i18n/request';
 import { CLINIC_COOKIE } from '@/lib/cookies';
 import { createStaffUser } from '@/modules/auth';
@@ -185,7 +186,73 @@ describe("the owner's changes are saved and audited, one row per save (acceptanc
       expect(written).not.toContain(value);
     }
   });
+
+  // E01-T08a tester (the builder's known gap): the row is locked while a save reads it, so of two
+  // saves at once the second waits for the first and names only what it changed itself. Without the
+  // lock it reads the row as it was before the first commits, and its audit row names the first's
+  // change as well. The first is held open until the second is seen waiting behind it.
+  it('two saves at once: the second waits for the first, then names only its own change', async () => {
+    const start: tenancy.ClinicDetails = {
+      name: 'Lakeside Dental',
+      phone: null,
+      address: null,
+      email: 'desk@example.test',
+      timeZone: 'Europe/Skopje',
+      locale: 'en',
+      currency: 'MKD',
+      country: 'MK',
+    };
+    await withTenant(clinicA, (tx) =>
+      tenancy.saveClinicDetails(tx, start, new Date('2026-10-12T08:00:00Z')),
+    );
+    // The first renames the clinic; the second, from a page that shows the new name, changes the
+    // email alone.
+    const first = { ...start, name: 'Harbour Lake Dental' };
+    const second = { ...first, email: 'front@example.test' };
+
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let firstPid = 0;
+    let firstWritten = () => {};
+    const written = new Promise<void>((resolve) => (firstWritten = resolve));
+    const one = withTenant(clinicA, async (tx) => {
+      firstPid = await backendPid(tx);
+      const result = await tenancy.saveClinicDetails(tx, first, new Date('2026-10-12T09:00:00Z'));
+      firstWritten();
+      await held; // its transaction, and so the row's lock, stay open
+      return result;
+    });
+    await Promise.race([written, one]);
+    const two = withTenant(clinicA, (tx) =>
+      tenancy.saveClinicDetails(tx, second, new Date('2026-10-12T09:00:01Z')),
+    );
+    try {
+      for (let waited = 0; ; waited += 20) {
+        const { rows } = await admin.query<{ n: number }>(
+          'select count(*)::int as n from pg_stat_activity where $1 = any(pg_blocking_pids(pid))',
+          [firstPid],
+        );
+        if (rows[0]!.n > 0) break;
+        expect(waited, 'the second save never waited for the first').toBeLessThan(4000);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    } finally {
+      release();
+    }
+    expect(await one).toEqual({ ok: true, changed: ['name'] });
+    expect(await two).toEqual({ ok: true, changed: ['email'] });
+    expect(await rowOf(clinicA)).toMatchObject({
+      name: 'Harbour Lake Dental',
+      email: 'front@example.test',
+    });
+  });
 });
+
+/** The id of the PostgreSQL server process behind the transaction's connection. */
+async function backendPid(tx: TenantTransaction): Promise<number> {
+  const { rows } = await tx.execute(sql`select pg_backend_pid() as pid`);
+  return Number(rows[0]?.pid);
+}
 
 describe('what the checks refuse is shown at its field, with nothing saved (acceptance 1)', () => {
   it.each<{ what: string; fields: Record<string, string>; path: string }>([
