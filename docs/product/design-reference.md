@@ -43,7 +43,7 @@ The markup uses a small template language: `{{ name }}` is a value, `<sc-for>` i
 | Automations: aftercare library | 570–611 | 2004–2010 | E06-T04 |
 | Automations: to review | 612–634 | 1966–1972 | E06-T08 |
 | Import: steps 1–4 | 637–745 (steps at 651, 666, 683, 717) | 1899–1910 | E04-T04 to T08 |
-| Settings: clinic / staff / hours / channels | 746–799 (tabs at 753, 758, 770, 779) | 1912–1919 | E01-T08a, E01-T08b (D-110), E01-T09, E04-T02, E03-T06 |
+| Settings: clinic / staff / hours / channels | 746–799 (tabs at 753, 758, 770, 779) | 1912–1919 | E01-T08a, E01-T08b (D-110), E01-T08c (D-111), E01-T09, E04-T02, E03-T06 |
 | Visit ("In the chair"): pick patient | 804–858 | 2024–2034 | E06-T03 (reduced, see scope) |
 | Visit: chart and treatment recording | 859–976 | 2035–2078 | **Not in v1** except the "When you finish" idea |
 | Visit: finished summary | 977–996 | 1658–1686 | E06-T03 (reduced) |

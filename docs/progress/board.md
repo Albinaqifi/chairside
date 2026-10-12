@@ -9,13 +9,14 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E01-T04b` (Ready), `/pipeline E01-T04b`. Also due: E01-T08a's Done pass, `/architect E01-T08a` (PR #59 is merged), which refines E01-T08b. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
+- **Next tasks to start, side by side:** `E01-T04b` (Ready), `/pipeline E01-T04b` in this checkout, and `E01-T08b` (Ready), `/pipeline E01-T08b` in the clone. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
+- **Two tasks run in parallel** (owner, 2026-10-12, D-111, as D-110's): E01-T04b in the main checkout, E01-T08b in the clone (`README.md`, "Two checkouts on one machine"). Each edits only its own board row and its own handoff note (a Discovered line goes in that note meanwhile); the second to merge has `main` merged in first, as E01-T08a had
 - **Decisions it waits on:** none
 
 ## Next (in order)
 
 1. E00-T07f, then E00-T07c, once the owner has the Render and monitor accounts ("Owner actions"; not yet on 2026-10-11): E00-T07f needs no account but goes right before staging (owner, D-109); until then the rest of E01 goes first
-2. The rest of E01, in the epic's own order (D-087): E01-T04b (Ready), E01-T08b (refined in E01-T08a's Done pass) and E01-T09; E00-T06c before the first journey that sets "now" (D-100)
+2. The rest of E01, in the epic's own order (D-087): E01-T04b and E01-T08b side by side (both Ready; owner, D-111), then E01-T08c (written in full; Ready in E01-T08b's Done pass) and E01-T09; E00-T06c before the first journey that sets "now" (D-100)
 3. E00-T12, before E02 (owner, 2026-10-03; D-102)
 
 ## Blocked
@@ -77,12 +78,13 @@ Fully specified.
 | E01-T05 | Book an appointment (drawer) | builder | normal | Planned | The patient search keeps nothing in the browser (D-095); a double click keeps the drawer open; a form in a drawer or dialog sends only itself (E00-T04e) |
 | E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | The cancel dialog sends the cancel only (E00-T04e) |
 | E01-T07 | Calendar: week view | builder | low | Planned | |
-| E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | split (D-110) | Into E01-T08a and E01-T08b, the next two rows |
-| E01-T08a | Settings: the page and the clinic's details | builder | normal | **Tested** | From E01-T08 (D-110), beside E01-T04a in a clone (owner). Branch `task/E01-T08a-settings-clinic-details`. `/settings` for the owner, the Clinic tab's eight details saved with one `clinic.updated` row; the zone by a name the database and Intl both know, in `clinic:create` too; `status` and `settings` untouched. Review: no required changes. Tester: no findings, one case added (two saves at once). Its delta review: approved, no required change. Nine Discovered lines in the note (two `message`). See `handoffs/E01-T08a.md` |
-| E01-T08b | Settings: opening hours and closed days | builder | normal | Planned | From E01-T08 (D-110): after E01-T04a, whose reads it uses and whose calendar its criteria check. Refined once E01-T04a and E01-T08a are Done |
+| E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | split (D-110) | Into E01-T08a … E01-T08c, the next three rows (E01-T08b split again, D-111) |
+| E01-T08a | Settings: the page and the clinic's details | builder | normal | **Done** | Merged by the owner (PR #59). `main` green (run 38278268926). `/settings` for the owner: the Clinic tab's eight details saved with one `clinic.updated` row; the zone by a name the database and Intl both know, in `clinic:create` too; `status` and `settings` untouched; no fix round; the owner tried it. Leftovers → E01-T08b (`message`: the clinic's phone shown with its country code), E02-T03 (`message`: WhatsApp's values made one line), E01-T11 (Settings in the accessibility check); one done by its tester, eight struck (D-111). See `handoffs/E01-T08a.md` |
+| E01-T08b | Settings: opening hours | builder | normal | **Ready** | From E01-T08 (D-110), split again (D-111): the week's hours on a second tab, and the clinic's phone shown with its country code (E01-T08a, `message`). Beside E01-T04b, in the clone (owner, 2026-10-12). See `handoffs/E01-T08b.md` |
+| E01-T08c | Settings: closed days | builder | normal | Planned | Split from E01-T08b (D-111), written in full: on the Opening hours tab, after E01-T08b; Ready in E01-T08b's Done pass |
 | E01-T09 | Settings: providers and treatment types | builder | normal | Planned | |
 | E01-T10 | Today screen, first version | builder | normal | Planned | |
-| E01-T11 | Journey J2 and a hard look at scheduling | tester | normal | Planned | Owner: receptionist trial if possible (Q-09). E00-T06c first if J2 sets "now" (D-100). J2 through the calendar, and the accessibility check on its pages (E01-T04a) |
+| E01-T11 | Journey J2 and a hard look at scheduling | tester | normal | Planned | Owner: receptionist trial if possible (Q-09). E00-T06c first if J2 sets "now" (D-100). J2 through the calendar, and the accessibility check on its pages (E01-T04a) and on Settings as its owner (E01-T08a) |
 
 ## E02 · Reminder loop (M2)
 
@@ -223,6 +225,7 @@ Outline. Needs E07-T00.
 - E00-T07d · The job-past-its-time test does not depend on timing · merged 2026-10-11 (PR #52)
 - E00-T07e · The start-up refusals' last gaps · merged 2026-10-12 (PR #54)
 - E01-T04a · Calendar: the day view · merged 2026-10-12 (PR #58)
+- E01-T08a · Settings: the page and the clinic's details · merged 2026-10-12 (PR #59)
 
 ## Owner actions (standing)
 
