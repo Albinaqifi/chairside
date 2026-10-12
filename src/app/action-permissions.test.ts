@@ -123,6 +123,7 @@ type ScopeRow = keyof typeof SCOPE_ROWS;
  */
 const ACTIONS: Record<string, Record<string, ScopeRow | 'userAction'>> = {
   'src/app/(auth)/choose-clinic/actions.ts': { chooseClinic: 'userAction' },
+  'src/app/(staff)/calendar/actions.ts': { readCalendarDay: 'Calendar, patients, booking' },
   'src/app/(staff)/dev/components/actions.ts': {
     demoAnswer: 'No area of the table: every member',
     demoOwnerOnly: 'Staff, settings, audit log, results panel',

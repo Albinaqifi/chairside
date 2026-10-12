@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { isoWeekday, type CalendarDay } from '@/lib/calendar-day';
 import { clinicsAndStaff } from './01-clinics-and-staff';
 import { MIDDAY, scheduling } from './02-scheduling';
-import { isoWeekday, minutesOf, type CalendarDay } from './seed-day';
+import { minutesOf } from './seed-day';
 import type { SeedRow } from './seed-files';
 import {
   SEEDED_CLINICS,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageOn, dayInZone, searchTerms } from './list';
+import { ageOn, searchTerms } from './list';
 import { phoneAsWritten } from './phone';
 
 // E01-T02a: the parts of the patient list that need no database. The search itself, against real
@@ -58,20 +58,6 @@ describe('ageOn: whole years on a day', () => {
 
   it('a birth after the day has no age', () => {
     expect(ageOn('2026-10-08', '2026-10-07')).toBeNull();
-  });
-});
-
-describe("dayInZone: the clinic's today, whatever the computer's zone", () => {
-  // 23:30 UTC on 7 October is already 8 October in Skopje (UTC+2 in summer time) and in Auckland.
-  const lateEvening = new Date('2026-10-07T23:30:00Z');
-
-  it.each([
-    { zone: 'UTC', day: '2026-10-07' },
-    { zone: 'Europe/Skopje', day: '2026-10-08' },
-    { zone: 'Pacific/Auckland', day: '2026-10-08' },
-    { zone: 'America/New_York', day: '2026-10-07' },
-  ])('$zone: $day', ({ zone, day }) => {
-    expect(dayInZone(lateEvening, zone)).toBe(day);
   });
 });
 

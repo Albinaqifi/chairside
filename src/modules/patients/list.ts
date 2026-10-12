@@ -1,5 +1,6 @@
 import { asc, count, sql, type SQL } from 'drizzle-orm';
 import type { TenantTransaction } from '@/db/tenant';
+import { dayInZone } from '@/lib/calendar-day';
 import { lastAndNextVisits } from '@/modules/scheduling';
 import { clinicPlace } from '@/modules/tenancy';
 import { phoneAsWritten } from './phone';
@@ -113,21 +114,6 @@ export function searchTerms(typed: string): { text: string; digits: string | nul
 function matching(text: string, digits: string | null): SQL {
   const name = sql`strpos(lower(${patients.firstName} || ' ' || ${patients.lastName}), lower(${text})) > 0`;
   return digits === null ? name : sql`(${name} or strpos(${patients.phoneE164}, ${digits}) > 0)`;
-}
-
-/** The day it is in this time zone at this moment, YYYY-MM-DD, whatever the computer's zone. */
-export function dayInZone(moment: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    calendar: 'gregory',
-    numberingSystem: 'latn',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(moment);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((found) => found.type === type)?.value ?? '';
-  return `${part('year').padStart(4, '0')}-${part('month')}-${part('day')}`;
 }
 
 /**

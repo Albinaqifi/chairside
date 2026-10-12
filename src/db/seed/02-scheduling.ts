@@ -1,5 +1,6 @@
+import { addDays, type CalendarDay } from '@/lib/calendar-day';
 import { EMAIL_DOMAIN, fakePhone } from './fake-data';
-import { addDays, addMinutes, localMoment, seedWeek, type CalendarDay } from './seed-day';
+import { addMinutes, localMoment, seedWeek } from './seed-day';
 import type { SeedFile, SeedRow } from './seed-files';
 import {
   SEEDED_CLINICS,
