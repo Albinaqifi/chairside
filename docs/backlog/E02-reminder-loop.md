@@ -89,7 +89,7 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 ### E02-T03 · Template rendering
 
 - **Role:** builder · **Risk:** normal · **Depends on:** E02-T01
-- **Read:** `messaging` (Templates; Channel order and fallback; WhatsApp specifics) · D-038, D-055
+- **Read:** `messaging` (Templates; Channel order and fallback; WhatsApp specifics) · D-038, D-055, D-111
 
 **Do.**
 - `validateTemplate(body, trigger)` → ok or the list of unknown variables.
@@ -97,11 +97,18 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 - Rendering is channel-aware: for email the full text (and subject); for WhatsApp the local
   copy of the approved template **plus** the ordered list of variable values the provider
   needs. SMS-specific pieces (part counting, Latin conversion) belong to E03-T10, not here.
+- **WhatsApp's values on one line** (E01-T08a review, `message`; D-111): Meta's Cloud API refuses a
+  parameter that holds a new-line or a tab, more than four spaces in a row, or nothing ("Param text
+  cannot have new-line/tab characters or more than 4 consecutive spaces"), and a name is stored
+  trimmed only (the clinic's, a patient's, a provider's). For WhatsApp each value has every run of
+  white space made one space, then trimmed; a value left empty fails closed as a missing one. The
+  local copy is rendered from the same values. Email keeps them as they are.
 - Date and time formatting through the clinic's locale and time zone.
 
 **Acceptance.**
 - [ ] Unknown variable → validation error. Missing value → render failure, never a string containing `{`.
 - [ ] WhatsApp rendering returns the variable values in the template's order and the matching local text; a template with a missing variable mapping fails closed.
+- [ ] For WhatsApp no value holds a new-line, a tab or two spaces in a row, and a value empty after that fails closed (a property test over any text); email's values unchanged.
 - [ ] Property test: valid template + complete values never leaves a brace in the output.
 - [ ] Dates render in the clinic's locale and zone, not the server's.
 

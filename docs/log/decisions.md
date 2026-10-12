@@ -2116,3 +2116,22 @@ architecture), `changed` (differs from the original files), `process`.
   grant would have made E01-T08a critical.
 - **Revisit if:** Node's Intl comes to spell zones as the database does, or the database image ships
   the old names; the parallel run costs more in rebases than it saves (the board's line goes).
+
+### D-111 · E01-T08a Done: E01-T08b split again, its opening hours beside E01-T04b (owner); the clinic's phone shown with its country code; WhatsApp's values made one line
+- **Origin:** E01-T08a's Done pass, 2026-10-12 (PR #59; `handoffs/E01-T08a.md`, `handoffs/E01-T08b.md`).
+  **Owner, 2026-10-12:** E01-T08b runs beside E01-T04b in the clone, under D-110's rules (the board's
+  line). The rest is the architect's.
+- **What:**
+  - **E01-T08b is split in two:** the opening hours and the phone below (E01-T08b), then the closed
+    days on the same tab (E01-T08c). Together about 700 lines of product code by estimate, against ~400.
+  - **The clinic's phone is shown in Settings with its country code** (`+389 70 001 402`), no longer as
+    the clinic writes it: shown nationally, a phone left as it was while the phone country changed was
+    read as a number of the new country (E01-T08a, `message`).
+  - **WhatsApp's variable values are made one line** (E01-T08a review, `message`): Meta refuses a
+    parameter holding a new-line, a tab, more than four spaces in a row, or nothing. E02-T03 makes each
+    run of white space one space and fails closed on an empty value; `messaging.md` says so.
+- **Why:** a small diff can be reviewed, and E01-T08a's parallel run cost one conflict of two lines; a
+  "+" number reads the same in every country, with no field added; one rule where WhatsApp's values
+  are made covers every name, the clinic's, a patient's, a provider's.
+- **Revisit if:** a clinic wants its number shown as it writes it (then keep a phone nobody touched by
+  what the page showed); Meta's documents give other limits (E03-T03 checks them).

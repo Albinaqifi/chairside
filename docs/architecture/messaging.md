@@ -177,6 +177,9 @@ Disabling a channel in clinic settings re-plans its pending messages on the next
 - Business-initiated messages must use templates approved by Meta, per language, with
   numbered variables. Our rules map to a provider template name and a local copy of its text;
   a rule cannot send on WhatsApp until its template is approved (skip reason `template_not_approved`).
+- A variable's value holds no new-line, no tab and no more than four spaces in a row, and is never
+  empty: Meta refuses the send otherwise. The rendering makes every run of white space one space and
+  fails closed on an empty value (E02-T03, D-111).
 - In v1 the templates are the product's (one sender number for all clinics, D-056); clinics edit email wording only.
 - The patient page link travels as a URL button. Quick-reply buttons come in v1.1.
 - Status events: `sent`, `delivered`, `read` (stored as delivered plus an event). A permanent

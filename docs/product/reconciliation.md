@@ -46,7 +46,7 @@ real patient data.
 | B6 | Upcoming (not yet sent) messages per patient. | Patient profile shows planned messages. E02-T12. |
 | B7 | Audit log viewer for owners. | E07-T01. Logging itself starts in E00. |
 | B8 | Opt-out page and consent history. | E03-T07 (page), E02-T05 (history). |
-| B9 | Closed days and holidays (the architecture lists this as "not covered yet"). | Settings, E01-T08b (D-110). Used by quiet hours (D-029). |
+| B9 | Closed days and holidays (the architecture lists this as "not covered yet"). | Settings, E01-T08c (D-110, D-111). Used by quiet hours (D-029). |
 | B10 | How a clinic is created; how the operator supports a clinic. | Script in v1 (D-042). Support access: Q-12. |
 | B11 | Patient data export and anonymisation. | E07-T05. |
 
