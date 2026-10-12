@@ -9,14 +9,14 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E01-T04a` (Ready): `/pipeline E01-T04a`. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
-- **Decisions it waits on:** none
-- **The first Monday run with the journeys** (2026-10-12) is the first in Firefox and WebKit on Linux, with the D-093 check's WebKit Back control (E00-T06b, `data`): the next architect pass reads it (D-100's "Revisit if")
+- **Next tasks to start, side by side:** `E01-T04a` (Ready), `/pipeline E01-T04a` in this checkout, and `E01-T08a` (Ready), `/pipeline E01-T08a` in the clone. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
+- **Two tasks run in parallel** (owner, 2026-10-12, D-110): E01-T04a in the main checkout, E01-T08a in a clone (`README.md`, "Two checkouts on one machine"). Each edits only its own board row and its own handoff note (a Discovered line goes in that note meanwhile); the second to merge rebases on `main` first
+- **Decisions they wait on:** none
 
 ## Next (in order)
 
 1. E00-T07f, then E00-T07c, once the owner has the Render and monitor accounts ("Owner actions"; not yet on 2026-10-11): E00-T07f needs no account but goes right before staging (owner, D-109); until then the rest of E01 goes first
-2. The rest of E01, in the epic's own order (D-087): E01-T04a (Ready), then E01-T04b (refined in E01-T04a's Done pass, D-108); E00-T06c before the first journey that sets "now" (D-100)
+2. The rest of E01, in the epic's own order (D-087): E01-T04a and E01-T08a (both Ready, side by side, D-110), then E01-T04b (refined in E01-T04a's Done pass, D-108), E01-T08b (refined once E01-T04a and E01-T08a are Done) and E01-T09; E00-T06c before the first journey that sets "now" (D-100)
 3. E00-T12, before E02 (owner, 2026-10-03; D-102)
 
 ## Blocked
@@ -78,7 +78,9 @@ Fully specified.
 | E01-T05 | Book an appointment (drawer) | builder | normal | Planned | The patient search keeps nothing in the browser (D-095); a double click keeps the drawer open; a form in a drawer or dialog sends only itself (E00-T04e) |
 | E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | The cancel dialog sends the cancel only (E00-T04e) |
 | E01-T07 | Calendar: week view | builder | low | Planned | |
-| E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | Planned | A time zone and a phone country the code knows (E01-T02a); a zone stored as Intl names it, never an offset, in `clinic:create` too (E00-T05b review, `message`) |
+| E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | split (D-110) | Into E01-T08a and E01-T08b, the next two rows |
+| E01-T08a | Settings: the page and the clinic's details | builder | normal | **Ready** | From E01-T08 (D-110), beside E01-T04a in a clone (owner). Owner only; a zone the database and Intl both know, by its name, never an offset, in `clinic:create` too (E00-T05b review, `message`); the save never touches `status`; `staff-pages.test.ts` changes for `/settings` (owner, 2026-10-12). See `handoffs/E01-T08a.md` |
+| E01-T08b | Settings: opening hours and closed days | builder | normal | Planned | From E01-T08 (D-110): after E01-T04a, whose reads it uses and whose calendar its criteria check. Refined once E01-T04a and E01-T08a are Done |
 | E01-T09 | Settings: providers and treatment types | builder | normal | Planned | |
 | E01-T10 | Today screen, first version | builder | normal | Planned | |
 | E01-T11 | Journey J2 and a hard look at scheduling | tester | normal | Planned | Owner: receptionist trial if possible (Q-09). E00-T06c first if J2 sets "now" (D-100) |

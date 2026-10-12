@@ -27,6 +27,11 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 - `UNIQUE (clinic_id, idempotency_key)` on `messages`; index on `(status, scheduled_for)`;
   unique `token_hash` on `patient_links`.
 - Grants: the app role may insert into `consents` and `message_events` but not update or delete them.
+- **Staff never change a clinic's pause** (E00-T01 Discovered line, `message`; D-110): the app role's
+  UPDATE on `clinics` becomes one by column, for the columns Settings changes (E01-T08a's name,
+  phone, address, email, timezone, locale, currency, default_country and `updated_at`; `settings`, for
+  E03-T06), never `status`: the pause the dispatcher obeys (D-030), which only the operator sets.
+  `security-privacy.md` section 1 says so.
 - **The meta-test checks the composite keys** (E01-T01a critical review, `data`): a case in
   `tests/integration/tenant-tables.test.ts` reads `pg_constraint` and fails for a foreign key from
   one tenant table to another that does not hold `clinic_id` on both sides (`clinics` and the
@@ -48,6 +53,8 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
       sides, and passes for every table there is (tests).
 - [ ] Inserting two messages with the same key in one clinic fails; the same key in two clinics is fine.
 - [ ] The app role cannot update or delete `consents` or `message_events` (test).
+- [ ] The app role cannot update `clinics.status`, and still saves a clinic's details in Settings
+      (tests).
 - [ ] A newly created clinic has its default rules and templates.
 - [ ] `data-model.md` matches the migrations.
 
@@ -154,6 +161,11 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 - Worker: a repeating job every 5 minutes that plans for every clinic (inside each clinic's
   tenant context) for appointments in the planning window.
 - Channel choice per D-055: one row for the first usable channel in the rule's order (enabled, contact present and valid, not refused, `whatsapp_status` not `unavailable`); `unreachable` skip plus task when none fits.
+- **The clinic's settings through one typed accessor** (`data-model.md`; moved from E01-T08, which
+  stores no key in them, D-110): `clinics.settings` (quiet hours, the default send time, the enabled
+  channels) is read only through a function of `tenancy` that checks what it returns and gives a
+  default for a key not set; a value it cannot read fails loudly, as `clinicPlace()` does for a zone.
+  E02-T02's functions take what it returns.
 - **The job may be run twice at once, and must be safe for it** (E00-T07b, `message` ×2). Its
   handler gets the job's `signal` (`src/db/queue.ts`): pg-boss aborts it when a stop has waited 20 s
   and handed the job back, and again when the handler passes its queue's `expireInSeconds`

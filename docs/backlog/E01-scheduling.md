@@ -6,14 +6,16 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 **Why now:** appointments are what every message is about. And booking speed is the first
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
-Order: T01a → T01b → T02a → T02b → T04a → T04b, T08, T09 (parallel-safe) → T03, T05 → T06 → T07,
-T10 → T11. With E00 (D-087, D-090, D-091, D-093, D-096, D-108): E00-T05a → T01a → T01b → E00-T04c →
-E00-T04d → E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 → T04a, T04b, T08, T09 and the
-rest, so a receptionist sees a patient list before Playwright and staging exist. T01 is split in two
-(D-091): the schema and the provider link (T01a), the seed (T01b). T02 is split in two (D-096): the
-list and the search (T02a), adding a patient (T02b); editing a patient's details moved to T03, the
-profile. T04 is split in two (D-108): the day view (T04a); the provider filter, a provider's own
-column, the "now" line and the reading on use (T04b).
+Order: T01a → T01b → T02a → T02b → T04a and T08a side by side (two checkouts, D-110) → T04b, T08b,
+T09 (parallel-safe) → T03, T05 → T06 → T07, T10 → T11. With E00 (D-087, D-090, D-091, D-093, D-096,
+D-108, D-110): E00-T05a → T01a → T01b → E00-T04c → E00-T04d → E00-T04e → T02a → T02b → E00-T06b →
+E00-T05b → E00-T07 → T04a and T08a → T04b, T08b, T09 and the rest, so a receptionist sees a patient
+list before Playwright and staging exist. T01 is split in two (D-091): the schema and the provider
+link (T01a), the seed (T01b). T02 is split in two (D-096): the list and the search (T02a), adding a
+patient (T02b); editing a patient's details moved to T03, the profile. T04 is split in two (D-108):
+the day view (T04a); the provider filter, a provider's own column, the "now" line and the reading on
+use (T04b). T08 is split in two (D-110): the Settings page and the clinic's details (T08a), beside
+T04a; the opening hours and closed days (T08b), after T04a, whose calendar shows them.
 
 ---
 
@@ -641,46 +643,133 @@ Day / Week toggle.
 
 ---
 
-### E01-T08 · Settings: clinic details, opening hours, closed days
+### E01-T08a · Settings: the page and the clinic's details
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04e,
-  E00-T05b (`newClinicProblems()`)
-- **Read:** `scope` (Settings) · `design-ref` (demo lines 746–778; logic 1912–1919) · `data-model` (`clinics`, `clinic_hours`, `closed_days`)
+- **Role:** builder · **Risk:** normal (a screen and a form: no table, migration, policy, permission,
+  wrapper or login change) · **Depends on:** E01-T01a, E01-T01b, E00-T04a … E00-T04e, E00-T05b (all
+  Done). Runs beside E01-T04a, in a second checkout (board, "Now"; owner, D-110)
+- **Read:** `scope` (Navigation and roles; Settings) · `design-ref` (demo lines 746–757; logic
+  1912–1914) · `data-model` (`clinics`) · D-015, D-097, D-098, D-101, D-110 · the architect section of
+  `handoffs/E01-T08a.md`
+
+**Why.** After `clinic:create`, only the database can change a clinic's details. Its name and phone
+go into every message (E02), and its time zone places every visit and every send: a zone saved wrong
+puts a reminder an hour off for half the year. Split from E01-T08 (D-110).
 
 **Do.**
-- Settings screen with tabs. This task: **Clinic** (name, phone, address, email, time zone,
-  language, currency, phone country) and **Opening hours** (per weekday, closed toggle) with
-  **Closed days** (date + label).
-- A typed, validated accessor for clinic settings (the only way settings are read).
-- Only `settings.manage` may change anything.
-- The time zone is one Intl knows and the phone country one the phone package supports
-  (`isSupportedCountry`, D-097): the database checks neither, and a zone Intl does not know fails
-  every page for the clinic's members, the login page and the clinic picker included (E01-T02a
-  test, `slice`). Both are the user's own input, so the schema checks them at their fields (D-098).
-- **A zone stored as Intl names it** (E00-T05b review, `message`): Intl also knows a fixed offset
-  (`+01:00`) and a name typed in lower case. A clinic saved with `+01:00` never moves to summer
-  time, so its day and every send planned by the clock are an hour off for half the year. The check
-  refuses a zone Intl resolves to an offset and stores the name Intl resolves (`europe/skopje` →
-  `Europe/Skopje`); `Intl.supportedValuesOf('timeZone')` alone would also refuse `UTC` and
-  `Europe/Kyiv`. One check, in `tenancy`, for this form and for `clinic:create`
-  (`newClinicProblems()`, `src/modules/tenancy/create-clinic.ts`), so a zone typed there is stored
-  the same way.
+- **The Settings page** (`/settings`), the owner's alone (`settings.manage`): it renders
+  `<PageClinic>`, answers anyone else with `notFound()` as the new-patient page does, and reads with a
+  `staffRead` naming `settings.manage`. Its tabs (`Tabs`; the demo's, line 753) hold one tab now,
+  **Clinic**; each later tab comes with its task (Opening hours E01-T08b, Providers and Treatment
+  types E01-T09, Staff E04-T02, Message channels E03-T06), none shown before.
+- **The Clinic tab:** one `StaffForm` with name, phone, address, email, time zone, language, currency
+  and phone country, filled from the clinic's row, keyed by the page's clinic (D-098). The name is
+  required; the phone is read with the form's own phone country (`readPhone`, D-097) and stored in
+  E.164, and shown as the clinic writes it (`phoneAsWritten`), both exported from `@/modules/patients`,
+  never copied; the email trimmed and lower-cased. Zone, language, currency and phone country are the
+  browser's own select (`NativeSelect`), offering the values their checks take; a stored value the
+  options lack is offered as it is, so a save never changes a field nobody touched. Country and
+  currency names through `Intl.DisplayNames` (data, as a formatted date is), languages' from the
+  message file.
+- **The checks.** What the input alone settles is the schema's, at its field (D-098):
+  `newClinicProblems()` for name, zone, country, currency and language, the one check `clinic:create`
+  makes, and the phone read with the input's country. The zone's database check (below) is the
+  handler's refusal, shown above the button, naming the field.
+- **A zone both the database and Intl know, by its name** (E00-T05b review, `message`; D-110): one of
+  PostgreSQL's region names (`pg_timezone_names`, `Area/Location`, none under `Etc/`) or `UTC`, found
+  in any case and stored as PostgreSQL spells it (`europe/skopje` → `Europe/Skopje`), and one Intl
+  knows. So no fixed offset: a clinic saved with `+01:00` never moves to summer time, and PostgreSQL
+  reads that text as an hour west of UTC where Intl reads it east; nor `Etc/GMT-1`. Intl's own list is
+  not the source: it lacks `UTC` and `Europe/Kyiv`, and spells 18 zones the old way (`Europe/Kiev`,
+  `Asia/Calcutta`), which the database does not know. One function in `tenancy`, for this form and for
+  `clinic:create`: `createClinic()` checks the zone in its transaction and stores PostgreSQL's
+  spelling, the script naming `--time-zone` when it refuses and writing nothing; `newClinicProblems()`
+  also refuses a zone Intl reads as an offset, before anything connects. `docs/runbook.md`'s
+  `--time-zone` line says so.
+- **The save** (`tenancy`): one function that sets the eight details and `updated_at` (from `now`) by
+  name, never `status` (the clinic's pause, the operator's, D-030) or `settings` (E02-T06, E03-T06).
+  One audit row, `clinic.updated`, its entity the clinic, its metadata the names of the fields
+  changed (as values: a key that is a personal field name fails `audit.record`). The next page shows
+  what was saved: the sidebar's clinic name, every time in the new zone.
+- **One test changes (owner, 2026-10-12):** `tests/integration/staff-pages.test.ts` opens every staff
+  page as a front-desk member and expects each to render; for `/settings` it now expects "not found"
+  for that member, in each case that opens every page, and a new case opens it as an owner. No other
+  expectation of it changes (agent rule 8).
 
-**Out of scope.** Staff tab (E04), Channels tab (E03), quiet hours UI (E03).
+**Out of scope.** The calendar and everything E01-T04a changes beside this task (D-110):
+`src/app/(staff)/calendar/`, `src/lib/calendar-day.ts` and `src/db/seed/seed-day.ts` with their tests,
+the day's reads it adds to `src/modules/scheduling/`, `src/modules/tenancy/` and
+`src/modules/patients/` (and `list.ts`'s `dayInZone`), the provider tints in `src/app/globals.css`,
+`CLAUDE.md`'s `src/lib/` line. Opening hours and closed days (E01-T08b: the calendar reads their
+tables). `clinics.settings` and its typed accessor (E02-T06). The database's guard on `status`
+(E02-T01). The demo's City field (one `address`) and "Booking link for patients" (D-024). Adding the
+page to the accessibility check, which holds no E01 screen yet.
 
 **Acceptance.**
-- [ ] Changes are saved, validated (a time zone Intl knows and names: `+01:00` refused,
-      `europe/skopje` saved as `Europe/Skopje`, `UTC` and `Europe/Kyiv` taken, in `clinic:create`
-      too; a phone country the phone package supports; closing after opening) and audited.
-- [ ] Front desk and dentist cannot open Settings (server refuses, not just hidden).
-- [ ] Changing the time zone changes how the calendar shows existing appointments (they keep their real moment).
-- [ ] Closed days and non-opening days show on the calendar.
+- [ ] The owner's changes are saved and audited, one row per save; an empty name, an impossible
+      phone, an email that is no email, and a currency, language or phone country the checks refuse
+      are each shown at their field, with nothing saved (tests).
+- [ ] The zone, in the form and in `clinic:create`: `+01:00`, `Etc/GMT-1` and `Europe/Kiev` (Intl
+      knows it, the test database does not) refused; `europe/skopje` saved as `Europe/Skopje`; `UTC`
+      and `Europe/Kyiv` taken (unit and integration tests).
+- [ ] A dentist, a hygienist and the front desk cannot open Settings or change anything: the page
+      answers "not found" and each action `forbidden` (`src/app/action-permissions.test.ts`, the page
+      test above).
+- [ ] A save changes its own clinic only, and of it only the eight details and `updated_at`: `status`
+      and `settings` stay as they were, another clinic's row unchanged (integration test, two clinics).
+- [ ] After another zone is saved, every appointment keeps its moment (`starts_at`, `ends_at`
+      unchanged) and the next page reads the new zone (integration tests). The calendar's side is
+      E01-T08b's.
+- [ ] The clinic's new name shows in the sidebar on the next page; "Try it" steps for the owner.
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
+
+---
+
+### E01-T08b · Settings: opening hours and closed days
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T08a (the page and its tabs), E01-T04a
+  (the calendar that shows both; `tenancy`'s reads of them)
+- **Read:** `scope` (Settings; Calendar) · `design-ref` (demo lines 770–777; logic 1919) ·
+  `data-model` (`clinic_hours`, `closed_days`) · D-018, D-029, D-098, D-110 · the architect section of
+  `handoffs/E01-T08b.md` (its Ready pass)
+
+**Why.** The calendar shades the hours a clinic is closed and counts % booked from its opening hours
+(E01-T04a), and quiet hours treat a closed day as quiet (D-029); today only the seed sets either.
+Split from E01-T08 (D-110), after E01-T04a, whose reads of both tables it uses.
+
+**Do.**
+- **Opening hours** (a tab; demo lines 770–777): each weekday, Monday first, open or closed (a
+  switch) with its opening and closing time; one save for the week. Closing after opening is the
+  schema's, at its field; a closed weekday has no row (`data-model.md`).
+- **Closed days**, on the same tab: the clinic's closed days from its today on, by date, each with its
+  label; one added (date and label), one removed. A date already closed is the handler's refusal,
+  shown above the button, naming the date (D-098).
+- A closed day is a calendar date, never a moment: shown from `YYYY-MM-DD` in UTC (`CLAUDE.md`, Dates
+  and times); the clinic's today from `src/lib/calendar-day.ts` and the wrapper's `now`.
+- Reads through E01-T04a's functions in `tenancy` where they fit, never a second reader of the same
+  rows; writes in `tenancy`. Each save audited; `settings.manage` only.
+
+**Out of scope.** Lunch and other breaks: provider breaks, E01-T09 (the demo's lunch column, D-018).
+Quiet hours (E03-T06). Moving or warning about the appointments on a day closed later (the calendar
+still shows them, E01-T04a).
+
+**Acceptance.**
+- [ ] Opening hours saved per weekday, a closing before its opening refused at its field, a closed
+      weekday without a row; a closed day added and removed; a date already closed refused, naming
+      it; each save audited (tests).
+- [ ] A dentist, a hygienist and the front desk can change neither (the permission test).
+- [ ] Settings and the calendar together: a weekday closed, hours changed and a closed day added in
+      Settings show on the calendar's day, and a zone saved in the Clinic tab moves the calendar's
+      appointments, each keeping its moment (tests of the day's read after each save).
+- [ ] A closed day shows on its own date in a zone behind UTC (a test that names `America/New_York`).
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---
 
 ### E01-T09 · Settings: providers and treatment types
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T08
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T08a (the Settings page and its tabs),
+  E01-T04a (the calendar its criteria name)
 - **Read:** `scope` (Settings) · `data-model` (`providers`, `provider_breaks`, `treatment_types`)
 
 **Do.**

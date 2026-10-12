@@ -2089,3 +2089,30 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a later better-auth decides these checks another way (its notice says
   `disableOriginCheck` will stop switching the CSRF check); E01 is done before the accounts exist
   (then the owner places E00-T07f again).
+
+### D-110 · E01-T08 split in two, the first beside E01-T04a in a second checkout (owner); a clinic's zone is a name the database and Intl both know; the settings accessor moves to E02-T06, the guard on `status` to E02-T01
+- **Origin:** E01-T08's Ready pass, 2026-10-12 (`handoffs/E01-T08a.md`). **Owner, 2026-10-12:**
+  E01-T08 runs at the same time as E01-T04a, in a second checkout; each edits only its own board row
+  and its own handoff note; the second to merge rebases on `main`. And E01-T08a may change
+  `staff-pages.test.ts` for `/settings` (agent rule 8). The rest is the architect's.
+- **What:**
+  - **E01-T08 is split in two:** E01-T08a, the Settings page and the clinic's details, beside
+    E01-T04a; E01-T08b, opening hours and closed days, after E01-T04a, whose reads of those tables it
+    uses and whose calendar its criteria check. As one task about 950 lines of product code, against
+    ~400.
+  - **A clinic's zone** is one of PostgreSQL's region names, or `UTC`, stored in PostgreSQL's
+    spelling, and one Intl knows: never an offset or an `Etc/` zone. A probe on Node 24 (ICU 77.1) and
+    the `postgres:18` image: Intl spells 18 zones the old way (`Europe/Kiev`), which the database does
+    not know, and lacks `UTC` and `Europe/Kyiv`; the database reads the text `+01:00` as an hour west
+    of UTC, Intl as an hour east. One function in `tenancy`, for Settings and `clinic:create`. This
+    replaces E01-T08's "the name Intl resolves".
+  - **The typed accessor for `clinics.settings`** moves to E02-T06, its first reader: E01 stores no
+    key in it.
+  - **Staff never change `clinics.status`**, the clinic's pause (D-030): E01-T08a's save names its
+    columns, and E02-T01 grants the app role UPDATE on `clinics` by column, `status` left out.
+- **Why:** a task twice the size, two builders writing the same `tenancy` files at once; the zone must
+  mean the same in SQL (`AT TIME ZONE`) and on the page; code nobody runs waits for its first reader;
+  the pause means nothing before E02-T07, and E02-T01 writes a critical migration anyway, where one
+  grant would have made E01-T08a critical.
+- **Revisit if:** Node's Intl comes to spell zones as the database does, or the database image ships
+  the old names; the parallel run costs more in rebases than it saves (the board's line goes).
