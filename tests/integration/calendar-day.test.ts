@@ -571,3 +571,77 @@ describe("the clinic's zone, also on the days the clocks change and the day afte
     expect(view.grid).toEqual({ from: 5 * H, to: 24 * H });
   });
 });
+
+describe("the day's two midnights: a visit that overlaps the day from the evening before, or starts at a midnight (tester)", () => {
+  // America/New_York, behind UTC: daylight time (UTC−4) on 20 to 22 October, so a day runs from
+  // 04:00 UTC to 04:00 UTC; 1 November, the day the clocks go back, runs 25 hours, from 04:00 UTC
+  // to 05:00 UTC on the 2nd. The visits are written in UTC.
+  const ny = {} as { clinic: string; provider: string; patient: string };
+  const v = {} as Record<'toMidnight' | 'atMidnight' | 'acrossMidnight' | 'nov1' | 'nov2', string>;
+
+  beforeAll(async () => {
+    ny.clinic = await clinicIn('America/New_York');
+    ny.provider = await provider(ny.clinic, { name: 'Elena Planinska', sort: 1 });
+    ny.patient = await patient(ny.clinic, 'Ana', 'Brezovska');
+    await weekdayHours(ny.clinic, '08:00', '18:00');
+    const visit = (at: string, minutes: number) =>
+      appointment(ny.clinic, ny.provider, ny.patient, at, minutes);
+    v.toMidnight = await visit('2026-10-21T03:30:00Z', 30); // 23:30 to 00:00, Tuesday 20 October
+    v.atMidnight = await visit('2026-10-21T04:00:00Z', 30); // 00:00 to 00:30, Wednesday 21 October
+    v.acrossMidnight = await visit('2026-10-22T03:30:00Z', 60); // 23:30 on the 21st to 00:30 on the 22nd
+    v.nov1 = await visit('2026-11-01T04:00:00Z', 30); // 00:00 on 1 November, daylight time
+    v.nov2 = await visit('2026-11-02T05:00:00Z', 30); // 00:00 on 2 November, standard time
+  });
+
+  it.each([
+    {
+      day: '2026-10-20',
+      what: 'a visit that ends at midnight is on its day',
+      shown: ['toMidnight', 23 * H + 30, 24 * H],
+    },
+    {
+      day: '2026-10-22',
+      what: 'a visit from the evening before, cut at 00:00',
+      shown: ['acrossMidnight', 0, 30],
+    },
+    { day: '2026-10-31', what: 'the visit at the next midnight is not on it', shown: null },
+    {
+      day: '2026-11-01',
+      what: 'the 25-hour day: its own midnight, not the next one 25 hours on',
+      shown: ['nov1', 0, 30],
+    },
+    { day: '2026-11-02', what: 'the day after: from its own midnight', shown: ['nov2', 0, 30] },
+  ] as const)('$day: $what', async ({ day, shown }) => {
+    const view = await read(ny.clinic, day);
+    const blocks = visits(view.columns[0]?.blocks ?? []).map((b) => [b.id, b.from, b.to]);
+    expect(blocks).toEqual(shown === null ? [] : [[v[shown[0]], shown[1], shown[2]]]);
+    expect(view.appointmentCount).toBe(blocks.length);
+  });
+
+  it('2026-10-21: a visit from its first minute, and one past its last, cut at 24:00', async () => {
+    const view = await read(ny.clinic, '2026-10-21');
+    expect(visits(view.columns[0]?.blocks ?? []).map((b) => [b.id, b.from, b.to])).toEqual([
+      [v.atMidnight, 0, 30],
+      [v.acrossMidnight, 23 * H + 30, 24 * H],
+    ]);
+    expect(view.grid).toEqual({ from: 0, to: 24 * H });
+  });
+
+  it('the visit from the evening before widens the next day’s grid to 00:00, not into the day before', async () => {
+    expect((await read(ny.clinic, '2026-10-22')).grid).toEqual({ from: 0, to: 18 * H });
+  });
+
+  it('a clinic far ahead of UTC: Pacific/Auckland, where 11:30 UTC on 12 October is already the 13th', async () => {
+    const auckland = await clinicIn('Pacific/Auckland');
+    const elena = await provider(auckland, { name: 'Elena Planinska', sort: 1 });
+    const ana = await patient(auckland, 'Ana', 'Brezovska');
+    // 09:00 on Tuesday 13 October in Auckland (daylight time, UTC+13) is 20:00 UTC on the 12th.
+    const id = await appointment(auckland, elena, ana, '2026-10-12T20:00:00Z', 30);
+    const view = await read(auckland, null, new Date('2026-10-12T11:30:00Z'));
+    expect(view).toMatchObject({ day: '2026-10-13', today: '2026-10-13' });
+    expect(visits(view.columns[0]?.blocks ?? []).map((b) => [b.id, b.from, b.to])).toEqual([
+      [id, 9 * H, 9 * H + 30],
+    ]);
+    expect(visits((await read(auckland, '2026-10-12')).columns[0]?.blocks ?? [])).toEqual([]);
+  });
+});
