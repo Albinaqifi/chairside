@@ -18,37 +18,46 @@ import { APP, OWNER_SESSION } from './servers.ts';
 // removes that day only. The first click's answer can come back before the second click: its row
 // leaves, and another day's Remove is then where the pointer rests, the next day's while the page
 // keeps its place, the day before's when the page was scrolled to its end (the shorter page scrolls
-// back a row). Each check closes days of its browser's own, in June 2032, far from the days the other
-// checks write on (calendar.spec.ts: March 2031), and opens again whatever is left. The list is the
-// clinic's, one for all three browsers, and a row another browser adds or removes moves this page's
-// rows at its next render: the checks take the list in turn (inTurn), so each one's rows move by its
-// own clicks alone.
+// back a row). Each check closes days of its browser's own, in June and July 2032, far from the days
+// the other checks write on (calendar.spec.ts: March 2031), and opens again whatever is left. The list
+// is the clinic's, one for all three browsers, and a row another browser adds or removes moves this
+// page's rows at its next render: the checks take the list in turn (inTurn), so each one's rows move
+// by its own clicks alone.
 
 const t = messages.settings.hours.closedDays;
 
 /** The seeded clinic the checks close days in, as the clinic picker names it. */
 const CLINIC_NAME = 'Harbour Street Dental';
 
+type Check = 'inPlace' | 'atTheEnd' | 'slower';
+
 /** The days each browser closes, three a check, in date order: no other browser or check uses them. */
-const DAYS: Record<string, Record<'inPlace' | 'atTheEnd', readonly [string, string, string]>> = {
+const DAYS: Record<string, Record<Check, readonly [string, string, string]>> = {
   chromium: {
     inPlace: ['2032-06-01', '2032-06-02', '2032-06-03'],
     atTheEnd: ['2032-06-04', '2032-06-05', '2032-06-06'],
+    slower: ['2032-07-01', '2032-07-02', '2032-07-03'],
   },
   firefox: {
     inPlace: ['2032-06-08', '2032-06-09', '2032-06-10'],
     atTheEnd: ['2032-06-11', '2032-06-12', '2032-06-13'],
+    slower: ['2032-07-08', '2032-07-09', '2032-07-10'],
   },
   webkit: {
     inPlace: ['2032-06-15', '2032-06-16', '2032-06-17'],
     atTheEnd: ['2032-06-18', '2032-06-19', '2032-06-20'],
+    slower: ['2032-07-15', '2032-07-16', '2032-07-17'],
   },
 };
 
-function daysOf(
-  testInfo: TestInfo,
-  check: 'inPlace' | 'atTheEnd',
-): readonly [string, string, string] {
+/**
+ * Windows' default double-click time: a person's second click comes up to this long after the first,
+ * and the first one's answer can be back almost at once, so the list still takes no click from the
+ * pointer this long after its rows moved (E01-T08c tester, fix round 1).
+ */
+const DOUBLE_CLICK_MS = 500;
+
+function daysOf(testInfo: TestInfo, check: Check): readonly [string, string, string] {
   const days = DAYS[testInfo.project.name]?.[check];
   if (!days) throw new Error(`No days for the browser ${testInfo.project.name}.`);
   return days;
@@ -313,6 +322,71 @@ test.describe("a double click on a closed day's Remove (E01-T08c test finding 1)
         expect(await stillClosed([before, target, warm])).toEqual([before]);
       } finally {
         await openDays([before, target, warm]);
+      }
+    });
+  });
+
+  // E01-T08c tester, fix round 1: the checks above click a second time as soon as the row has left,
+  // which a far shorter moment passes too (one of 200 ms passed 5 of their 6 runs). A person's second
+  // click can come half a second after an answer that was back at once, so the moment lasts at least
+  // that long. Playwright's WebKit sees a change up to a second after the page made it, so no click
+  // of Playwright's can be timed to it: the page itself asks, half a second after the row left by its
+  // own clock, what a click where the pointer rests would reach (elementFromPoint, whose hit test
+  // skips what takes no pointer events, as a click's does).
+  test("half a second after a Remove's row has left, a click where the pointer rests reaches no other day's Remove", async ({
+    page,
+  }, testInfo: TestInfo) => {
+    const [warm, target, next] = daysOf(testInfo, 'slower');
+    await inTurn(async () => {
+      await closeDays([warm, target, next]);
+      try {
+        await page.setViewportSize({ width: 1280, height: 2400 });
+        await openClosedDays(page);
+        await removeOf(page, warm).click();
+        await expect(dayRow(page, warm)).toHaveCount(0);
+
+        await takesThePointer(page, target);
+        const spot = await restOn(page, target);
+        await page.evaluate(
+          ({ name, point, after }) => {
+            const answer = window as unknown as { reached?: string };
+            const observer = new MutationObserver(() => {
+              const left = ![...document.querySelectorAll('[role="group"]')].some(
+                (group) => group.getAttribute('aria-label') === name,
+              );
+              if (!left) return;
+              observer.disconnect();
+              setTimeout(() => {
+                const button = document.elementFromPoint(point.x, point.y)?.closest('button');
+                answer.reached = button
+                  ? `the Remove of ${button.closest('[role="group"]')?.getAttribute('aria-label') ?? 'no day'}`
+                  : 'no button';
+              }, after);
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+          },
+          { name: shownDate(target), point: spot, after: DOUBLE_CLICK_MS },
+        );
+        const sent = actionsSent(page);
+        await page.mouse.down();
+        await page.mouse.up();
+        await page.waitForFunction(
+          () => (window as unknown as { reached?: string }).reached !== undefined,
+        );
+        // The case: the next day's Remove has moved up where the pointer rests, and takes no click.
+        expect(
+          await isUnder(removeOf(page, next), spot),
+          "another day's Remove under the pointer",
+        ).toBe(true);
+        expect(
+          await page.evaluate(() => (window as unknown as { reached?: string }).reached),
+          'what a click half a second after the change reaches',
+        ).toBe('no button');
+        await sent.answered();
+        expect(sent.count(), 'Removes sent').toBe(1);
+        expect(await stillClosed([warm, target, next])).toEqual([next]);
+      } finally {
+        await openDays([warm, target, next]);
       }
     });
   });
