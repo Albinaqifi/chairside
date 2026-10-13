@@ -16,13 +16,17 @@ import { APP } from './servers.ts';
 const t = messages.calendar.booking;
 
 /** The days each browser books on, one a check: weekdays, open 08:00–18:00 like every weekday. */
-const DAYS: Record<string, Record<'mouse' | 'keyboard' | 'filter' | 'twice' | 'read', string>> = {
+const DAYS: Record<
+  string,
+  Record<'mouse' | 'keyboard' | 'filter' | 'twice' | 'read' | 'words', string>
+> = {
   chromium: {
     mouse: '2031-04-07',
     keyboard: '2031-04-08',
     filter: '2031-04-09',
     twice: '2031-04-10',
     read: '2031-04-11',
+    words: '2031-04-28', // the tester's (acceptance 8)
   },
   firefox: {
     mouse: '2031-04-14',
@@ -30,6 +34,7 @@ const DAYS: Record<string, Record<'mouse' | 'keyboard' | 'filter' | 'twice' | 'r
     filter: '2031-04-16',
     twice: '2031-04-17',
     read: '2031-04-18',
+    words: '2031-04-29',
   },
   webkit: {
     mouse: '2031-04-21',
@@ -37,6 +42,7 @@ const DAYS: Record<string, Record<'mouse' | 'keyboard' | 'filter' | 'twice' | 'r
     filter: '2031-04-23',
     twice: '2031-04-24',
     read: '2031-04-25',
+    words: '2031-04-30',
   },
 };
 
@@ -425,6 +431,99 @@ test.describe('a read on use while the drawer is open (acceptance 9)', () => {
         },
       ]);
       await page.waitForLoadState('networkidle');
+    } finally {
+      await clear(day);
+    }
+  });
+});
+
+/** A request's body without its multipart boundaries: random letters, which could spell a word. */
+function withoutBoundaries(body: string): string {
+  const first = body.split(/\r?\n/, 1)[0] ?? '';
+  return first.startsWith('--') && first.length > 2 ? body.split(first).join('') : body;
+}
+
+test.describe("the patient search's words in no address and no booking (acceptance 8, tester)", () => {
+  test("after a search the address holds none of its words, and the booking's request none either", async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'words');
+    // What is typed: the start of a seeded patient's first and last names. Each word is looked for in
+    // lower case, as written and URL-decoded; neither is a hexadecimal word, so no id holds one.
+    const typed = 'Mimoza Kod';
+    const words = ['mimoza', 'kod'];
+    const holdsWord = (text: string) => {
+      const lower = text.toLowerCase();
+      let decoded = lower;
+      try {
+        decoded = decodeURIComponent(lower);
+      } catch {
+        // Not URL-encoded: as written.
+      }
+      return words.some((word) => lower.includes(word) || decoded.includes(word));
+    };
+    const { rows } = await db.query<{ id: string }>(
+      `select id from patients where clinic_id = $1 and first_name = 'Mimoza' and last_name = 'Kodra'`,
+      [SEEDED_CLINICS.harbourStreet],
+    );
+    const picked = rows[0]?.id;
+    if (rows.length !== 1 || !picked) throw new Error('The seed has no one Mimoza Kodra.');
+
+    const requests: {
+      url: string;
+      method: string;
+      action: boolean;
+      body: string;
+      headers: string;
+    }[] = [];
+    page.on('request', (request) => {
+      const headers = request.headers();
+      requests.push({
+        url: request.url(),
+        method: request.method(),
+        action: headers['next-action'] !== undefined,
+        body: withoutBoundaries(request.postData() ?? ''),
+        // Every header but the cookie, whose random letters could spell a word.
+        headers: JSON.stringify(Object.entries(headers).filter(([name]) => name !== 'cookie')),
+      });
+    });
+    try {
+      await openCalendar(page, day);
+      await newAppointment(page).click();
+      const open = drawer(page);
+      await open.getByRole('combobox', { name: t.patient }).fill(typed);
+      await expect(suggestions(open)).toHaveCount(1);
+      // The search sent its words in a request's body, a POST to the calendar's own address.
+      const searches = requests.filter((request) => request.action && holdsWord(request.body));
+      expect(searches.length, 'the search sent its words').toBeGreaterThan(0);
+      for (const search of searches) {
+        expect(search.method).toBe('POST');
+        expect(holdsWord(search.url), 'the search request’s address').toBe(false);
+      }
+      expect(holdsWord(page.url()), 'the address after the search').toBe(false);
+
+      await suggestions(open).filter({ hasText: 'Mimoza Kodra' }).click();
+      await open.getByRole('button', { name: 'Checkup', exact: true }).click();
+      await open.getByRole('button', { name: /^Book / }).click();
+      await expect(open).toBeHidden();
+      await page.waitForLoadState('networkidle');
+      expect(await bookedOn(day)).toMatchObject([{ patient: 'Mimoza Kodra', title: 'Checkup' }]);
+
+      // The booking's request: the patient picked by id, none of the words searched for.
+      const bookings = requests.filter(
+        (request) => request.action && request.body.includes('patientId'),
+      );
+      expect(bookings, 'one booking request').toHaveLength(1);
+      expect(bookings[0]?.body).toContain(picked);
+      expect(holdsWord(bookings[0]?.body ?? ''), 'the booking request’s body').toBe(false);
+      expect(holdsWord(bookings[0]?.headers ?? ''), 'the booking request’s headers').toBe(false);
+      // No address the page asked for holds a word, nor a header naming the page's (its referer);
+      // nor the page's own.
+      for (const request of requests) {
+        expect(holdsWord(request.url), request.url).toBe(false);
+        expect(holdsWord(request.headers), `the headers of ${request.url}`).toBe(false);
+      }
+      expect(holdsWord(page.url()), 'the address after the booking').toBe(false);
     } finally {
       await clear(day);
     }

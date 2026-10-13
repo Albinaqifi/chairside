@@ -57,6 +57,8 @@ interface Place {
 let skopje: Place;
 let newYork: Place;
 let other: Place;
+/** A clinic far ahead of UTC (the tester's, test-strategy.md "Hidden local time"). */
+let auckland: Place;
 /** Who books in the module's tests (a user without a login), and the signed-in front desk. */
 let bookerId: string;
 let frontDeskId: string;
@@ -121,11 +123,12 @@ beforeAll(async () => {
   skopje = await clinicIn('Europe/Skopje');
   newYork = await clinicIn('America/New_York');
   other = await clinicIn('Europe/Skopje');
+  auckland = await clinicIn('Pacific/Auckland');
 
-  // The front desk of the three clinics, signed in once; each test picks its clinic.
+  // The front desk of the four clinics, signed in once; each test picks its clinic.
   const email = testEmail();
   ({ id: frontDeskId } = await createStaffUser({ email, name: 'Front desk', password: PASSWORD }));
-  for (const clinicId of [skopje.clinic, newYork.clinic, other.clinic]) {
+  for (const clinicId of [skopje.clinic, newYork.clinic, other.clinic, auckland.clinic]) {
     await insertMembership(admin, { clinicId, userId: frontDeskId, role: 'front_desk' });
   }
   request.cookie = await signInCookie(email, PASSWORD, '10.51.0.1');
@@ -348,6 +351,88 @@ describe('the row as stored (acceptance 4)', () => {
       await expect(book(skopje, change)).rejects.toThrow(/cannot be stored/);
     }
     expect(await written(skopje.clinic)).toEqual(before);
+  });
+});
+
+// The tester's (E01-T05a, test-strategy.md "Hidden local time"): a clinic far ahead of UTC, where a
+// morning's moment falls on the UTC day before, through the module and through the action.
+describe('a clinic in Pacific/Auckland, far ahead of UTC (tester)', () => {
+  const inAuckland = { timeZone: 'Pacific/Auckland' } as const;
+
+  it.each([
+    { day: '2026-09-26', what: 'the day before the clocks go forward', at: '2026-09-25T21:00' },
+    { day: '2026-09-27', what: 'the day the clocks go forward', at: '2026-09-26T20:00' },
+    { day: '2026-09-28', what: 'the day after', at: '2026-09-27T20:00' },
+    { day: '2026-04-05', what: 'the day the clocks go back', at: '2026-04-04T21:00' },
+    { day: '2026-04-06', what: 'the day after', at: '2026-04-05T21:00' },
+  ])('$day, $what: 09:00 local is $at UTC, on the UTC day before', async ({ day, at }) => {
+    const id = await booked(auckland, { ...inAuckland, day, startMinute: 9 * H });
+    const start = new Date(`${at}:00Z`);
+    expect(await moments(id)).toEqual([
+      start.toISOString(),
+      new Date(start.getTime() + 30 * 60_000).toISOString(),
+    ]);
+  });
+
+  it('the calendar shows it on its own day at the local time chosen, not on the UTC day', async () => {
+    const id = await booked(auckland, { ...inAuckland, day: '2026-09-27', startMinute: 11 * H });
+    const [onItsDay, onTheUtcDay] = await withTenant(auckland.clinic, async (tx) => [
+      await scheduling.appointmentsOnDay(tx, '2026-09-27', 'Pacific/Auckland'),
+      await scheduling.appointmentsOnDay(tx, '2026-09-26', 'Pacific/Auckland'),
+    ]);
+    expect(onItsDay.filter((found) => found.id === id).map((found) => found.startMinute)).toEqual([
+      11 * H,
+    ]);
+    expect(onTheUtcDay.map((found) => found.id)).not.toContain(id);
+  });
+
+  it('a start the clocks skip is refused, with nothing written; one that comes twice is the second', async () => {
+    const before = await written(auckland.clinic);
+    // 02:30 on 27 September: the clocks go from 02:00 to 03:00.
+    expect(
+      await book(auckland, { ...inAuckland, day: '2026-09-27', startMinute: 2 * H + 30 }),
+    ).toEqual({ ok: false, code: 'start_skipped' });
+    expect(await written(auckland.clinic)).toEqual(before);
+    // 02:30 on 5 April comes at 13:30 UTC (summer time), then at 14:30 UTC (standard time).
+    const id = await booked(auckland, {
+      ...inAuckland,
+      day: '2026-04-05',
+      startMinute: 2 * H + 30,
+    });
+    expect((await moments(id))[0]).toBe('2026-04-04T14:30:00.000Z');
+  });
+
+  it("the booking action books in the clinic's own zone", async () => {
+    request.clinic = auckland.clinic;
+    const result = await bookAppointment(
+      auckland.clinic,
+      form(auckland, { day: '2026-09-28', start: '08:15' }),
+    );
+    if (!result.ok) throw new Error(`refused: ${result.error.code}`);
+    // 08:15 on 28 September in Auckland, summer time (UTC+13): 19:15 UTC the day before.
+    expect(await moments(result.value.id)).toEqual([
+      '2026-09-27T19:15:00.000Z',
+      '2026-09-27T19:45:00.000Z',
+    ]);
+  });
+});
+
+// The tester's (E01-T05a): on a day of 23 hours a visit holds the chair for its real minutes.
+describe('on the day the clocks go forward, a visit across the hour they skip (tester)', () => {
+  it('01:30 for 60 minutes ends at 03:30: a booking at 03:00 or 03:15 overlaps it, one at 03:30 does not', async () => {
+    // Skopje, 29 March 2026: 01:30 local is 00:30 UTC; 60 minutes on is 01:30 UTC, 03:30 local.
+    await existing(skopje, '2026-03-29T00:30:00Z', 60, { providerId: skopje.hygienist });
+    const hygienist = { providerId: skopje.hygienist, day: '2026-03-29' };
+    expect(await book(skopje, { ...hygienist, startMinute: 3 * H })).toEqual({
+      ok: false,
+      code: 'overlap',
+    });
+    expect(await book(skopje, { ...hygienist, startMinute: 3 * H + 15 })).toEqual({
+      ok: false,
+      code: 'overlap',
+    });
+    const id = await booked(skopje, { ...hygienist, startMinute: 3 * H + 30 });
+    expect((await moments(id))[0]).toBe('2026-03-29T01:30:00.000Z');
   });
 });
 
