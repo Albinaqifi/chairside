@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl';
-import { createElement, type ComponentProps } from 'react';
+import { createElement, type ComponentProps, type ReactElement, type ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FormAnswer } from '@/app/_lib/form-answer';
@@ -7,16 +7,19 @@ import { FrameClinic } from '@/app/_lib/frame-clinic';
 import messages from '@/i18n/en.json';
 import { LOCALE } from '@/i18n/locale';
 import type { TreatmentType } from '@/modules/scheduling';
+import { Sheet } from '@/ui/sheet';
 import { startChoices, type BookingChoices } from './booking-choices';
-import { BookingForm, NewAppointment, type Booking } from './new-appointment';
+import { BookingDrawer, BookingForm, NewAppointment, type Booking } from './new-appointment';
 import { layoutDay } from './day';
 
 // E01-T05a, acceptance 5 (the message), 6 and 8: the booking form of the new-appointment drawer as the
 // server renders it, inside the staff frame, with next-intl's provider as the root layout gives it:
 // the message file and the clinic's zone. The drawer opens in a portal, which renders nothing on the
-// server: its form is rendered here on its own. useActionState is replaced so that a test can choose
-// the form's answer, as in new-patient-form.test.ts. Clicks and keys are in tests/e2e/booking.spec.ts.
-// Names are from the seed's invented lists; ids are made up.
+// server: its form is rendered here on its own, and the open drawer, for the line under its title,
+// with Radix's Portal rendering its children in place (as in src/ui/double-click-guard.test.ts).
+// useActionState is replaced so that a test can choose the form's answer, as in
+// new-patient-form.test.ts. Clicks and keys are in tests/e2e/booking.spec.ts. Names are from the
+// seed's invented lists; ids are made up.
 
 const form = vi.hoisted(() => ({ state: undefined as unknown }));
 vi.mock('react', async (importOriginal) => {
@@ -34,6 +37,14 @@ vi.mock('react', async (importOriginal) => {
 // The actions are server code: the form only hands them to StaffForm and the search.
 vi.mock('./actions', () => ({ bookAppointment: vi.fn(), readCalendarDay: vi.fn() }));
 vi.mock('../patients/actions', () => ({ searchPatients: vi.fn() }));
+
+// Radix's Portal waits for the browser before it renders anything: here it renders its children in
+// place, so an open drawer renders on the server. A closed one still renders nothing.
+vi.mock('radix-ui', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('radix-ui')>();
+  const inPlace = ({ children }: { children?: ReactNode }) => children ?? null;
+  return { ...actual, Dialog: { ...actual.Dialog, Portal: inPlace } };
+});
 
 const CLINIC = '01970000-0000-7000-8000-0000000000f5';
 const H = 60;
@@ -135,6 +146,36 @@ function optionsOf(html: string, name: string): { value: string; text: string; c
 function bookText(html: string): string {
   const button = /<button\b[^>]*type="submit"[^>]*>([\s\S]*?)<\/button>/.exec(html);
   return text(button?.[1] ?? '');
+}
+
+/** What the server sends for `element`, in a staff frame, with next-intl's provider in `timeZone`. */
+function inFrame(element: ReactElement, timeZone: string): string {
+  const frame: ComponentProps<typeof FrameClinic> = { clinicId: CLINIC, children: element };
+  const provider: ComponentProps<typeof NextIntlClientProvider> = {
+    locale: LOCALE,
+    messages,
+    timeZone,
+    children: createElement(FrameClinic, frame),
+  };
+  return renderToString(createElement(NextIntlClientProvider, provider));
+}
+
+/**
+ * The drawer opened on `choices`, as the server renders it in a clinic in `timeZone`: the text of the
+ * line under its title, in its header (Radix's Description: a screen reader reads it with the title,
+ * linked once the drawer is open in the browser).
+ */
+function drawerLine(choices: BookingChoices, timeZone: string): string {
+  const drawer = createElement(BookingDrawer, { choices, onBooked: vi.fn() });
+  const sheet: ComponentProps<typeof Sheet> = { open: true, children: drawer };
+  const html = inFrame(createElement(Sheet, sheet), timeZone);
+  expect(tags(html, 'div').filter((div) => div.get('role') === 'dialog')).toHaveLength(1);
+  const header = /<div\b[^>]*data-slot="sheet-header"[^>]*>([\s\S]*?)<\/div>/.exec(html)?.[1] ?? '';
+  const title = /<h2\b[^>]*data-slot="sheet-title"[^>]*>([\s\S]*?)<\/h2>/.exec(header);
+  expect(text(title?.[1] ?? '')).toBe(messages.calendar.booking.title);
+  const line = /<p\b[^>]*data-slot="sheet-description"[^>]*>([\s\S]*?)<\/p>/.exec(header);
+  if (!title || !line || line.index < title.index) throw new Error('no line under the title');
+  return text(line[1] ?? '');
 }
 
 describe('the fields the booking sends, and nothing typed kept in the browser (acceptance 8)', () => {
@@ -304,6 +345,25 @@ describe("the clinic's refusals, above Book (acceptance 5, D-098)", () => {
     const groupError = group?.get('aria-describedby') ?? '';
     expect(text(new RegExp(`<p id="${groupError}"[^>]*>([^<]*)</p>`).exec(html)?.[1] ?? '')).toBe(
       messages.form.fieldErrors.missing,
+    );
+  });
+});
+
+describe("the line under the drawer's title: its day and time, the same in every clinic's zone (D-098)", () => {
+  // The day is a calendar date and the times are minutes of the day: each is formatted in UTC, never
+  // in the clinic's zone, so the line is the same wherever the clinic is. Formatted in the zone, the
+  // day would be the day before in New York, behind UTC ("Sunday, October 25"), and 09:00 would move
+  // in all three (10:00, 04:00 and 22:00: the times are drawn on 1 January). The zones are named
+  // here, never the computer's: CI runs once, in UTC (D-099).
+  const ZONES = ['Europe/Skopje', 'America/New_York', 'Pacific/Auckland'];
+
+  it.each(ZONES)('a clinic in %s: on today, 09:00 for 30 minutes', (zone) => {
+    expect(drawerLine(CHOICES, zone)).toBe('Monday, October 26 · 09:00–09:30');
+  });
+
+  it.each(ZONES)('a clinic in %s: a day of another year than today names its year', (zone) => {
+    expect(drawerLine({ ...CHOICES, day: '2031-04-07' }, zone)).toBe(
+      'Monday, April 7, 2031 · 09:00–09:30',
     );
   });
 });

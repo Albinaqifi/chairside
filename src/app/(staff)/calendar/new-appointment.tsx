@@ -105,7 +105,7 @@ export interface Booking {
  * The open drawer: its title, under it the day and the time chosen ("Monday, October 12 ·
  * 10:30–11:00"), and the form. Escape closes the patient field's list first, then the drawer.
  */
-function BookingDrawer({
+export function BookingDrawer({
   choices,
   onBooked,
 }: {
