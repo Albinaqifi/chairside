@@ -57,7 +57,13 @@ Legend: ✅ in v1 as designed · ✏️ in v1 but changed · ⏳ later · ❌ no
 ## New appointment drawer
 
 - ✅ Patient search with quick "add as new patient", treatment chips with default length,
-  start / length / provider, open-treatment hint.
+  start / length / provider (E01-T05a, E01-T05b; D-113). The open-treatment hint comes with
+  treatment plans (M6).
+- ✏️ Only active patients can be booked: an archived or deceased patient shows in the search
+  with their label and cannot be picked; an archived one is made active on the profile first.
+  (owner, D-113)
+- ✏️ No treatment is chosen until one is picked (the demo starts on Checkup), so no booking takes
+  one by default; the treatment's name is the appointment's title on the calendar. (E01-T05a)
 - ✏️ Quick-add asks for first name, last name and a phone or email. A patient without any
   contact detail is allowed but flagged.
 - ✅ "Text the patient a booking confirmation now" (D-045).
