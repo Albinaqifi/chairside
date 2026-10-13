@@ -209,28 +209,84 @@ async function restOn(page: Page, date: string): Promise<{ x: number; y: number 
  * one's row has left: the first answer back before the second click, as a fast answer brings it (the
  * tester's: 100–330 ms, clicks 150–250 ms apart). Waiting for the row, never a fixed time, makes the
  * case the same on every machine: a slower answer would meet the second click on the first row's own
- * Remove, disabled while it runs. The row is looked for at every frame. Before the second click, the
- * check that another day's Remove (`comesUnder`) is now where the pointer rests: the case itself.
+ * Remove, disabled while it runs.
+ *
+ * The first click is Playwright's, the second the page's own (E01-T08c tester, fix round 1):
+ * Playwright's WebKit sees a change up to a second after the page made it, so a second click of
+ * Playwright's, sent once it saw the row gone, could come after the moment the list takes no click,
+ * and rightly remove the day it met then. The page watches its own rows: a MutationObserver, which
+ * the browser calls as soon as the change is made, before any timer of the page's can run. It clicks
+ * once another day's Remove (`comesUnder`) is where the pointer rests, the case itself: at once while
+ * the page keeps its place, and with the scroll back when the page was at its end (in all three
+ * browsers, both there at the observer's first look; a scroll back that came later would be waited
+ * for). It clicks what a click there reaches: the element `elementFromPoint` gives, whose hit test
+ * skips what takes no pointer events, as a click's does; on a button, the click is what sends its
+ * form. If that day's Remove has not come there within DOUBLE_CLICK_MS of the row leaving, the page
+ * does not click, and the check fails on that: the case did not arise.
  */
 async function doubleClickAsTheRowLeaves(
   page: Page,
   date: string,
   spot: { x: number; y: number },
-  comesUnder: Locator,
+  comesUnder: string,
 ): Promise<void> {
+  await page.evaluate(
+    ({ name, under, point, within }) => {
+      // The day whose Remove was where the pointer rests at the second click; null: none came.
+      const record = window as unknown as { secondClickUnder?: string | null };
+      const groupOf = (day: string) =>
+        [...document.querySelectorAll('[role="group"]')].find(
+          (group) => group.getAttribute('aria-label') === day,
+        );
+      let leftAt = 0;
+      const clickOnceUnder = () => {
+        const box = groupOf(under)?.querySelector('button')?.getBoundingClientRect();
+        const isUnder =
+          box !== undefined &&
+          point.x >= box.left &&
+          point.x <= box.right &&
+          point.y >= box.top &&
+          point.y <= box.bottom;
+        if (!isUnder) {
+          if (performance.now() - leftAt < within) setTimeout(clickOnceUnder, 0);
+          else record.secondClickUnder = null;
+          return;
+        }
+        document.elementFromPoint(point.x, point.y)?.dispatchEvent(
+          new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            view: window,
+            detail: 2,
+            clientX: point.x,
+            clientY: point.y,
+          }),
+        );
+        record.secondClickUnder = under;
+      };
+      const observer = new MutationObserver(() => {
+        if (groupOf(name)) return;
+        observer.disconnect();
+        leftAt = performance.now();
+        clickOnceUnder();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    },
+    { name: shownDate(date), under: shownDate(comesUnder), point: spot, within: DOUBLE_CLICK_MS },
+  );
   await page.mouse.down();
   await page.mouse.up();
   await page.waitForFunction(
-    (name) =>
-      ![...document.querySelectorAll('[role="group"]')].some(
-        (group) => group.getAttribute('aria-label') === name,
-      ),
-    shownDate(date),
-    { polling: 'raf' },
+    () =>
+      (window as unknown as { secondClickUnder?: string | null }).secondClickUnder !== undefined,
   );
-  expect(await isUnder(comesUnder, spot), "another day's Remove under the pointer").toBe(true);
-  await page.mouse.down({ clickCount: 2 });
-  await page.mouse.up({ clickCount: 2 });
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { secondClickUnder?: string | null }).secondClickUnder,
+    ),
+    "another day's Remove under the pointer",
+  ).toBe(shownDate(comesUnder));
 }
 
 /** After a double click: one Remove sent, and answered. The wait proves only that no second comes. */
@@ -270,7 +326,7 @@ test.describe("a double click on a closed day's Remove (E01-T08c test finding 1)
         const spot = await restOn(page, target);
         const sent = actionsSent(page);
         // The next day's row moves up into the removed one's place.
-        await doubleClickAsTheRowLeaves(page, target, spot, removeOf(page, next));
+        await doubleClickAsTheRowLeaves(page, target, spot, next);
         await expectOneRemove(page, sent);
         await expect(dayRow(page, next)).toBeVisible();
         expect(await stillClosed([warm, target, next])).toEqual([next]);
@@ -316,7 +372,7 @@ test.describe("a double click on a closed day's Remove (E01-T08c test finding 1)
 
         const sent = actionsSent(page);
         // The page, a row shorter, scrolls back a row: the day before comes down into the place.
-        await doubleClickAsTheRowLeaves(page, target, spot, removeOf(page, before));
+        await doubleClickAsTheRowLeaves(page, target, spot, before);
         await expectOneRemove(page, sent);
         await expect(dayRow(page, before)).toBeVisible();
         expect(await stillClosed([before, target, warm])).toEqual([before]);
