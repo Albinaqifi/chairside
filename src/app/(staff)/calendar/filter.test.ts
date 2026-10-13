@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstChoice, shownColumns, toggleColumn, type ColumnChoice } from './filter';
+import { firstChoice, showColumn, shownColumns, toggleColumn, type ColumnChoice } from './filter';
 
 // E01-T04b: the provider filter's rules, without React: the choice a member opens with, the columns
 // a day shows, and a chip's click. ./calendar-screen.tsx keeps the choice; the chips in a browser
@@ -95,5 +95,38 @@ describe('the choice holds over other days (Previous, Today, Next)', () => {
     const choice = click(firstChoice(null), DAY, A, B);
     expect(shownColumns(choice, [A, B])).toEqual([A, B]);
     expect(shownColumns(choice, DAY)).toEqual([C]);
+  });
+});
+
+// E01-T05a: after a booking, its provider's column shows (demo logic line 2133).
+describe('a booking in a column the filter had off', () => {
+  it('turns that column on, keeping the others as they show, in the day’s order', () => {
+    const off = click(firstChoice(null), DAY, B);
+    const after = showColumn(off, DAY, B);
+    expect(shownColumns(after, DAY)).toEqual(DAY);
+    const linked = showColumn(firstChoice(A), DAY, C);
+    expect(shownColumns(linked, DAY)).toEqual([A, C]);
+  });
+
+  it('a column that shows already: the choice comes back unchanged', () => {
+    const choice = firstChoice(A);
+    expect(showColumn(choice, DAY, A)).toBe(choice);
+    const all = firstChoice(null);
+    expect(showColumn(all, DAY, C)).toBe(all);
+  });
+
+  it('on a day shown whole because the choice showed none, every column stays on', () => {
+    // The dentist's own column is not on this day (D), so every column shows; a booking in B keeps
+    // them all, rather than leaving B alone.
+    const choice = firstChoice(D);
+    expect(shownColumns(choice, DAY)).toEqual(DAY);
+    expect(shownColumns(showColumn(choice, DAY, B), DAY)).toEqual(DAY);
+  });
+
+  it('never changes the choice it is given', () => {
+    const off = click(firstChoice(null), DAY, B);
+    const copy = { others: off.others, set: new Map(off.set) };
+    showColumn(off, DAY, B);
+    expect(off).toEqual(copy);
   });
 });

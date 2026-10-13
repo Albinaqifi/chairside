@@ -92,6 +92,8 @@ export interface DayCalendarProps {
   nowMinute?: number | null;
   /** Shown under the line that counts what shows: a read on use that did not work. */
   notice?: ReactNode;
+  /** New appointment and its drawer (E01-T05a), at the header's end, after the chips (demo line 237). */
+  newAppointment?: ReactNode;
 }
 
 /**
@@ -99,9 +101,10 @@ export interface DayCalendarProps {
  * the provider filter's chips (E01-T04b), the count of the appointments and columns shown, then a
  * column per provider shown on an hour grid, with the "now" line on today (E01-T04b), and the
  * statuses' legend. Drawn from what ./calendar-screen.tsx holds: the filter's choice and the clock
- * are the browser's. Nothing on it is clicked yet but the chips (E01-T05, E01-T06). Every moment is
- * shown in the clinic's zone (next-intl's formatter, D-015); the day, the hours of the grid and the
- * weekday are no moments, so they are formatted in UTC (CLAUDE.md, Dates and times).
+ * are the browser's. Nothing on the grid is clicked yet (E01-T05b, E01-T06); the header's New
+ * appointment opens the booking drawer (E01-T05a). Every moment is shown in the clinic's zone
+ * (next-intl's formatter, D-015); the day, the hours of the grid and the weekday are no moments, so
+ * they are formatted in UTC (CLAUDE.md, Dates and times).
  *
  * A closed day says so above the grid, with its label (the demo has no closed day: a layout proposed
  * for the owner in the handoff note).
@@ -112,6 +115,7 @@ export function DayCalendar({
   onToggle,
   nowMinute = null,
   notice = null,
+  newAppointment = null,
 }: DayCalendarProps) {
   const t = useTranslations();
   const format = useFormatter();
@@ -150,22 +154,25 @@ export function DayCalendar({
           </nav>
           <h1 className="font-serif text-heading tracking-heading">{title}</h1>
         </div>
-        {onToggle && view.columns.length > 0 && (
-          <div
-            role="group"
-            aria-label={t('calendar.providerFilter')}
-            className="flex flex-wrap gap-1.5"
-          >
-            {view.columns.map((column) => (
-              <ProviderChip
-                key={column.providerId}
-                column={column}
-                on={showing.has(column.providerId)}
-                onToggle={onToggle}
-              />
-            ))}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-3.5">
+          {onToggle && view.columns.length > 0 && (
+            <div
+              role="group"
+              aria-label={t('calendar.providerFilter')}
+              className="flex flex-wrap gap-1.5"
+            >
+              {view.columns.map((column) => (
+                <ProviderChip
+                  key={column.providerId}
+                  column={column}
+                  on={showing.has(column.providerId)}
+                  onToggle={onToggle}
+                />
+              ))}
+            </div>
+          )}
+          {newAppointment}
+        </div>
       </div>
       <p className="-mt-1.5 mb-3 text-small text-muted">
         {t('calendar.summary', {

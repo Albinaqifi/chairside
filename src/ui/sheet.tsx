@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Dialog as SheetPrimitive } from 'radix-ui';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from './cn';
+import { useDoubleClickGuard } from './double-click-guard';
 
 /**
  * The drawer: shadcn/ui's Sheet (D-009, style new-york-v4) on Radix's Dialog, not shadcn/ui's
@@ -72,6 +73,10 @@ type SheetContentProps = Omit<ComponentProps<typeof SheetPrimitive.Content>, 'ti
  * The overlay and the drawer sit on one level, as the dialog's do, and Radix adds them to the page
  * in the order they open: a dialog opened from the drawer covers it with its own overlay. All of
  * them sit under the toast (z-60, toast.tsx), so a toast after a booking shows above the drawer.
+ *
+ * A double click on what opens it leaves it open (E01-T05a, ./double-click-guard.ts): for half a
+ * second after it opens, a pointer down outside it is ignored; then a click on the overlay closes it.
+ * Escape and the close button always do.
  */
 function SheetContent({
   title,
@@ -79,9 +84,12 @@ function SheetContent({
   width = 420,
   className,
   children,
+  onOpenAutoFocus,
+  onPointerDownOutside,
   ...props
 }: SheetContentProps) {
   const t = useTranslations('drawer');
+  const guard = useDoubleClickGuard({ onOpenAutoFocus, onPointerDownOutside });
   return (
     <SheetPrimitive.Portal>
       <SheetPrimitive.Overlay data-slot="sheet-overlay" className="fixed inset-0 z-40 bg-overlay" />
@@ -94,6 +102,7 @@ function SheetContent({
           className,
         )}
         {...props}
+        {...guard}
       >
         <div
           data-slot="sheet-header"

@@ -8,7 +8,8 @@ import { Button } from '@/ui/button';
 import { readCalendarDay } from './actions';
 import type { CalendarDayView, CalendarRead } from './day';
 import { DayCalendar } from './day-calendar';
-import { firstChoice, shownColumns, toggleColumn, type ColumnChoice } from './filter';
+import { firstChoice, showColumn, shownColumns, toggleColumn, type ColumnChoice } from './filter';
+import { NewAppointment } from './new-appointment';
 import { MINUTE_MS, nowLineMinute, untilNextMinute } from './now-line';
 import { readAgain, readIsDue, readTimeOf, USE_EVENTS } from './read-on-use';
 
@@ -36,6 +37,8 @@ const readTimes = new WeakMap<CalendarDayView, number>();
  *   reads the day again through the calendar's read, at most once every 30 seconds after the last
  *   read; never on a timer. An ended session sends that use to the login page (the read's wrapper,
  *   D-074).
+ * - New appointment and its drawer (./new-appointment.tsx, E01-T05a), with the treatment types the
+ *   last read brought. After a booking, the provider's column is turned on if the filter had it off.
  */
 export function CalendarScreen({
   initial,
@@ -52,9 +55,10 @@ export function CalendarScreen({
   // A read on use, and a read that did not work, each for the page's render it followed: a later
   // render of the page (Previous, Today, Next) shows its own day, and an answer for an earlier one is
   // dropped.
-  const [read, setRead] = useState<{ after: CalendarDayView; view: CalendarDayView } | null>(null);
+  const [read, setRead] = useState<{ after: CalendarDayView; read: CalendarRead } | null>(null);
   const [problem, setProblem] = useState<{ after: CalendarDayView; kind: Problem } | null>(null);
-  const view = read !== null && read.after === initial.view ? read.view : initial.view;
+  const current = read !== null && read.after === initial.view ? read.read : initial;
+  const view = current.view;
   const shownProblem = problem !== null && problem.after === initial.view ? problem.kind : null;
 
   const lastReadAt = useRef(0);
@@ -80,7 +84,7 @@ export function CalendarScreen({
           const answer = await readAgain(readCalendarDay, clinicId, asked);
           if (answer.kind === 'read') {
             readTimes.set(answer.read.view, at);
-            setRead({ after, view: answer.read.view });
+            setRead({ after, read: answer.read });
             setProblem(null);
           } else {
             setProblem({ after, kind: answer.kind });
@@ -111,15 +115,24 @@ export function CalendarScreen({
       ? null
       : nowLineMinute(new Date(minute), timeZone, view);
   const columnIds = view.columns.map((column) => column.providerId);
+  const shown = shownColumns(choice, columnIds);
 
   return (
     <DayCalendar
       view={view}
-      shown={shownColumns(choice, columnIds)}
-      onToggle={(providerId) =>
-        setChoice((current) => toggleColumn(current, columnIds, providerId))
-      }
+      shown={shown}
+      onToggle={(providerId) => setChoice((before) => toggleColumn(before, columnIds, providerId))}
       nowMinute={nowMinute}
+      newAppointment={
+        <NewAppointment
+          view={view}
+          treatmentTypes={current.treatmentTypes}
+          shown={shown}
+          onBooked={(providerId) =>
+            setChoice((before) => showColumn(before, columnIds, providerId))
+          }
+        />
+      }
       notice={
         shownProblem === 'clinic_changed' ? (
           <div

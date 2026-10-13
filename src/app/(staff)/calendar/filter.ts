@@ -53,3 +53,21 @@ export function toggleColumn(
   for (const id of columnIds) set.set(id, next.includes(id));
   return { others: choice.others, set };
 }
+
+/**
+ * The choice after a booking in a provider's column (E01-T05a, demo logic line 2133): that column
+ * turned on when it does not show, so the new block shows at once; every other column of the day as
+ * it shows. A column that shows already leaves the choice unchanged.
+ */
+export function showColumn(
+  choice: ColumnChoice,
+  columnIds: readonly string[],
+  providerId: string,
+): ColumnChoice {
+  const shown = shownColumns(choice, columnIds);
+  if (shown.includes(providerId)) return choice;
+  const set = new Map(choice.set);
+  for (const id of columnIds) set.set(id, shown.includes(id));
+  set.set(providerId, true);
+  return { others: choice.others, set };
+}
