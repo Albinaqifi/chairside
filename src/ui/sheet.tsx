@@ -75,8 +75,9 @@ type SheetContentProps = Omit<ComponentProps<typeof SheetPrimitive.Content>, 'ti
  * them sit under the toast (z-60, toast.tsx), so a toast after a booking shows above the drawer.
  *
  * A double click on what opens it leaves it open (E01-T05a, ./double-click-guard.ts): for half a
- * second after it opens, a pointer down outside it is ignored; then a click on the overlay closes it.
- * Escape and the close button always do.
+ * second after it opens, a pointer down outside it is ignored, and so is a press of the close button
+ * by a pointer (where the opener sits under the corner, the second click lands on it); then a click
+ * on the overlay or on the close button closes it. Escape, and a key on the close button, always do.
  */
 function SheetContent({
   title,
@@ -102,7 +103,7 @@ function SheetContent({
           className,
         )}
         {...props}
-        {...guard}
+        {...guard.content}
       >
         <div
           data-slot="sheet-header"
@@ -118,7 +119,10 @@ function SheetContent({
           ) : null}
         </div>
         {children}
-        <SheetClose className="absolute top-5.5 right-6 inline-flex size-8 items-center justify-center rounded-pill bg-border/50 text-text transition-colors outline-none hover:bg-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus focus-visible:outline-solid">
+        <SheetClose
+          {...guard.close}
+          className="absolute top-5.5 right-6 inline-flex size-8 items-center justify-center rounded-pill bg-border/50 text-text transition-colors outline-none hover:bg-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus focus-visible:outline-solid"
+        >
           <XIcon aria-hidden="true" className="size-4" />
           <span className="sr-only">{t('close')}</span>
         </SheetClose>

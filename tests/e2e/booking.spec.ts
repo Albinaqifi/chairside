@@ -533,7 +533,8 @@ test.describe("the patient search's words in no address and no booking (acceptan
 test.describe('a double click on New appointment (acceptance 10, E00-T04e tester)', () => {
   // The content is at most 1,240 px wide, at the left: on a 1920 px screen New appointment is left
   // of where the drawer opens, so the second click of a double click lands on the overlay. On a
-  // narrower one it lands in the drawer itself, which no click closes.
+  // narrower one it lands in the drawer itself: on its header, or on its Close button (the next
+  // check, at 1280 px).
   test.use({ viewport: { width: 1920, height: 1080 } });
 
   test('leaves the drawer open; a click on the overlay a second later closes it', async ({
@@ -580,5 +581,110 @@ test.describe('a double click on New appointment (acceptance 10, E00-T04e tester
         description: `the two presses reached the page ${Math.round(second - first)} ms apart`,
       });
     }
+  });
+});
+
+test.describe("a double click on New appointment's right part at 1280 px (acceptance 10, E01-T05a tester, finding 1)", () => {
+  // From 1280 to 1536 px wide the drawer's Close button opens under New appointment's right part, so
+  // the second click of a double click there lands on Close. Close ignores a pointer's press for as
+  // long as a double click lasts after the drawer opened, as the overlay does
+  // (src/ui/double-click-guard.ts); pressed on its own it closes the drawer, and so do Escape and a
+  // key on Close.
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('leaves the drawer open, 80, 150 and 250 ms between the clicks; Close pressed a second later, Escape and a key on Close close it', async ({
+    page,
+  }) => {
+    await openCalendar(page, '2031-04-07');
+    const button = newAppointment(page);
+    const close = drawer(page).getByRole('button', { name: messages.drawer.close, exact: true });
+
+    // Where Close opens: the drawer opened once, then closed by Escape.
+    await button.click();
+    await expect(drawer(page)).toBeVisible();
+    const closeBox = await close.boundingBox();
+    await page.keyboard.press('Escape');
+    await expect(drawer(page)).toBeHidden();
+    const box = await button.boundingBox();
+    if (!box || !closeBox) throw new Error('New appointment or Close has no box.');
+    // A point on both: on New appointment while the drawer is closed, on Close once it is open.
+    const left = Math.max(box.x, closeBox.x);
+    const right = Math.min(box.x + box.width, closeBox.x + closeBox.width);
+    const top = Math.max(box.y, closeBox.y);
+    const bottom = Math.min(box.y + box.height, closeBox.y + closeBox.height);
+    expect(left < right && top < bottom, "Close opens under New appointment's right part").toBe(
+      true,
+    );
+    const at = { x: (left + right) / 2, y: (top + bottom) / 2 };
+
+    // Each press the page gets: its time stamp, and whether it landed on Close.
+    type Press = { at: number; onClose: boolean };
+    await page.evaluate(() => {
+      const presses: Press[] = [];
+      (window as unknown as { presses: Press[] }).presses = presses;
+      document.addEventListener(
+        'pointerdown',
+        (event) => {
+          const target = event.target instanceof Element ? event.target : null;
+          presses.push({
+            at: event.timeStamp,
+            onClose: Boolean(target?.closest('[data-slot="sheet-close"]')),
+          });
+        },
+        true,
+      );
+    });
+
+    // A click at that point, in one call to Playwright: a press and a release sent as two calls reach
+    // the page later, further apart than the gap asked for.
+    const click = () => page.mouse.click(at.x, at.y);
+
+    // Not Playwright's own double click: its second press, a few milliseconds after the first, lands
+    // on the overlay in Chromium (now and then in Firefox too), not on Close.
+    for (const gap of [80, 150, 250]) {
+      await page.evaluate(() => {
+        (window as unknown as { presses: Press[] }).presses.length = 0;
+      });
+      await click();
+      await page.waitForTimeout(gap);
+      await click();
+      await page.waitForTimeout(700);
+      const [first, second] = await page.evaluate(
+        () => (window as unknown as { presses: Press[] }).presses,
+      );
+      if (!first || !second) throw new Error(`${gap} ms: the page got fewer than two presses.`);
+      // The drawer opens between the two presses, so two presses less than half a second apart are a
+      // double click by the guard's rule. How far apart they reached the page is the page's to say,
+      // as in the check above; 450 ms leaves a margin.
+      if (second.at - first.at < 450) {
+        expect(second.onClose, `${gap} ms: the second press on Close`).toBe(true);
+        await expect(drawer(page), `${gap} ms: the drawer still open`).toBeVisible();
+        // Close pressed on its own, a second after the drawer opened, closes it.
+        await page.waitForTimeout(300);
+        await click();
+      } else {
+        test.info().annotations.push({
+          type: 'not checked',
+          description: `${gap} ms: the two presses reached the page ${Math.round(second.at - first.at)} ms apart`,
+        });
+        await page.keyboard.press('Escape');
+      }
+      await expect(drawer(page), `${gap} ms: closed again`).toBeHidden();
+    }
+
+    // Escape closes it at once after a double click (here Playwright's: where its second press lands
+    // does not matter).
+    await page.mouse.dblclick(at.x, at.y);
+    await page.keyboard.press('Escape');
+    await expect(drawer(page), 'closed by Escape').toBeHidden();
+
+    // A key on Close closes it at once after it opened: Shift+Tab from the first field reaches it.
+    await button.focus();
+    await page.keyboard.press('Enter');
+    await expect(drawer(page).getByRole('combobox', { name: t.patient })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(close, 'Shift+Tab from the patient field reaches Close').toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(drawer(page), 'closed by Enter on Close').toBeHidden();
   });
 });

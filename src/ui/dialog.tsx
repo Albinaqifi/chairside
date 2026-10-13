@@ -69,7 +69,9 @@ type DialogContentProps = Omit<ComponentProps<typeof DialogPrimitive.Content>, '
  * toast (sheet.tsx).
  *
  * A double click on what opens it leaves it open, as the drawer's does (E01-T05a,
- * ./double-click-guard.ts): for half a second after it opens, a pointer down outside it is ignored.
+ * ./double-click-guard.ts): for half a second after it opens, a pointer down outside it is ignored,
+ * and so is a press of the close button by a pointer. Escape, and a key on the close button, always
+ * close it.
  */
 function DialogContent({
   title,
@@ -95,7 +97,7 @@ function DialogContent({
           className,
         )}
         {...props}
-        {...guard}
+        {...guard.content}
       >
         <div data-slot="dialog-header" className="grid gap-1.5 pr-8">
           <DialogPrimitive.Title
@@ -111,7 +113,10 @@ function DialogContent({
           ) : null}
         </div>
         {children}
-        <DialogClose className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-pill bg-border/50 text-text transition-colors outline-none hover:bg-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus focus-visible:outline-solid">
+        <DialogClose
+          {...guard.close}
+          className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-pill bg-border/50 text-text transition-colors outline-none hover:bg-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus focus-visible:outline-solid"
+        >
           <XIcon aria-hidden="true" className="size-4" />
           <span className="sr-only">{t('close')}</span>
         </DialogClose>
