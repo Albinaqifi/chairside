@@ -7,18 +7,20 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
 Order: T01a → T01b → T02a → T02b → T04a and T08a side by side (two checkouts, D-110) → T04b and T08b
-side by side (D-111) → T05 and T08c side by side (D-112) → T09, T03 → T06 → T07, T10 → T11. With E00
-(D-087, D-090, D-091, D-093, D-096, D-108, D-110, D-111, D-112): E00-T05a → T01a → T01b → E00-T04c →
-E00-T04d → E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 → T04a and T08a → T04b and T08b →
-T05 and T08c → T09 and the rest, so a receptionist sees a patient list before Playwright and staging
-exist. T01 is split in two (D-091): the schema and the provider link (T01a), the seed (T01b). T02 is
+side by side (D-111) → T05a and T08c side by side (D-112, D-113) → T05b → T09, T03 → T06 → T07, T10 →
+T11. With E00 (D-087, D-090, D-091, D-093, D-096, D-108, D-110, D-111, D-112, D-113): E00-T05a → T01a →
+T01b → E00-T04c → E00-T04d → E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 → T04a and T08a →
+T04b and T08b → T05a and T08c → T05b → T09 and the rest, so a receptionist sees a patient list before
+Playwright and staging exist. T01 is split in two (D-091): the schema and the provider link (T01a), the seed (T01b). T02 is
 split in two (D-096): the list and the search (T02a), adding a patient (T02b); editing a patient's
 details moved to T03, the profile. T04 is split in two (D-108): the day view (T04a); the provider
 filter, a provider's own column, the "now" line and the reading on use (T04b). T08 is split in two
 (D-110): the Settings page and the clinic's details (T08a), beside T04a; the opening hours and closed
 days (T08b), after T04a, whose calendar shows them. T08b is split again (D-111): the opening hours
 (T08b), beside T04b; the closed days (T08c), on the same tab, after it. T05, booking, moves up beside
-T08c, ahead of T09 and T03 (owner, D-112).
+T08c, ahead of T09 and T03 (owner, D-112). T05 is split in two (D-113): booking an existing patient
+from New appointment (T05a), beside T08c; the overlap warning with "Book anyway", a click on the grid
+and a new patient in one go (T05b), after it. Only active patients are booked (owner, D-113).
 
 ---
 
@@ -567,69 +569,159 @@ out: a click on a block or a slot (E01-T05, E01-T06), the week view (E01-T07).
 
 ---
 
-### E01-T05 · Book an appointment (new-appointment drawer)
+### E01-T05a · Book an existing patient: the new-appointment drawer
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T04a, E01-T02b
-- **Read:** `scope` (New appointment drawer) · `design-ref` (demo lines 1323–1362; logic 1958–1964, 2116–2135) · `data-model` (`appointments`, "No double booking") · D-020, D-093, D-095 · `handoffs/E00-T04e.md` (the reviewer's suggestion 1, the tester's note 1)
+- **Role:** builder · **Risk:** normal (a screen and the scheduling module's first write, through
+  `staffAction`: no change to a wrapper, `StaffForm`, a policy, a permission, a table or a migration)
+  · **Depends on:** E01-T04b (Done), E01-T02b (Done)
+- **Read:** `scope` (Calendar; New appointment drawer) · `design-ref` (demo lines 237, 1323–1362;
+  logic 1619–1621, 1958–1964, 2116–2135; "Layout": the drawers) · `data-model` (`appointments`, "No
+  double booking") · D-020, D-093, D-095, D-098, D-108, D-113 · `handoffs/E00-T04e.md` (the tester's
+  note 1) · the architect section of `handoffs/E01-T05a.md`
 
-**Why.** The single most used action. It must be fast.
+**Why.** Booking is the single most used action and the first thing a receptionist judges (R-09): it
+must be fast. This first slice books an existing patient at a free time, end to end; overlaps with
+"Book anyway", a click on the grid and a new patient follow in E01-T05b (D-113).
 
 **Do.**
-- `scheduling.createAppointment(...)` with validation, overlap handling and audit.
-- Drawer opened from "New appointment" or by clicking an empty slot (prefilled time and provider):
-  patient search with suggestions and "add as new patient" (first name, last name, phone or
-  email), treatment chips that set the default length, start / length / provider.
-- If the slot overlaps: a clear warning and a second, explicit "Book anyway" (sets `overlap_ok`).
-- **One booking per click** (E01-T01a tester note 1, `message`): the database refuses a second
-  ordinary booking of the same time, not a second `overlap_ok` one, so a double click on "Book
-  anyway" would keep two rows and E02 would remind the patient of each. The create action's
-  duplicate check (E00-T03's double-submit line, on the Discovered list) covers it.
-- After a booking the drawer closes or its form is emptied: `StaffForm` keeps every field after
-  done (D-092), so a second Send would book again (E00-T04c review, `slice`).
-- The patient search keeps nothing in the browser (E00-T04d review, `data`, D-095): inside the
-  booking form, no `autocomplete` of its own; outside it, `autoComplete="off"`; its words never in
-  the page's address.
-- A race (someone else took the slot meanwhile) shows a friendly message, not an error page.
-- Fully usable by keyboard; focus starts in the patient field.
-- **A double click on the button that opens the drawer leaves it open** (E00-T04e test, `speed`):
-  today the second click lands on the overlay, which closes it on a click (Radix acts on the
-  `click` after a pointer down outside), so a receptionist who double-clicks "New appointment" sees
-  the drawer flash and go. The drawer's and the dialog's content (`src/ui/sheet.tsx`, `dialog.tsx`)
-  ignore a pointer down outside them for as long as a double click lasts after they open (half a
-  second, Windows' default); after that a click on the overlay closes them, and Escape and the close
-  button always do.
-- **A form inside the drawer or the dialog sends only itself** (E00-T04e review, `message`): React
-  passes a `submit` on to every `onSubmit` above it in React's tree, through the portal too (React
-  19.2.8), and `StaffForm` sends from `onSubmit` with `new FormData(event.currentTarget)`. A staff
-  form in a dialog opened from inside another staff form (a quick new patient from the booking form,
-  E01-T06's cancel from the drawer's move form) would also send the outer one. The drawer's and the
-  dialog's content stop a `submit` from leaving them (`src/ui/`); `StaffForm` is not changed.
+- **`scheduling.createAppointment(tx, booking, now)`** books one appointment in the clinic of the
+  transaction: a patient, an active provider and an active treatment type, whose name is its title; a
+  start, a local time on a day of the clinic (minutes from the day's local midnight, as the calendar's
+  are; the clinic's zone passed in, as `appointmentsOnDay` takes it), and a length in minutes; status
+  `booked`, `source` `staff`, `overlap_ok` false, `created_by` the acting user. It refuses, writing
+  nothing, a time that overlaps another appointment of the provider that is not cancelled or a no-show,
+  one booked with `overlap_ok` too (`overlap`), and a provider or a treatment type that is not active
+  or not the clinic's. Two bookings of one provider at once take turns, so the second sees the first.
+  With it, the clinic's active treatment types, by name.
+- **The booking action** (`calendar.manage`: every member, `scope-v1.md`'s "Calendar, patients,
+  booking"), with one `appointment.created` audit row of ids. It refuses a patient who is not active
+  (owner, D-113), asked of the patients module. When it is done, its answer brings the calendar's day
+  again (Next.js 16's `refresh()`, or `revalidatePath` as `createPatient` does).
+- **The drawer** (`Sheet`, demo lines 1323–1362), opened by **New appointment** in the calendar's
+  header (demo line 237) at once, from the page's own state, never a navigation: a read on use on its
+  way holds a navigation (E01-T04b tester, `speed`). Under its title the day the calendar shows and the
+  time chosen ("Monday, October 12 · 10:30–11:00"). The **patient** field, focused first, with up to
+  five suggestions from the patient search as one types (a name or a phone, `searchPatients`), each
+  with its phone; an archived or deceased patient shows with their label and cannot be picked (owner,
+  D-113). The **treatment** chips, buttons pressed or not, none chosen until one is picked, each setting
+  the length to its own. **Start** (each quarter hour of the grid; on today the next quarter hour after
+  the clinic's now while that is inside the day's hours, else the day's opening, or the grid's start),
+  **length** (15, 30, 45, 60, 90 and 120 minutes, and the treatment's own) and **provider** (the active
+  ones; first the first column shown), each the browser's own select. **Book** names the time and the
+  provider's short name, as the demo's does (logic 2127).
+- **After a booking** the drawer closes, a toast names the patient and the time (the demo's, logic
+  2134), and the block is on the grid at once, in its provider's column, turned on if the filter had it
+  off (logic 2133). A double click on Book books once.
+- **The patient search keeps nothing in the browser** (E00-T04d review, `data`, D-095): inside the
+  booking form, no `autocomplete` of its own; outside it, `autoComplete="off"`; its words go in the
+  search's request body, never in the page's address, and are no field of the booking.
+- **Fully usable by keyboard:** the arrow keys move through the suggestions, Enter picks one and never
+  sends the form, Escape closes the list, then the drawer; Tab reaches every field and Book.
+- **A double click on New appointment leaves the drawer open** (E00-T04e test, `speed`): today the
+  second click lands on the overlay, which closes it on a click (Radix acts on the `click` after a
+  pointer down outside), so a receptionist who double-clicks "New appointment" sees the drawer flash
+  and go. The drawer's and the dialog's content (`src/ui/sheet.tsx`, `dialog.tsx`) ignore a pointer
+  down outside them for as long as a double click lasts after they open (half a second, Windows'
+  default); after that a click on the overlay closes them, and Escape and the close button always do.
 
-**Out of scope.** The "text a booking confirmation" tick box (E02-T12). Booking outside opening hours rules beyond a warning.
+**Out of scope.** E01-T05b's: the overlap warning before Book and "Book anyway", a click on an empty
+slot, a new patient. The "text a booking confirmation" tick box (E02-T11, D-045). The open-treatment
+hint (it needs treatment plans, E06). A warning for a time outside the hours, in a break or on a
+closed day (the grid shades them). A day other than the one the calendar shows (the demo's drawer has
+none). A form inside another form's drawer or dialog (E01-T06, D-113). The drawer in the accessibility
+check and in a journey (E01-T11).
 
 **Acceptance.**
-- [ ] Booking an existing patient takes: open drawer, type name, pick, pick treatment, save.
-      No more required steps.
-- [ ] A new patient can be added and booked in one go.
-- [ ] Overlap shows the warning; "Book anyway" works; without it the booking is refused.
-- [ ] A double click on "Book anyway" books one appointment (integration test).
-- [ ] Two simultaneous bookings of the same slot: one succeeds, the other gets the friendly message (integration test).
-- [ ] The new block appears on the calendar immediately.
-- [ ] Audit row written; the appointment's `source` is `staff`.
-- [ ] The patient search has no `autocomplete` but `off` (unit test), and after a search the
-      address holds none of its words (tester).
+- [ ] From New appointment, booking an existing patient takes: type part of the name, pick them, pick
+      a treatment, Book; start, length and provider come filled in, the treatment sets the length. No
+      more required steps (e2e).
+- [ ] By keyboard alone, the focus first in the patient field: the arrow keys and Enter pick a
+      suggestion, Enter there never sends the form, Tab reaches every field and Book (e2e, three
+      browsers).
+- [ ] After Book: the drawer closed, the toast, the block on the grid without a reload, in its
+      provider's column also when the filter had it off; a double click on Book books one (e2e).
+- [ ] The row as stored: the patient, provider and treatment chosen, the treatment's name as title,
+      `booked`, `staff`, `overlap_ok` false, `created_by` the user; its start and end at the local time
+      chosen in the clinic's zone, on the days the clocks change too (integration, Europe/Skopje and
+      America/New_York); one `appointment.created` audit row, ids only (integration).
+- [ ] A time that overlaps another visit of the provider (not cancelled or a no-show; one booked with
+      `overlap_ok` too) is refused with a message above Book that asks for another time, nothing
+      written; of two bookings of the same time at once, one is booked and the other gets that message
+      (integration tests; the message in a component test).
+- [ ] An archived or deceased patient shows with their label and cannot be picked (component test);
+      the action refuses them, an inactive provider or treatment type, and another clinic's patient,
+      provider or treatment type, with nothing written (integration).
+- [ ] Every role can book: the permission test has the action under `calendar.manage`.
+- [ ] The patient search has no `autocomplete` but `off` (unit test); after a search the address
+      holds none of its words, and the booking's request none either (tester).
+- [ ] A read on use while the drawer is open keeps everything typed and chosen in it (e2e, the
+      browser's clock moved).
 - [ ] A double click on "New appointment" (80, 150 and 250 ms between the clicks) leaves the drawer
       open in Chromium, Firefox and WebKit; a click on the overlay a second later closes it (tester,
       in a browser).
-- [ ] A staff form in a dialog opened from inside another staff form sends its own action only: one
-      request, one audit row (tester, in a browser, on a scratch page removed after).
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
+
+---
+
+### E01-T05b · Booking: overlaps and "Book anyway", a click on the grid, a new patient in one go
+
+- **Role:** builder · **Risk:** normal (as E01-T05a's; a new patient is written through
+  `patients.create`, E01-T02b) · **Depends on:** E01-T05a
+- **Read:** `scope` (Calendar; New appointment drawer) · `design-ref` (demo lines 260, 1335, 1350;
+  logic 1819, 1963, 2120, 2125, 2131) · `data-model` ("No double booking") · D-020, D-033, D-098,
+  D-113 · the architect section of `handoffs/E01-T05b.md`, written in E01-T05a's Done pass
+
+**Why.** Clinics squeeze in emergencies, so staff book over another visit, on purpose (D-020); the grid
+is where a receptionist sees a free time; a caller who is not a patient yet is booked in the same go
+(`scope-v1.md`). Split from E01-T05 (D-113); refined in E01-T05a's Done pass, as it builds on its code.
+
+**Do.**
+- **The overlap warning before Book** (demo line 1350, logic 1963, 2125): while start, length and
+  provider overlap another visit of that provider on the day shown (not cancelled or a no-show), the
+  drawer says with whom and when, and Book becomes **Book anyway**, which books it with `overlap_ok`
+  (D-020). Without it the action refuses, as in E01-T05a.
+- **One booking per click** (E01-T01a tester note 1, `message`): the database refuses a second
+  ordinary booking of the same time, not a second `overlap_ok` one, so a double click on "Book anyway",
+  or the same booking sent twice, would keep two rows and E02 would remind the patient of each. A second
+  booking of the same patient with the same provider at the same start, while the first is not
+  cancelled, is refused: the duplicate check E00-T03's tester (note 3) asked of the create actions, as
+  the wrappers do not make an action idempotent.
+- **A click on an empty slot** of a column (demo line 260, logic 1819) opens the drawer with that
+  provider and the quarter hour clicked; a block's click is E01-T06's. The keyboard's way stays New
+  appointment.
+- **A new patient in one go** (`scope-v1.md`, quick add; demo line 1335, logic 2120, 2131): "Add “…” as
+  new patient" under the suggestions turns the patient field into first name and last name (the typed
+  words split), phone and email, fields of the booking form, not a form of its own (D-113). Without a
+  phone or an email the drawer says no reminder can reach the patient, and books. The patient
+  (`patients.create`: the phone read with the clinic's country, `phone_impossible` above Book, D-098)
+  and the booking are written in one transaction: a refused booking writes no patient. Each has its
+  audit row; how the second is written is settled in this task's Ready pass (the wrapper writes one;
+  `src/db/clinic-create.ts` writes its own through `audit.record`).
+
+**Out of scope.** A warning for a break, outside the hours or on a closed day (weighed in this task's
+Ready pass, with what E01-T05a showed the owner). A likely-duplicate warning in the drawer: the
+suggestions list the name's matches first (E01-T02b's page keeps its own). The confirmation tick box
+(E02-T11).
+
+**Acceptance.**
+- [ ] An overlap shows the warning with the other visit's patient and time; "Book anyway" books it with
+      `overlap_ok`; without it the booking is refused (component and integration tests).
+- [ ] A double click on "Book anyway" books one appointment, and so does the same booking sent twice
+      (integration test).
+- [ ] A click on an empty slot opens the drawer with its provider and quarter hour; a click on a block
+      does not (e2e).
+- [ ] A new patient is added and booked in one go; without a phone or an email it is allowed and the
+      drawer says so; an impossible phone is refused above Book with nothing written; a refused booking
+      writes no patient; one `patient.created` and one `appointment.created` audit row (integration;
+      e2e).
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---
 
 ### E01-T06 · Appointment drawer: details, move, status changes
 
-- **Role:** builder · **Risk:** critical · **Depends on:** E01-T05
-- **Read:** `scope` (Appointment drawer) · `design-ref` (demo lines 1197–1258; logic 1937–1957) · `data-model` (Appointment state machine)
+- **Role:** builder · **Risk:** critical · **Depends on:** E01-T05b
+- **Read:** `scope` (Appointment drawer) · `design-ref` (demo lines 1197–1258; logic 1937–1957) · `data-model` (Appointment state machine) · `handoffs/E00-T04e.md` (the reviewer's suggestion 1) · D-113
 
 **Why.** Status changes drive messages later. Wrong transitions mean wrong messages.
 
@@ -641,6 +733,12 @@ out: a click on a block or a slot (E01-T05, E01-T06), the week view (E01-T07).
   Each emits a domain event hook (a no-op now) that E02 uses to trigger message planning.
 - Drawer: patient and treatment header, status pill, time and provider selects, status
   buttons, "Book next visit", "Patient profile".
+- **A form inside the drawer or the dialog sends only itself** (E00-T04e review, `message`; moved
+  here from E01-T05, the first form inside another's, D-113): React passes a `submit` on to every
+  `onSubmit` above it in React's tree, through the portal too (React 19.2.8), and `StaffForm` sends
+  from `onSubmit` with `new FormData(event.currentTarget)`, so the cancel dialog's form, opened from
+  the drawer's move form, would also send the move. The drawer's and the dialog's content stop a
+  `submit` from leaving them (`src/ui/`); `StaffForm` is not changed.
 
 **Out of scope.** Message timeline, aftercare box, treatment plan list, "start visit" (later epics; do not render placeholders).
 
@@ -653,7 +751,7 @@ out: a click on a block or a slot (E01-T05, E01-T06), the week view (E01-T07).
 - [ ] Every transition writes an audit row with old and new status.
 - [ ] The event hook fires exactly once per successful change (test).
 - [ ] Cancelling from the dialog over the drawer runs the cancel only: the drawer's move form sends
-      nothing (tester, in a browser; E01-T05's guard, E00-T04e review).
+      nothing, one request and one audit row (tester, in a browser; the guard above, E00-T04e review).
 
 ---
 
@@ -897,8 +995,8 @@ accessibility check and in a journey (E01-T11).
   deactivate.
 - **A number's own error text** (E00-T04c, `speed`): the first number fields. `form.fieldErrors`
   has one text per kind of problem, so a length below its limit reads "This is too short.". Texts
-  for a number too small or too big (or a text per field in `StaffField`), which E01-T05's length
-  uses too. A change to `StaffForm`, `StaffField` or `form-answer.ts` makes this task critical, as it
+  for a number too small or too big (or a text per field in `StaffField`); E01-T05a's length is a
+  select (D-113), so these are the first number fields. A change to `StaffForm`, `StaffField` or `form-answer.ts` makes this task critical, as it
   made E00-T04d (D-093): settled in its Ready pass, with the field-level refusal on the Discovered
   list (D-098).
 
@@ -951,6 +1049,11 @@ accessibility check and in a journey (E01-T11).
 - Exploratory testing of the whole epic: wrong roles, the second clinic, double clicks,
   keyboard-only booking, odd times (23:30, across midnight), daylight-saving dates, very long names.
 - Time five bookings of an existing patient by keyboard and report the median.
+- **The first click after a pause** (E01-T04b tester, `speed`): while the calendar's read on use is on
+  its way, Previous, Next, Today and the sidebar's links wait for it (React holds a navigation's
+  transition until the read's ends; a read held 3 s showed Next after 3.1–3.4 s), and a click's own
+  `pointerdown` starts such a read whenever 30 s have passed; the patient search has the same pattern.
+  Time it on staging, with Book after a pause too, and report whether a receptionist would notice.
 - Findings go to the handoff note; real bugs become tasks via the board.
 
 **Owner action.** If a pilot receptionist is available (Q-09), let them try booking on staging now.

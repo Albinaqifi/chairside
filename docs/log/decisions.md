@@ -2154,3 +2154,28 @@ architecture), `changed` (differs from the original files), `process`.
   checked one.
 - **Revisit if:** a merge costs more than the parallel run saves (then one task at a time, and the
   board's line goes); E01-T05 needs a setting that only E01-T09 makes.
+
+### D-113 · E01-T04b Done: E01-T05 split in two, an existing patient first; only active patients are booked (owner); the nested-form guard moves to E01-T06
+- **Origin:** E01-T04b's Done pass, 2026-10-13 (PR #63; `handoffs/E01-T04b.md`, `handoffs/E01-T05a.md`).
+  **Owner, 2026-10-13:** only active patients can be booked; an archived or deceased one shows in the
+  drawer's search with their label and cannot be picked, and an archived one is made active on the
+  profile first (E01-T03). The rest is the architect's.
+- **What:**
+  - **E01-T05 is split in two:** E01-T05a, booking an existing patient from New appointment (the
+    scheduling module's first write, the drawer, the search, the treatment chips, start, length and
+    provider, an overlap refused, the block on the grid at once), in E01-T05's place beside E01-T08c
+    (D-112); E01-T05b after it: the overlap warning with "Book anyway" and one booking per click, a
+    click on an empty slot, a new patient in one go. As one task, about 850 lines of product code by
+    estimate against the Definition of Ready's 400; E01-T05a about 500 with comments.
+  - **Only active patients are booked** (owner): the booking action refuses another. `scope-v1.md`
+    says so, with the drawer's two other differences from the demo (no treatment chosen by default;
+    the open-treatment hint with treatment plans, M6).
+  - **The guard that keeps a form's `submit` inside its drawer or dialog moves to E01-T06**, the first
+    task with a staff form inside another's React tree (the cancel dialog over the move form):
+    E01-T05b's new patient is fields of the booking form, not a form of its own.
+- **Why:** a slice that books end to end first (`intent.md`, "How to decide", 4), each part one
+  session; E02 sends nothing to an archived or deceased patient (E02-T05), so such a booking would get
+  no reminder, silently, the failure `intent.md` names worst.
+- **Revisit if:** E01-T05a runs far over its estimate (then E01-T05b is split again before it starts); a
+  returning archived patient must be booked faster than the profile allows (E01-T03); E01-T05b's new
+  patient needs a form of its own after all (then the guard comes back to it).

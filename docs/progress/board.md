@@ -9,14 +9,14 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next tasks to start, side by side:** `E01-T08c` (Ready), `/pipeline E01-T08c` in the clone, and `E01-T05` in this checkout, made Ready by E01-T04b's Done pass first (`/architect E01-T04b`: PR #63 is merged), then `/pipeline E01-T05`. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
-- **Two tasks run in parallel** (owner, 2026-10-13, D-112, as D-110's): E01-T05 in the main checkout, E01-T08c in the clone (`README.md`, "Two checkouts on one machine"). Each edits only its own board row and its own handoff note (a Discovered line goes in that note meanwhile); the second to merge has `main` merged in, never rebased, and passes `pnpm check` on the merged tree before it is pushed (D-112)
+- **Next tasks to start, side by side:** `E01-T08c` (Ready), `/pipeline E01-T08c` in the clone, and `E01-T05a` (Ready, split from E01-T05 in E01-T04b's Done pass, D-113), `/pipeline E01-T05a` in this checkout. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
+- **Two tasks run in parallel** (owner, 2026-10-13, D-112, as D-110's): E01-T05a in the main checkout (E01-T05's first part, D-113), E01-T08c in the clone (`README.md`, "Two checkouts on one machine"). Each edits only its own board row and its own handoff note (a Discovered line goes in that note meanwhile); the second to merge has `main` merged in, never rebased, and passes `pnpm check` on the merged tree before it is pushed (D-112)
 - **Decisions it waits on:** none
 
 ## Next (in order)
 
 1. E00-T07f, then E00-T07c, once the owner has the Render and monitor accounts ("Owner actions"; not yet on 2026-10-11): E00-T07f needs no account but goes right before staging (owner, D-109); until then the rest of E01 goes first
-2. The rest of E01, in the epic's own order (D-087): E01-T05 and E01-T08c side by side (owner, D-112: E01-T08c Ready, E01-T05 Ready in E01-T04b's Done pass), then E01-T09 and E01-T03; E00-T06c before the first journey that sets "now" (D-100)
+2. The rest of E01, in the epic's own order (D-087): E01-T05a and E01-T08c side by side (owner, D-112; both Ready), then E01-T05b (refined in E01-T05a's Done pass, D-113), then E01-T09 and E01-T03; E00-T06c before the first journey that sets "now" (D-100)
 3. E00-T12, before E02 (owner, 2026-10-03; D-102)
 
 ## Blocked
@@ -74,9 +74,11 @@ Fully specified.
 | E01-T03 | Patient profile, and editing a patient's details | builder | normal | Planned | Editing from E01-T02 (D-096) |
 | E01-T04 | Calendar: day view | builder | normal | split (D-108) | Into E01-T04a and E01-T04b, the next two rows |
 | E01-T04a | Calendar: the day view | builder | normal | **Done** | Merged by the owner (PR #58). `main` green (run 38275749941). `/calendar`: the clinic's day in its zone from four modules (DST tested in Skopje and New York), the grid with breaks, overlaps side by side, hours and closed days, % booked, Previous / Today / Next by `?day=`; the day helpers in `src/lib/calendar-day.ts`; the owner tried it. Leftovers → E01-T04b (owner: the 24-hour clock on every page, D-049; no lunch on a closed day), E01-T11 (a journey through the calendar); the closed-day notice kept (owner); two struck. See `handoffs/E01-T04a.md` |
-| E01-T04b | Calendar: the filter, a provider's own column, the "now" line and a fresh day | builder | normal | **Tested** | Reviewer (delta review, `3502212..ff4f1a5`): the fix approved, no required changes, 1 `none` suggestion (in the note). Tester, after fix round 1: finding 1 fixed (its e2e red without the fix in three browsers), no new finding; 2 e2e checks added (Back from Patients; Back to a day read on use). Builder, fix round 1: the tester's finding fixed (a day Back or Forward shows again keeps the time of its read; e2e with Back and Forward), for the tester to check. Tester: back to builder, 1 finding (`speed`, against acceptance 3: Back or Forward shows a kept day counted as freshly read); 5 e2e checks added; 1 Discovered line. Reviewer: no required changes, 4 `none` suggestions (in the note). Builder, branch `task/E01-T04b-calendar-filter`: chips and own column, "now" line, read on use, 24-hour clock, no break on a closed day. From E01-T04 (D-108): read again when used, never on a timer, so the 30-minute sign-out holds (owner). Refined in E01-T04a's Done pass, with two of the owner's answers on the day view (2026-10-12): the 24-hour clock on every page (D-049), no lunch on a closed day. See `handoffs/E01-T04b.md` |
-| E01-T05 | Book an appointment (drawer) | builder | normal | Planned | Next, in this checkout beside E01-T08c (owner, D-112); refined in E01-T04b's Done pass. The patient search keeps nothing in the browser (D-095); a double click keeps the drawer open; a form in a drawer or dialog sends only itself (E00-T04e) |
-| E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | The cancel dialog sends the cancel only (E00-T04e) |
+| E01-T04b | Calendar: the filter, a provider's own column, the "now" line and a fresh day | builder | normal | **Done** | Merged by the owner (PR #63). `main` green (run 38316078716). The chips and a linked provider's own column, the "now" line by the browser's clock, the day read again on use and never on a timer (a day Back or Forward shows is as old as its read), every time of day in the 24-hour clock, no break on a closed day; one fix round; the owner tried it. Leftovers → E01-T05a (`slice`: the first screen that changes a day shows it at once and keeps its drawer through a read on use; the drawer opens without a navigation), E01-T11 (`speed`: a read on its way holds a navigation); eight `none` struck. See `handoffs/E01-T04b.md` |
+| E01-T05 | Book an appointment (drawer) | builder | normal | split (D-113) | Into E01-T05a and E01-T05b, the next two rows; the nested-form guard → E01-T06 |
+| E01-T05a | Book an existing patient: the new-appointment drawer | builder | normal | **Ready** | From E01-T05 (D-113), refined in E01-T04b's Done pass: `scheduling.createAppointment`, the drawer from New appointment, the patient search (nothing kept in the browser, D-095), treatment chips, start, length and provider, an overlap and a race refused with one message, the block at once, the keyboard, a double click on New appointment; only active patients (owner, D-113). In this checkout, beside E01-T08c (D-112). See `handoffs/E01-T05a.md` |
+| E01-T05b | Booking: overlaps and "Book anyway", a click on the grid, a new patient in one go | builder | normal | Planned | From E01-T05 (D-113): the warning and "Book anyway", one booking per click (`message`), an empty slot's click, the quick new patient in one transaction. Refined in E01-T05a's Done pass |
+| E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | The drawer's and the dialog's content keep a form's submit inside them, moved from E01-T05 (D-113): the cancel dialog sends the cancel only (E00-T04e) |
 | E01-T07 | Calendar: week view | builder | low | Planned | |
 | E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | split (D-110) | Into E01-T08a … E01-T08c, the next three rows (E01-T08b split again, D-111) |
 | E01-T08a | Settings: the page and the clinic's details | builder | normal | **Done** | Merged by the owner (PR #59). `main` green (run 38278268926). `/settings` for the owner: the Clinic tab's eight details saved with one `clinic.updated` row; the zone by a name the database and Intl both know, in `clinic:create` too; `status` and `settings` untouched; no fix round; the owner tried it. Leftovers → E01-T08b (`message`: the clinic's phone shown with its country code), E02-T03 (`message`: WhatsApp's values made one line), E01-T11 (Settings in the accessibility check); one done by its tester, eight struck (D-111). See `handoffs/E01-T08a.md` |
@@ -84,7 +86,7 @@ Fully specified.
 | E01-T08c | Settings: closed days | builder | normal | **Ready** | Split from E01-T08b (D-111); refined in E01-T08b's Done pass: the list from the clinic's today, an add and each Remove its own `StaffForm`, a date already closed or past refused above the button, the date's unique key instead of a lock. In the clone, beside E01-T05 (owner, D-112). See `handoffs/E01-T08c.md` |
 | E01-T09 | Settings: providers and treatment types | builder | normal | Planned | |
 | E01-T10 | Today screen, first version | builder | normal | Planned | |
-| E01-T11 | Journey J2 and a hard look at scheduling | tester | normal | Planned | Owner: receptionist trial if possible (Q-09). E00-T06c first if J2 sets "now" (D-100). J2 through the calendar, and the accessibility check on its pages (E01-T04a) and on Settings as its owner (E01-T08a) |
+| E01-T11 | Journey J2 and a hard look at scheduling | tester | normal | Planned | Owner: receptionist trial if possible (Q-09). E00-T06c first if J2 sets "now" (D-100). J2 through the calendar, and the accessibility check on its pages (E01-T04a) and on Settings as its owner (E01-T08a); the first click after a pause timed on staging (E01-T04b) |
 
 ## E02 · Reminder loop (M2)
 
@@ -227,6 +229,7 @@ Outline. Needs E07-T00.
 - E01-T04a · Calendar: the day view · merged 2026-10-12 (PR #58)
 - E01-T08a · Settings: the page and the clinic's details · merged 2026-10-12 (PR #59)
 - E01-T08b · Settings: opening hours · merged 2026-10-12 (PR #62)
+- E01-T04b · Calendar: the filter, a provider's own column, the "now" line and a fresh day · merged 2026-10-12 (PR #63)
 
 ## Owner actions (standing)
 
