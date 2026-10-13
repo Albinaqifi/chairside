@@ -3,6 +3,7 @@
 import { refresh } from 'next/cache';
 import { z } from 'zod';
 import { refuse, staffAction, staffRead } from '@/app/_lib/actions';
+import { isCalendarDay } from '@/lib/calendar-day';
 import * as patients from '@/modules/patients';
 import * as tenancy from '@/modules/tenancy';
 import { hoursFieldNames, minutesOfTimeValue, WEEKDAY_FIELDS } from './opening-hours';
@@ -202,5 +203,87 @@ export const saveOpeningHours = staffAction(
     const saved = await tenancy.saveOpeningHours(tx, input, now);
     refresh();
     return { changes: { weekdays: saved.changed } };
+  },
+);
+
+/*
+ * Closed days (E01-T08c), on the Opening hours tab under the week: the clinic's closed days from its
+ * today on, an add (a date and a label), and a Remove for each, every one its own StaffForm. What the
+ * input alone settles is the schema's, shown at its field (D-098): a date that is no date, a label
+ * empty or too long. What needs the clinic's zone or rows is the module's refusal, shown above the
+ * button: a date before the clinic's today (in_the_past), one closed already (already_closed), a
+ * Remove of a day no longer closed (not_closed). Each change is audited about the clinic, with the
+ * date and never the label, which is free text.
+ */
+
+/**
+ * A closed day's date: a date of the calendar, `YYYY-MM-DD` (isCalendarDay: 2026-02-30 is none). The
+ * browser's date field sends '' for a date it cannot read, half typed: the form says "Fill this in.".
+ */
+const closedDate = z.string().superRefine((value, ctx) => {
+  if (!isCalendarDay(value)) {
+    ctx.addIssue({ code: 'invalid_format', format: 'date', message: 'date' });
+  }
+});
+
+/** A closed day's label: trimmed, then not empty, at most CLOSED_DAY_LABEL_MAX characters. */
+const closedLabel = z.string().trim().min(1).max(tenancy.CLOSED_DAY_LABEL_MAX);
+
+/**
+ * The clinic's closed days from its today on, by date, for the Settings page (forPage). Nothing in
+ * them is a patient's: no audit row.
+ */
+export const readClosedDays = staffRead(
+  { permission: 'settings.manage', input: z.object({}) },
+  async ({ tx, now }) => tenancy.closedDaysAhead(tx, now),
+);
+
+/**
+ * Closes the clinic on a day (tenancy.addClosedDay), with one audit row, clinic.closed_day_added,
+ * about the clinic, whose metadata is the date. A date before the clinic's today, or one it is closed
+ * on already, is refused, with nothing written. When it is done, the page is rendered again
+ * (refresh()): the list, and the calendar's next read shows the day closed.
+ */
+export const addClosedDay = staffAction(
+  {
+    permission: 'settings.manage',
+    input: z.object({ date: closedDate, label: closedLabel }),
+    audit: {
+      action: 'clinic.closed_day_added',
+      entityType: 'clinic',
+      entityId: ({ staff }) => staff.clinic.clinicId,
+      metadata: ({ input }) => ({ date: input.date }),
+    },
+  },
+  async ({ input, tx, now }) => {
+    const added = await tenancy.addClosedDay(tx, input, now);
+    if (!added.ok) return refuse(added.code);
+    refresh();
+    return { date: input.date };
+  },
+);
+
+/**
+ * Opens a closed day again (tenancy.removeClosedDay), sent by its Remove with the date hidden, with
+ * one audit row, clinic.closed_day_removed, about the clinic, whose metadata is the date. A day no
+ * longer closed, or one before the clinic's today, is refused, with nothing written. When it is done,
+ * the page is rendered again (refresh()), as after an add.
+ */
+export const removeClosedDay = staffAction(
+  {
+    permission: 'settings.manage',
+    input: z.object({ date: closedDate }),
+    audit: {
+      action: 'clinic.closed_day_removed',
+      entityType: 'clinic',
+      entityId: ({ staff }) => staff.clinic.clinicId,
+      metadata: ({ input }) => ({ date: input.date }),
+    },
+  },
+  async ({ input, tx, now }) => {
+    const removed = await tenancy.removeClosedDay(tx, input.date, now);
+    if (!removed.ok) return refuse(removed.code);
+    refresh();
+    return { date: input.date };
   },
 );

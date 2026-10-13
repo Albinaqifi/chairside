@@ -164,7 +164,24 @@
       "noTime": "Not set",
       "save": "Save",
       "saving": "Saving…",
-      "saved": "Opening hours saved."
+      "saved": "Opening hours saved.",
+      "closedDays": {
+        "heading": "Closed days",
+        "intro": "Days the clinic stays closed although its opening hours say open, such as public holidays. The calendar shows each one as closed, with its label.",
+        "none": "No closed days ahead.",
+        "date": "Date",
+        "label": "Label",
+        "add": "Add closed day",
+        "adding": "Adding…",
+        "added": "Closed day added.",
+        "alreadyClosed": "The clinic is already closed on this date. Choose another date.",
+        "inThePast": "This date has passed. Choose today or a later date.",
+        "remove": "Remove",
+        "removing": "Removing…",
+        "removed": "Closed day removed.",
+        "notClosed": "This day is no longer closed: it was removed meanwhile, in another tab or by someone else. Reload the page to see the closed days as they are now.",
+        "removePast": "This day has passed, so it stays as it is. Reload the page to see the closed days from today on."
+      }
     }
   },
   "placeholder": {
