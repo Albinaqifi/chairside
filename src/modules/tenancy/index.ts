@@ -25,3 +25,14 @@ export { clinicCountries, clinicCurrencies } from './create-clinic';
 export { clinicTimeZones, isClinicTimeZoneName, knownTimeZone } from './time-zone';
 // E01-T08b: the week's opening hours, saved from Settings.
 export { saveOpeningHours, type SaveHoursResult } from './hours';
+// E01-T08c: the closed days from the clinic's today on, added and removed from Settings.
+export {
+  addClosedDay,
+  CLOSED_DAY_LABEL_MAX,
+  closedDaysAhead,
+  removeClosedDay,
+  type AddClosedDayRefusal,
+  type AddClosedDayResult,
+  type RemoveClosedDayRefusal,
+  type RemoveClosedDayResult,
+} from './closed-days';

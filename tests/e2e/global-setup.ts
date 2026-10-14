@@ -7,7 +7,7 @@ import { resetDatabase } from '@/db/reset';
 import { seedDatabase } from '@/db/seed';
 import { SEED_PASSWORD, SEEDED_PEOPLE } from '@/db/seed/seeded';
 import { e2eDatabase } from './e2e-database.ts';
-import { APP, DEV, e2eEnv, FRONT_DESK_SESSION } from './servers.ts';
+import { APP, DEV, e2eEnv, FRONT_DESK_SESSION, OWNER_SESSION } from './servers.ts';
 
 /**
  * The pages the checks open on `next dev`, each with the file it is made from: the components
@@ -35,9 +35,10 @@ const TOUCHES = 3;
  *    as the integration tests rebuild theirs. resetDatabase() and seedDatabase() refuse every
  *    database that is not on this machine. Never the development database.
  * 2. Logs the seeded front desk in once, through the auth library's own route, and keeps the
- *    session for the accessibility and D-093 checks in every browser, on both servers. J1 logs in
- *    itself. A run signs in at most seven times: this once, and J1's two in each of three browsers;
- *    the limit is ten a minute (D-064 point 5), counted in the run's fresh database.
+ *    session for the accessibility and D-093 checks in every browser, on both servers; then the
+ *    seeded owner, once, for the closed days' check (E01-T08c). J1 logs in itself. A run signs in at
+ *    most eight times: these two, and J1's two in each of three browsers; the limit is ten a minute
+ *    (D-064 point 5), counted in the run's fresh database.
  * 3. Opens /dev/components and Today on `next dev` with that session, so it compiles them before
  *    the tests ask, and brings back a page it answers 404 for (TOUCHES).
  */
@@ -66,6 +67,21 @@ export default async function globalSetup(): Promise<void> {
     await browserless.storageState({ path: FRONT_DESK_SESSION });
   } finally {
     await browserless.dispose();
+  }
+
+  // A context of its own: a second sign-in in the front desk's would replace that session's cookie.
+  const owner = await request.newContext({ baseURL: APP });
+  try {
+    const signIn = await owner.post('/api/auth/sign-in/email', {
+      headers: { origin: APP },
+      data: { email: SEEDED_PEOPLE.owner.email, password: SEED_PASSWORD },
+    });
+    if (!signIn.ok()) {
+      throw new Error(`The seeded owner could not sign in (status ${signIn.status()}).`);
+    }
+    await owner.storageState({ path: OWNER_SESSION });
+  } finally {
+    await owner.dispose();
   }
 }
 

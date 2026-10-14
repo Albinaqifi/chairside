@@ -141,6 +141,9 @@ const ACTIONS: Record<string, Record<string, ScopeRow | 'userAction'>> = {
     saveClinicDetails: 'Staff, settings, audit log, results panel',
     readOpeningHours: 'Staff, settings, audit log, results panel',
     saveOpeningHours: 'Staff, settings, audit log, results panel',
+    readClosedDays: 'Staff, settings, audit log, results panel',
+    addClosedDay: 'Staff, settings, audit log, results panel',
+    removeClosedDay: 'Staff, settings, audit log, results panel',
   },
   'src/app/_lib/clinic-time-zone.ts': { clinicTimeZone: 'No area of the table: every member' },
 };
