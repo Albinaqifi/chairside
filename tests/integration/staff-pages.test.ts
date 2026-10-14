@@ -16,11 +16,13 @@ import PatientsPage from '@/app/(staff)/patients/page';
 import { PatientList } from '@/app/(staff)/patients/patient-list';
 import { PlaceholderPage } from '@/app/(staff)/placeholder-page';
 import { ClinicDetailsForm } from '@/app/(staff)/settings/clinic-details-form';
+import { ClosedDays } from '@/app/(staff)/settings/closed-days';
 import { OpeningHoursForm } from '@/app/(staff)/settings/opening-hours-form';
 import SettingsPage from '@/app/(staff)/settings/page';
 import { Sidebar } from '@/app/(staff)/sidebar';
 import VisitPage from '@/app/(staff)/visit/page';
 import { closeDb } from '@/db/client';
+import { addDays, dayInZone } from '@/lib/calendar-day';
 import { CLINIC_COOKIE } from '@/lib/cookies';
 import { newId } from '@/lib/ids';
 import { createStaffUser } from '@/modules/auth';
@@ -472,5 +474,49 @@ describe('the Settings page (E01-T08a)', () => {
     expect(week?.[1]).toEqual({ weekday: 2, key: 'tuesday', open: false, opens: '', closes: '' });
     const details = elementsOf<ComponentProps<typeof ClinicDetailsForm>>(page, ClinicDetailsForm);
     expect(details[0]?.props.values).toMatchObject({ phone: '+389 70 001 402', country: 'MK' });
+  });
+
+  // E01-T08c, acceptance 1 (the page's side): the Opening hours tab's closed days keyed by the clinic
+  // (D-098), handed that clinic's days from its today on, by date; a past one not. The page reads with
+  // the real clock: the days keep two days from the clinic's today, either way.
+  it("an owner: the closed days keyed by the clinic, from the clinic's today on", async () => {
+    request.cookie = await signInCookie(
+      await memberAs('owner', [firstClinic, secondClinic]),
+      PASSWORD,
+      freshAddress(),
+    );
+    const today = dayInZone(new Date(), 'Europe/Skopje');
+    await admin.query('delete from closed_days where clinic_id = any($1)', [
+      [firstClinic, secondClinic],
+    ]);
+    for (const [clinicId, days, label] of [
+      [firstClinic, 20, 'Later'],
+      [firstClinic, -2, 'Past'],
+      [firstClinic, 5, 'Sooner'],
+      [secondClinic, 7, 'Second clinic'],
+    ] as const) {
+      await insertRow(admin, 'closed_days', {
+        id: newId(),
+        clinic_id: clinicId,
+        date: addDays(today, days),
+        label,
+      });
+    }
+    for (const [chosen, days] of [
+      [
+        firstClinic,
+        [
+          { date: addDays(today, 5), label: 'Sooner' },
+          { date: addDays(today, 20), label: 'Later' },
+        ],
+      ],
+      [secondClinic, [{ date: addDays(today, 7), label: 'Second clinic' }]],
+    ] as const) {
+      request.clinic = chosen;
+      const page = await SettingsPage();
+      const sections = elementsOf<ComponentProps<typeof ClosedDays>>(page, ClosedDays);
+      expect(sections.map((section) => section.key)).toEqual([chosen]);
+      expect(sections[0]?.props.days).toEqual(days);
+    }
   });
 });

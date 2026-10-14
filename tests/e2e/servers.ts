@@ -60,5 +60,12 @@ export function e2eEnv(database: E2eDatabase, origin: string): Record<string, st
  */
 export const FRONT_DESK_SESSION = path.join(import.meta.dirname, '.auth', 'front-desk.json');
 
+/**
+ * The seeded owner's session, made once per run by the global setup as the front desk's is: for the
+ * owner's own pages (Settings, E01-T08c). The owner is in both seeded clinics, so a check chooses one
+ * on the clinic picker first, as the owner does after logging in.
+ */
+export const OWNER_SESSION = path.join(import.meta.dirname, '.auth', 'owner.json');
+
 /** No session at all: for the journeys that log in themselves, and pages seen signed out. */
 export const SIGNED_OUT = { cookies: [], origins: [] };

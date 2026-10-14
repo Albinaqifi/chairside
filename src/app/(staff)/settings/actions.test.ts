@@ -2,8 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Staff } from '@/app/_lib/auth';
 import { logger } from '@/lib/logger';
 import {
+  addClosedDay,
   readClinicSettings,
+  readClosedDays,
   readOpeningHours,
+  removeClosedDay,
   saveClinicDetails,
   saveOpeningHours,
 } from './actions';
@@ -45,6 +48,10 @@ const tenancy = vi.hoisted(() => ({
   // E01-T08b: the Opening hours tab's read and save.
   openingHours: vi.fn(),
   saveOpeningHours: vi.fn(),
+  // E01-T08c: the closed days' read, add and remove.
+  closedDaysAhead: vi.fn(),
+  addClosedDay: vi.fn(),
+  removeClosedDay: vi.fn(),
 }));
 vi.mock('@/modules/tenancy', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/modules/tenancy')>()),
@@ -98,11 +105,17 @@ beforeEach(() => {
   tenancy.saveOpeningHours.mockReset();
   tenancy.saveOpeningHours.mockResolvedValue({ changed: [1] });
   tenancy.openingHours.mockReset();
+  tenancy.closedDaysAhead.mockReset();
+  tenancy.addClosedDay.mockReset();
+  tenancy.addClosedDay.mockResolvedValue({ ok: true });
+  tenancy.removeClosedDay.mockReset();
+  tenancy.removeClosedDay.mockResolvedValue({ ok: true });
   cache.refresh.mockReset();
   vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -665,6 +678,258 @@ describe("readOpeningHours: the page's read", () => {
     tenancy.openingHours.mockResolvedValue(WEEKDAYS_8_TO_18);
     expect(await readOpeningHours.forPage({})).toEqual({ ok: true, value: WEEKDAYS_8_TO_18 });
     expect(tenancy.openingHours).toHaveBeenCalledWith(TX);
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+});
+
+// E01-T08c, acceptance 1 and 5 (the actions' side): what the closed days' actions take from their
+// forms and hand the tenancy module with the moment the wrapper read, what the input alone settles
+// at its field before any transaction, the module's refusals as the forms get them, and the audit
+// rows they ask for: the date, never the label. The module's work against real rows, in the clinic's
+// zone, is in tests/integration/closed-days.test.ts.
+
+/**
+ * The add form's data as the browser sends it, with these fields in place of those, or left out when
+ * undefined.
+ */
+function closedDaySent(fields: Record<string, string | undefined> = {}): FormData {
+  const all: Record<string, string | undefined> = {
+    date: '2026-12-25',
+    label: 'Christmas Day',
+    ...fields,
+  };
+  const data = new FormData();
+  for (const [name, value] of Object.entries(all)) {
+    if (value !== undefined) data.append(name, value);
+  }
+  return data;
+}
+
+/** A Remove's data as the browser sends it: the date, hidden; or nothing when null. */
+function removeSent(date: string | null = '2026-12-25'): FormData {
+  const data = new FormData();
+  if (date !== null) data.append('date', date);
+  return data;
+}
+
+/** 22:00 on 14 October 2026 in New York: already the 15th in UTC. */
+const NEW_YORK_EVENING = new Date('2026-10-15T02:00:00Z');
+
+describe('addClosedDay: what it hands tenancy.addClosedDay', () => {
+  it('the date as sent, the label trimmed, and the moment the wrapper read', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NEW_YORK_EVENING);
+    expect(await addClosedDay(CLINIC, closedDaySent({ label: '  Christmas Day ' }))).toEqual({
+      ok: true,
+      value: { date: '2026-12-25' },
+    });
+    expect(tenancy.addClosedDay).toHaveBeenCalledExactlyOnceWith(
+      TX,
+      { date: '2026-12-25', label: 'Christmas Day' },
+      NEW_YORK_EVENING,
+    );
+  });
+
+  it('a label of 100 characters once trimmed is taken', async () => {
+    const label = 'L'.repeat(100);
+    expect(await addClosedDay(CLINIC, closedDaySent({ label: ` ${label} ` }))).toMatchObject({
+      ok: true,
+    });
+    expect(tenancy.addClosedDay).toHaveBeenCalledWith(
+      TX,
+      expect.objectContaining({ label }),
+      expect.any(Date),
+    );
+  });
+
+  it('0000-01-01, which isCalendarDay takes and PostgreSQL does not: handed on, for the module to refuse as past', async () => {
+    tenancy.addClosedDay.mockResolvedValue({ ok: false, code: 'in_the_past' });
+    expect(await addClosedDay(CLINIC, closedDaySent({ date: '0000-01-01' }))).toEqual({
+      ok: false,
+      error: { code: 'in_the_past' },
+    });
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('addClosedDay: what the input alone settles is refused at its field, before any transaction (D-098)', () => {
+  it.each([
+    { what: 'an empty date', fields: { date: '' }, path: 'date', code: 'invalid_format' },
+    { what: 'a date not sent', fields: { date: undefined }, path: 'date', code: 'invalid_type' },
+    {
+      what: 'a day the month lacks',
+      fields: { date: '2026-02-30' },
+      path: 'date',
+      code: 'invalid_format',
+    },
+    {
+      what: 'a date written another way',
+      fields: { date: '25.12.2026' },
+      path: 'date',
+      code: 'invalid_format',
+    },
+    {
+      what: 'a year of five digits',
+      fields: { date: '20261-12-25' },
+      path: 'date',
+      code: 'invalid_format',
+    },
+    {
+      what: 'a date with a time',
+      fields: { date: '2026-12-25T00:00' },
+      path: 'date',
+      code: 'invalid_format',
+    },
+    { what: 'an empty label', fields: { label: '' }, path: 'label', code: 'too_small' },
+    { what: 'a label of blanks', fields: { label: '   ' }, path: 'label', code: 'too_small' },
+    { what: 'a label not sent', fields: { label: undefined }, path: 'label', code: 'invalid_type' },
+    {
+      what: 'a label of 101 characters',
+      fields: { label: 'L'.repeat(101) },
+      path: 'label',
+      code: 'too_big',
+    },
+  ])('$what: invalid_input at $path, nothing handed on', async ({ fields, path, code }) => {
+    expect(await addClosedDay(CLINIC, closedDaySent(fields))).toEqual({
+      ok: false,
+      error: { code: 'invalid_input', issues: [{ path: [path], code }] },
+    });
+    expect(db.opened).toBe(0);
+    expect(tenancy.addClosedDay).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('both at once, each at its field', async () => {
+    const result = await addClosedDay(CLINIC, closedDaySent({ date: '2026-13-01', label: '' }));
+    if (result.ok || !('issues' in result.error)) throw new Error('expected invalid_input');
+    expect(result.error.issues.map((issue) => issue.path[0])).toEqual(['date', 'label']);
+    expect(db.opened).toBe(0);
+  });
+
+  it('a field sent twice: at that field, never internal', async () => {
+    const data = closedDaySent();
+    data.append('date', '2026-12-26');
+    const result = await addClosedDay(CLINIC, data);
+    if (result.ok || !('issues' in result.error)) throw new Error('expected invalid_input');
+    expect(result.error.issues.map((issue) => issue.path)).toEqual([['date']]);
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('addClosedDay: its answer, its audit row and the page rendered again', () => {
+  it('done: one audit row clinic.closed_day_added about the clinic, naming the date and never the label; the page refreshed', async () => {
+    await addClosedDay(CLINIC, closedDaySent());
+    expect(audit.record).toHaveBeenCalledExactlyOnceWith(TX, {
+      at: expect.any(Date),
+      actorType: 'user',
+      actorId: USER,
+      action: 'clinic.closed_day_added',
+      entityType: 'clinic',
+      entityId: CLINIC,
+      metadata: { date: '2026-12-25' },
+    });
+    expect(JSON.stringify(audit.record.mock.calls)).not.toContain('Christmas');
+    expect(cache.refresh).toHaveBeenCalledOnce();
+  });
+
+  it.each(['already_closed', 'in_the_past'])(
+    "the module's %s: the form gets that refusal, with no audit row and no refresh",
+    async (code) => {
+      tenancy.addClosedDay.mockResolvedValue({ ok: false, code });
+      expect(await addClosedDay(CLINIC, closedDaySent())).toEqual({ ok: false, error: { code } });
+      expect(audit.record).not.toHaveBeenCalled();
+      expect(cache.refresh).not.toHaveBeenCalled();
+    },
+  );
+
+  it('sent for another clinic than the request is in: clinic_changed, before any transaction', async () => {
+    expect(await addClosedDay('01970000-0000-7000-8000-0000000000d9', closedDaySent())).toEqual({
+      ok: false,
+      error: { code: 'clinic_changed' },
+    });
+    expect(db.opened).toBe(0);
+    expect(tenancy.addClosedDay).not.toHaveBeenCalled();
+  });
+
+  it('a clinic id among the fields is no input: the module gets the date and the label alone', async () => {
+    const data = closedDaySent();
+    data.append('clinicId', '01970000-0000-7000-8000-0000000000d9');
+    await addClosedDay(CLINIC, data);
+    expect(tenancy.addClosedDay).toHaveBeenCalledWith(
+      TX,
+      { date: '2026-12-25', label: 'Christmas Day' },
+      expect.any(Date),
+    );
+  });
+});
+
+describe('removeClosedDay: what it hands tenancy.removeClosedDay, and what it refuses', () => {
+  it('the date as sent and the moment the wrapper read; done: one audit row clinic.closed_day_removed naming the date; the page refreshed', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NEW_YORK_EVENING);
+    expect(await removeClosedDay(CLINIC, removeSent('2026-10-14'))).toEqual({
+      ok: true,
+      value: { date: '2026-10-14' },
+    });
+    expect(tenancy.removeClosedDay).toHaveBeenCalledExactlyOnceWith(
+      TX,
+      '2026-10-14',
+      NEW_YORK_EVENING,
+    );
+    expect(audit.record).toHaveBeenCalledExactlyOnceWith(TX, {
+      at: NEW_YORK_EVENING,
+      actorType: 'user',
+      actorId: USER,
+      action: 'clinic.closed_day_removed',
+      entityType: 'clinic',
+      entityId: CLINIC,
+      metadata: { date: '2026-10-14' },
+    });
+    expect(cache.refresh).toHaveBeenCalledOnce();
+  });
+
+  it.each(['not_closed', 'in_the_past'])(
+    "the module's %s: the form gets that refusal, with no audit row and no refresh",
+    async (code) => {
+      tenancy.removeClosedDay.mockResolvedValue({ ok: false, code });
+      expect(await removeClosedDay(CLINIC, removeSent())).toEqual({ ok: false, error: { code } });
+      expect(audit.record).not.toHaveBeenCalled();
+      expect(cache.refresh).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { what: 'no date', date: '', code: 'invalid_format' },
+    { what: 'a date not sent', date: null, code: 'invalid_type' },
+    { what: 'a day the month lacks', date: '2027-02-29', code: 'invalid_format' },
+    { what: 'a date written another way', date: '12/25/2026', code: 'invalid_format' },
+  ])('$what: invalid_input at the date, before any transaction', async ({ date, code }) => {
+    expect(await removeClosedDay(CLINIC, removeSent(date))).toEqual({
+      ok: false,
+      error: { code: 'invalid_input', issues: [{ path: ['date'], code }] },
+    });
+    expect(db.opened).toBe(0);
+    expect(tenancy.removeClosedDay).not.toHaveBeenCalled();
+  });
+
+  it('sent for another clinic than the request is in: clinic_changed, before any transaction', async () => {
+    expect(await removeClosedDay('01970000-0000-7000-8000-0000000000d9', removeSent())).toEqual({
+      ok: false,
+      error: { code: 'clinic_changed' },
+    });
+    expect(db.opened).toBe(0);
+    expect(tenancy.removeClosedDay).not.toHaveBeenCalled();
+  });
+});
+
+describe("readClosedDays: the page's read", () => {
+  it('the days the module gives from the moment the wrapper read, with no audit row', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NEW_YORK_EVENING);
+    const days = [{ date: '2026-10-14', label: 'Closed for training' }];
+    tenancy.closedDaysAhead.mockResolvedValue(days);
+    expect(await readClosedDays.forPage({})).toEqual({ ok: true, value: days });
+    expect(tenancy.closedDaysAhead).toHaveBeenCalledExactlyOnceWith(TX, NEW_YORK_EVENING);
     expect(audit.record).not.toHaveBeenCalled();
   });
 });

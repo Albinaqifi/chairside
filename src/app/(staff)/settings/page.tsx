@@ -8,9 +8,10 @@ import { phoneWithCountryCode } from '@/modules/patients';
 import * as tenancy from '@/modules/tenancy';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs';
 import { membershipExtras } from '../navigation';
-import { readClinicSettings, readOpeningHours } from './actions';
+import { readClinicSettings, readClosedDays, readOpeningHours } from './actions';
 import { countryChoices, currencyChoices, languageChoices, zoneChoices } from './clinic-choices';
 import { ClinicDetailsForm } from './clinic-details-form';
+import { ClosedDays } from './closed-days';
 import { weekValues } from './opening-hours';
 import { OpeningHoursForm } from './opening-hours-form';
 
@@ -23,8 +24,9 @@ export async function generateMetadata(): Promise<Metadata> {
  * Settings (E01-T08a, demo lines 746–757): the owner's alone (settings.manage, scope-v1.md). Anyone
  * else is answered "not found", as the new-patient page answers; the reads and the saves check the
  * permission themselves too (security-privacy.md, section 2). Its tabs hold two now, Clinic and
- * Opening hours (E01-T08b): each later tab comes with its task (Providers and Treatment types
- * E01-T09, Staff E04-T02, Message channels E03-T06), none shown before.
+ * Opening hours (E01-T08b), whose closed days stand under the week, outside its form (E01-T08c):
+ * each later tab comes with its task (Providers and Treatment types E01-T09, Staff E04-T02, Message
+ * channels E03-T06), none shown before.
  *
  * Everything the forms start with is made here, on the server: the phone with its country code
  * (D-111), so a phone country changed in the same save leaves the number as it was, and the
@@ -40,6 +42,10 @@ export default async function SettingsPage() {
   const { details, timeZones } = read.value;
   const hours = await readOpeningHours.forPage({});
   if (!hours.ok) throw new Error(`The opening hours could not be read (${hours.error.code}).`);
+  const closedDays = await readClosedDays.forPage({});
+  if (!closedDays.ok) {
+    throw new Error(`The closed days could not be read (${closedDays.error.code}).`);
+  }
   const [nav, t, languageName, locale] = await Promise.all([
     getTranslations('nav'),
     getTranslations('settings'),
@@ -88,6 +94,9 @@ export default async function SettingsPage() {
         <TabsContent value="hours">
           <div className="rounded-card border border-border bg-surface px-5.5 py-5">
             <OpeningHoursForm key={staff.clinic.clinicId} week={weekValues(hours.value)} />
+          </div>
+          <div className="mt-4 rounded-card border border-border bg-surface px-5.5 py-5">
+            <ClosedDays key={staff.clinic.clinicId} days={closedDays.value} />
           </div>
         </TabsContent>
       </Tabs>
