@@ -8,7 +8,8 @@ thing a receptionist judges (risk R-09), so it should be in front of a real one 
 
 Order: T01a → T01b → T02a → T02b → T04a and T08a side by side (two checkouts, D-110) → T04b and T08b
 side by side (D-111) → T05a and T08c side by side (D-112, D-113) → T05b → T05c → T05d → T09, T03 → T06 →
-T07, T10 → T11. With E00 (D-087, D-090, D-091, D-093, D-096, D-108, D-110, D-111, D-112, D-113, D-114):
+T07, T10 → T08d → T11. With E00 (D-087, D-090, D-091, D-093, D-096, D-108, D-110, D-111, D-112, D-113,
+D-114, D-115):
 E00-T05a → T01a → T01b → E00-T04c → E00-T04d → E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 →
 T04a and T08a → T04b and T08b → T05a and T08c → T05b → T05c → T05d → T09 and the rest, so a receptionist sees a patient list before
 Playwright and staging exist. T01 is split in two (D-091): the schema and the provider link (T01a), the seed (T01b). T02 is
@@ -24,7 +25,8 @@ and a new patient in one go (T05b), after it. Only active patients are booked (o
 split again (D-114), as T05a came to far more lines than estimated: the overlap warning with "Book
 anyway", one booking per click and a warning for breaks, hours and closed days (T05b); a click on an
 empty slot, and a double click's second press changes nothing in the drawer (T05c); a new patient in
-one go (T05d).
+one go (T05d). T08c was merged with its last review's change open, a double click on a closed day's
+Remove while the list's heading is above the window: it is T08d, after T10 and before T11 (owner, D-115).
 
 ---
 
@@ -1057,6 +1059,15 @@ journey (E01-T11).
 
 ### E01-T08c · Settings: closed days
 
+**As built** (Done 2026-10-19, merged 2026-10-14, PR #66; D-115): as planned, about 380 lines of product
+code with comments. Also: whenever the list's rows change, it takes no pointer click for a second
+(`SETTLE_MS`), so a double click's second press reaches no Remove that a row's leaving moves under the
+pointer (the tester's finding); the keyboard is never held, and after a Remove it is on the section's
+heading. Merged with the delta review's change open: with the heading above the window, that focus
+scrolls another day's Remove under the pointer before the guard starts. That is E01-T08d (owner,
+D-115). The layout, which the demo lacks, is kept, and each Remove stays teal (owner, 2026-10-19). The
+text below is the plan as it was.
+
 - **Role:** builder · **Risk:** normal (a list and two small forms on a table the app role already
   writes, migration 0002: no table, migration, policy, permission, wrapper or login change) ·
   **Depends on:** E01-T08b (the Opening hours tab it joins), E01-T04a (both Done). Runs beside
@@ -1115,6 +1126,56 @@ accessibility check and in a journey (E01-T11).
 - [ ] In a zone behind UTC (tests that name `America/New_York`): at 22:00 on the 14th there (the 15th
       in UTC), the 14th is still the clinic's today, listed and accepted, and the 13th refused; a closed
       day shows on its own date, never the day before.
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
+
+---
+
+### E01-T08d · Settings: a double click on a closed day's Remove changes nothing else, wherever the page scrolls
+
+- **Role:** builder · **Risk:** normal (a screen: the closed days' client component and its e2e checks;
+  no action, wrapper, `StaffForm`, query, table or migration) · **Depends on:** E01-T08c (Done). Runs
+  after E01-T10, before E01-T11 (owner, D-115)
+- **Read:** D-107, D-115 · `handoffs/E01-T08c.md`: the reviewer's delta review (its required change
+  1), fix round 1's and fix round 2's builder sections · the architect section of
+  `handoffs/E01-T08d.md`
+
+**Why.** A closed day opened by mistake is one the calendar offers for booking and, from E03-T06, one
+reminders go out on (D-029). E01-T08c's guard stops a double click's second press from removing a
+second day when the rows move, but not when the page scrolls first: with the list's heading above the
+window, the focus a Remove moves to the heading scrolls the page before the guard starts, and the
+second press lands on another day's Remove (its delta review: Chromium and Firefox) or, higher in the
+window, on the week's form. From E01-T08c's last review (`message`, D-115).
+
+**Do.**
+- **A double click's second press on the closed days changes nothing** (`message`): whatever the first
+  press's answer moves or scrolls under the pointer in the second after it (another day's Remove, the
+  week's switches, times and Save, the add form), the second press reaches none of it, with the list's
+  heading above the window too. The way is the builder's: for example, the focus moved to the heading
+  only in the commit that starts the guard, a guard from the moment a Remove is sent, or a pointer's
+  Remove that scrolls nothing.
+- **The keyboard keeps its place:** after a Remove the focus is on the section's heading, shown in the
+  window, and Tab goes on from there; no guard holds the keyboard (E01-T08c).
+- **The checks** in `tests/e2e/closed-days.spec.ts`, beside E01-T08c's: days of each browser's own,
+  `inTurn`, the second click the page's own, made at the event it means (fix round 2; D-107), so no
+  lateness of Playwright's decides a result.
+
+**Out of scope.** The guard's cost, a deliberate click dropped for a second with no cue (E01-T08c's
+tester and delta review: within the trade-off). The add form's double click in WebKit ("Fill this in."
+on the emptied form, nothing saved; E01-T08c tester, `none`). A `min` on the date field (E01-T08c
+review, `none`). A quieter Remove (owner, D-115). The drawers' and dialogs' guard (E01-T05c).
+
+**Acceptance.**
+- [ ] With 16 closed days or more, a 1280 × 800 window and the list's heading above it (the delta
+      review's case): one click on a day's Remove, then the page's own click where the pointer rests at
+      each moment something moves under it (the heading's `focus`, each `scroll` of the window, the
+      row's leaving), at three heights in the window, the highest where the scroll brings the week's
+      form under the pointer: one request sent, that day removed, every other day still closed, no
+      weekday's switch or time changed. Red on today's `main` (`931ba96`) in Chromium and Firefox
+      (e2e, three browsers; where WebKit's layout brings no control under the pointer, the check says
+      so and asserts the rest).
+- [ ] By keyboard, Enter on a Remove with the heading above the window: that day removed, the focus on
+      the heading and the heading in the window; Tab then reaches the first day's Remove (e2e).
+- [ ] E01-T08c's three double-click checks stay green, unchanged (rule 8).
 - [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---

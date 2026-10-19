@@ -2202,3 +2202,23 @@ architecture), `changed` (differs from the original files), `process`.
   message rules are where a wrong message is stopped.
 - **Revisit if:** E01-T05b runs far over its estimate again (then E01-T05c and E01-T05d are sized
   again first); the receptionist trial (Q-09) finds the warning line noise.
+
+### D-115 · E01-T08c Done with its last review's change open: the fix is E01-T08d, at the end of E01 (owner); the closed days' layout kept (owner)
+- **Origin:** E01-T08c's Done pass, 2026-10-19 (PR #66, merged by the owner on 2026-10-14 with its
+  delta review's required change open; `handoffs/E01-T08c.md`). **Owner, 2026-10-19:** the fix runs
+  not now but at the end of E01, before its hard look (E01-T11); the closed days' layout, which the
+  demo lacks, is kept; each Remove stays teal, as every staff form's button. The rest is the architect's.
+- **What:**
+  - **E01-T08d, new:** a double click's second press on the closed days changes nothing, wherever the
+    page scrolls after the first (the delta review's `message` change: with the list's heading above
+    the window, the focus after a Remove scrolls another day's Remove under the pointer before the
+    guard starts). In E01's order after E01-T10, before E01-T11, whose tester then looks at it.
+  - **The Done pass ran on a row still "In progress"**, as its pull request was merged and the board
+    named the pass: the open change was weighed as a leftover (`message`, so its own task, rule 15).
+  - **The layout** (a section under the week: each day with its label and a Remove, the add form under
+    a line) is the reference for the screen (`design-reference.md`, "Screens the demo does not have").
+- **Why:** no reminder reads a closed day before E03-T06 (D-029) and no clinic uses the app before the
+  pilot, so the fix costs the same at the end of E01 and booking goes on first (D-112). A `message`
+  leftover is always work, so it is a task, not a note.
+- **Revisit if:** a clinic keys its closed days before E01-T08d is merged (then it runs first); E01-T05c's
+  double-click guard in `src/ui/` turns out to fit the list as well (then E01-T08d builds on it).
