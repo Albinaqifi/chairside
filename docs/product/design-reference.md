@@ -141,7 +141,10 @@ No jargon on patient pages. Keep this tone in every new screen the demo does not
 Login, two-factor, invite acceptance, password reset, failed-message and attention items,
 expired link, "too late to cancel", second-check screen, import undo, audit log, opt-out page,
 closed days (a line above the grid that says why the day is closed and the day shaded whole,
-E01-T04a, kept by the owner on 2026-10-12; no lunch shown on it, E01-T04b), the new-patient page
+E01-T04a, kept by the owner on 2026-10-12; no lunch shown on it, E01-T04b), the closed days in
+Settings (on the Opening hours tab, under the week: each day with its label and a Remove, teal as
+every staff form's button, then the add form under a line; E01-T08c, kept by the owner on 2026-10-19,
+D-115), the new-patient page
 (E01-T02b: the demo's only new patient is the booking drawer's quick one, lines 1335 and
 2120–2131, E01-T05d; its list has no "New patient" button). Build them
 from the same tokens and components, in the same tone. When a layout
