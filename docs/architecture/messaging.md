@@ -75,7 +75,9 @@ skip reason. No database, no system clock. Tested with tables and property tests
 
 ### Booking confirmation
 At once, if staff left the box ticked. If inside quiet hours: next allowed moment, and skip
-if that is after the appointment.
+if that is after the appointment. A visit booked after it started (a walk-in entered after the
+visit, which the drawer allows) gets no confirmation and no reminder: skip, reason `too_late`
+(D-114).
 
 ### Recall
 - Due date comes from the patient's care plan (`next_due_on`).

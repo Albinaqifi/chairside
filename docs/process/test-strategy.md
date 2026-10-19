@@ -52,6 +52,8 @@ Pure-function tables for `computeSendTime` and friends:
   02:00–03:00; "day before" across the change.
 - Appointments at 00:30 and 23:30; Monday 08:00 with a quiet Sunday; the day after a closed day.
 - Booked after its reminder time: sent late, replaced by the confirmation, or skipped as too late.
+- Booked after its start (a walk-in entered after the visit): no confirmation and no reminder,
+  skipped as too late (D-114).
 - Quiet hours: reminders move earlier, everything else later.
 - Recall month arithmetic: 31 August + 6 months; 29 February.
 - **Hidden local time:** CI runs the suite once, in UTC (D-099). A test of code that handles
@@ -111,7 +113,11 @@ Keep this list short. Each runs against a fresh seeded database, the fake channe
 the test controls (E00-T06c, from the first journey that needs it; J1 does not, D-100). A journey
 writes out every address it opens, the build's (`APP` in `tests/e2e/servers.ts`): Playwright's
 default base URL is `next dev`'s, so a relative address would test `next dev` without an error
-(a review check, E00-T06b delta review).
+(a review check, E00-T06b delta review). A toast is found in its Notifications region, not by a
+role: Radix's copy for screen readers lasts about a second. A check that presses Escape in a drawer
+or dialog first closes any toast and waits until none shows: while another of Radix's layers is up,
+the new one takes Escape only after a render React schedules later (E01-T05a, fix round 3; a review
+check).
 
 | # | Journey | Added in |
 |---|---|---|
