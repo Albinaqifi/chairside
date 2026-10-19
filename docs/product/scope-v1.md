@@ -57,8 +57,14 @@ Legend: ✅ in v1 as designed · ✏️ in v1 but changed · ⏳ later · ❌ no
 ## New appointment drawer
 
 - ✅ Patient search with quick "add as new patient", treatment chips with default length,
-  start / length / provider (E01-T05a, E01-T05b; D-113). The open-treatment hint comes with
+  start / length / provider (E01-T05a … E01-T05d; D-113, D-114). The open-treatment hint comes with
   treatment plans (M6).
+- ✏️ Book sits under the fields, not in a bar along the drawer's foot. (owner, D-114)
+- ✏️ Besides an overlap, which takes "Book anyway" (D-020), the drawer warns in one line when the
+  time is in the provider's break, outside the opening hours or on a closed day; Book still books
+  it. The demo warns for lunch only. (owner, D-114)
+- ✏️ A time already past can be booked (a walk-in entered after the visit); no booking
+  confirmation and no reminder goes out for it. (D-114)
 - ✏️ Only active patients can be booked: an archived or deceased patient shows in the search
   with their label and cannot be picked; an archived one is made active on the profile first.
   (owner, D-113)
@@ -85,7 +91,8 @@ Legend: ✅ in v1 as designed · ✏️ in v1 but changed · ⏳ later · ❌ no
   visit. ✏️ Filters in v1: All, Due for a visit, Agreed to offers. ⏳ Orthodontics, Unfinished treatment.
 - ✅ Profile: header, next appointment, care plan card, messages, visit history, communication settings.
 - ✏️ Profile also has: date of birth, language, guardian, notes ("not a clinical record"),
-  status (active / archived / deceased). (D-033, D-040)
+  status (active / archived / deceased). (D-033, D-040) A patient with a visit booked ahead is
+  not archived or marked deceased until that visit is cancelled or moved. (owner, D-114)
 - ✏️ Messages section shows **upcoming** messages too, and delivery failures. (B6, B2)
 - ✏️ Communication: three switches (appointment messages, recalls and follow-ups, offers) plus
   "do not WhatsApp" / "do not email" (and "do not SMS" once SMS exists). Every change is

@@ -34,7 +34,7 @@ The markup uses a small template language: `{{ name }}` is a value, `<sc-for>` i
 |---|---|---|---|
 | Sidebar / navigation | 24–58 | 2085–2088 | E00-T04b |
 | Today | 62–213 | 1783–1810 | E01-T10, then E02, E05, E06 add panels |
-| Calendar: header and day view | 215–283 | 1812–1847 | E01-T04a, E01-T04b (D-108); New appointment (237) E01-T05a, a click on an empty slot (260, logic 1819) E01-T05b (D-113) |
+| Calendar: header and day view | 215–283 | 1812–1847 | E01-T04a, E01-T04b (D-108); New appointment (237) E01-T05a, a click on an empty slot (260, logic 1819) E01-T05c (D-113, D-114) |
 | Calendar: week view | 284–314 | 1835–1845 | E01-T07 |
 | Patients list | 316–347 | 1849–1858 | E01-T02a |
 | Patient profile | 348–446 | 1860–1880, 1690–1719 | E01-T03, then later epics |
@@ -58,7 +58,7 @@ The markup uses a small template language: `{{ name }}` is a value, `<sc-for>` i
 | Patient page: aligner progress | 1169–1190 | 2020–2023 | v1.1 |
 | Drawer: appointment details | 1197–1258 | 1937–1957, 1720–1727 | E01-T06, E02-T12 |
 | Drawer: aftercare review | 1259–1322 | 1975–1994 | E06-T08 |
-| Drawer: new appointment | 1323–1362 | 1619–1621, 1958–1964, 2116–2135 | E01-T05a; the overlap warning and the quick new patient E01-T05b (D-113) |
+| Drawer: new appointment | 1323–1362 | 1619–1621, 1958–1964, 2116–2135 | E01-T05a; the overlap warning E01-T05b, a click on a slot E01-T05c, the quick new patient E01-T05d (D-113, D-114) |
 | Toast | 1364–1366 | 1615 (`flash`) | E00-T04c |
 
 Useful data in the logic section:
@@ -143,6 +143,6 @@ expired link, "too late to cancel", second-check screen, import undo, audit log,
 closed days (a line above the grid that says why the day is closed and the day shaded whole,
 E01-T04a, kept by the owner on 2026-10-12; no lunch shown on it, E01-T04b), the new-patient page
 (E01-T02b: the demo's only new patient is the booking drawer's quick one, lines 1335 and
-2120–2131, E01-T05b; its list has no "New patient" button). Build them
+2120–2131, E01-T05d; its list has no "New patient" button). Build them
 from the same tokens and components, in the same tone. When a layout
 choice is not obvious, the builder proposes one in the handoff note and flags it for the owner.

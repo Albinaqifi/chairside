@@ -2179,3 +2179,26 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** E01-T05a runs far over its estimate (then E01-T05b is split again before it starts); a
   returning archived patient must be booked faster than the profile allows (E01-T03); E01-T05b's new
   patient needs a form of its own after all (then the guard comes back to it).
+
+### D-114 · E01-T05a Done: E01-T05b split again; a warning line for breaks, hours and closed days, Book under the fields, no archive while visits are ahead (owner); a visit booked after its start gets no message
+- **Origin:** E01-T05a's Done pass, 2026-10-19 (PR #67; `handoffs/E01-T05a.md`, `handoffs/E01-T05b.md`).
+  **Owner, 2026-10-19:** Book stays under the drawer's fields, not in the demo's bar along its foot;
+  the drawer warns in one line when a booking falls in the provider's break, outside the opening
+  hours or on a closed day, and Book still books it; a patient with a visit booked ahead is not
+  archived or marked deceased until it is cancelled or moved (E01-T03). The rest is the architect's.
+- **What:**
+  - **E01-T05b is split again** (D-113's "Revisit if": E01-T05a came to about 1,350 lines of product
+    code with comments, against 500): E01-T05b, the overlap warning with "Book anyway", one booking
+    per click and the warning line; E01-T05c, a click on an empty slot, and a double click's second
+    press changes nothing in a drawer or dialog; E01-T05d, a new patient in one go. Each is sized
+    from the lines E01-T05a measured, about 220–300.
+  - **A visit booked after its start is allowed** (a walk-in entered after the visit; E01-T05a
+    builder, `message`): nothing refuses a start before now, and no booking confirmation or reminder
+    goes out for it (`messaging.md`, "Booking confirmation"; `test-strategy.md`, "Message timing").
+- **Why:** each part one session (the Definition of Ready), sized from what was built, as the
+  drawer's estimate missed by most. A warning costs no click and catches a wrong pick before a
+  reminder goes out for it; an archive that left visits ahead would leave them without a reminder,
+  silently (D-113's reason). Refusing a past start would stop the desk recording a walk-in; the
+  message rules are where a wrong message is stopped.
+- **Revisit if:** E01-T05b runs far over its estimate again (then E01-T05c and E01-T05d are sized
+  again first); the receptionist trial (Q-09) finds the warning line noise.
