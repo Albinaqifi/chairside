@@ -105,6 +105,23 @@ const column = (page: Page, provider: string) => page.getByRole('list', { name: 
 const suggestions = (open: Locator) =>
   open.getByRole('listbox', { name: t.suggestions }).getByRole('option');
 
+/** The toasts showing, in their region: Radix's own copy for screen readers lasts a second only. */
+const toasts = (page: Page) =>
+  page.getByRole('region', { name: 'Notifications (F8)' }).getByRole('listitem');
+
+/**
+ * Closes the booking's toast with Escape and waits until no toast shows, before the drawer opens
+ * again. The toast is one of Radix's layers, as the drawer is, and a drawer opened over it listens
+ * for Escape only once React has rendered it as the top layer, work React schedules after the
+ * opening: until then the toast's listener takes Escape and the drawer stays open
+ * (@radix-ui/react-dismissable-layer 1.1.19; CI run 38643760726). Alone, the drawer listens from its
+ * opening. A toast that does not take this Escape yet still goes after its 3.4 s, inside the wait.
+ */
+async function closeToast(page: Page): Promise<void> {
+  await page.keyboard.press('Escape');
+  await expect(toasts(page), 'no toast up when the drawer opens').toHaveCount(0);
+}
+
 /**
  * Opens the calendar on `day` and waits until React has hydrated New appointment (it holds React's
  * props) and the page has settled: a click before would open nothing.
@@ -188,7 +205,8 @@ test.describe('booking an existing patient from New appointment (acceptance 1 an
           status: 'booked',
         },
       ]);
-      // A new opening starts a new booking.
+      // A new opening starts a new booking; the booking's toast is closed first (closeToast).
+      await closeToast(page);
       await newAppointment(page).click();
       await expect(drawer(page).getByRole('combobox', { name: t.patient })).toHaveValue('');
       await page.keyboard.press('Escape');
@@ -292,7 +310,9 @@ test.describe('by keyboard alone (acceptance 2)', () => {
         ['Mimoza Kodra', chips[0]],
       ]);
 
-      // Escape with the list closed closes the drawer.
+      // Escape with the list closed closes the drawer, opened with the booking's toast closed first
+      // (closeToast).
+      await closeToast(page);
       await page.keyboard.press('Enter');
       await expect(drawer(page)).toBeVisible();
       await page.keyboard.press('Escape');
