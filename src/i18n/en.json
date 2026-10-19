@@ -131,7 +131,31 @@
     "legend": "Statuses",
     "providerFilter": "Columns shown",
     "readFailed": "This day could not be read again, so it may be out of date. It is tried again the next time you use the page.",
-    "clinicChanged": "The clinic was changed in another tab. Reload the page to go on in the clinic chosen there."
+    "clinicChanged": "The clinic was changed in another tab. Reload the page to go on in the clinic chosen there.",
+    "booking": {
+      "open": "New appointment",
+      "title": "New appointment",
+      "when": "{day} · {from}–{to}",
+      "patient": "Patient",
+      "patientPlaceholder": "Type a name or phone",
+      "suggestions": "Patients found",
+      "treatment": "Treatment",
+      "noTreatments": "No treatments yet. Each treatment the clinic offers gets a button here.",
+      "start": "Start",
+      "length": "Length",
+      "minutes": "{count} min",
+      "provider": "Provider",
+      "noProviders": "No providers yet",
+      "book": "Book {time} with {provider}",
+      "bookWithoutProvider": "Book {time}",
+      "booking": "Booking…",
+      "booked": "Booked {name}, {time}.",
+      "overlap": "This time overlaps another visit of this provider. Choose another time, or another provider.",
+      "patientNotBookable": "This patient cannot be booked: only an active patient can. Choose the patient again.",
+      "providerNotBookable": "This provider takes no new appointments. Choose another provider.",
+      "treatmentNotBookable": "This treatment is no longer offered. Choose another treatment.",
+      "startSkipped": "The clocks skip this start on this day. Choose another time."
+    }
   },
   "languages": {
     "en": "English"

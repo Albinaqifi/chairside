@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from './cn';
+import { useDoubleClickGuard } from './double-click-guard';
 
 /**
  * The dialog: shadcn/ui's Dialog (D-009, style new-york-v4), on Radix's. A question that needs a
@@ -66,9 +67,23 @@ type DialogContentProps = Omit<ComponentProps<typeof DialogPrimitive.Content>, '
  * shadcn/ui's is: Radix gives the first focus to the first control inside. Its label comes from the
  * message file. The dialog sits on the drawer's level, opened after it and so above it, under the
  * toast (sheet.tsx).
+ *
+ * A double click on what opens it leaves it open, as the drawer's does (E01-T05a,
+ * ./double-click-guard.ts): for half a second after it opens, a pointer down outside it is ignored,
+ * and so is a press of the close button by a pointer. Escape, and a key on the close button, always
+ * close it.
  */
-function DialogContent({ title, description, className, children, ...props }: DialogContentProps) {
+function DialogContent({
+  title,
+  description,
+  className,
+  children,
+  onOpenAutoFocus,
+  onPointerDownOutside,
+  ...props
+}: DialogContentProps) {
   const t = useTranslations('dialog');
+  const guard = useDoubleClickGuard({ onOpenAutoFocus, onPointerDownOutside });
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
@@ -82,6 +97,7 @@ function DialogContent({ title, description, className, children, ...props }: Di
           className,
         )}
         {...props}
+        {...guard.content}
       >
         <div data-slot="dialog-header" className="grid gap-1.5 pr-8">
           <DialogPrimitive.Title
@@ -97,7 +113,10 @@ function DialogContent({ title, description, className, children, ...props }: Di
           ) : null}
         </div>
         {children}
-        <DialogClose className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-pill bg-border/50 text-text transition-colors outline-none hover:bg-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus focus-visible:outline-solid">
+        <DialogClose
+          {...guard.close}
+          className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-pill bg-border/50 text-text transition-colors outline-none hover:bg-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus focus-visible:outline-solid"
+        >
           <XIcon aria-hidden="true" className="size-4" />
           <span className="sr-only">{t('close')}</span>
         </DialogClose>

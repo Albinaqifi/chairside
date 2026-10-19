@@ -20,6 +20,7 @@ export {
   type PatientStatus,
 } from './list';
 export { patientNames, type PatientName } from './names';
+export { patientStatus } from './status'; // E01-T05a: only an active patient is booked (D-113)
 // E01-T08a: the clinic's own phone on Settings is read and shown as a patient's is (D-097). Here, as
 // `patients` imports `tenancy`, which so cannot import them back.
 export { phoneAsWritten, readPhone } from './phone';

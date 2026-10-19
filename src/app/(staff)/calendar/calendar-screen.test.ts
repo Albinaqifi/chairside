@@ -62,7 +62,7 @@ const TODAY: CalendarDayView = layoutDay({
 
 function render(ownProviderId: string | null): string {
   const screen: ReactNode = createElement(CalendarScreen, {
-    initial: { view: TODAY, ownProviderId },
+    initial: { view: TODAY, ownProviderId, treatmentTypes: [] },
     asked: null,
   });
   const frame: ComponentProps<typeof FrameClinic> = { clinicId: CLINIC, children: screen };

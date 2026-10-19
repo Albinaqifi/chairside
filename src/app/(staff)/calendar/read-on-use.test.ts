@@ -23,6 +23,7 @@ const READ: CalendarRead = {
     columns: [],
   },
   ownProviderId: null,
+  treatmentTypes: [], // E01-T05a: the read carries the clinic's active treatment types
 };
 
 function answering(result: ActionResult<CalendarRead>) {

@@ -379,6 +379,8 @@ describe('the columns', () => {
       leftWithVisit.id,
     ]);
     expect(view.columns[1]).toMatchObject({ name: 'Arben Kodra', initials: 'AK', hue: 290 });
+    // E01-T05a: whether a booking can take the column's provider.
+    expect(view.columns.map((column) => column.active)).toEqual([true, true, false]);
   });
 
   it("each with its own appointments and its breaks of the day's weekday", () => {

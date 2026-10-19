@@ -5,6 +5,7 @@ import type {
   DayAppointment,
   Provider,
   ProviderBreak,
+  TreatmentType,
 } from '@/modules/scheduling';
 import type { ClosedDay, OpeningHours } from '@/modules/tenancy';
 
@@ -103,6 +104,11 @@ export interface Column {
   initials: string;
   chairLabel: string;
   hue: number;
+  /**
+   * False for an inactive provider shown for an appointment that day: no booking takes them
+   * (E01-T05a). Every active provider has a column.
+   */
+  active: boolean;
   /** Null on a closed day, and when breaks fill the hours. */
   percentBooked: number | null;
   /** By start: appointments and breaks; blocks that overlap sit side by side. */
@@ -131,10 +137,13 @@ export interface CalendarDayView {
 /**
  * What the calendar's read gives (./actions.ts): the day, and the provider the reader's membership
  * is linked to (`memberships.provider_id`), whose column the calendar opens on (E01-T04b), or null.
+ * With them, the clinic's active treatment types, by name, so the new-appointment drawer opens
+ * without a request of its own (E01-T05a).
  */
 export interface CalendarRead {
   view: CalendarDayView;
   ownProviderId: string | null;
+  treatmentTypes: TreatmentType[];
 }
 
 /**
@@ -230,6 +239,7 @@ function columnOf(
     initials: initialsOf(provider.name),
     chairLabel: provider.chairLabel,
     hue: provider.colorHue,
+    active: provider.active,
     percentBooked: percentBooked(
       open,
       appointments.map((appointment) => ({ ...spanOf(appointment), status: appointment.status })),
