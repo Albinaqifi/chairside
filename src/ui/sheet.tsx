@@ -78,6 +78,9 @@ type SheetContentProps = Omit<ComponentProps<typeof SheetPrimitive.Content>, 'ti
  * second after it opens, a pointer down outside it is ignored, and so is a press of the close button
  * by a pointer (where the opener sits under the corner, the second click lands on it); then a click
  * on the overlay or on the close button closes it. Escape, and a key on the close button, always do.
+ * And the double click's second press changes nothing in it (E01-T05c): for that half second a
+ * pointer's press in it or on the overlay moves no focus and reaches no control, so the first field
+ * keeps the focus; a key always works.
  */
 function SheetContent({
   title,
@@ -87,13 +90,28 @@ function SheetContent({
   children,
   onOpenAutoFocus,
   onPointerDownOutside,
+  onPointerDownCapture,
+  onMouseDownCapture,
+  onClickCapture,
+  onKeyDownCapture,
   ...props
 }: SheetContentProps) {
   const t = useTranslations('drawer');
-  const guard = useDoubleClickGuard({ onOpenAutoFocus, onPointerDownOutside });
+  const guard = useDoubleClickGuard({
+    onOpenAutoFocus,
+    onPointerDownOutside,
+    onPointerDownCapture,
+    onMouseDownCapture,
+    onClickCapture,
+    onKeyDownCapture,
+  });
   return (
     <SheetPrimitive.Portal>
-      <SheetPrimitive.Overlay data-slot="sheet-overlay" className="fixed inset-0 z-40 bg-overlay" />
+      <SheetPrimitive.Overlay
+        data-slot="sheet-overlay"
+        className="fixed inset-0 z-40 bg-overlay"
+        {...guard.overlay}
+      />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         data-width={width}

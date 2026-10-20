@@ -9,7 +9,7 @@ import { readCalendarDay } from './actions';
 import type { CalendarDayView, CalendarRead } from './day';
 import { DayCalendar } from './day-calendar';
 import { firstChoice, showColumn, shownColumns, toggleColumn, type ColumnChoice } from './filter';
-import { NewAppointment } from './new-appointment';
+import { NewAppointment, type NewAppointmentHandle } from './new-appointment';
 import { MINUTE_MS, nowLineMinute, untilNextMinute } from './now-line';
 import { readAgain, readIsDue, readTimeOf, USE_EVENTS } from './read-on-use';
 
@@ -39,6 +39,7 @@ const readTimes = new WeakMap<CalendarDayView, number>();
  *   D-074).
  * - New appointment and its drawer (./new-appointment.tsx, E01-T05a), with the treatment types the
  *   last read brought. After a booking, the provider's column is turned on if the filter had it off.
+ *   A click on an empty slot of the grid opens the same drawer on that slot (E01-T05c).
  */
 export function CalendarScreen({
   initial,
@@ -63,6 +64,7 @@ export function CalendarScreen({
 
   const lastReadAt = useRef(0);
   const reading = useRef(false);
+  const booking = useRef<NewAppointmentHandle>(null);
 
   // The next read may come 30 seconds after the read of the day shown: a day the page rendered was
   // read when the browser first drew it, a day a read on use brought when that read started. A day
@@ -123,8 +125,10 @@ export function CalendarScreen({
       shown={shown}
       onToggle={(providerId) => setChoice((before) => toggleColumn(before, columnIds, providerId))}
       nowMinute={nowMinute}
+      onSlot={(slot, at) => booking.current?.openAt(slot, at)}
       newAppointment={
         <NewAppointment
+          ref={booking}
           view={view}
           treatmentTypes={current.treatmentTypes}
           shown={shown}

@@ -119,7 +119,12 @@ default base URL is `next dev`'s, so a relative address would test `next dev` wi
 role: Radix's copy for screen readers lasts about a second. A check that presses Escape in a drawer
 or dialog first closes any toast and waits until none shows: while another of Radix's layers is up,
 the new one takes Escape only after a render React schedules later (E01-T05a, fix round 3; a review
-check).
+check). A drawer or dialog drops a pointer's press for half a second after it opens, a double click's
+second (`src/ui/double-click-guard.ts`, E01-T05c), and the calendar's grid takes no click for half a
+second after the booking drawer closed: a check lets that half second pass before its first press in
+one, or on the grid after one, as `pressable()` in `tests/e2e/booking.spec.ts` does. With the page's
+clock installed and paused it is the fake clock's half second: Playwright stamps each event with that
+clock's time (a review check).
 
 | # | Journey | Added in |
 |---|---|---|

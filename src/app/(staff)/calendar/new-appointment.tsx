@@ -1,11 +1,20 @@
 'use client';
 
 import { useFormatter, useTimeZone, useTranslations } from 'next-intl';
-import { useId, useState, type ReactNode } from 'react';
+import {
+  useId,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { StaffField, StaffForm } from '@/app/_lib/staff-form';
 import type { TreatmentType } from '@/modules/scheduling';
 import { Button } from '@/ui/button';
 import { cn } from '@/ui/cn';
+import { withinDoubleClick } from '@/ui/double-click-guard';
 import type { FieldControlProps } from '@/ui/field';
 import { NativeSelect, NativeSelectOption } from '@/ui/native-select';
 import { Sheet, SheetBody, SheetContent, SheetTrigger } from '@/ui/sheet';
@@ -18,6 +27,7 @@ import {
   minutesOfStart,
   startValue,
   type BookingChoices,
+  type Slot,
 } from './booking-choices';
 import { anyWarning, bookingWarnings, NO_WARNINGS, type BookingWarnings } from './booking-warnings';
 import type { CalendarDayView } from './day';
@@ -45,34 +55,62 @@ const CHIP =
  * After a booking the drawer closes, the toast names the patient and the time, and `onBooked` gets
  * the provider, whose column the calendar turns on (demo logic lines 2133–2134). The booking's
  * answer brings the calendar's day again (refresh()), so the block is on the grid at once.
+ *
+ * A click on an empty slot of the grid opens the same drawer at once (E01-T05c, `ref`'s `openAt`),
+ * its choices read as New appointment's are, with the slot's start and provider in place of the first
+ * ones. Not within a double click of the drawer closing: a double click on Book whose answer closes
+ * the drawer before the second click lands that click on the grid, which then opens nothing.
  */
 export function NewAppointment({
   view,
   treatmentTypes,
   shown,
   onBooked,
+  ref,
 }: {
   view: CalendarDayView;
   treatmentTypes: readonly TreatmentType[];
   /** The ids of the columns shown, in order: the first active one is the provider first chosen. */
   shown: readonly string[];
   onBooked: (providerId: string) => void;
+  /** Where the calendar's grid opens the drawer on a slot (./calendar-screen.tsx). */
+  ref?: Ref<NewAppointmentHandle>;
 }) {
   const t = useTranslations('calendar.booking');
   const timeZone = useTimeZone();
   const [open, setOpen] = useState(false);
   const [opening, setOpening] = useState<{ count: number; choices: BookingChoices } | null>(null);
 
-  function openChange(next: boolean) {
-    if (next) {
-      // The browser's clock, in the clinic's zone, as the "now" line reads it. Every request names
-      // the clinic's zone (src/i18n/request.ts); without one, the day's opening.
-      const now = timeZone === undefined ? null : clinicNow(new Date(), timeZone);
-      const choices = bookingChoices(view, treatmentTypes, shown, now);
-      setOpening((before) => ({ count: (before?.count ?? 0) + 1, choices }));
-    }
-    setOpen(next);
+  // When the drawer last went from the page: only from then does a click land on the grid under it.
+  // Taken as the render removes it, since a booking's answer closes it with no event of its own; on
+  // the clock an event's time stamp counts on, performance.now(), so a click's compares with it.
+  const closedAt = useRef<number | null>(null);
+  const wasOpen = useRef(false);
+  useLayoutEffect(() => {
+    if (wasOpen.current && !open) closedAt.current = performance.now();
+    wasOpen.current = open;
+  }, [open]);
+
+  function openOn(slot: Slot | null) {
+    // The browser's clock, in the clinic's zone, as the "now" line reads it. Every request names
+    // the clinic's zone (src/i18n/request.ts); without one, the day's opening.
+    const now = timeZone === undefined ? null : clinicNow(new Date(), timeZone);
+    const choices = bookingChoices(view, treatmentTypes, shown, now, slot);
+    setOpening((before) => ({ count: (before?.count ?? 0) + 1, choices }));
+    setOpen(true);
   }
+
+  function openChange(next: boolean) {
+    if (next) openOn(null);
+    else setOpen(false);
+  }
+
+  useImperativeHandle(ref, () => ({
+    openAt(slot: Slot, at: number) {
+      if (open || withinDoubleClick(closedAt.current, at)) return;
+      openOn(slot);
+    },
+  }));
 
   return (
     <Sheet open={open} onOpenChange={openChange}>
@@ -92,6 +130,15 @@ export function NewAppointment({
       )}
     </Sheet>
   );
+}
+
+/** What the calendar's grid can ask of New appointment (E01-T05c). */
+export interface NewAppointmentHandle {
+  /**
+   * Opens the drawer on an empty slot, clicked at `at` (the click's time stamp): unless it is open
+   * already, or the click comes within a double click of the drawer closing.
+   */
+  openAt: (slot: Slot, at: number) => void;
 }
 
 /** What the person has chosen so far. */

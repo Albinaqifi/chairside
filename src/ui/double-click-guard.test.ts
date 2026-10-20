@@ -7,6 +7,7 @@ import {
   withinDoubleClick,
   type CloseButtonHandlers,
   type GuardedHandlers,
+  type OverlayHandlers,
 } from './double-click-guard';
 import { SheetContent } from './sheet';
 
@@ -18,6 +19,7 @@ import { SheetContent } from './sheet';
 
 const radix = vi.hoisted(() => ({
   content: [] as Record<string, unknown>[],
+  overlay: [] as Record<string, unknown>[],
   close: [] as Record<string, unknown>[],
 }));
 vi.mock('radix-ui', async (importOriginal) => {
@@ -28,7 +30,10 @@ vi.mock('radix-ui', async (importOriginal) => {
     Dialog: {
       ...actual.Dialog,
       Portal: children,
-      Overlay: () => null,
+      Overlay: (props: Record<string, unknown>) => {
+        radix.overlay.push(props);
+        return null;
+      },
       Title: children,
       Description: children,
       Content: (props: Record<string, unknown>) => {
@@ -49,6 +54,7 @@ vi.mock('next-intl', () => ({
 
 beforeEach(() => {
   radix.content.length = 0;
+  radix.overlay.length = 0;
   radix.close.length = 0;
 });
 
@@ -273,5 +279,222 @@ describe.each(KINDS)("$name's close button, in its corner", ({ Content }) => {
     expect(pointerClick(close, 9100)).toBe(false);
     content.onOpenAutoFocus(opening(9000));
     expect(pointerClick(close, 9100)).toBe(true);
+  });
+});
+
+// E01-T05c: a double click's second press changes nothing anywhere in the content, nor on the overlay.
+// The second click lands on whatever opened under the pointer: a chip, a select, the submit button (an
+// empty slot of the calendar under the drawer), a status button (E01-T06's block). Its mousedown is
+// prevented, which keeps the focus where Radix put it and opens no select's list; its click is
+// prevented and stopped in the capture phase, so no control inside sees it.
+
+type CapturedPress = Parameters<GuardedHandlers['onPointerDownCapture']>[0];
+type CapturedMouse = Parameters<GuardedHandlers['onMouseDownCapture']>[0];
+type CapturedClick = Parameters<GuardedHandlers['onClickCapture']>[0];
+type CapturedKey = Parameters<GuardedHandlers['onKeyDownCapture']>[0];
+
+/** A mouse event the guard may prevent and stop: a mousedown, or a click. */
+function mouseEvent(type: 'mousedown' | 'click'): CapturedMouse & {
+  preventDefault: ReturnType<typeof vi.fn>;
+  stopPropagation: ReturnType<typeof vi.fn>;
+} {
+  const event = {
+    type,
+    defaultPrevented: false,
+    preventDefault: vi.fn(() => {
+      event.defaultPrevented = true;
+    }),
+    stopPropagation: vi.fn(),
+  };
+  return event as unknown as ReturnType<typeof mouseEvent>;
+}
+
+/** A pointer pressed at `timeStamp`, whose own default the guard must never prevent. */
+function pointerDown(timeStamp: number): CapturedPress & {
+  preventDefault: ReturnType<typeof vi.fn>;
+} {
+  return { type: 'pointerdown', timeStamp, preventDefault: vi.fn() } as unknown as ReturnType<
+    typeof pointerDown
+  >;
+}
+
+describe.each(KINDS)("$name's content: a pointer's press in it (E01-T05c)", ({ Content }) => {
+  /** Renders the content with these props of the caller's, and gives the handlers Radix got. */
+  function rendered(caller: Record<string, unknown> = {}): GuardedHandlers {
+    renderToString(createElement(Content, { title: 'A title', ...caller }));
+    const props = radix.content.at(-1);
+    if (!props) throw new Error("Radix's Content was not rendered");
+    return props as unknown as GuardedHandlers;
+  }
+
+  /**
+   * A pointer pressed in the content at `timeStamp`, then let go: what the guard did to the press
+   * itself, its mousedown (the focus, a select's list) and its click (the control's own handler).
+   */
+  function press(
+    content: GuardedHandlers,
+    timeStamp: number,
+  ): { downPrevented: boolean; focusKept: boolean; clickDropped: boolean } {
+    const down = pointerDown(timeStamp);
+    content.onPointerDownCapture(down);
+    const mousedown = mouseEvent('mousedown');
+    content.onMouseDownCapture(mousedown);
+    const click = mouseEvent('click');
+    content.onClickCapture(click as unknown as CapturedClick);
+    const dropped = click.preventDefault.mock.calls.length > 0;
+    expect(click.stopPropagation.mock.calls.length > 0, 'a dropped click is stopped too').toBe(
+      dropped,
+    );
+    return {
+      downPrevented: down.preventDefault.mock.calls.length > 0,
+      focusKept: mousedown.preventDefault.mock.calls.length > 0,
+      clickDropped: dropped,
+    };
+  }
+
+  it('80, 150 or 250 ms after it opened: no focus moves and its click reaches nothing; the press itself is left to Radix', () => {
+    const content = rendered();
+    content.onOpenAutoFocus(opening(5000));
+    for (const after of [80, 150, 250, 499]) {
+      expect(press(content, 5000 + after), `${after} ms`).toEqual({
+        downPrevented: false,
+        focusKept: true,
+        clickDropped: true,
+      });
+    }
+  });
+
+  it('a press made before the opening was stamped is the double click’s too: a busy page took it in late', () => {
+    const content = rendered();
+    content.onOpenAutoFocus(opening(1300));
+    expect(press(content, 1150)).toMatchObject({ focusKept: true, clickDropped: true });
+  });
+
+  it('from half a second after it opened a press works as before: the focus moves, the click reaches its control', () => {
+    const content = rendered();
+    content.onOpenAutoFocus(opening(5000));
+    for (const after of [500, 1000, 60_000]) {
+      expect(press(content, 5000 + after), `${after} ms`).toEqual({
+        downPrevented: false,
+        focusKept: false,
+        clickDropped: false,
+      });
+    }
+  });
+
+  it('a key always works: its click at once after it opened, also after a press let go elsewhere', () => {
+    const content = rendered();
+    content.onOpenAutoFocus(opening(5000));
+    for (const key of ['Enter', ' ']) {
+      // Pressed within the double click, then moved off before it was let go: no click came.
+      content.onPointerDownCapture(pointerDown(5100));
+      content.onKeyDownCapture({ type: 'keydown', key } as unknown as CapturedKey);
+      const click = mouseEvent('click');
+      content.onClickCapture(click as unknown as CapturedClick);
+      expect(click.preventDefault, key === ' ' ? 'Space' : key).not.toHaveBeenCalled();
+      expect(click.stopPropagation, key === ' ' ? 'Space' : key).not.toHaveBeenCalled();
+    }
+  });
+
+  it('a click with no press before it, as a screen reader makes, works at once after it opened, and right after a dropped one', () => {
+    const content = rendered();
+    content.onOpenAutoFocus(opening(5000));
+    const first = mouseEvent('click');
+    content.onClickCapture(first as unknown as CapturedClick);
+    expect(first.preventDefault).not.toHaveBeenCalled();
+    expect(press(content, 5100).clickDropped).toBe(true);
+    const next = mouseEvent('click');
+    content.onClickCapture(next as unknown as CapturedClick);
+    expect(next.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('counts from each opening, and drops nothing before it ever opened', () => {
+    const content = rendered();
+    expect(press(content, 0).clickDropped).toBe(false);
+    content.onOpenAutoFocus(opening(1000));
+    expect(press(content, 9100).clickDropped).toBe(false);
+    content.onOpenAutoFocus(opening(9000));
+    expect(press(content, 9100).clickDropped).toBe(true);
+  });
+
+  it("runs the caller's own capture handlers first, with the same events", () => {
+    const calls: string[] = [];
+    const caller = {
+      onPointerDownCapture: vi.fn(() => calls.push('caller press')),
+      onMouseDownCapture: vi.fn(() => calls.push('caller mousedown')),
+      onClickCapture: vi.fn(() => calls.push('caller click')),
+      onKeyDownCapture: vi.fn(() => calls.push('caller key')),
+    };
+    const content = rendered(caller);
+    content.onOpenAutoFocus(opening(0));
+    const down = pointerDown(100);
+    content.onPointerDownCapture(down);
+    const mousedown = mouseEvent('mousedown');
+    mousedown.preventDefault.mockImplementation(() => calls.push('guard mousedown'));
+    content.onMouseDownCapture(mousedown);
+    const click = mouseEvent('click');
+    click.preventDefault.mockImplementation(() => calls.push('guard click'));
+    content.onClickCapture(click as unknown as CapturedClick);
+    const key = { type: 'keydown', key: 'Tab' } as unknown as CapturedKey;
+    content.onKeyDownCapture(key);
+    expect(caller.onPointerDownCapture).toHaveBeenCalledWith(down);
+    expect(caller.onMouseDownCapture).toHaveBeenCalledWith(mousedown);
+    expect(caller.onClickCapture).toHaveBeenCalledWith(click);
+    expect(caller.onKeyDownCapture).toHaveBeenCalledWith(key);
+    expect(calls).toEqual([
+      'caller press',
+      'caller mousedown',
+      'guard mousedown',
+      'caller click',
+      'guard click',
+      'caller key',
+    ]);
+  });
+});
+
+type OverlayPress = Parameters<OverlayHandlers['onPointerDown']>[0];
+type OverlayMouse = Parameters<OverlayHandlers['onMouseDown']>[0];
+
+describe.each(KINDS)("$name's overlay: a press on it (E01-T05c)", ({ Content }) => {
+  /** Renders the content, and gives the handlers Radix's Content and the overlay got. */
+  function rendered(): { content: GuardedHandlers; overlay: OverlayHandlers } {
+    renderToString(createElement(Content, { title: 'A title' }));
+    const content = radix.content.at(-1);
+    const overlay = radix.overlay.at(-1);
+    if (!content || !overlay) throw new Error("Radix's Content or Overlay was not rendered");
+    return {
+      content: content as unknown as GuardedHandlers,
+      overlay: overlay as unknown as OverlayHandlers,
+    };
+  }
+
+  /** A pointer pressed on the overlay at `timeStamp`, then let go: true when the focus was kept. */
+  function focusKept(overlay: OverlayHandlers, timeStamp: number): boolean {
+    overlay.onPointerDown(pointerDown(timeStamp) as unknown as OverlayPress);
+    const mousedown = mouseEvent('mousedown');
+    overlay.onMouseDown(mousedown as unknown as OverlayMouse);
+    overlay.onClick(mouseEvent('click') as unknown as OverlayMouse);
+    return mousedown.preventDefault.mock.calls.length > 0;
+  }
+
+  it('within a double click of the opening it moves no focus (an opener left of the drawer); from half a second on, as before', () => {
+    const { content, overlay } = rendered();
+    expect(focusKept(overlay, 100), 'before it ever opened').toBe(false);
+    content.onOpenAutoFocus(opening(5000));
+    for (const after of [80, 150, 250, 499]) {
+      expect(focusKept(overlay, 5000 + after), `${after} ms`).toBe(true);
+    }
+    for (const after of [500, 1000]) {
+      expect(focusKept(overlay, 5000 + after), `${after} ms`).toBe(false);
+    }
+  });
+
+  it('its click forgets the press: a click in the content with no press before it then works', () => {
+    const { content, overlay } = rendered();
+    content.onOpenAutoFocus(opening(5000));
+    expect(focusKept(overlay, 5100)).toBe(true);
+    const click = mouseEvent('click');
+    content.onClickCapture(click as unknown as CapturedClick);
+    expect(click.preventDefault).not.toHaveBeenCalled();
   });
 });

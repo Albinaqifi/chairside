@@ -114,6 +114,15 @@ export function firstProvider(columns: readonly Column[], shown: readonly string
 }
 
 /**
+ * An empty slot of the calendar's grid that a click opened the drawer on (E01-T05c): its column's
+ * provider and the quarter hour under the pointer, in minutes from the day's local midnight.
+ */
+export interface Slot {
+  providerId: string;
+  start: number;
+}
+
+/**
  * What the drawer offers, and what it begins with, read once when it opens and kept while it is open:
  * a read on use that changes the calendar's day under it changes nothing typed or chosen in it, and a
  * booking is made on the day its title names.
@@ -130,20 +139,30 @@ export interface BookingChoices {
   treatmentTypes: readonly TreatmentType[];
 }
 
-/** The drawer's choices for the day shown, the columns shown, and the clinic's now (null if unknown). */
+/**
+ * The drawer's choices for the day shown, the columns shown, and the clinic's now (null if unknown).
+ * Opened on an empty slot of the grid (E01-T05c), it begins on the slot's start and provider instead:
+ * each only when the drawer offers it (a start of the grid, an active provider), else the first one.
+ */
 export function bookingChoices(
   view: CalendarDayView,
   treatmentTypes: readonly TreatmentType[],
   shown: readonly string[],
   now: ClinicNow | null,
+  slot: Slot | null = null,
 ): BookingChoices {
+  const starts = startChoices(view.grid);
+  const providers = bookableProviders(view.columns);
   return {
     day: view.day,
     today: view.today,
-    starts: startChoices(view.grid),
-    firstStart: firstStart(view, now),
-    providers: bookableProviders(view.columns),
-    firstProviderId: firstProvider(view.columns, shown),
+    starts,
+    firstStart: slot !== null && starts.includes(slot.start) ? slot.start : firstStart(view, now),
+    providers,
+    firstProviderId:
+      slot !== null && providers.some((provider) => provider.id === slot.providerId)
+        ? slot.providerId
+        : firstProvider(view.columns, shown),
     treatmentTypes,
   };
 }
