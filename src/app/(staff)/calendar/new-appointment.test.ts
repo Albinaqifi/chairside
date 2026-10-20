@@ -10,7 +10,7 @@ import type { TreatmentType } from '@/modules/scheduling';
 import { Sheet } from '@/ui/sheet';
 import { startChoices, type BookingChoices } from './booking-choices';
 import { BookingDrawer, BookingForm, NewAppointment, type Booking } from './new-appointment';
-import { layoutDay } from './day';
+import { layoutDay, type CalendarDayView, type DayRows } from './day';
 
 // E01-T05a, acceptance 5 (the message), 6 and 8: the booking form of the new-appointment drawer as the
 // server renders it, inside the staff frame, with next-intl's provider as the root layout gives it:
@@ -82,18 +82,49 @@ const FIRST: Booking = {
   providerId: DENTIST,
 };
 
+/**
+ * The day the calendar holds, CHOICES's: open 08:00–18:00, a column for each provider, nothing booked
+ * and no break, so nothing is warned of (E01-T05b's cases are below).
+ */
+const VIEW = layoutDay({
+  day: CHOICES.day,
+  today: CHOICES.today,
+  weekday: 1,
+  hours: [{ weekday: 1, opens: 8 * H, closes: 18 * H }],
+  closedDay: null,
+  providers: CHOICES.providers.map((found, index) => ({
+    id: found.id,
+    name: found.shortName,
+    shortName: found.shortName,
+    chairLabel: `Chair ${index + 1}`,
+    colorHue: 195,
+    active: true,
+  })),
+  breaks: [],
+  appointments: [],
+});
+
 beforeEach(() => {
   form.state = undefined;
 });
 
-/** What the server sends for the form, in a staff frame, in Skopje. */
+/**
+ * What the server sends for the form, in a staff frame, in Skopje (or `timeZone`), on the day the
+ * calendar holds (VIEW, or `view`).
+ */
 function render(
   booking: Partial<Booking> = {},
-  options: { choices?: Partial<BookingChoices>; answer?: FormAnswer<unknown> } = {},
+  options: {
+    choices?: Partial<BookingChoices>;
+    answer?: FormAnswer<unknown>;
+    view?: CalendarDayView;
+    timeZone?: string;
+  } = {},
 ): string {
   if (options.answer) form.state = { answer: options.answer, attempt: 1 };
   const element = createElement(BookingForm, {
     choices: { ...CHOICES, ...options.choices },
+    view: options.view ?? VIEW,
     booking: { ...FIRST, ...booking },
     onChange: vi.fn(),
     listOpen: false,
@@ -104,7 +135,7 @@ function render(
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
     locale: LOCALE,
     messages,
-    timeZone: 'Europe/Skopje',
+    timeZone: options.timeZone ?? 'Europe/Skopje',
     children: createElement(FrameClinic, frame),
   };
   return renderToString(createElement(NextIntlClientProvider, provider));
@@ -166,7 +197,7 @@ function inFrame(element: ReactElement, timeZone: string): string {
  * linked once the drawer is open in the browser).
  */
 function drawerLine(choices: BookingChoices, timeZone: string): string {
-  const drawer = createElement(BookingDrawer, { choices, onBooked: vi.fn() });
+  const drawer = createElement(BookingDrawer, { choices, view: VIEW, onBooked: vi.fn() });
   const sheet: ComponentProps<typeof Sheet> = { open: true, children: drawer };
   const html = inFrame(createElement(Sheet, sheet), timeZone);
   expect(tags(html, 'div').filter((div) => div.get('role') === 'dialog')).toHaveLength(1);
@@ -401,5 +432,285 @@ describe('New appointment on the calendar', () => {
       button?.get('aria-expanded'),
     ]).toEqual(['button', 'dialog', 'false']);
     expect(text(html)).toBe(messages.calendar.booking.open);
+  });
+});
+
+// E01-T05b: what the drawer warns of above Book, on the day the calendar holds, as the server renders
+// it. CHOICES's day, Monday 26 October 2026: in Skopje (UTC+1 that day) local midnight is 23:00 UTC
+// the day before; in New York (UTC-4) it is 04:00 UTC. The rules alone are in booking-warnings.test.ts.
+
+type DayVisit = DayRows['appointments'][number];
+
+/** A visit of the provider, `from` to `to` in minutes of the day, in a clinic whose midnight is `midnightUtc`. */
+function visitOf(
+  providerId: string,
+  from: number,
+  to: number,
+  fields: { status?: DayVisit['status']; name?: [string, string]; midnightUtc?: Date } = {},
+): DayVisit {
+  const midnight = (fields.midnightUtc ?? new Date('2026-10-25T23:00:00Z')).getTime();
+  const [firstName, lastName] = fields.name ?? ['Ana', 'Brezovska'];
+  return {
+    id: `01970000-0000-7000-8000-00000000${String(from).padStart(4, '0')}`,
+    providerId,
+    patientId: '01970000-0000-7000-8000-000000000301',
+    title: 'Checkup',
+    status: fields.status ?? 'booked',
+    note: '',
+    startsAt: new Date(midnight + from * 60_000),
+    endsAt: new Date(midnight + to * 60_000),
+    startMinute: from,
+    endMinute: to,
+    patient: { firstName, lastName },
+  };
+}
+
+/** The dentist's lunch, 12:00 to 13:00. */
+const LUNCH = {
+  id: 'lunch-dentist',
+  providerId: DENTIST,
+  startMinute: 12 * H,
+  endMinute: 13 * H,
+  label: 'Lunch',
+};
+
+/** CHOICES's day with these rows: VIEW's hours and providers unless given. */
+function dayWith(rows: Partial<DayRows>): CalendarDayView {
+  return layoutDay({
+    day: CHOICES.day,
+    today: CHOICES.today,
+    weekday: 1,
+    hours: [{ weekday: 1, opens: 8 * H, closes: 18 * H }],
+    closedDay: null,
+    providers: CHOICES.providers.map((found, index) => ({
+      id: found.id,
+      name: found.shortName,
+      shortName: found.shortName,
+      chairLabel: `Chair ${index + 1}`,
+      colorHue: 195,
+      active: true,
+    })),
+    breaks: [],
+    appointments: [],
+    ...rows,
+  });
+}
+
+/**
+ * Where the warning's live region starts: the last one before Book (the patient field has one of its
+ * own, further up), and after the provider's select, the last field.
+ */
+function warningAt(html: string): number {
+  const at = html.lastIndexOf('<div role="status">', html.indexOf('type="submit"'));
+  if (at === -1 || at < html.indexOf('name="providerId"')) throw new Error('no warning region');
+  return at;
+}
+
+/** The warning's live region, as written: from its start up to the form's own message or Book. */
+function warningRegion(html: string): string {
+  const rest = html.slice(warningAt(html));
+  const ends = ['role="alert"', 'type="submit"']
+    .map((mark) => rest.indexOf(mark))
+    .filter((at) => at !== -1);
+  return rest.slice(0, Math.min(...ends)).replace(/<[^>]*$/, '');
+}
+
+/** Each line of the warning. */
+function warningLines(html: string): string[] {
+  return [...warningRegion(html).matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/g)].map(([, inside = '']) =>
+    text(inside),
+  );
+}
+
+/** The hidden "anyway", when the form sends it. */
+function anywayField(html: string): string | undefined {
+  return tags(html, 'input')
+    .find((input) => input.get('name') === 'anyway')
+    ?.get('value');
+}
+
+/** The form's own message: its alert's text. */
+function alertText(html: string): string {
+  return text(/<p role="alert"[^>]*>([\s\S]*?)<\/p>/.exec(html)?.[1] ?? '');
+}
+
+describe('an overlap: the other visit named above Book, and Book anyway (E01-T05b, acceptance 1)', () => {
+  const WITH_OTHER = dayWith({ appointments: [visitOf(DENTIST, 9 * H, 9 * H + 30)] });
+
+  it("names the other visit's patient and its time, says it can still be booked, and Book is Book anyway", () => {
+    const html = render({ start: 9 * H + 15 }, { view: WITH_OTHER });
+    expect(warningLines(html)).toEqual(["Overlaps Ana Brezovska's visit, 09:00–09:30."]);
+    expect(text(warningRegion(html))).toContain(messages.calendar.booking.warning.anyway);
+    expect(bookText(html)).toBe('Book anyway, 09:15 with Dr. Planinska');
+    // The person's "anyway" is sent with it.
+    expect(anywayField(html)).toBe('true');
+  });
+
+  it('sits above Book, under the fields, in a live region', () => {
+    const html = render({ start: 9 * H + 15 }, { view: WITH_OTHER });
+    const at = warningAt(html);
+    expect(at).toBeGreaterThan(html.indexOf('name="providerId"'));
+    expect(at).toBeLessThan(html.indexOf('type="submit"'));
+    expect(html.slice(at)).toMatch(/^<div role="status"><div [^>]*><ul/);
+  });
+
+  it('nothing overlapped: no warning, Book, and no "anyway" sent; the live region is there, empty', () => {
+    // Back to back with the other visit.
+    const html = render({ start: 9 * H + 30 }, { view: WITH_OTHER });
+    expect(text(warningRegion(html))).toBe('');
+    expect(bookText(html)).toBe('Book 09:30 with Dr. Planinska');
+    expect(anywayField(html)).toBeUndefined();
+  });
+
+  it.each([
+    { what: 'a start after it', booking: { start: 9 * H + 30 }, anyway: false },
+    { what: 'a start on it', booking: { start: 9 * H }, anyway: true },
+    {
+      what: 'a length that ends before it',
+      booking: { start: 8 * H + 45, length: 15 },
+      anyway: false,
+    },
+    {
+      what: 'a length that runs into it',
+      booking: { start: 8 * H + 45, length: 30 },
+      anyway: true,
+    },
+    { what: 'another provider', booking: { start: 9 * H, providerId: HYGIENIST }, anyway: false },
+  ])('follows start, length and provider: $what', ({ booking, anyway }) => {
+    const html = render(booking, { view: WITH_OTHER });
+    expect(warningLines(html)).toHaveLength(anyway ? 1 : 0);
+    expect(bookText(html).startsWith('Book anyway')).toBe(anyway);
+    expect(anywayField(html)).toBe(anyway ? 'true' : undefined);
+  });
+
+  it('every visit it overlaps, each with its patient, by start; a cancelled one or a no-show is none', () => {
+    const view = dayWith({
+      appointments: [
+        visitOf(DENTIST, 9 * H + 30, 10 * H + 30, { name: ['Marko', 'Dardha'] }),
+        visitOf(DENTIST, 9 * H, 10 * H),
+        visitOf(DENTIST, 9 * H + 45, 10 * H + 15, {
+          status: 'cancelled',
+          name: ['Bojan', 'Kamenov'],
+        }),
+        visitOf(DENTIST, 9 * H + 50, 10 * H + 10, { status: 'no_show', name: ['Elena', 'Lumi'] }),
+      ],
+    });
+    expect(warningLines(render({ start: 9 * H + 45 }, { view }))).toEqual([
+      "Overlaps Ana Brezovska's visit, 09:00–10:00.",
+      "Overlaps Marko Dardha's visit, 09:30–10:30.",
+    ]);
+  });
+
+  it("the other visit's time is a moment, shown in the clinic's zone as the grid shows it", () => {
+    // A clinic in New York: 09:00 there is 13:00 UTC.
+    const midnightUtc = new Date('2026-10-26T04:00:00Z');
+    const view = dayWith({ appointments: [visitOf(DENTIST, 9 * H, 9 * H + 30, { midnightUtc })] });
+    expect(warningLines(render({ start: 9 * H }, { view, timeZone: 'America/New_York' }))).toEqual([
+      "Overlaps Ana Brezovska's visit, 09:00–09:30.",
+    ]);
+  });
+
+  it('the calendar holds another day (past midnight, a page on today): nothing is warned of', () => {
+    const nextDay = layoutDay({
+      day: '2026-10-27',
+      today: '2026-10-27',
+      weekday: 2,
+      hours: [],
+      closedDay: null,
+      providers: [],
+      breaks: [],
+      appointments: [],
+    });
+    const html = render({ start: 9 * H }, { view: nextDay });
+    expect(text(warningRegion(html))).toBe('');
+    expect(bookText(html)).toBe('Book 09:00 with Dr. Planinska');
+  });
+
+  it('refused as an overlap, with the day brought again: the refusal, the warning naming that visit, and Book anyway (acceptance 2)', () => {
+    const html = render(
+      { start: 9 * H },
+      { view: WITH_OTHER, answer: { kind: 'refused', code: 'overlap' } },
+    );
+    expect(alertText(html)).toBe(messages.calendar.booking.overlap);
+    expect(warningLines(html)).toEqual(["Overlaps Ana Brezovska's visit, 09:00–09:30."]);
+    expect(bookText(html)).toBe('Book anyway, 09:00 with Dr. Planinska');
+  });
+});
+
+describe('one booking per click: the same booking again (E01-T05b, acceptance 3)', () => {
+  it('already_booked: its text, in an alert above Book', () => {
+    const html = render({}, { answer: { kind: 'refused', code: 'already_booked' } });
+    expect(alertText(html)).toBe(messages.calendar.booking.alreadyBooked);
+    expect(html.indexOf('role="alert"')).toBeLessThan(html.indexOf('type="submit"'));
+  });
+});
+
+describe('a warning line for a break, the hours or a closed day; Book still books (E01-T05b, acceptance 4)', () => {
+  /** The lines, Book's text and the "anyway" sent, for a booking on `view`. */
+  function warned(booking: Partial<Booking>, view: CalendarDayView) {
+    const html = render(booking, { view });
+    return { lines: warningLines(html), book: bookText(html), anyway: anywayField(html) };
+  }
+
+  it("the provider's break, by its label and time; not another provider's, nor one it only touches", () => {
+    const view = dayWith({ breaks: [LUNCH] });
+    expect(warned({ start: 12 * H + 15 }, view)).toEqual({
+      lines: ["Overlaps Dr. Planinska's break: Lunch, 12:00–13:00."],
+      book: 'Book 12:15 with Dr. Planinska',
+      anyway: undefined,
+    });
+    expect(warned({ start: 12 * H, providerId: HYGIENIST }, view).lines).toEqual([]);
+    expect(warned({ start: 11 * H + 30 }, view).lines).toEqual([]);
+  });
+
+  it('a time partly outside the hours, at either end: the day’s hours named', () => {
+    expect(warned({ start: 17 * H + 45 }, dayWith({}))).toEqual({
+      lines: ['Runs outside the opening hours, 08:00–18:00.'],
+      book: 'Book 17:45 with Dr. Planinska',
+      anyway: undefined,
+    });
+    expect(warned({ start: 7 * H + 45 }, dayWith({})).lines).toEqual([
+      'Runs outside the opening hours, 08:00–18:00.',
+    ]);
+  });
+
+  it('a closed day, by its label', () => {
+    const view = dayWith({ closedDay: { date: CHOICES.day, label: 'Staff training day' } });
+    expect(warned({ start: 9 * H }, view)).toEqual({
+      lines: ['The clinic is closed that day: Staff training day.'],
+      book: 'Book 09:00 with Dr. Planinska',
+      anyway: undefined,
+    });
+  });
+
+  it('a weekday without hours, by its name', () => {
+    const view = dayWith({ hours: [{ weekday: 2, opens: 8 * H, closes: 18 * H }] });
+    expect(warned({ start: 9 * H }, view)).toEqual({
+      lines: ['The clinic is closed that day: no opening hours on Monday.'],
+      book: 'Book 09:00 with Dr. Planinska',
+      anyway: undefined,
+    });
+  });
+
+  it('none inside the hours, on an open day, outside every break', () => {
+    const view = dayWith({ breaks: [LUNCH] });
+    for (const start of [8 * H, 11 * H + 30, 13 * H, 17 * H + 30]) {
+      expect(warned({ start }, view).lines, `${start}`).toEqual([]);
+    }
+  });
+
+  it('an overlap and a break at once: a line each, the visit first, and Book anyway', () => {
+    const view = dayWith({
+      appointments: [visitOf(DENTIST, 11 * H + 30, 12 * H + 30)],
+      breaks: [LUNCH],
+    });
+    expect(warned({ start: 12 * H }, view)).toEqual({
+      lines: [
+        "Overlaps Ana Brezovska's visit, 11:30–12:30.",
+        "Overlaps Dr. Planinska's break: Lunch, 12:00–13:00.",
+      ],
+      book: 'Book anyway, 12:00 with Dr. Planinska',
+      anyway: 'true',
+    });
   });
 });

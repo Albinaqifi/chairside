@@ -25,6 +25,15 @@ const NO_HOURS_GRID: Span = { from: 8 * 60, to: 18 * 60 };
 /** The statuses whose minutes are not booked time: the chair is free again. */
 const NOT_BOOKED: ReadonlySet<AppointmentStatus> = new Set(['cancelled', 'no_show']);
 
+/**
+ * True for a visit that holds the chair: of every status but cancelled and no-show, as the booking's
+ * own check counts them (data-model.md, "No double booking"). The new-appointment drawer warns of an
+ * overlap with one (./booking-warnings.ts, E01-T05b).
+ */
+export function holdsTheChair(status: AppointmentStatus): boolean {
+  return !NOT_BOOKED.has(status);
+}
+
 /** The first day the calendar can show: PostgreSQL has no year 0, so `0000-12-31` is no day of it. */
 const FIRST_DAY: CalendarDay = '0001-01-01';
 

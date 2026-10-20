@@ -71,7 +71,11 @@ WHERE (status NOT IN ('cancelled', 'no_show') AND NOT overlap_ok)
 ```
 A range holds its start, not its end (`'[)'`), so back-to-back visits do not overlap; `starts_at`
 before `ends_at` keeps every range non-empty. Staff "book anyway" sets `overlap_ok = true` on that
-one appointment (D-020). Patient-driven bookings can never set it.
+one appointment (D-020). Patient-driven bookings can never set it. It is set only when the visit does
+overlap another that holds the chair as the row is written: one that no longer does is an ordinary
+booking, which the constraint guards (E01-T05b). The constraint does not hold a row with
+`overlap_ok`, so the booking refuses the same booking again (the patient, the provider, the start)
+under the provider's row lock (`already_booked`): one click books once.
 
 ### Appointment state machine
 

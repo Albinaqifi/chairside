@@ -147,14 +147,24 @@
       "provider": "Provider",
       "noProviders": "No providers yet",
       "book": "Book {time} with {provider}",
+      "bookAnyway": "Book anyway, {time} with {provider}",
       "bookWithoutProvider": "Book {time}",
       "booking": "Booking…",
       "booked": "Booked {name}, {time}.",
       "overlap": "This time overlaps another visit of this provider. Choose another time, or another provider.",
+      "alreadyBooked": "This patient is already booked with this provider at this time, so it was not booked again.",
       "patientNotBookable": "This patient cannot be booked: only an active patient can. Choose the patient again.",
       "providerNotBookable": "This provider takes no new appointments. Choose another provider.",
       "treatmentNotBookable": "This treatment is no longer offered. Choose another treatment.",
-      "startSkipped": "The clocks skip this start on this day. Choose another time."
+      "startSkipped": "The clocks skip this start on this day. Choose another time.",
+      "warning": {
+        "overlap": "Overlaps {name}'s visit, {from}–{to}.",
+        "anyway": "You can still book it with Book anyway.",
+        "break": "Overlaps {provider}'s break: {label}, {from}–{to}.",
+        "outsideHours": "Runs outside the opening hours, {from}–{to}.",
+        "closedDay": "The clinic is closed that day: {label}.",
+        "noHours": "The clinic is closed that day: no opening hours on {weekday}."
+      }
     }
   },
   "languages": {

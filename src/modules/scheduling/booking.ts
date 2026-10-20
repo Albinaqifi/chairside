@@ -33,6 +33,12 @@ export interface NewBooking {
   timeZone: string;
   /** The user who books it. */
   createdBy: string;
+  /**
+   * The person's "anyway" (D-020, E01-T05b): true when they pressed Book anyway over the overlap the
+   * drawer showed. A time that overlaps another visit is then booked with `overlap_ok`; false, it is
+   * refused.
+   */
+  anyway: boolean;
 }
 
 /**
@@ -41,17 +47,23 @@ export interface NewBooking {
  * - `provider_not_bookable`: no provider of the clinic by that id, or one that is not active.
  * - `treatment_not_bookable`: no treatment type of the clinic by that id, or one that is not active.
  * - `start_skipped`: the clocks skip that local time on that day (the night summer time starts).
- * - `overlap`: another visit of the provider at that time that holds the chair.
+ * - `already_booked`: the patient already has a visit with the provider at that start that holds the
+ *   chair: the same booking sent again (a double click, a second tab), with or without "anyway".
+ * - `overlap`: another visit of the provider at that time that holds the chair, and no "anyway".
  */
 export type BookingRefusal =
-  'provider_not_bookable' | 'treatment_not_bookable' | 'start_skipped' | 'overlap';
+  | 'provider_not_bookable'
+  | 'treatment_not_bookable'
+  | 'start_skipped'
+  | 'already_booked'
+  | 'overlap';
 
 export type BookingResult = { ok: true; id: string } | { ok: false; code: BookingRefusal };
 
 /**
  * Books one appointment in the clinic of the transaction (E01-T05a, the scheduling module's first
- * write): the treatment type's name is its title; status `booked`, source `staff`, `overlap_ok`
- * false, `created_by` the user who books it, both moments of the row `now`.
+ * write): the treatment type's name is its title; status `booked`, source `staff`, `created_by` the
+ * user who books it, both moments of the row `now`.
  *
  * Its start is the local time on the clinic's day, in its zone: PostgreSQL turns the day's local
  * midnight plus the minutes into a moment (`AT TIME ZONE`), so 09:00 is 09:00 on the days the clocks
@@ -61,16 +73,26 @@ export type BookingResult = { ok: true; id: string } | { ok: false; code: Bookin
  * later.
  *
  * Refused, with nothing written: a provider or a treatment type that is not active or not the
- * clinic's (Row-Level Security shows no other clinic's), and a time that overlaps another visit of
- * the provider that holds the chair: of every status but cancelled and no-show, one booked anyway
- * (`overlap_ok`) too, which the database's own constraint lets through. A visit that ends when this
- * one starts, or starts when it ends, does not overlap it.
+ * clinic's (Row-Level Security shows no other clinic's); the same booking again (`already_booked`,
+ * E01-T05b): a visit of the patient with the provider at the same start that holds the chair, with or
+ * without "anyway", checked before the overlap, so one click books once; and, without "anyway", a
+ * time that overlaps another visit of the provider that holds the chair: of every status but
+ * cancelled and no-show, one booked anyway (`overlap_ok`) too, which the database's own constraint
+ * lets through. A visit that ends when this one starts, or starts when it ends, does not overlap it.
+ *
+ * With "anyway" (D-020, E01-T05b), a time that overlaps such a visit as the row is written is booked
+ * with `overlap_ok` true, which the constraint then lets through; one that no longer overlaps (the
+ * other visit was cancelled since the drawer showed it) is an ordinary booking, `overlap_ok` false,
+ * which the constraint guards. So `overlap_ok` always means "booked over another visit"
+ * (data-model.md, "No double booking").
  *
  * Two bookings of one provider at once take turns: the provider's row is locked first, so the
- * second waits until the first is committed or rolled back, then sees its visit and is refused as an
- * overlap. A wait longer than the lock timeout (5 s, src/db/tenant.ts) fails loudly. The exclusion
- * constraint `appointments_no_double_booking` stays the last guard: a writer that skips the lock and
- * overlaps fails it, loudly.
+ * second waits until the first is committed or rolled back, then sees its visit: refused as
+ * `already_booked` when it is the same booking, else as an overlap, or booked anyway. A wait longer
+ * than the lock timeout (5 s, src/db/tenant.ts) fails loudly. The exclusion constraint
+ * `appointments_no_double_booking` stays the last guard for an ordinary booking: a writer that skips
+ * the lock and overlaps fails it, loudly. It does not hold a row booked anyway: the lock alone keeps a
+ * second copy of one from being written, so E02 reminds the patient once.
  *
  * A value the caller's schema should have refused is an Error: a day that is no date of the
  * calendar, a start outside the day, a length that is not a whole number of minutes above 0.
@@ -103,6 +125,21 @@ export async function createAppointment(
   );
   if (checked.rows[0]?.on_its_day !== true) return { ok: false, code: 'start_skipped' };
 
+  // The same booking again: the moment compared in SQL, as the overlap's are.
+  const [same] = await tx
+    .select({ id: appointments.id })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.patientId, booking.patientId),
+        eq(appointments.providerId, booking.providerId),
+        notInArray(appointments.status, CHAIR_FREED),
+        eq(appointments.startsAt, startsAt),
+      ),
+    )
+    .limit(1);
+  if (same) return { ok: false, code: 'already_booked' };
+
   const [clash] = await tx
     .select({ id: appointments.id })
     .from(appointments)
@@ -115,7 +152,7 @@ export async function createAppointment(
       ),
     )
     .limit(1);
-  if (clash) return { ok: false, code: 'overlap' };
+  if (clash && !booking.anyway) return { ok: false, code: 'overlap' };
 
   const id = newId();
   await tx.insert(appointments).values({
@@ -128,7 +165,8 @@ export async function createAppointment(
     startsAt,
     endsAt,
     status: 'booked',
-    overlapOk: false,
+    // Only over a real overlap, as it is when the row is written (D-020).
+    overlapOk: clash !== undefined,
     source: 'staff',
     createdBy: booking.createdBy,
     createdAt: now,

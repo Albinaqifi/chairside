@@ -69,6 +69,8 @@ Property tests:
 
 ### Duplicates, retries, states (critical)
 - Run the planner twice, and twice in parallel: the number of message rows does not change.
+- The same booking sent twice, and twice at once, with or without "book anyway": one appointment, the
+  other refused as `already_booked`, so E02 reminds the patient once (E01-T05b).
 - Move an appointment: the old reminder is cancelled, exactly one new one exists.
 - Two dispatchers at once: no row is sent twice.
 - Temporary failure retries with growing delays; permanent failure stops; five failures end in `failed`.
