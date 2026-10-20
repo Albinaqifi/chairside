@@ -601,14 +601,24 @@ describe('an overlap: the other visit named above Book, and Book anyway (E01-T05
     ]);
   });
 
-  it("the other visit's time is a moment, shown in the clinic's zone as the grid shows it", () => {
-    // A clinic in New York: 09:00 there is 13:00 UTC.
-    const midnightUtc = new Date('2026-10-26T04:00:00Z');
-    const view = dayWith({ appointments: [visitOf(DENTIST, 9 * H, 9 * H + 30, { midnightUtc })] });
-    expect(warningLines(render({ start: 9 * H }, { view, timeZone: 'America/New_York' }))).toEqual([
-      "Overlaps Ana Brezovska's visit, 09:00–09:30.",
-    ]);
-  });
+  // The zones are named here, never the computer's: CI runs once, in UTC (D-099). Local midnight of
+  // 26 October 2026 is 23:00 UTC the day before in Skopje (UTC+1), 04:00 UTC in New York (UTC-4,
+  // behind UTC) and 11:00 UTC the day before in Auckland (UTC+13, far ahead): a visit at 09:00 there,
+  // shown in UTC, would read 08:00, 13:00 and 20:00.
+  it.each([
+    { zone: 'Europe/Skopje', midnightUtc: '2026-10-25T23:00:00Z' },
+    { zone: 'America/New_York', midnightUtc: '2026-10-26T04:00:00Z' },
+    { zone: 'Pacific/Auckland', midnightUtc: '2026-10-25T11:00:00Z' },
+  ])(
+    "the other visit's time is a moment, shown in the clinic's zone as the grid shows it: a clinic in $zone",
+    ({ zone, midnightUtc }) => {
+      const visit = visitOf(DENTIST, 9 * H, 9 * H + 30, { midnightUtc: new Date(midnightUtc) });
+      const view = dayWith({ appointments: [visit] });
+      expect(warningLines(render({ start: 9 * H }, { view, timeZone: zone }))).toEqual([
+        "Overlaps Ana Brezovska's visit, 09:00–09:30.",
+      ]);
+    },
+  );
 
   it('the calendar holds another day (past midnight, a page on today): nothing is warned of', () => {
     const nextDay = layoutDay({
@@ -646,9 +656,9 @@ describe('one booking per click: the same booking again (E01-T05b, acceptance 3)
 });
 
 describe('a warning line for a break, the hours or a closed day; Book still books (E01-T05b, acceptance 4)', () => {
-  /** The lines, Book's text and the "anyway" sent, for a booking on `view`. */
-  function warned(booking: Partial<Booking>, view: CalendarDayView) {
-    const html = render(booking, { view });
+  /** The lines, Book's text and the "anyway" sent, for a booking on `view`, in Skopje or `timeZone`. */
+  function warned(booking: Partial<Booking>, view: CalendarDayView, timeZone?: string) {
+    const html = render(booking, { view, timeZone });
     return { lines: warningLines(html), book: bookText(html), anyway: anywayField(html) };
   }
 
@@ -683,14 +693,20 @@ describe('a warning line for a break, the hours or a closed day; Book still book
     });
   });
 
-  it('a weekday without hours, by its name', () => {
-    const view = dayWith({ hours: [{ weekday: 2, opens: 8 * H, closes: 18 * H }] });
-    expect(warned({ start: 9 * H }, view)).toEqual({
-      lines: ['The clinic is closed that day: no opening hours on Monday.'],
-      book: 'Book 09:00 with Dr. Planinska',
-      anyway: undefined,
-    });
-  });
+  // The day is a calendar date: its weekday is formatted in UTC, never in the clinic's zone (D-098).
+  // In New York, behind UTC, 26 October would be the Sunday before; the zones are named, never the
+  // computer's (D-099).
+  it.each(['Europe/Skopje', 'America/New_York', 'Pacific/Auckland'])(
+    'a weekday without hours, by its name: a clinic in %s',
+    (zone) => {
+      const view = dayWith({ hours: [{ weekday: 2, opens: 8 * H, closes: 18 * H }] });
+      expect(warned({ start: 9 * H }, view, zone)).toEqual({
+        lines: ['The clinic is closed that day: no opening hours on Monday.'],
+        book: 'Book 09:00 with Dr. Planinska',
+        anyway: undefined,
+      });
+    },
+  );
 
   it('none inside the hours, on an open day, outside every break', () => {
     const view = dayWith({ breaks: [LUNCH] });
