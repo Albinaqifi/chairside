@@ -92,6 +92,26 @@ end-to-end journeys (milestones M0 and M1 on `docs/product/roadmap.md`). Next co
 the schedule screens, the staging deployment and the reminder loop (M2). The board:
 `docs/progress/board.md`.
 
+### Where things are in the repo
+
+One line per folder. The full picture, with the conventions, is in `CLAUDE.md`; the map of the
+documents is `docs/README.md`.
+
+| Path | What is there |
+|---|---|
+| `src/app/` | The Next.js routes: the staff app under `(staff)/`, login and the clinic picker under `(auth)/`, the health check and the login library's routes under `api/`. Pages stay thin and call a module. `_lib/` holds the action wrappers and the staff form. `src/proxy.ts` next to it renews the session on every request. |
+| `src/modules/` | All business logic, one folder per module: `tenancy`, `auth`, `audit`, `patients`, `scheduling` so far. In each, `index.ts` is the public API, `schema.ts` its tables, and the unit tests sit next to the code. |
+| `src/db/` | The connection pool, the tenant wrapper `withTenant`, the SQL migrations, the job queue, the seed, and the scripts behind `pnpm db:*` and `pnpm clinic:create`. |
+| `src/worker/` | The worker's entry point: the job queue and the heartbeat. Job handlers join it with the reminder loop. |
+| `src/ui/`, `src/app/globals.css` | The shared components (shadcn/ui, restyled) and the design tokens: colours, fonts, radii. |
+| `src/i18n/`, `src/lib/` | Every visible text (`en.json`) and the locale; small shared helpers: the clock, ids, the logger, calendar days. |
+| `tests/` | `integration/` runs against a real PostgreSQL, including the test that fails any table without tenant isolation; `e2e/` holds the Playwright journeys. Unit tests live next to the code in `src/`. |
+| `eslint-rules/` | The project's own lint rules that enforce the architecture (module boundaries, server actions, database access, forms), and the tests that prove each one fires. |
+| `docs/` | The plan and its memory: `intent.md` (why), `architecture/` (how), `backlog/` (the tasks, one file per epic), `progress/` (the board, the handoff notes, things discovered on the way), `log/` (decisions, risks, open questions), `process/` (the agent rules and the workflow), `product/` (scope and the design reference), `runbook.md` (how the operator runs it by hand). |
+| `.claude/`, `CLAUDE.md` | The agent roles (`agents/`), the `/pipeline` and `/architect` commands (`skills/`), and the settings that keep `.env` away from agents. `CLAUDE.md` is what every agent session loads first. |
+| `design/` | The original HTML design: a visual reference, not code to copy. |
+| `.github/workflows/ci.yml`, `Dockerfile`, `docker-compose.yml` | CI; the one image that runs the web and the worker; the local database. |
+
 ### Where AI is used in the product
 
 The AI writes a first draft of aftercare instructions ("after a filling, avoid hot drinks
