@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bookAppointment, readCalendarDay } from '@/app/(staff)/calendar/actions';
+import { bookingWarnings } from '@/app/(staff)/calendar/booking-warnings';
 import { closeDb } from '@/db/client';
 import { withTenant } from '@/db/tenant';
 import type { CalendarDay } from '@/lib/calendar-day';
@@ -1151,4 +1152,103 @@ describe('a break, the hours or a closed day are warned of, never refused (E01-T
       expect((await row(result.value.id)).overlap_ok, `${day} ${start}`).toBe(false);
     }
   });
+});
+
+// The tester's (E01-T05b): the drawer's warning, read from the day as the calendar reads it, and the
+// server's check agree on the four days the clocks change in Skopje and New York (a block's minutes
+// are the clock's, as the drawer's start is: in real minutes a 23- or 25-hour day would put the visit
+// an hour off); the same booking again over the patient's own visit of every status that holds the
+// chair; and the same booking from two tabs at once, one with "anyway" and one without, where only
+// the provider's lock and `already_booked` keep the second copy out (a row booked anyway is not held
+// by the database's constraint). Days of August 2031 in Skopje (UTC+2: 09:00 is 07:00 UTC).
+
+describe('on the days the clocks change, the warning and the server agree (tester)', () => {
+  it.each([
+    // Skopje: summer time from 02:00 (UTC+2), so 09:00 is 07:00 UTC; winter time from 03:00 (UTC+1).
+    { zone: 'Europe/Skopje', day: '2031-03-30', nine: '2031-03-30T07:00:00Z' },
+    { zone: 'Europe/Skopje', day: '2031-10-26', nine: '2031-10-26T08:00:00Z' },
+    // New York: daylight time from 02:00 (UTC-4), 09:00 is 13:00 UTC; standard time from 02:00 (UTC-5).
+    { zone: 'America/New_York', day: '2031-03-09', nine: '2031-03-09T13:00:00Z' },
+    { zone: 'America/New_York', day: '2031-11-02', nine: '2031-11-02T14:00:00Z' },
+  ] as const)(
+    '$zone on $day: a visit at 09:00 is warned of from 08:45 to 09:15, not at 08:30 or 09:30, and the server refuses and books alike',
+    async ({ zone, day, nine }) => {
+      const place = zone === 'America/New_York' ? newYork : skopje;
+      request.clinic = place.clinic;
+      const other = await existing(place, nine, 30);
+      const read = await readCalendarDay(place.clinic, { day });
+      if (!read.ok) throw new Error(`not read: ${read.error.code}`);
+      const warned = (start: number) =>
+        bookingWarnings(read.value.view, {
+          providerId: place.dentist,
+          start,
+          length: 30,
+        }).overlaps.map((block) => block.id);
+      for (const start of [8 * H + 45, 9 * H, 9 * H + 15]) {
+        expect(warned(start), `${start}`).toEqual([other]);
+      }
+      expect(warned(8 * H + 30)).toEqual([]);
+      expect(warned(9 * H + 30)).toEqual([]);
+
+      // The server, alike: 09:30 is an ordinary booking; 09:15 is refused, then booked anyway.
+      const after = await bookAppointment(place.clinic, form(place, { day, start: '09:30' }));
+      if (!after.ok) throw new Error(`09:30 refused: ${after.error.code}`);
+      expect((await row(after.value.id)).overlap_ok).toBe(false);
+      expect(await bookAppointment(place.clinic, form(place, { day, start: '09:15' }))).toEqual({
+        ok: false,
+        error: { code: 'overlap' },
+      });
+      const anyway = await bookAppointment(
+        place.clinic,
+        form(place, { day, start: '09:15', anyway: 'true' }),
+      );
+      if (!anyway.ok) throw new Error(`09:15 anyway refused: ${anyway.error.code}`);
+      expect((await row(anyway.value.id)).overlap_ok).toBe(true);
+    },
+  );
+});
+
+describe('one booking per click, the edges (tester)', () => {
+  let nextDay = 1;
+  const freshDay = (): CalendarDay => `2031-08-${String(nextDay++).padStart(2, '0')}`;
+
+  it.each(['booked', 'confirmed', 'arrived', 'completed'])(
+    'the same booking again over the patient\'s own %s visit: already_booked, with or without "anyway", nothing written',
+    async (status) => {
+      const day = freshDay();
+      await existing(skopje, `${day}T07:00:00Z`, 30, { patientId: skopje.ana, status });
+      const before = await written(skopje.clinic);
+      for (const anyway of [false, true]) {
+        expect(
+          await book(skopje, { day, startMinute: 9 * H, anyway }),
+          `anyway: ${anyway}`,
+        ).toEqual({ ok: false, code: 'already_booked' });
+      }
+      expect(await written(skopje.clinic)).toEqual(before);
+    },
+  );
+
+  it.each([
+    { first: false, second: true },
+    { first: true, second: false },
+  ])(
+    'from two tabs at once, the first with "anyway": $first, the second: $second: one row, the other already_booked',
+    async ({ first, second }) => {
+      const day = freshDay();
+      // The tab that sends "anyway" showed Marko's visit at 09:00, cancelled since: nothing holds the
+      // chair, so the first is an ordinary booking whichever it is.
+      await existing(skopje, `${day}T07:00:00Z`, 30, { status: 'cancelled' });
+      const one = bookAndHold(skopje, { day, startMinute: 9 * H, anyway: first });
+      await one.booked;
+      const startedAt = Date.now();
+      const two = book(skopje, { day, startMinute: 9 * H, anyway: second });
+      const [answerOne, answerTwo] = await Promise.all([one.result, two]);
+      expect(answerOne.ok).toBe(true);
+      expect(answerTwo).toEqual({ ok: false, code: 'already_booked' });
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(300);
+      expect(
+        (await dentistsDay(skopje, day)).filter((visit) => visit.patient === skopje.ana),
+      ).toEqual([{ patient: skopje.ana, starts: '09:00', overlap_ok: false }]);
+    },
+  );
 });
