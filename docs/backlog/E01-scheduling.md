@@ -694,6 +694,13 @@ check and in a journey (E01-T11).
 
 ### E01-T05b · Booking: overlaps and "Book anyway", one booking per click, a warning for breaks and hours
 
+**As built** (Done 2026-10-20, PR #70): as planned, about 290 lines of product code with comments, on
+the estimate. Also: the booking's answer brings the day again on `already_booked` as well as on an
+overlap; the warnings sit in one box in the amber every warning of the app has (the "Needs a call"
+panel's), not the demo's orange text (owner, 2026-10-20). Left as known: a drawer left open past
+midnight on today's calendar still books its own day but warns of nothing, as the calendar then holds
+the next day (a code comment says so). The text below is the plan as it was.
+
 - **Role:** builder · **Risk:** normal (as E01-T05a's: the drawer and the scheduling module's booking,
   through `staffAction`; no change to a wrapper, `StaffForm`, a policy, a permission, a table or a
   migration: `overlap_ok` is migration 0002's) · **Depends on:** E01-T05a (Done)
@@ -758,10 +765,11 @@ confirmation tick box (E02-T11).
 ### E01-T05c · Booking: a click on an empty slot, and a double click's second press changes nothing
 
 - **Role:** builder · **Risk:** normal (a screen, and `src/ui/`'s drawer and dialog, as E01-T05a's
-  guard; no action, wrapper, `StaffForm`, policy or table) · **Depends on:** E01-T05b
+  guard; no action, wrapper, `StaffForm`, policy, table or migration) · **Depends on:** E01-T05b
+  (Done)
 - **Read:** `scope` (Calendar) · `design-ref` (demo line 260; logic 1819) · D-108, D-113, D-114 ·
   `handoffs/E01-T05a.md` (the tester's Discovered line 2; fix round 2's two Discovered lines) · the
-  architect section of `handoffs/E01-T05c.md`, written in E01-T05b's Done pass
+  architect section of `handoffs/E01-T05c.md`
 
 **Why.** The grid is where a receptionist sees a free time, and a click there is the quickest way to
 book it (demo logic 1819). A double click is a desk habit on a calendar, and its second press lands
@@ -771,9 +779,15 @@ E01-T06's drawer it could press a status button (a no-show marked by mistake). S
 
 **Do.**
 - **A click on an empty slot** of a column (demo line 260, logic 1819) opens the booking drawer with
-  that column's provider and the quarter hour under the pointer (one the start select offers), on
-  the day shown; a shaded time too, where E01-T05b's warning says why. A click on a block (an
-  appointment, E01-T06's; a break) opens nothing. The keyboard's way stays New appointment.
+  that column's provider and the quarter hour the pointer is in, counted from the grid's top as the
+  demo counts it (the grid's last quarter at its foot; always one the start select offers), on the
+  day shown; a shaded time too, where E01-T05b's warning says why. It opens at once, from the
+  calendar's state, never a navigation, as New appointment does: the drawer's choices are read when
+  it opens (D-108), with the slot's start and provider in place of the first ones. A click on a block
+  (an appointment, E01-T06's; a break) opens nothing, and nor does a click on the column of an
+  inactive provider, shown for a visit it holds: no booking takes them (E01-T05a). The click is the
+  pointer's, with the demo's `copy` cursor; the keyboard's and a screen reader's way stays New
+  appointment.
 - **A double click's second press changes nothing** (E01-T05a, fix round 2's Discovered lines:
   `speed`, the focus; `message`, E01-T06's buttons): for half a second after the drawer or the dialog
   opens, a pointer's press anywhere in it (a field, a chip, a select, Book) is dropped and moves no
@@ -785,15 +799,17 @@ E01-T06's drawer it could press a status button (a no-show marked by mistake). S
   within half a second of the drawer closing opens nothing.
 
 **Out of scope.** A drag across slots to set the length (the demo has none). A block's click
-(E01-T06). The week view's click (E01-T07).
+(E01-T06). The week view's click (E01-T07). The closed days' Remove (E01-T08d, D-115).
 
 **Acceptance.**
 - [ ] A click on an empty slot opens the drawer with that column's provider and the quarter hour
-      under the pointer, the grid's first and last included; a click on a block opens nothing (e2e,
-      three browsers; unit for the quarter hour).
+      under the pointer, the grid's first and last quarter and a shaded time included; a click on a
+      block (a visit, a break) opens nothing (e2e, three browsers; unit for the quarter hour); nor
+      does a click on an inactive provider's column (component test).
 - [ ] A double click (80, 150 and 250 ms between the clicks) on an empty slot and on New appointment,
       its second press on a chip, a select or Book: the drawer open, nothing chosen or sent, the
-      focus in the patient field (e2e, three browsers).
+      focus in the patient field; Escape then closes it, and a press from half a second on picks as
+      before (e2e, three browsers). The dialog drops such a press too (unit).
 - [ ] A double click on Book: one booking, the drawer closed and not opened again (e2e).
 - [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 

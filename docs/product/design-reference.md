@@ -110,7 +110,7 @@ Both are open-licensed; bundle them with the app (D-009).
 | `primary-soft` | `oklch(0.92 0.03 190)` | Active navigation, selected |
 | `accent` | `oklch(0.55 0.1 195)` | Toggles on, checkmarks, selected borders |
 | `panel-dark` | `oklch(0.3 0.045 200)` | Dark results panel, selected chips |
-| `warn-bg` / `warn-border` | `oklch(0.975 0.03 85)` / `oklch(0.9 0.05 85)` | "Needs a call" panel |
+| `warn-bg` / `warn-border` | `oklch(0.975 0.03 85)` / `oklch(0.9 0.05 85)` | "Needs a call" panel; every warning box of the app, the booking drawer's too (owner, 2026-10-20) |
 
 **Status colours** (text / background / dot): copy from `ST`, lines 1377–1385.
 Confirmed = green (hue 155), no reply = amber (65–85), booked = blue (250),
