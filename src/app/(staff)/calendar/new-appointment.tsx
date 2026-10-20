@@ -19,11 +19,15 @@ import {
   startValue,
   type BookingChoices,
 } from './booking-choices';
+import { anyWarning, bookingWarnings, NO_WARNINGS, type BookingWarnings } from './booking-warnings';
 import type { CalendarDayView } from './day';
 import { PatientField, type PickedPatient } from './patient-field';
 
 /** A time of the day the drawer shows, "10:30": no moment, so in UTC, as the grid's hours are. */
 const TIME_OF_DAY = { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' } as const;
+
+/** A visit's time, "09:00": a moment, so in the clinic's zone (next-intl's), as the grid shows it. */
+const VISIT_TIME = { hour: 'numeric', minute: '2-digit' } as const;
 
 /** A treatment's chip (demo line 1344), as the calendar's provider chips are drawn. */
 const CHIP =
@@ -35,7 +39,8 @@ const CHIP =
  * would hold one). What the drawer offers (./booking-choices.ts) is read when it opens, from the day
  * the calendar shows, the columns shown and the browser's clock in the clinic's zone, and kept while it
  * is open: a read on use that brings a new day under it changes nothing typed or chosen in it (D-108).
- * Each opening starts a new booking.
+ * Each opening starts a new booking. What the drawer warns of (E01-T05b) is read from the day the
+ * calendar holds now, `view`, handed on as a prop that changes, never as a key.
  *
  * After a booking the drawer closes, the toast names the patient and the time, and `onBooked` gets
  * the provider, whose column the calendar turns on (demo logic lines 2133–2134). The booking's
@@ -78,6 +83,7 @@ export function NewAppointment({
         <BookingDrawer
           key={opening.count}
           choices={opening.choices}
+          view={view}
           onBooked={(providerId) => {
             setOpen(false);
             onBooked(providerId);
@@ -107,9 +113,12 @@ export interface Booking {
  */
 export function BookingDrawer({
   choices,
+  view,
   onBooked,
 }: {
   choices: BookingChoices;
+  /** The day the calendar holds now: each read on use and each booking's answer change it. */
+  view: CalendarDayView;
   onBooked: (providerId: string) => void;
 }) {
   const t = useTranslations('calendar.booking');
@@ -148,6 +157,7 @@ export function BookingDrawer({
       <SheetBody>
         <BookingForm
           choices={choices}
+          view={view}
           booking={booking}
           onChange={(change) => setBooking((before) => ({ ...before, ...change }))}
           listOpen={listOpen}
@@ -166,9 +176,17 @@ export function BookingDrawer({
  * setting the length to its own; the start, the length and the provider, each the browser's own
  * select; the day the calendar shows, hidden. Book names the time and the provider (demo logic
  * line 2127). A problem of the input shows at its field; the clinic's refusals above Book (D-098).
+ *
+ * Above Book, what the time is warned of on the day the calendar holds now (./booking-warnings.ts,
+ * E01-T05b), following start, length and provider as they change: an overlap turns Book into Book
+ * anyway and adds the hidden `anyway`, sent only while the overlap shows (D-020); a break, the hours
+ * or a closed day leave Book as it is. Past midnight a page on the clinic's today reads the next day,
+ * whose visits are not this booking's: then nothing is warned of, and the server's check still
+ * refuses an overlap.
  */
 export function BookingForm({
   choices,
+  view,
   booking,
   onChange,
   listOpen,
@@ -176,6 +194,8 @@ export function BookingForm({
   onDone,
 }: {
   choices: BookingChoices;
+  /** The day the calendar holds now. */
+  view: CalendarDayView;
   booking: Booking;
   onChange: (change: Partial<Booking>) => void;
   listOpen: boolean;
@@ -194,6 +214,8 @@ export function BookingForm({
   const patientName = booking.patient
     ? names('fullName', { first: booking.patient.firstName, last: booking.patient.lastName })
     : '';
+  const warnings = view.day === choices.day ? bookingWarnings(view, booking) : NO_WARNINGS;
+  const anyway = warnings.overlaps.length > 0;
   return (
     <StaffForm
       action={bookAppointment}
@@ -201,6 +223,7 @@ export function BookingForm({
       onDone={(value) => onDone(value.providerId)}
       refusals={{
         overlap: t('overlap'),
+        already_booked: t('alreadyBooked'),
         patient_not_bookable: t('patientNotBookable'),
         provider_not_bookable: t('providerNotBookable'),
         treatment_not_bookable: t('treatmentNotBookable'),
@@ -208,12 +231,16 @@ export function BookingForm({
       }}
       submitLabel={
         provider
-          ? t('book', { time: time(booking.start), provider: provider.shortName })
+          ? t(anyway ? 'bookAnyway' : 'book', {
+              time: time(booking.start),
+              provider: provider.shortName,
+            })
           : t('bookWithoutProvider', { time: time(booking.start) })
       }
       pendingLabel={t('booking')}
     >
       <input type="hidden" name="day" value={choices.day} />
+      {anyway && <input type="hidden" name="anyway" value="true" />}
       <StaffField
         name="patientId"
         label={t('patient')}
@@ -240,71 +267,160 @@ export function BookingForm({
           />
         )}
       />
-      {/* The provider's short name is the longest of the three: its select is the widest. */}
-      <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-2.5">
-        <StaffField
-          name="start"
-          label={t('start')}
-          render={(field) => (
-            <NativeSelect
-              {...field}
-              value={startValue(booking.start)}
-              onChange={(event) => {
-                const start = minutesOfStart(event.currentTarget.value);
-                if (start !== null) onChange({ start });
-              }}
-            >
-              {choices.starts.map((minutes) => (
-                <NativeSelectOption key={minutes} value={startValue(minutes)}>
-                  {time(minutes)}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          )}
-        />
-        <StaffField
-          name="length"
-          label={t('length')}
-          render={(field) => (
-            <NativeSelect
-              {...field}
-              value={String(booking.length)}
-              onChange={(event) => onChange({ length: Number(event.currentTarget.value) })}
-            >
-              {lengthChoices(treatment?.minutes ?? null, booking.length).map((minutes) => (
-                <NativeSelectOption key={minutes} value={String(minutes)}>
-                  {t('minutes', { count: minutes })}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          )}
-        />
-        <StaffField
-          name="providerId"
-          label={t('provider')}
-          render={(field) =>
-            choices.providers.length === 0 ? (
-              // Disabled, so nothing is sent: Book then says the field needs a provider.
-              <NativeSelect {...field} disabled defaultValue="">
-                <NativeSelectOption value="">{t('noProviders')}</NativeSelectOption>
-              </NativeSelect>
-            ) : (
+      {/*
+        The form's last child: StaffForm puts its refusal's message and Book right under it. The
+        warning shares it with the selects, so its live region, empty, adds no gap above Book.
+      */}
+      <div>
+        {/* The provider's short name is the longest of the three: its select is the widest. */}
+        <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-2.5">
+          <StaffField
+            name="start"
+            label={t('start')}
+            render={(field) => (
               <NativeSelect
                 {...field}
-                value={booking.providerId}
-                onChange={(event) => onChange({ providerId: event.currentTarget.value })}
+                value={startValue(booking.start)}
+                onChange={(event) => {
+                  const start = minutesOfStart(event.currentTarget.value);
+                  if (start !== null) onChange({ start });
+                }}
               >
-                {choices.providers.map((option) => (
-                  <NativeSelectOption key={option.id} value={option.id}>
-                    {option.shortName}
+                {choices.starts.map((minutes) => (
+                  <NativeSelectOption key={minutes} value={startValue(minutes)}>
+                    {time(minutes)}
                   </NativeSelectOption>
                 ))}
               </NativeSelect>
-            )
-          }
+            )}
+          />
+          <StaffField
+            name="length"
+            label={t('length')}
+            render={(field) => (
+              <NativeSelect
+                {...field}
+                value={String(booking.length)}
+                onChange={(event) => onChange({ length: Number(event.currentTarget.value) })}
+              >
+                {lengthChoices(treatment?.minutes ?? null, booking.length).map((minutes) => (
+                  <NativeSelectOption key={minutes} value={String(minutes)}>
+                    {t('minutes', { count: minutes })}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            )}
+          />
+          <StaffField
+            name="providerId"
+            label={t('provider')}
+            render={(field) =>
+              choices.providers.length === 0 ? (
+                // Disabled, so nothing is sent: Book then says the field needs a provider.
+                <NativeSelect {...field} disabled defaultValue="">
+                  <NativeSelectOption value="">{t('noProviders')}</NativeSelectOption>
+                </NativeSelect>
+              ) : (
+                <NativeSelect
+                  {...field}
+                  value={booking.providerId}
+                  onChange={(event) => onChange({ providerId: event.currentTarget.value })}
+                >
+                  {choices.providers.map((option) => (
+                    <NativeSelectOption key={option.id} value={option.id}>
+                      {option.shortName}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              )
+            }
+          />
+        </div>
+        <BookingWarning
+          warnings={warnings}
+          day={choices.day}
+          providerName={provider?.shortName ?? ''}
         />
       </div>
     </StaffForm>
+  );
+}
+
+/**
+ * What the drawer warns of, above Book (E01-T05b), a line each: each visit the time overlaps, its
+ * patient and its time, as the grid shows them (demo line 1350, logic line 2125), then that Book
+ * anyway still books it; the provider's break; the day's opening hours, when the time runs outside
+ * them; the day the clinic is closed (owner, D-114). A polite live region that is always there, as the
+ * new patient's duplicate warning is, so a screen reader reads a warning when it appears; empty, it
+ * takes no room.
+ */
+function BookingWarning({
+  warnings,
+  day,
+  providerName,
+}: {
+  warnings: BookingWarnings;
+  /** The booking's day, for a weekday without hours. */
+  day: string;
+  providerName: string;
+}) {
+  const t = useTranslations('calendar.booking.warning');
+  const names = useTranslations('patients');
+  const format = useFormatter();
+  const time = (minutes: number) =>
+    format.dateTime(new Date(Date.UTC(2000, 0, 1, 0, minutes)), TIME_OF_DAY);
+  const lines: { key: string; text: string }[] = [
+    ...warnings.overlaps.map((visit) => ({
+      key: visit.id,
+      text: t('overlap', {
+        name: names('fullName', { first: visit.patient.firstName, last: visit.patient.lastName }),
+        from: format.dateTime(new Date(visit.startsAt), VISIT_TIME),
+        to: format.dateTime(new Date(visit.endsAt), VISIT_TIME),
+      }),
+    })),
+    ...warnings.breaks.map((found) => ({
+      key: found.id,
+      text: t('break', {
+        provider: providerName,
+        label: found.label,
+        from: time(found.from),
+        to: time(found.to),
+      }),
+    })),
+  ];
+  if (warnings.outsideHours) {
+    lines.push({
+      key: 'hours',
+      text: t('outsideHours', {
+        from: time(warnings.outsideHours.from),
+        to: time(warnings.outsideHours.to),
+      }),
+    });
+  }
+  if (warnings.closed) {
+    lines.push({
+      key: 'closed',
+      text:
+        warnings.closed.why === 'closed_day'
+          ? t('closedDay', { label: warnings.closed.label })
+          : t('noHours', {
+              weekday: format.dateTime(new Date(day), { weekday: 'long', timeZone: 'UTC' }),
+            }),
+    });
+  }
+  return (
+    <div role="status">
+      {anyWarning(warnings) && (
+        <div className="mt-4 grid gap-1 rounded-control border border-warn-border bg-warn-bg px-3 py-2">
+          <ul className="grid gap-1">
+            {lines.map((line) => (
+              <li key={line.key}>{line.text}</li>
+            ))}
+          </ul>
+          {warnings.overlaps.length > 0 && <p>{t('anyway')}</p>}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bookAppointment, readCalendarDay } from '@/app/(staff)/calendar/actions';
+import { bookingWarnings } from '@/app/(staff)/calendar/booking-warnings';
 import { closeDb } from '@/db/client';
 import { withTenant } from '@/db/tenant';
 import type { CalendarDay } from '@/lib/calendar-day';
@@ -50,6 +51,8 @@ interface Place {
   filling: string;
   inactiveTreatment: string;
   ana: string;
+  /** Another active patient: the one whose visit the clinic already had (existing()). */
+  marko: string;
   archived: string;
   deceased: string;
 }
@@ -113,6 +116,7 @@ async function clinicIn(timeZone: string): Promise<Place> {
     filling: await treatment('Filling', 45),
     inactiveTreatment: await treatment('Whitening', 60, false),
     ana: await patient('Ana', 'Brezovska'),
+    marko: await patient('Marko', 'Dardha'),
     archived: await patient('Ana', 'Planinska', 'archived'),
     deceased: await patient('Shpëtim', 'Lumi', 'deceased'),
   };
@@ -155,6 +159,7 @@ function booking(place: Place, change: Partial<scheduling.NewBooking> = {}): sch
     lengthMinutes: 30,
     timeZone: place === newYork ? 'America/New_York' : 'Europe/Skopje',
     createdBy: bookerId,
+    anyway: false,
     ...change,
   };
 }
@@ -202,12 +207,16 @@ async function written(clinicId: string): Promise<[number, number]> {
   ];
 }
 
-/** An appointment written as the migration role: one the clinic already had. */
+/**
+ * An appointment written as the migration role: one the clinic already had, of another patient than
+ * the one booked (Marko's), so a booking over it is an overlap, never the same booking again
+ * (E01-T05b, `already_booked`); the same patient's is `patientId`.
+ */
 async function existing(
   place: Place,
   startsAt: string,
   minutes: number,
-  fields: { status?: string; overlapOk?: boolean; providerId?: string } = {},
+  fields: { status?: string; overlapOk?: boolean; providerId?: string; patientId?: string } = {},
 ): Promise<string> {
   const id = newId();
   await admin.query(
@@ -218,7 +227,7 @@ async function existing(
     [
       id,
       place.clinic,
-      place.ana,
+      fields.patientId ?? place.marko,
       fields.providerId ?? place.dentist,
       startsAt,
       minutes,
@@ -653,7 +662,7 @@ describe('the booking action (acceptance 4, 5, 6)', () => {
     expect(cache.revalidatePath).toHaveBeenCalledExactlyOnceWith('/patients');
   });
 
-  it('an overlap: overlap, with nothing written and nothing brought again', async () => {
+  it('an overlap: overlap, with nothing written, and the day brought again (E01-T05b)', async () => {
     request.clinic = skopje.clinic;
     await existing(skopje, '2031-03-04T08:00:00Z', 30);
     const before = await written(skopje.clinic);
@@ -661,7 +670,10 @@ describe('the booking action (acceptance 4, 5, 6)', () => {
       await bookAppointment(skopje.clinic, form(skopje, { day: '2031-03-04', start: '09:15' })),
     ).toEqual({ ok: false, error: { code: 'overlap' } });
     expect(await written(skopje.clinic)).toEqual(before);
-    expect(cache.refresh).not.toHaveBeenCalled();
+    // E01-T05b: a visit the drawer did not show; the refused answer brings the day, so its warning
+    // names it. E01-T05a brought it only after a booking.
+    expect(cache.refresh).toHaveBeenCalledOnce();
+    expect(cache.revalidatePath).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -750,4 +762,493 @@ describe('the booking action (acceptance 4, 5, 6)', () => {
     expect(result).toEqual({ ok: false, error: { code: 'patient_not_bookable' } });
     expect(await counts()).toEqual(before);
   });
+});
+
+// E01-T05b: Book anyway (D-020) and one booking per click, through the module and through the action.
+// Each case on a day of its own, June 2031 for the module and July 2031 for the action, in Skopje's
+// summer time (UTC+2): 09:00 local is 07:00 UTC.
+
+/** The dentist's visits on the day, as stored: whose, the local start in Skopje, overlap_ok, by start. */
+async function dentistsDay(
+  place: Place,
+  day: CalendarDay,
+): Promise<{ patient: string; starts: string; overlap_ok: boolean }[]> {
+  const { rows } = await admin.query<{ patient: string; starts: string; overlap_ok: boolean }>(
+    `select patient_id as patient, overlap_ok,
+            to_char(starts_at at time zone 'Europe/Skopje', 'HH24:MI') as starts
+       from appointments
+      where provider_id = $1 and (starts_at at time zone 'Europe/Skopje')::date = $2::date
+      order by starts_at, id`,
+    [place.dentist, day],
+  );
+  return rows;
+}
+
+/**
+ * Books in a transaction that stays open half a second after its booking, as a first receptionist's
+ * would while a second books: `booked` resolves once its booking is in, the result once it commits.
+ */
+function bookAndHold(
+  place: Place,
+  change: Partial<scheduling.NewBooking>,
+): { booked: Promise<void>; result: Promise<scheduling.BookingResult> } {
+  let signal!: () => void;
+  const booked = new Promise<void>((resolve) => {
+    signal = resolve;
+  });
+  const result = withTenant(place.clinic, async (tx) => {
+    const answer = await scheduling.createAppointment(tx, booking(place, change), NOW);
+    signal();
+    await tx.execute(sql`select pg_sleep(0.5)`);
+    return answer;
+  });
+  return { booked, result };
+}
+
+describe('Book anyway: overlap_ok true only over a real overlap (E01-T05b, acceptance 1)', () => {
+  let nextDay = 1;
+  const freshDay = (): CalendarDay => `2031-06-${String(nextDay++).padStart(2, '0')}`;
+
+  it('with "anyway", a time over another visit is booked with overlap_ok true, and both are kept', async () => {
+    const day = freshDay();
+    await existing(skopje, `${day}T07:00:00Z`, 30);
+    const id = await booked(skopje, { day, startMinute: 9 * H + 15, anyway: true });
+    expect(await row(id)).toMatchObject({
+      overlap_ok: true,
+      status: 'booked',
+      patient_id: skopje.ana,
+    });
+    expect(await dentistsDay(skopje, day)).toEqual([
+      { patient: skopje.marko, starts: '09:00', overlap_ok: false },
+      { patient: skopje.ana, starts: '09:15', overlap_ok: true },
+    ]);
+  });
+
+  it.each(['booked', 'confirmed', 'arrived', 'completed'])(
+    'over a %s visit, and over one booked anyway itself: overlap_ok true',
+    async (status) => {
+      const day = freshDay();
+      await existing(skopje, `${day}T07:00:00Z`, 60, { status });
+      await existing(skopje, `${day}T07:30:00Z`, 30, { overlapOk: true });
+      const id = await booked(skopje, { day, startMinute: 9 * H + 45, anyway: true });
+      expect((await row(id)).overlap_ok).toBe(true);
+    },
+  );
+
+  it.each(['cancelled', 'no_show'])(
+    'with "anyway", the other visit %s by the time it reaches the server: an ordinary booking, overlap_ok false',
+    async (status) => {
+      const day = freshDay();
+      // The drawer showed the overlap; the other visit was then cancelled (or marked a no-show).
+      const other = await existing(skopje, `${day}T07:00:00Z`, 30);
+      await admin.query('update appointments set status = $2 where id = $1', [other, status]);
+      const id = await booked(skopje, { day, startMinute: 9 * H, anyway: true });
+      expect((await row(id)).overlap_ok).toBe(false);
+      // An ordinary booking, which the database's constraint guards: a visit over it that skips the
+      // module's check fails the constraint.
+      await expect(existing(skopje, `${day}T07:15:00Z`, 30)).rejects.toThrow(
+        /appointments_no_double_booking/,
+      );
+    },
+  );
+
+  it('with "anyway" and nothing to overlap: an ordinary booking, overlap_ok false', async () => {
+    const day = freshDay();
+    await existing(skopje, `${day}T07:00:00Z`, 30);
+    // Back to back: 09:30, as the other visit ends.
+    const id = await booked(skopje, { day, startMinute: 9 * H + 30, anyway: true });
+    expect((await row(id)).overlap_ok).toBe(false);
+  });
+
+  it('without "anyway", the same time is refused as an overlap, with nothing written', async () => {
+    const day = freshDay();
+    await existing(skopje, `${day}T07:00:00Z`, 30);
+    const before = await written(skopje.clinic);
+    expect(await book(skopje, { day, startMinute: 9 * H + 15, anyway: false })).toEqual({
+      ok: false,
+      code: 'overlap',
+    });
+    expect(await written(skopje.clinic)).toEqual(before);
+  });
+});
+
+describe('one booking per click: the same booking again is already_booked (E01-T05b, acceptance 3)', () => {
+  let nextDay = 15;
+  const freshDay = (): CalendarDay => `2031-06-${String(nextDay++).padStart(2, '0')}`;
+
+  it.each([false, true])(
+    'sent twice (anyway: %s): the second is already_booked, with nothing written',
+    async (anyway) => {
+      const day = freshDay();
+      await booked(skopje, { day, startMinute: 9 * H, anyway });
+      const before = await written(skopje.clinic);
+      expect(await book(skopje, { day, startMinute: 9 * H, anyway })).toEqual({
+        ok: false,
+        code: 'already_booked',
+      });
+      expect(await written(skopje.clinic)).toEqual(before);
+      expect(await dentistsDay(skopje, day)).toEqual([
+        { patient: skopje.ana, starts: '09:00', overlap_ok: false },
+      ]);
+    },
+  );
+
+  it('booked anyway over another visit, then sent again, with or without "anyway": already_booked, not an overlap', async () => {
+    const day = freshDay();
+    await existing(skopje, `${day}T07:00:00Z`, 30);
+    await booked(skopje, { day, startMinute: 9 * H, anyway: true });
+    const before = await written(skopje.clinic);
+    for (const anyway of [true, false]) {
+      expect(await book(skopje, { day, startMinute: 9 * H, anyway })).toEqual({
+        ok: false,
+        code: 'already_booked',
+      });
+    }
+    expect(await written(skopje.clinic)).toEqual(before);
+    expect(await dentistsDay(skopje, day)).toEqual([
+      { patient: skopje.marko, starts: '09:00', overlap_ok: false },
+      { patient: skopje.ana, starts: '09:00', overlap_ok: true },
+    ]);
+  });
+
+  it('the same patient, provider and start with another treatment or length is the same booking', async () => {
+    const day = freshDay();
+    await booked(skopje, { day, startMinute: 10 * H });
+    expect(
+      await book(skopje, {
+        day,
+        startMinute: 10 * H,
+        lengthMinutes: 45,
+        treatmentTypeId: skopje.filling,
+      }),
+    ).toEqual({ ok: false, code: 'already_booked' });
+  });
+
+  it('is no copy: another start, another provider, another patient, or a visit that frees its time', async () => {
+    const day = freshDay();
+    await booked(skopje, { day, startMinute: 9 * H });
+    // Ana again at 09:15 with the dentist: her own visit overlaps it.
+    expect(await book(skopje, { day, startMinute: 9 * H + 15 })).toEqual({
+      ok: false,
+      code: 'overlap',
+    });
+    // Ana at 09:00 with the hygienist, who is free then.
+    await booked(skopje, { day, startMinute: 9 * H, providerId: skopje.hygienist });
+    // Marko at 09:00 with the dentist: another patient's booking over Ana's visit.
+    expect(await book(skopje, { day, startMinute: 9 * H, patientId: skopje.marko })).toEqual({
+      ok: false,
+      code: 'overlap',
+    });
+    // Ana's visit at 11:00, cancelled or a no-show: the same booking again books.
+    for (const status of ['cancelled', 'no_show']) {
+      await existing(skopje, `${day}T09:00:00Z`, 30, { patientId: skopje.ana, status });
+    }
+    await booked(skopje, { day, startMinute: 11 * H });
+  });
+
+  it.each([false, true])(
+    'twice at once (anyway: %s): the second waits for the provider’s lock, then is already_booked; one row',
+    async (anyway) => {
+      const day = freshDay();
+      // With "anyway" over another visit: the database's constraint does not hold a row booked anyway,
+      // so the lock alone keeps the second copy out.
+      if (anyway) await existing(skopje, `${day}T07:00:00Z`, 30);
+      const first = bookAndHold(skopje, { day, startMinute: 9 * H, anyway });
+      await first.booked;
+      const startedAt = Date.now();
+      const second = book(skopje, { day, startMinute: 9 * H, anyway });
+      const [one, two] = await Promise.all([first.result, second]);
+      expect(one.ok).toBe(true);
+      expect(two).toEqual({ ok: false, code: 'already_booked' });
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(300);
+      expect(
+        (await dentistsDay(skopje, day)).filter((visit) => visit.patient === skopje.ana),
+      ).toEqual([{ patient: skopje.ana, starts: '09:00', overlap_ok: anyway }]);
+    },
+  );
+});
+
+describe('the booking action: "anyway", the same booking again, and a visit booked meanwhile (E01-T05b)', () => {
+  let nextDay = 1;
+  const freshDay = (): CalendarDay => `2031-07-${String(nextDay++).padStart(2, '0')}`;
+
+  it('Book anyway sends "anyway": booked with overlap_ok true, one audit row, the day brought again', async () => {
+    request.clinic = skopje.clinic;
+    const day = freshDay();
+    await existing(skopje, `${day}T07:00:00Z`, 30);
+    const before = await written(skopje.clinic);
+    const result = await bookAppointment(
+      skopje.clinic,
+      form(skopje, { day, start: '09:15', anyway: 'true' }),
+    );
+    if (!result.ok) throw new Error(`refused: ${result.error.code}`);
+    expect(await written(skopje.clinic)).toEqual([before[0] + 1, before[1] + 1]);
+    expect(await row(result.value.id)).toMatchObject({ overlap_ok: true, created_by: frontDeskId });
+    expect(cache.refresh).toHaveBeenCalledOnce();
+  });
+
+  it('"anyway" sent after the other visit was cancelled: an ordinary booking, overlap_ok false', async () => {
+    request.clinic = skopje.clinic;
+    const day = freshDay();
+    const other = await existing(skopje, `${day}T07:00:00Z`, 30);
+    await admin.query(`update appointments set status = 'cancelled' where id = $1`, [other]);
+    const result = await bookAppointment(
+      skopje.clinic,
+      form(skopje, { day, start: '09:00', anyway: 'true' }),
+    );
+    if (!result.ok) throw new Error(`refused: ${result.error.code}`);
+    expect((await row(result.value.id)).overlap_ok).toBe(false);
+  });
+
+  it('"anyway" is a field the drawer sends as "true" alone: another value is the schema’s problem, at it', async () => {
+    request.clinic = skopje.clinic;
+    const before = await written(skopje.clinic);
+    const result = await bookAppointment(
+      skopje.clinic,
+      form(skopje, { day: freshDay(), anyway: 'yes' }),
+    );
+    if (result.ok || result.error.code !== 'invalid_input' || !('issues' in result.error)) {
+      throw new Error('expected invalid_input');
+    }
+    expect(result.error.issues.map((issue) => issue.path[0])).toEqual(['anyway']);
+    expect(await written(skopje.clinic)).toEqual(before);
+  });
+
+  it.each([undefined, 'true'])(
+    'the same booking sent twice (anyway: %s): already_booked, nothing written, the day brought again',
+    async (anyway) => {
+      request.clinic = skopje.clinic;
+      const day = freshDay();
+      // With "anyway": over Marko's visit at 10:00.
+      if (anyway) await existing(skopje, `${day}T08:00:00Z`, 30);
+      const fields = { day, start: '10:00', ...(anyway ? { anyway } : {}) };
+      const first = await bookAppointment(skopje.clinic, form(skopje, fields));
+      if (!first.ok) throw new Error(`refused: ${first.error.code}`);
+      cache.refresh.mockClear();
+      const before = await written(skopje.clinic);
+      expect(await bookAppointment(skopje.clinic, form(skopje, fields))).toEqual({
+        ok: false,
+        error: { code: 'already_booked' },
+      });
+      expect(await written(skopje.clinic)).toEqual(before);
+      expect(cache.refresh).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each([undefined, 'true'])(
+    'the same booking sent twice at once (anyway: %s): one row, the other already_booked',
+    async (anyway) => {
+      request.clinic = skopje.clinic;
+      const day = freshDay();
+      if (anyway) await existing(skopje, `${day}T08:00:00Z`, 30);
+      const fields = { day, start: '10:00', ...(anyway ? { anyway } : {}) };
+      const before = await written(skopje.clinic);
+      const answers = await Promise.all([
+        bookAppointment(skopje.clinic, form(skopje, fields)),
+        bookAppointment(skopje.clinic, form(skopje, fields)),
+      ]);
+      expect(answers.filter((answer) => answer.ok)).toHaveLength(1);
+      expect(answers.filter((answer) => !answer.ok)).toEqual([
+        { ok: false, error: { code: 'already_booked' } },
+      ]);
+      expect(await written(skopje.clinic)).toEqual([before[0] + 1, before[1] + 1]);
+    },
+  );
+
+  it('a visit booked by someone else after the day was read: Book refused, the day brought again names it, Book anyway books it (acceptance 2)', async () => {
+    request.clinic = skopje.clinic;
+    const day = freshDay();
+    const blocksOfDentist = async () => {
+      const read = await readCalendarDay(skopje.clinic, { day });
+      if (!read.ok) throw new Error(`not read: ${read.error.code}`);
+      const column = read.value.view.columns.find((found) => found.providerId === skopje.dentist);
+      return (column?.blocks ?? []).filter((block) => block.kind === 'appointment');
+    };
+    // The drawer opened on the day as read: nothing booked at 09:00.
+    expect(await blocksOfDentist()).toEqual([]);
+    // Someone else books Marko at 09:00 meanwhile.
+    const other = await existing(skopje, `${day}T07:00:00Z`, 30);
+    // Book, without "anyway": refused, and the answer brings the day again.
+    expect(await bookAppointment(skopje.clinic, form(skopje, { day, start: '09:00' }))).toEqual({
+      ok: false,
+      error: { code: 'overlap' },
+    });
+    expect(cache.refresh).toHaveBeenCalledOnce();
+    // The day it brings holds that visit, which the drawer's warning then names.
+    expect((await blocksOfDentist()).map((block) => block.id)).toEqual([other]);
+    // Book anyway.
+    const result = await bookAppointment(
+      skopje.clinic,
+      form(skopje, { day, start: '09:00', anyway: 'true' }),
+    );
+    if (!result.ok) throw new Error(`refused: ${result.error.code}`);
+    expect(await dentistsDay(skopje, day)).toEqual([
+      { patient: skopje.marko, starts: '09:00', overlap_ok: false },
+      { patient: skopje.ana, starts: '09:00', overlap_ok: true },
+    ]);
+  });
+});
+
+describe('a break, the hours or a closed day are warned of, never refused (E01-T05b, acceptance 4)', () => {
+  it('the day read as the drawer warns of it, and Book books each: in a break, partly outside the hours, on a closed day, on a weekday without hours', async () => {
+    // A clinic of its own, so no other case's day changes: open Monday to Friday 08:00–18:00, the
+    // dentist's lunch on Tuesdays, Wednesday 23 July 2031 closed. Skopje in July is UTC+2.
+    const place = await clinicIn('Europe/Skopje');
+    await insertMembership(admin, {
+      clinicId: place.clinic,
+      userId: frontDeskId,
+      role: 'front_desk',
+    });
+    for (const weekday of [1, 2, 3, 4, 5]) {
+      await insertRow(admin, 'clinic_hours', {
+        id: newId(),
+        clinic_id: place.clinic,
+        weekday,
+        opens: '08:00',
+        closes: '18:00',
+      });
+    }
+    await insertRow(admin, 'provider_breaks', {
+      id: newId(),
+      clinic_id: place.clinic,
+      provider_id: place.dentist,
+      weekday: 2,
+      starts: '12:00',
+      ends: '13:00',
+      label: 'Lunch',
+    });
+    await insertRow(admin, 'closed_days', {
+      id: newId(),
+      clinic_id: place.clinic,
+      date: '2031-07-23',
+      label: 'Staff training day',
+    });
+    request.clinic = place.clinic;
+    const viewOf = async (day: CalendarDay) => {
+      const read = await readCalendarDay(place.clinic, { day });
+      if (!read.ok) throw new Error(`not read: ${read.error.code}`);
+      return read.value.view;
+    };
+    const tuesday = await viewOf('2031-07-22');
+    const lunch = tuesday.columns
+      .find((column) => column.providerId === place.dentist)
+      ?.blocks.filter((block) => block.kind === 'break');
+    expect(lunch?.map((block) => [block.from, block.to])).toEqual([[12 * H, 13 * H]]);
+    expect((await viewOf('2031-07-24')).open).toEqual({ from: 8 * H, to: 18 * H });
+    expect((await viewOf('2031-07-23')).closed).toEqual({
+      why: 'closed_day',
+      label: 'Staff training day',
+    });
+    expect((await viewOf('2031-07-26')).closed).toEqual({ why: 'no_hours' });
+
+    for (const [day, start] of [
+      ['2031-07-22', '12:15'], // in the dentist's lunch
+      ['2031-07-24', '17:45'], // to 18:15, past the closing
+      ['2031-07-23', '09:00'], // a closed day
+      ['2031-07-26', '09:00'], // a Saturday, no hours
+    ] as const) {
+      const result = await bookAppointment(place.clinic, form(place, { day, start }));
+      if (!result.ok) throw new Error(`${day} ${start} refused: ${result.error.code}`);
+      expect((await row(result.value.id)).overlap_ok, `${day} ${start}`).toBe(false);
+    }
+  });
+});
+
+// The tester's (E01-T05b): the drawer's warning, read from the day as the calendar reads it, and the
+// server's check agree on the four days the clocks change in Skopje and New York (a block's minutes
+// are the clock's, as the drawer's start is: in real minutes a 23- or 25-hour day would put the visit
+// an hour off); the same booking again over the patient's own visit of every status that holds the
+// chair; and the same booking from two tabs at once, one with "anyway" and one without, where only
+// the provider's lock and `already_booked` keep the second copy out (a row booked anyway is not held
+// by the database's constraint). Days of August 2031 in Skopje (UTC+2: 09:00 is 07:00 UTC).
+
+describe('on the days the clocks change, the warning and the server agree (tester)', () => {
+  it.each([
+    // Skopje: summer time from 02:00 (UTC+2), so 09:00 is 07:00 UTC; winter time from 03:00 (UTC+1).
+    { zone: 'Europe/Skopje', day: '2031-03-30', nine: '2031-03-30T07:00:00Z' },
+    { zone: 'Europe/Skopje', day: '2031-10-26', nine: '2031-10-26T08:00:00Z' },
+    // New York: daylight time from 02:00 (UTC-4), 09:00 is 13:00 UTC; standard time from 02:00 (UTC-5).
+    { zone: 'America/New_York', day: '2031-03-09', nine: '2031-03-09T13:00:00Z' },
+    { zone: 'America/New_York', day: '2031-11-02', nine: '2031-11-02T14:00:00Z' },
+  ] as const)(
+    '$zone on $day: a visit at 09:00 is warned of from 08:45 to 09:15, not at 08:30 or 09:30, and the server refuses and books alike',
+    async ({ zone, day, nine }) => {
+      const place = zone === 'America/New_York' ? newYork : skopje;
+      request.clinic = place.clinic;
+      const other = await existing(place, nine, 30);
+      const read = await readCalendarDay(place.clinic, { day });
+      if (!read.ok) throw new Error(`not read: ${read.error.code}`);
+      const warned = (start: number) =>
+        bookingWarnings(read.value.view, {
+          providerId: place.dentist,
+          start,
+          length: 30,
+        }).overlaps.map((block) => block.id);
+      for (const start of [8 * H + 45, 9 * H, 9 * H + 15]) {
+        expect(warned(start), `${start}`).toEqual([other]);
+      }
+      expect(warned(8 * H + 30)).toEqual([]);
+      expect(warned(9 * H + 30)).toEqual([]);
+
+      // The server, alike: 09:30 is an ordinary booking; 09:15 is refused, then booked anyway.
+      const after = await bookAppointment(place.clinic, form(place, { day, start: '09:30' }));
+      if (!after.ok) throw new Error(`09:30 refused: ${after.error.code}`);
+      expect((await row(after.value.id)).overlap_ok).toBe(false);
+      expect(await bookAppointment(place.clinic, form(place, { day, start: '09:15' }))).toEqual({
+        ok: false,
+        error: { code: 'overlap' },
+      });
+      const anyway = await bookAppointment(
+        place.clinic,
+        form(place, { day, start: '09:15', anyway: 'true' }),
+      );
+      if (!anyway.ok) throw new Error(`09:15 anyway refused: ${anyway.error.code}`);
+      expect((await row(anyway.value.id)).overlap_ok).toBe(true);
+    },
+  );
+});
+
+describe('one booking per click, the edges (tester)', () => {
+  let nextDay = 1;
+  const freshDay = (): CalendarDay => `2031-08-${String(nextDay++).padStart(2, '0')}`;
+
+  it.each(['booked', 'confirmed', 'arrived', 'completed'])(
+    'the same booking again over the patient\'s own %s visit: already_booked, with or without "anyway", nothing written',
+    async (status) => {
+      const day = freshDay();
+      await existing(skopje, `${day}T07:00:00Z`, 30, { patientId: skopje.ana, status });
+      const before = await written(skopje.clinic);
+      for (const anyway of [false, true]) {
+        expect(
+          await book(skopje, { day, startMinute: 9 * H, anyway }),
+          `anyway: ${anyway}`,
+        ).toEqual({ ok: false, code: 'already_booked' });
+      }
+      expect(await written(skopje.clinic)).toEqual(before);
+    },
+  );
+
+  it.each([
+    { first: false, second: true },
+    { first: true, second: false },
+  ])(
+    'from two tabs at once, the first with "anyway": $first, the second: $second: one row, the other already_booked',
+    async ({ first, second }) => {
+      const day = freshDay();
+      // The tab that sends "anyway" showed Marko's visit at 09:00, cancelled since: nothing holds the
+      // chair, so the first is an ordinary booking whichever it is.
+      await existing(skopje, `${day}T07:00:00Z`, 30, { status: 'cancelled' });
+      const one = bookAndHold(skopje, { day, startMinute: 9 * H, anyway: first });
+      await one.booked;
+      const startedAt = Date.now();
+      const two = book(skopje, { day, startMinute: 9 * H, anyway: second });
+      const [answerOne, answerTwo] = await Promise.all([one.result, two]);
+      expect(answerOne.ok).toBe(true);
+      expect(answerTwo).toEqual({ ok: false, code: 'already_booked' });
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(300);
+      expect(
+        (await dentistsDay(skopje, day)).filter((visit) => visit.patient === skopje.ana),
+      ).toEqual([{ patient: skopje.ana, starts: '09:00', overlap_ok: false }]);
+    },
+  );
 });

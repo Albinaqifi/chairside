@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import pg from 'pg';
-import { SEEDED_CLINICS, SEEDED_PROVIDERS } from '@/db/seed/seeded';
+import { SEEDED_CLINICS, SEEDED_PEOPLE, SEEDED_PROVIDERS } from '@/db/seed/seeded';
 import messages from '@/i18n/en.json' with { type: 'json' };
 import { e2eDatabase } from './e2e-database.ts';
 import { APP } from './servers.ts';
@@ -12,13 +12,30 @@ import { APP } from './servers.ts';
 // (the browser's clock moved); a double click on New appointment. Each check books on a day of its
 // browser's own, in April 2031, far from the seed's week and from calendar.spec.ts's March days, so no
 // other check's counts change; it removes what it booked. Names are the seed's invented ones.
+//
+// E01-T05b, on days of May 2031: the overlap warning and Book anyway, following start, length and
+// provider, and its double click; a visit booked by someone else after the day was read, which the
+// refused Book's answer brings; a read on use while the warning shows; the warning line for a break.
+// The other visits are written as the migration role, as calendar.spec.ts writes its rows.
 
 const t = messages.calendar.booking;
 
 /** The days each browser books on, one a check: weekdays, open 08:00–18:00 like every weekday. */
 const DAYS: Record<
   string,
-  Record<'mouse' | 'keyboard' | 'filter' | 'twice' | 'read' | 'words', string>
+  Record<
+    | 'mouse'
+    | 'keyboard'
+    | 'filter'
+    | 'twice'
+    | 'read'
+    | 'words'
+    | 'anyway'
+    | 'meanwhile'
+    | 'readWarning'
+    | 'breakLine',
+    string
+  >
 > = {
   chromium: {
     mouse: '2031-04-07',
@@ -27,6 +44,10 @@ const DAYS: Record<
     twice: '2031-04-10',
     read: '2031-04-11',
     words: '2031-04-28', // the tester's (acceptance 8)
+    anyway: '2031-05-05', // E01-T05b's
+    meanwhile: '2031-05-06',
+    readWarning: '2031-05-07',
+    breakLine: '2031-05-08',
   },
   firefox: {
     mouse: '2031-04-14',
@@ -35,6 +56,10 @@ const DAYS: Record<
     twice: '2031-04-17',
     read: '2031-04-18',
     words: '2031-04-29',
+    anyway: '2031-05-12',
+    meanwhile: '2031-05-13',
+    readWarning: '2031-05-14',
+    breakLine: '2031-05-15',
   },
   webkit: {
     mouse: '2031-04-21',
@@ -43,6 +68,10 @@ const DAYS: Record<
     twice: '2031-04-24',
     read: '2031-04-25',
     words: '2031-04-30',
+    anyway: '2031-05-19',
+    meanwhile: '2031-05-20',
+    readWarning: '2031-05-21',
+    breakLine: '2031-05-22',
   },
 };
 
@@ -81,6 +110,52 @@ async function bookedOn(day: string): Promise<Stored[]> {
     [SEEDED_CLINICS.harbourStreet, day],
   );
   return rows;
+}
+
+/** The seeded clinic's appointments on the day: whose, the local start, whether booked anyway. */
+async function overlapOkOn(day: string): Promise<[string, string, boolean][]> {
+  const { rows } = await db.query<{ patient: string; starts: string; overlap_ok: boolean }>(
+    `select p.first_name || ' ' || p.last_name as patient, a.overlap_ok,
+            to_char(a.starts_at at time zone 'Europe/Skopje', 'HH24:MI') as starts
+       from appointments a join patients p on p.id = a.patient_id
+      where a.clinic_id = $1 and (a.starts_at at time zone 'Europe/Skopje')::date = $2::date
+      order by a.starts_at, a.created_at`,
+    [SEEDED_CLINICS.harbourStreet, day],
+  );
+  return rows.map((row) => [row.patient, row.starts, row.overlap_ok]);
+}
+
+/**
+ * A visit someone else booked: the seeded patient of that name with the dentist on the day, from the
+ * local time for `minutes`, written as the migration role (E01-T05b).
+ */
+async function bookedElsewhere(
+  day: string,
+  start: string,
+  minutes: number,
+  [first, last]: [string, string],
+): Promise<void> {
+  const { rowCount } = await db.query(
+    `insert into appointments (id, clinic_id, patient_id, provider_id, title, starts_at, ends_at,
+                               status, source, created_by)
+     select gen_random_uuid(), p.clinic_id, p.id, $4, 'Checkup',
+            ($2::date + $3::time) at time zone 'Europe/Skopje',
+            (($2::date + $3::time) at time zone 'Europe/Skopje') + make_interval(mins => $5),
+            'booked', 'staff', $6
+       from patients p
+      where p.clinic_id = $1 and p.first_name = $7 and p.last_name = $8`,
+    [
+      SEEDED_CLINICS.harbourStreet,
+      day,
+      start,
+      SEEDED_PROVIDERS.harbourStreetDentist,
+      minutes,
+      SEEDED_PEOPLE.frontDesk.id,
+      first,
+      last,
+    ],
+  );
+  if (rowCount !== 1) throw new Error(`The seed has no one ${first} ${last}.`);
 }
 
 /** Removes what a check booked on its day. */
@@ -706,5 +781,263 @@ test.describe("a double click on New appointment's right part at 1280 px (accept
     await expect(close, 'Shift+Tab from the patient field reaches Close').toBeFocused();
     await page.keyboard.press('Enter');
     await expect(drawer(page), 'closed by Enter on Close').toBeHidden();
+  });
+});
+
+/** The drawer's text for a visit the time overlaps (E01-T05b): "Overlaps Ana Brezovska's visit, …". */
+const overlapsVisit = (name: string, from: string, to: string) =>
+  t.warning.overlap.replace('{name}', name).replace('{from}', from).replace('{to}', to);
+
+/**
+ * Every action the page sends from now on (a POST with Next.js's action header): its address, and
+ * whether it is a booking (the only one that sends a patient's id) rather than a read or a search.
+ */
+function countActions(page: Page): { path: string; booking: boolean }[] {
+  const actions: { path: string; booking: boolean }[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.headers()['next-action'] !== undefined) {
+      actions.push({
+        path: new URL(request.url()).pathname,
+        booking: (request.postData() ?? '').includes('patientId'),
+      });
+    }
+  });
+  return actions;
+}
+
+test.describe('an overlap and Book anyway (E01-T05b, acceptance 1, 3 and 5)', () => {
+  test('the warning names the other visit and follows start, length and provider; a double click on Book anyway books one, with overlap_ok', async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'anyway');
+    try {
+      await bookedElsewhere(day, '10:00', 30, ['Bojan', 'Kamenov']);
+      await openCalendar(page, day);
+      await newAppointment(page).click();
+      const open = drawer(page);
+      await open.getByRole('combobox', { name: t.patient }).fill('Mimoza K');
+      await suggestions(open).filter({ hasText: 'Mimoza Kodra' }).click();
+      await open.getByRole('button', { name: 'Checkup', exact: true }).click();
+      const start = open.getByLabel(t.start, { exact: true });
+      const length = open.getByLabel(t.length, { exact: true });
+      const provider = open.getByLabel(t.provider, { exact: true });
+      const warning = open.getByText(overlapsVisit('Bojan Kamenov', '10:00', '10:30'), {
+        exact: true,
+      });
+      const book = open.getByRole('button', { name: /^Book / });
+
+      // Over the other visit: the warning, and Book anyway.
+      await start.selectOption('10:15');
+      await expect(warning).toBeVisible();
+      await expect(open.getByText(t.warning.anyway, { exact: true })).toBeVisible();
+      await expect(book).toHaveText('Book anyway, 10:15 with Dr. Planinska');
+      // The start after it: gone.
+      await start.selectOption('10:30');
+      await expect(warning).toBeHidden();
+      await expect(book).toHaveText('Book 10:30 with Dr. Planinska');
+      // 09:45 for 30 minutes runs into it; for 15 it ends as the other visit starts.
+      await start.selectOption('09:45');
+      await expect(warning).toBeVisible();
+      await length.selectOption('15');
+      await expect(warning).toBeHidden();
+      await length.selectOption('30');
+      await expect(warning).toBeVisible();
+      // Another provider is free then.
+      await provider.selectOption({ label: 'Dr. Kodra' });
+      await expect(warning).toBeHidden();
+      await expect(book).toHaveText('Book 09:45 with Dr. Kodra');
+      await provider.selectOption({ label: 'Dr. Planinska' });
+      await start.selectOption('10:15');
+      await expect(book).toHaveText('Book anyway, 10:15 with Dr. Planinska');
+
+      // A double click on Book anyway books one.
+      const actions = countActions(page);
+      await book.dblclick();
+      await expect(open).toBeHidden();
+      await expect(column(page, 'Elena Planinska').locator('li[data-status]')).toHaveCount(2);
+      await page.waitForLoadState('networkidle');
+      expect(
+        actions.filter((action) => action.booking),
+        'one booking request',
+      ).toHaveLength(1);
+      expect(await overlapOkOn(day)).toEqual([
+        ['Bojan Kamenov', '10:00', false],
+        ['Mimoza Kodra', '10:15', true],
+      ]);
+    } finally {
+      await clear(day);
+    }
+  });
+});
+
+test.describe('a visit booked by someone else after the day was read (E01-T05b, acceptance 2)', () => {
+  test('Book is refused, its answer brings the day: the warning names that visit without a reload, and Book anyway books it', async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'meanwhile');
+    try {
+      // The page's clock stands still, so no read on use comes: only the booking's answer can bring
+      // the day.
+      await page.clock.install();
+      await openCalendar(page, day);
+      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+      await markPage(page);
+      await newAppointment(page).click();
+      const open = drawer(page);
+      const patient = open.getByRole('combobox', { name: t.patient });
+      await patient.fill('Mimoza K');
+      // The search waits a moment after the last key, on the page's clock.
+      await page.clock.runFor(300);
+      await suggestions(open).filter({ hasText: 'Mimoza Kodra' }).click();
+      await open.getByRole('button', { name: 'Checkup', exact: true }).click();
+      await open.getByLabel(t.start, { exact: true }).selectOption('09:00');
+      const book = open.getByRole('button', { name: /^Book / });
+      await expect(book).toHaveText('Book 09:00 with Dr. Planinska');
+
+      // Someone else books Bojan Kamenov with the same provider at 09:00 meanwhile.
+      await bookedElsewhere(day, '09:00', 30, ['Bojan', 'Kamenov']);
+      const actions = countActions(page);
+      await book.click();
+      // Refused, its text above Book.
+      await expect(open.getByRole('alert')).toHaveText(t.overlap);
+      // The answer brought the day: the warning names that visit, and Book is Book anyway.
+      await expect(
+        open.getByText(overlapsVisit('Bojan Kamenov', '09:00', '09:30'), { exact: true }),
+      ).toBeVisible();
+      await expect(book).toHaveText('Book anyway, 09:00 with Dr. Planinska');
+      expect(actions, 'one request: the booking, whose answer brought the day').toEqual([
+        { path: '/calendar', booking: true },
+      ]);
+      expect(await notReloaded(page), 'the page was not loaded again').toBe(true);
+      // Nothing typed or chosen changed with it.
+      await expect(patient).toHaveValue('Mimoza Kodra');
+      await expect(open.getByRole('button', { name: 'Checkup', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(await bookedOn(day)).toHaveLength(1);
+
+      // Book anyway, one press away.
+      await book.click();
+      await expect(open).toBeHidden();
+      expect(await overlapOkOn(day)).toEqual([
+        ['Bojan Kamenov', '09:00', false],
+        ['Mimoza Kodra', '09:00', true],
+      ]);
+      await page.waitForLoadState('networkidle');
+    } finally {
+      await clear(day);
+    }
+  });
+});
+
+test.describe('a read on use while the warning shows (E01-T05b, acceptance 5)', () => {
+  test('keeps everything typed and chosen; the warning follows the day the read brings', async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'readWarning');
+    const actions = countActions(page);
+    try {
+      await bookedElsewhere(day, '09:00', 30, ['Bojan', 'Kamenov']);
+      await page.clock.install();
+      await openCalendar(page, day);
+      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+
+      await newAppointment(page).click();
+      const open = drawer(page);
+      const patient = open.getByRole('combobox', { name: t.patient });
+      await patient.fill('Mimoza K');
+      await page.clock.runFor(300);
+      await suggestions(open).filter({ hasText: 'Mimoza Kodra' }).click();
+      await open.getByRole('button', { name: 'Checkup', exact: true }).click();
+      await open.getByLabel(t.start, { exact: true }).selectOption('09:00');
+      await open.getByLabel(t.length, { exact: true }).selectOption('60');
+      const first = open.getByText(overlapsVisit('Bojan Kamenov', '09:00', '09:30'), {
+        exact: true,
+      });
+      const second = open.getByText(overlapsVisit('Arben Dardha', '09:30', '10:00'), {
+        exact: true,
+      });
+      await expect(first).toBeVisible();
+      await expect(second).toBeHidden();
+
+      // Meanwhile Arben Dardha is booked at 09:30. 31 seconds on, the page is used inside the drawer:
+      // the day is read again under it.
+      await bookedElsewhere(day, '09:30', 30, ['Arben', 'Dardha']);
+      const before = actions.length;
+      await page.clock.fastForward(31_000);
+      const read = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.request().headers()['next-action'] !== undefined,
+      );
+      const title = open.getByRole('heading', { name: t.title });
+      const box = await title.boundingBox();
+      if (!box) throw new Error('The drawer has no title to move the pointer over.');
+      await page.mouse.move(box.x + 5, box.y + 5);
+      await page.mouse.move(box.x + 15, box.y + 5);
+      await page.keyboard.press('Shift');
+      await read;
+      expect(actions.slice(before), 'one read').toEqual([{ path: '/calendar', booking: false }]);
+
+      // The warning names both now; everything typed and chosen is as it was.
+      await expect(first).toBeVisible();
+      await expect(second).toBeVisible();
+      await expect(open).toBeVisible();
+      await expect(patient).toHaveValue('Mimoza Kodra');
+      await expect(open.getByRole('button', { name: 'Checkup', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await expect(open.getByLabel(t.start, { exact: true })).toHaveValue('09:00');
+      await expect(open.getByLabel(t.length, { exact: true })).toHaveValue('60');
+      await expect(open.getByLabel(t.provider, { exact: true })).toHaveValue(
+        SEEDED_PROVIDERS.harbourStreetDentist,
+      );
+
+      const book = open.getByRole('button', { name: 'Book anyway, 09:00 with Dr. Planinska' });
+      await book.click();
+      await expect(open).toBeHidden();
+      expect(await overlapOkOn(day)).toEqual([
+        ['Bojan Kamenov', '09:00', false],
+        ['Mimoza Kodra', '09:00', true],
+        ['Arben Dardha', '09:30', false],
+      ]);
+      await page.waitForLoadState('networkidle');
+    } finally {
+      await clear(day);
+    }
+  });
+});
+
+test.describe('a warning line for a break (E01-T05b, acceptance 4)', () => {
+  test("a time in the provider's lunch says so; Book stays Book and books it", async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'breakLine');
+    try {
+      await openCalendar(page, day);
+      await newAppointment(page).click();
+      const open = drawer(page);
+      await open.getByRole('combobox', { name: t.patient }).fill('Mimoza K');
+      await suggestions(open).filter({ hasText: 'Mimoza Kodra' }).click();
+      await open.getByRole('button', { name: 'Checkup', exact: true }).click();
+      const line = open.getByText("Overlaps Dr. Planinska's break: Lunch, 12:00–13:00.", {
+        exact: true,
+      });
+      await open.getByLabel(t.start, { exact: true }).selectOption('11:30');
+      await expect(line).toBeHidden();
+      await open.getByLabel(t.start, { exact: true }).selectOption('12:15');
+      await expect(line).toBeVisible();
+      const book = open.getByRole('button', { name: /^Book / });
+      await expect(book).toHaveText('Book 12:15 with Dr. Planinska');
+
+      await book.click();
+      await expect(open).toBeHidden();
+      expect(await overlapOkOn(day)).toEqual([['Mimoza Kodra', '12:15', false]]);
+      await page.waitForLoadState('networkidle');
+    } finally {
+      await clear(day);
+    }
   });
 });

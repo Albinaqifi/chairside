@@ -36,7 +36,7 @@ export const readCalendarDay = staffRead(
  * is the schema's, shown at its field (D-098): a patient, a treatment and a provider picked, a start of
  * the day, a length. What needs the clinic's rows is the handler's refusal, shown above Book: a patient
  * who is not active (owner, D-113), a provider or a treatment no longer offered, a start the clocks
- * skip, an overlap.
+ * skip, the same booking again, an overlap without "anyway" (E01-T05b).
  */
 
 const booking = z.object({
@@ -59,6 +59,14 @@ const booking = z.object({
     .regex(/^\d{1,4}$/)
     .transform(Number)
     .pipe(z.number().int().min(1).max(LENGTH_MAX)),
+  /**
+   * The person's "anyway" (D-020, E01-T05b): a hidden field the drawer sends only while it shows the
+   * overlap, which Book anyway then books. Not sent: an overlap is refused.
+   */
+  anyway: z
+    .literal('true')
+    .optional()
+    .transform((sent) => sent !== undefined),
 });
 
 /**
@@ -73,6 +81,11 @@ const booking = z.object({
  * on the grid at once; and every patient list visited before is read again on its next visit, one
  * reached by Back too (revalidatePath): its next visit has changed. Never redirect() here: the
  * wrapper answers a throw `internal`.
+ *
+ * Refused as an overlap or as the same booking again, the day comes back too (E01-T05b): the visit is
+ * one the drawer did not show, booked since the calendar's day was read, and the drawer's warning then
+ * names it, with Book anyway one press away. The refusal still writes nothing: refresh() only asks
+ * Next.js to send the page again with the answer, and the wrapper rolls the transaction back.
  */
 export const bookAppointment = staffAction(
   {
@@ -96,10 +109,14 @@ export const bookAppointment = staffAction(
         lengthMinutes: input.length,
         timeZone,
         createdBy: staff.user.id,
+        anyway: input.anyway,
       },
       now,
     );
-    if (!booked.ok) return refuse(booked.code);
+    if (!booked.ok) {
+      if (booked.code === 'overlap' || booked.code === 'already_booked') refresh();
+      return refuse(booked.code);
+    }
     refresh();
     revalidatePath('/patients');
     return { id: booked.id, providerId: input.providerId };
