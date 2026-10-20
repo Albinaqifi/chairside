@@ -60,6 +60,8 @@ Legend: ✅ in v1 as designed · ✏️ in v1 but changed · ⏳ later · ❌ no
   start / length / provider (E01-T05a … E01-T05d; D-113, D-114). The open-treatment hint comes with
   treatment plans (M6).
 - ✏️ Book sits under the fields, not in a bar along the drawer's foot. (owner, D-114)
+- ✏️ The overlap and the warning lines sit in one box in the soft amber every warning of the app
+  has (the "Needs a call" panel's), not the demo's orange text. (owner, 2026-10-20; E01-T05b)
 - ✏️ Besides an overlap, which takes "Book anyway" (D-020), the drawer warns in one line when the
   time is in the provider's break, outside the opening hours or on a closed day; Book still books
   it. The demo warns for lunch only. (owner, D-114)
