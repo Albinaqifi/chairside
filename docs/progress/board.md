@@ -10,7 +10,7 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
 - **Next task to start:** `E00-T13` (Ready), `/pipeline E00-T13`: `next` 16.4.2 and `zod` 4.6.7, so `pnpm audit --prod` is green again, before any other merge (owner, 2026-10-26, D-116). E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
-- **Decisions it waits on:** none (the owner's answer of 2026-10-26 is D-116)
+- **Decisions it waits on:** E00-T13 is Blocked (builder, 2026-10-26): the owner chooses how the two D-093 checks red on Next.js 16.4.2 are fixed (`handoffs/E00-T13.md`, builder section; recommended: a test-only fix round in E00-T13)
 - **E01-T05c (Tested, PR #72) waits for it:** once E00-T13 is on `main`, `main` is merged into `task/E01-T05c-slot-click` (no rebase, D-112; a conflict in the notes keeps both sides), `pnpm check` passes on the merged tree, the merge is pushed, and PR #72's new run must be green before the owner merges it; then its Done pass
 
 ## Next (in order)
@@ -25,6 +25,7 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 | Task | Blocked by | Who must act |
 |---|---|---|
 | E03-T02 … T09 | Q-08 providers (decided in E03-T01) and Meta business verification | Owner + architect |
+| E00-T13 | On Next.js 16.4.2 two D-093 checks (`form-memory.spec.ts`) are red in every run; the fix is a test change the task forbids (options in `handoffs/E00-T13.md`) | Owner |
 
 ## E00 · Foundation (M0)
 
@@ -59,7 +60,7 @@ Fully specified. A task becomes Ready when its dependencies are Done, except the
 | E00-T07f | The auth library's origin check stays on | builder | critical | **Ready** | From E00-T07e's review (`data`, D-109): `TEST` or `NODE_ENV=test` switch the library's origin and CSRF checks off, on a host too; two settings in `createAuth()` keep them on, in every test as well. Runs right before E00-T07c, once the owner has the accounts (owner, 2026-10-12). See `handoffs/E00-T07f.md` |
 | E00-T07c | Staging on Render | builder + owner | critical | Planned | From E00-T07 (D-102). The smallest paid plans for the web, the worker and the database (owner, 2026-10-11, D-105); owner: the Render and monitor accounts next ("Owner actions", Q-07). A database that lowers Cyrillic (E01-T02a); the sign-in limit's client address (E00-T02); the setup link out of the host's logs (E00-T05b); the heartbeat's monitor and its timings, and the host's wait against the worker's 20 s (E00-T07b). The refusals' last gaps were E00-T07e; the library's origin check is E00-T07f, right before it (D-109). Refined when the owner has the accounts |
 | E00-T12 | The logger's net before messaging | builder | normal | Planned | Before E02 (owner, 2026-10-03): `URL` and `Buffer` values, the messaging and link names, the plurals of whole names (E00-T01, E00-T05b; D-102) |
-| E00-T13 | Next.js 16.4.2 and Zod 4.6.7: the dependency check green again | builder | normal | **Ready** | From E01-T05c's test (`data`): `pnpm audit --prod` red since 2026-10-26 on two critical and one high advisory in `next` 16.3.8 and a high one in `zod` 4.6.5, `main` too; owner: upgrade first, before any other merge (D-116). `package.json` and the lockfile only; a needed code change stops it. See `handoffs/E00-T13.md` |
+| E00-T13 | Next.js 16.4.2 and Zod 4.6.7: the dependency check green again | builder | normal | **Blocked** | From E01-T05c's test (`data`): `pnpm audit --prod` red since 2026-10-26 on two critical and one high advisory in `next` 16.3.8 and a high one in `zod` 4.6.5, `main` too; owner: upgrade first, before any other merge (D-116). Builder, 2026-10-26: upgraded on its branch, the audit clean, `pnpm check` and the build green; two D-093 checks in `form-memory.spec.ts` red on 16.4.2 every run (green on 16.3.8), fixed only by a test change: the owner's choice (rules 4, 8). See `handoffs/E00-T13.md` |
 
 ## E01 · Scheduling (M1)
 
