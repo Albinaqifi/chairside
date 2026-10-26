@@ -2222,3 +2222,22 @@ architecture), `changed` (differs from the original files), `process`.
   leftover is always work, so it is a task, not a note.
 - **Revisit if:** a clinic keys its closed days before E01-T08d is merged (then it runs first); E01-T05c's
   double-click guard in `src/ui/` turns out to fit the list as well (then E01-T08d builds on it).
+
+### D-116 · Next.js 16.4.2 and Zod 4.6.7 before the next merge, as E00-T13 (owner); one copy of Zod by the lockfile alone
+- **Origin:** E01-T05c's test, 2026-10-26 (`handoffs/E01-T05c.md`, its tester's question; `pnpm audit
+  --prod` red on `main`'s Monday run 40312088104 and E01-T05c's run 40320367013). **Owner, 2026-10-26:**
+  "Yes: upgrade next to 16.4.1 or later and zod to 4.6.6 or later as a small task of its own before the
+  next merge." The versions and the rest are the architect's (`handoffs/E00-T13.md`).
+- **What:**
+  - **E00-T13, new, first on the board:** `next` and `eslint-config-next` exactly 16.4.2, `zod` exactly
+    4.6.7, `package.json` and the lockfile only; a needed code or test change stops it for the owner.
+    E01-T05c, Tested, is merged after it, with `main` merged into its branch for a new run (D-112).
+  - **One copy of Zod** (D-068 still holds): `better-auth`'s range `^4.5.4` takes 4.6.7, and `pnpm add`
+    moves it there without `overrides`. `better-auth` 1.7.7, `next-intl` 4.14.9 and React 19.2.8 stay.
+- **Why:** two critical remote code executions and two highs in production dependencies (D-075). 16.4.1
+  is the security release; 16.4.2 (2026-10-15) adds its Turbopack fixes; 16.4.3 (2026-10-23) changes how
+  `proxy.ts` loads, where the session is renewed (D-067), too new to take untried (as D-088 left radix-ui
+  1.7.0). Zod 4.6.7 is 4.6.6, which holds the fix, republished a day later. Probed on `0ec5ae0`: the
+  audit, format, lint, types, unit tests and the build pass with no code change.
+- **Revisit if:** a check fails on the upgrade (the owner chooses a fix or another version); 16.4.3 or a
+  later 16.4 has been out a few weeks at the next dependency change (move to it); a new advisory.
