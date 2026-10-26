@@ -817,44 +817,73 @@ E01-T06's drawer it could press a status button (a no-show marked by mistake). S
 
 ### E01-T05d · Booking: a new patient in one go
 
-- **Role:** builder · **Risk:** normal (as E01-T05a's; the patient is written through
-  `patients.create`, E01-T02b, with its own audit row in the same transaction; no wrapper,
-  `StaffForm`, policy or table) · **Depends on:** E01-T05b
-- **Read:** `scope` (New appointment drawer) · `design-ref` (demo line 1335; logic 2120, 2131) ·
-  D-033, D-095, D-097, D-098, D-113, D-114 · `handoffs/E01-T02b.md` (the patient form) · the architect
-  section of `handoffs/E01-T05d.md`, written when it is refined
+- **Role:** builder · **Risk:** normal (as E01-T05a's and E01-T05b's: the booking action and the
+  drawer; the patient is written through `patients.create`, E01-T02b, with its own audit row in the
+  same transaction; no wrapper, `StaffForm`, permission, policy or table changes) · **Depends on:**
+  E01-T05b, E01-T05c (both Done)
+- **Read:** `scope` (New appointment drawer) · `design-ref` (demo lines 1333–1336; logic 2120, 2131) ·
+  `test-strategy` (Duplicates, retries, states: the same booking sent twice) · D-033, D-095, D-097,
+  D-098, D-113, D-114 · `handoffs/E01-T02b.md` (the patient form) · the architect section of
+  `handoffs/E01-T05d.md`
 
 **Why.** A caller who is not a patient yet is booked in the same go (`scope-v1.md`, quick add):
 today the desk adds them on the patients page, then comes back to book. Split from E01-T05b (D-114).
+About 280 lines of product code with comments, sized from E01-T05b and E01-T05c.
 
 **Do.**
-- **"Add “…” as new patient"** under the suggestions (demo line 1335, logic 2120), once a few
-  letters are typed, by pointer and by keyboard (the arrow keys reach it as a suggestion): it turns
-  the patient field into first name and last name (the typed words split, the last one the last
-  name), phone and email, fields of the booking form, not a form of its own (D-113); and back to the
-  search.
-- Without a phone or an email the drawer says no reminder can reach the patient, and books
-  (`scope-v1.md`: allowed, flagged).
-- **One transaction:** the booking action writes the patient through `patients.create` (the phone
-  read with the clinic's country, `phone_impossible` above Book, D-098; the language the new-patient
-  page starts on), then books: a refused booking writes no patient (a refusal rolls the handler
-  back, `refuse()`). Two audit rows of ids: the wrapper's `appointment.created`, and
-  `patient.created`, which the handler writes through `audit.record` (the member as actor, the
-  action's `now`), as `src/db/clinic-create.ts` writes its own.
+- **"Add “…” as new patient"** as the suggestion list's last option (demo line 1335, logic 2120:
+  shown once three characters are typed and no patient is picked, whether the search found anyone or
+  not), by pointer and by keyboard: the arrow keys reach it as an option and Enter takes it, as a
+  suggestion. It turns the patient field into first name, last name, phone and email, fields of the
+  booking form, not a form of its own (D-113), the focus in the first one; a button (`type="button"`)
+  goes back to the search, the typed text in it again.
+- **What was typed fills the fields:** words split at spaces, the last one the last name and the rest
+  the first name (one word: the first name); a text of only digits, spaces and `+ - ( )` (a phone
+  searched for) goes to the phone field, the names empty. A pure function, unit-tested.
+- Without a phone and an email the drawer says, in one line under them, that no reminder can reach
+  the patient, and Book still books (`scope-v1.md`: allowed, flagged).
+- **One transaction:** the booking action takes either the picked patient's id or the new patient's
+  fields, never both (its schema; the new patient's names, phone and email checked as the
+  new-patient page's are, each shown at its field). For a new patient the handler first asks
+  `can(…, 'patients.manage')` as the pages do (every role has it today, `permissions.ts`; refused as
+  a code of its own, a review check), then writes the patient through `patients.create` (the phone
+  read with the clinic's country, `phone_impossible` above Book with the new-patient page's text,
+  D-098; the language the new-patient page starts on, the message file's first), then books it: a
+  refused booking writes no patient (a refusal rolls the handler back, `refuse()`). Two audit rows of
+  ids: `patient.created`, which the handler writes through `audit.record` (actor `user`, the member's
+  user id, the action's `now`; no metadata, as the new-patient page's), and the wrapper's
+  `appointment.created`.
+- **The same booking sent twice books one patient once** (`test-strategy.md`, Duplicates; `message`:
+  two patients with one phone get two reminders). `already_booked` matches the patient's id, which a
+  second send of a new patient would make anew, and with "anyway" book again. So the drawer makes the
+  new patient's id (`newId()`, `src/lib/ids.ts`) once per opening and sends it; `patients.create`
+  takes it (optional: E01-T02b's page and E04's import leave it out) and writes nothing when a
+  patient by that id exists (`ON CONFLICT (id) DO NOTHING`, which waits for a send at the same moment
+  to commit), saying so. The handler then writes no `patient.created` and books that patient as a
+  picked one, its status checked (`patient_not_bookable` for an id of no active patient of the
+  clinic): the same booking again is `already_booked`.
 - The new patient's words go in the booking's request body, never the page's address, and no field
   sets an `autocomplete` of its own (D-095).
 
 **Out of scope.** A likely-duplicate warning in the drawer: the suggestions list the name's matches
 first (E01-T02b's page keeps its own). The date of birth, the guardian and the notes (the profile,
-E01-T03).
+E01-T03). The language: the new-patient page's first, changed on the profile (E01-T03).
 
 **Acceptance.**
 - [ ] A new patient is added and booked in one go, the names from the words typed; one
-      `patient.created` and one `appointment.created` row, ids only (integration; e2e).
+      `patient.created` and one `appointment.created` row, ids only (integration; e2e, three
+      browsers).
+- [ ] "Add “…” as new patient" shows from the third character, with or without suggestions, is
+      reached by the arrow keys and taken by Enter; back to the search brings the typed text back
+      (component). Typed words split into the names, a phone into the phone field (unit).
 - [ ] Without a phone and an email it books, and the drawer says no reminder can reach the patient
       (component; integration).
-- [ ] An impossible phone is refused above Book with nothing written; a refused booking (an overlap,
-      `already_booked`) writes no patient and no audit row (integration).
+- [ ] An impossible phone is refused above Book with nothing written; an email that is no email is
+      shown at its field; a refused booking (an overlap without "anyway") writes no patient and no
+      audit row (integration).
+- [ ] The same booking with a new patient sent twice, and twice at once, with and without "anyway":
+      one patient, one appointment, one `patient.created`; the other refused as `already_booked`
+      (integration).
 - [ ] No field of the new patient has an `autocomplete` of its own (unit); their words are in the
       request's body and in no address (tester).
 - [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
@@ -890,6 +919,12 @@ E01-T03).
   and the cancel dialog. A drawer cannot see `StaffForm`'s send today (it sends from `onSubmit`, so
   `useFormStatus` does not see it): `StaffForm` tells its caller, the change this critical task's
   review covers.
+- **The drawer keeps to controls the double click's guard stops** (E01-T05c tester; the double
+  click criterion below, `message`): the
+  guard (`src/ui/double-click-guard.ts`) drops a press by its `mousedown` and its `click`, so a control
+  that acts on the pointer's press (Radix's Select or DropdownMenu trigger) would still act within the
+  half second. The time and provider selects are the browser's own (`NativeSelect`) and the status
+  controls are buttons; a control that acts on the press extends the guard first.
 
 **Out of scope.** Message timeline, aftercare box, treatment plan list, "start visit" (later epics; do not render placeholders).
 
@@ -1272,6 +1307,10 @@ review, `none`). A quieter Remove (owner, D-115). The drawers' and dialogs' guar
   Time the drawer's patient search there as well (E01-T05a builder, `speed`): it asks for the
   patient list's 50 rows, with their last and next visits, at each pause in typing, to show five; if
   a receptionist would notice, a limit in its input is the fix (a task).
+- **A press right after a drawer opens** (E01-T05c builder, `speed`): for half a second after a
+  drawer or dialog opens, a press in it is dropped without a sign (the double click's guard), so a
+  chip pressed at once must be pressed again. Watch whether a receptionist hits it, by mouse and, if
+  the desk has one, on a touch screen (the guard reads the same events; no check drives touch).
 - Findings go to the handoff note; real bugs become tasks via the board.
 
 **Owner action.** If a pilot receptionist is available (Q-09), let them try booking on staging now.
