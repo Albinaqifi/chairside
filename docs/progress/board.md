@@ -9,13 +9,13 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** E01-T05c's Done pass, `/architect E01-T05c`: the owner merged PR #72 on 2026-10-26 after E00-T13 (the run on `main` green, [40395861963](https://github.com/Albinaqifi/chairside/actions/runs/40395861963)); it refines E01-T05d, next after it. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
+- **Next task to start:** `E01-T05d` (Ready), `/pipeline E01-T05d`: a new patient booked in one go from the drawer. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
 - **Decisions it waits on:** none
 
 ## Next (in order)
 
 1. E00-T07f, then E00-T07c, once the owner has the Render and monitor accounts ("Owner actions"; not yet on 2026-10-11): E00-T07f needs no account but goes right before staging (owner, D-109); until then the rest of E01 goes first
-2. The rest of E01, in the epic's own order (D-087): E01-T05c (merged, PR #72; its Done pass next), then E01-T05d (split, D-114; refined in E01-T05c's Done pass), then E01-T09 and E01-T03 … E01-T10, then E01-T08d (Ready: the closed days' double click, `message`; owner: at the end of E01, D-115), then E01-T11; E00-T06c before the first journey that sets "now" (D-100)
+2. The rest of E01, in the epic's own order (D-087): E01-T05d (Ready), then E01-T09 and E01-T03 … E01-T10, then E01-T08d (Ready: the closed days' double click, `message`; owner: at the end of E01, D-115), then E01-T11; E00-T06c before the first journey that sets "now" (D-100)
 3. E00-T12, before E02 (owner, 2026-10-03; D-102)
 
 ## Blocked
@@ -78,8 +78,8 @@ Fully specified.
 | E01-T05 | Book an appointment (drawer) | builder | normal | split (D-113) | Into E01-T05a … E01-T05d, the next four rows (E01-T05b split again, D-114); the nested-form guard → E01-T06 |
 | E01-T05a | Book an existing patient: the new-appointment drawer | builder | normal | **Done** | Merged by the owner (PR #67). `main` green (run 39248556989). New appointment on `/calendar` books an existing patient: the drawer with the patient search, treatment chips, start, length and provider, the block at once; `scheduling.createAppointment` (the provider's row locked, an overlap and a race refused, a start the clocks skip refused); the double-click guard on the overlay and Close; three fix rounds; the owner tried it. Leftovers → E01-T05b, split again into E01-T05b … T05d (owner: a warning line for breaks, hours and closed days; Book under the fields; D-114), E01-T03 (`message`: no archive while a visit is ahead, owner), E01-T06 (`message`, `slice`), E01-T11, `messaging.md` and `test-strategy.md` (`message`: no message for a visit booked after its start); two done by its testers, five struck. See `handoffs/E01-T05a.md` |
 | E01-T05b | Booking: overlaps and "Book anyway", one booking per click, a warning for breaks and hours | builder | normal | **Done** | Merged by the owner (PR #70). `main` green (run 39402754170). The overlap warning above Book and Book anyway (`overlap_ok` only over a real overlap), `already_booked` under the provider's lock (`message`), a warning line for a break, the hours or a closed day; about 290 lines, on the estimate; one fix round; the owner tried it and kept the warning's amber. Leftovers: six `none` lines and one known gap struck, the drawer's warning already in E01-T11's accessibility check. See `handoffs/E01-T05b.md` |
-| E01-T05c | Booking: a click on an empty slot, and a double click's second press changes nothing | builder | normal | **Tested** | Tester: every criterion met, no finding; one e2e check and one unit case added. `pnpm audit --prod` red since 2026-10-26 on new Next.js and Zod advisories, `main` too (Monday run 40312088104): a dependency change, the owner's (rule 4). Split from E01-T05b (D-114), refined in its Done pass: the slot's provider and quarter hour (an inactive provider's column takes no click); no press in a drawer or dialog counts for half a second after it opens (`message`: E01-T06's buttons); no second drawer after a double click on Book. About 250 lines. See `handoffs/E01-T05c.md` |
-| E01-T05d | Booking: a new patient in one go | builder | normal | Planned | Split from E01-T05b (D-114): "Add … as new patient", `patients.create` and the booking in one transaction, two audit rows (the handler's through `audit.record`). Refined in the Done pass before it |
+| E01-T05c | Booking: a click on an empty slot, and a double click's second press changes nothing | builder | normal | **Done** | Merged by the owner (PR #72), after E00-T13; `main` green (run 40395861963); the owner tried it, all fine. A click on an empty slot opens the drawer on its provider and quarter hour; no press in a drawer or dialog counts for half a second after it opens. Leftovers: the guard's pointer-down controls → E01-T06, a press dropped after opening → E01-T11, the slot's start → `scope-v1.md`; the rest struck. See `handoffs/E01-T05c.md` |
+| E01-T05d | Booking: a new patient in one go | builder | normal | Ready | Split from E01-T05b (D-114), refined in E01-T05c's Done pass: "Add … as new patient" as the suggestions' last option, `patients.create` and the booking in one transaction, two audit rows (the handler's through `audit.record`); the drawer makes the new patient's id, so the same booking sent twice books one patient once (`message`). About 280 lines. See `handoffs/E01-T05d.md` |
 | E01-T06 | Appointment drawer: details, move, status changes | builder | critical | Planned | The drawer's and the dialog's content keep a form's submit inside them, moved from E01-T05 (D-113): the cancel dialog sends the cancel only (E00-T04e). A drawer or dialog stays open while its form's request is on its way, the booking drawer too (`slice`, D-114); a double click on a block marks no status (E01-T05c's guard, `message`) |
 | E01-T07 | Calendar: week view | builder | low | Planned | |
 | E01-T08 | Settings: clinic details, opening hours, closed days | builder | normal | split (D-110) | Into E01-T08a … E01-T08c, the next three rows (E01-T08b split again, D-111); E01-T08d, the row after them, from E01-T08c's last review (D-115) |
@@ -237,6 +237,7 @@ Outline. Needs E07-T00.
 - E01-T05a · Book an existing patient: the new-appointment drawer · merged 2026-10-19 (PR #67)
 - E01-T05b · Booking: overlaps and "Book anyway", one booking per click, a warning for breaks and hours · merged 2026-10-20 (PR #70)
 - E00-T13 · Next.js 16.4.2 and Zod 4.6.7: the dependency check green again · merged 2026-10-26 (PR #74)
+- E01-T05c · Booking: a click on an empty slot, and a double click's second press changes nothing · merged 2026-10-26 (PR #72)
 
 ## Owner actions (standing)
 

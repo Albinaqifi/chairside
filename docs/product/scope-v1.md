@@ -45,6 +45,9 @@ Legend: ✅ in v1 as designed · ✏️ in v1 but changed · ⏳ later · ❌ no
 
 - ✅ Day view: one column per provider, filter chips, hour grid, now-line, status styling,
   click an empty slot to book.
+- ✏️ A click on an empty slot starts at the quarter hour under the pointer, up to the grid's last
+  (17:45 on a day to 18:00); the demo starts no later than 30 minutes before the day's end. A start
+  outside the hours gets the drawer's warning line (D-114). E01-T05c.
 - ✅ Week view with one lane per provider.
 - ✏️ Lunch and breaks come from provider breaks, not from appointments. (D-018)
 - ✏️ Overlap: warning plus an explicit "book anyway" (D-020). The database enforces the rest.
