@@ -11,16 +11,16 @@ import { demoForm } from './demo-form.ts';
 // by its navigation type: a page that loads itself again would turn a Back into a reload.
 //
 // The page comes from a server of the test's own in front of `next dev` (components-page-server.ts),
-// in an answer no browser shows again from its cache: after Back the page comes from the server and
-// runs `next dev`'s script without the debug data `next dev` keeps in the browser, which a page from
-// the cache waits for (the last test below). The browsers give fields back as from their cache.
+// answered `no-cache` as a page a browser keeps a form's state for, and never shown again from the
+// browser's cache: after Back the page comes from the server. The browsers give fields back as from
+// their cache.
 //
 // The control: the same server without the form's `autocomplete="off"`, the same steps get the
 // values back, where the browser gives fields back at all. Measured with Playwright 1.63.0 on
-// Windows (2026-10-08, and again on 2026-10-09 with the page from the server after Back): with the
-// attribute, no browser gives a field back; without it, Firefox does after a reload and after Back,
-// Chromium and WebKit after Back only. Where a browser gives nothing back, its control is skipped
-// and says why.
+// Windows (Next.js 16.3.8: 2026-10-08, and again on 2026-10-09 with the page from the server after
+// Back; Next.js 16.4.2: 2026-10-26): with the attribute, no browser gives a field back; without it,
+// Firefox does after a reload and after Back, Chromium and WebKit after Back only. Where a browser
+// gives nothing back, its control is skipped and says why.
 
 type Return = 'reload' | 'back';
 
@@ -155,53 +155,3 @@ for (const how of ['reload', 'back'] as const) {
     });
   });
 }
-
-/**
- * The IndexedDB database where `next dev`'s script keeps each page's debug data, to show the page
- * again from the browser's cache (Next.js 16.3.8, `next/dist/client/dev/debug-channel.js`).
- */
-const NEXT_DEV_DEBUG_DATA = '__next_debug_channel';
-
-/**
- * Makes every request to open NEXT_DEV_DEBUG_DATA wait forever, as a stalled read would, and counts
- * them in the page (`window.debugDataRequests`): a test can then see that `next dev` asked.
- */
-async function holdNextDevDebugData(page: Page): Promise<void> {
-  await page.addInitScript((database) => {
-    const open = IDBFactory.prototype.open;
-    IDBFactory.prototype.open = function (this: IDBFactory, name: string, version?: number) {
-      if (name !== database) return open.call(this, name, version);
-      const counted = window as Window & { debugDataRequests?: number };
-      counted.debugDataRequests = (counted.debugDataRequests ?? 0) + 1;
-      // A request that never answers: neither success nor error.
-      return { addEventListener() {}, removeEventListener() {} } as unknown as IDBOpenDBRequest;
-    };
-  }, NEXT_DEV_DEBUG_DATA);
-}
-
-// After Back the check's page must run its script without the debug data `next dev` keeps in the
-// browser: a page shown again from the browser's cache waits for it, and the pages that never ran
-// their script after Back had come from the cache (E00-T06b testers, fix rounds 2 and 3, Firefox
-// under load). Here that data never comes. With the page served as `next dev` serves it, red in
-// Chromium and Firefox every time (fix round 4, measured); WebKit loaded it from the server either
-// way.
-test("after Back, the demo form's page runs its script without the debug data next dev keeps in the browser", async ({
-  page,
-}) => {
-  await holdNextDevDebugData(page);
-  await withComponentsPage({ stripFormAutocomplete: false }, async ({ origin }) => {
-    await page.goto(`${origin}/dev/components`);
-    await expect(demoForm(page).send).toBeEnabled(DEV_PAGE);
-    // `next dev` stores the page's debug data once the page is idle: it asked, so the hold is in its way.
-    await expect
-      .poll(
-        () =>
-          page.evaluate(
-            () => (window as Window & { debugDataRequests?: number }).debugDataRequests ?? 0,
-          ),
-        { message: "next dev asks for the database of a page's debug data", ...DEV_PAGE },
-      )
-      .toBeGreaterThan(0);
-    await leaveAndComeBack(page, 'back', origin);
-  });
-});

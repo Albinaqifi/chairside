@@ -1890,7 +1890,8 @@ into E01-T05c's branch, which comes after this merge (board, "Now").
 - [ ] `pnpm audit --prod` answers "No known vulnerabilities found", locally and in the pull
       request's CI run.
 - [ ] `git diff --name-only main...HEAD` names `package.json`, `pnpm-lock.yaml` and files under
-      `docs/`, nothing else.
+      `docs/`, nothing else; since the owner's answer of 2026-10-26 also
+      `tests/e2e/form-memory.spec.ts`, `tests/e2e/components-page-server.ts` and `AGENTS.md` (D-117).
 - [ ] `pnpm check`, `pnpm build` and `pnpm test:e2e` (Chromium, Firefox, WebKit) pass with no test
-      changed, and the pull request's CI run is green.
+      changed but those two (D-117), and the pull request's CI run is green.
 - [ ] The run on `main` after the merge is green (the owner merges; read in this task's Done pass).

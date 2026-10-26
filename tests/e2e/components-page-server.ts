@@ -6,32 +6,40 @@ import { DEV_PORT } from './servers.ts';
 
 /*
  * The D-093 check's server (form-memory.spec.ts): a server of the test's own in front of `next dev`
- * that answers /dev/components as `next dev` does, but for two things, and passes everything else
+ * that answers /dev/components as `next dev` does, but for three things, and passes everything else
  * through as it is: the page's scripts and requests, and the WebSocket `next dev`'s script keeps
  * open. The browser loads the page from it as from any server, once: its Back is a Back, its reload
  * a reload.
  *
- * 1. Always: the page's answer carries `Vary: *`, so no browser serves the page again from its own
+ * 1. Always: the page's answer carries `Cache-Control: no-cache`, in place of `next dev`'s own.
+ *    Next.js 16.4.2's `next dev` answers every page `no-store` (`next/dist/server/base-server.js`:
+ *    "Documents and data responses must not be stored in development"); 16.3.8 answered `no-cache`.
+ *    With `no-store` Firefox keeps no form state at all, and the check could not fail there: its
+ *    control went red on Next.js 16.4.2 (E00-T13, measured). With `no-cache` it gives fields back
+ *    again, the case the form's attribute guards.
+ * 2. Always: the page's answer carries `Vary: *`, so no browser serves the page again from its own
  *    cache. After Back the page comes from the server, as a production staff page does (`no-store`),
- *    and every browser still gives a form's fields back as before (measured 2026-10-09, below).
- *    Why: `next dev` answers its pages `no-cache`, so Chromium and Firefox keep the page and show it
- *    again from their cache after Back. Such a page runs `next dev`'s script only once it has read
- *    the debug data `next dev` stored for it in the browser's IndexedDB, and never when that read
- *    does not answer (measured with the read held: Chromium and Firefox, every time). The pages that
- *    did not run their script after Back in Firefox under load had come from the cache (E00-T06b
- *    testers, fix rounds 2 and 3). A page from the server gets that data over `next dev`'s
- *    WebSocket, as on its first visit, and needs nothing stored in the browser.
- *    Not `no-store`: with it, Firefox keeps no form state at all, and the check could not fail there.
- * 2. For the control only: without the form's own `autocomplete="off"`.
+ *    and every browser still gives a form's fields back as before (measured, below).
+ *    Why (Next.js 16.3.8, E00-T06b fix round 4): a page answered `no-cache` was kept by Chromium and
+ *    Firefox and shown again from their cache after Back, and such a page ran `next dev`'s script
+ *    only once it had read the debug data `next dev` stored for it in the browser's IndexedDB, never
+ *    when that read did not answer (measured with the read held: Chromium and Firefox, every time).
+ *    The pages that did not run their script after Back in Firefox under load had come from the
+ *    cache (E00-T06b testers, fix rounds 2 and 3). Next.js 16.4.2 keeps that data in the page's
+ *    memory and gets it over `next dev`'s WebSocket (`next/dist/client/dev/debug-channel.js`), and
+ *    nothing in it opens IndexedDB; a page from the server needs nothing stored in the browser.
+ * 3. For the control only: without the form's own `autocomplete="off"`.
  *
- * Not Playwright's `route.fulfill()`: `next dev`'s script (Next.js 16.3.8) takes a page answered that
- * way for one from the browser's cache, finds no debug data kept for it and loads the page again,
- * WebKit on every visit and Firefox after Back, so a Back became a reload (measured 2026-10-08).
+ * Not Playwright's `route.fulfill()`: `next dev`'s script (Next.js 16.3.8) took a page answered that
+ * way for one from the browser's cache, found no debug data kept for it and loaded the page again,
+ * WebKit on every visit and Firefox after Back, so a Back became a reload (measured 2026-10-08; not
+ * measured again on 16.4.2, as this server needs no route).
  *
- * Measured with `Vary: *` (Playwright 1.63.0, Windows, 2026-10-09): after Back every browser loads
- * the page from the server; with the form's attribute no browser gives a field back; without it,
- * Firefox does after a reload and after Back, Chromium and WebKit after Back only: as with the page
- * from the browser's cache.
+ * Measured with `Vary: *` (Playwright 1.63.0, Windows; Next.js 16.3.8 and `next dev`'s `no-cache`,
+ * 2026-10-09; Next.js 16.4.2 and this server's `no-cache`, 2026-10-26): after Back every browser
+ * loads the page as a new document; with the form's attribute no browser gives a field back;
+ * without it, Firefox does after a reload and after Back, Chromium and WebKit after Back only: as
+ * with the page from the browser's cache.
  *
  * It listens on `localhost`, as both servers of the run are named: the session cookie, set for
  * `localhost`, reaches every port.
@@ -85,7 +93,9 @@ export async function serveComponentsPage(options: {
           delete pageHeaders['transfer-encoding'];
           response.writeHead(status, {
             ...pageHeaders,
-            // Never served again from the browser's cache (1. above).
+            // A page whose form state a browser keeps, as with Next.js 16.3.8 (1. above).
+            'cache-control': 'no-cache',
+            // Never served again from the browser's cache (2. above).
             vary: '*',
             'content-length': Buffer.byteLength(body),
           });

@@ -2241,3 +2241,20 @@ architecture), `changed` (differs from the original files), `process`.
   audit, format, lint, types, unit tests and the build pass with no code change.
 - **Revisit if:** a check fails on the upgrade (the owner chooses a fix or another version); 16.4.3 or a
   later 16.4 has been out a few weeks at the next dependency change (move to it); a new advisory.
+
+### D-117 · E00-T13 takes a test-only fix for the D-093 check on Next.js 16.4.2 (owner)
+- **Origin:** E00-T13's builder, 2026-10-26 (`handoffs/E00-T13.md`): on 16.4.2 two D-093 checks in
+  `tests/e2e/form-memory.spec.ts` were red every run, a test change D-116 left to the owner. **Owner,
+  2026-10-26:** "option 1 from the builder's note: drop or rewrite the :188 debug-data check, make the
+  page server answer no-cache so Firefox's control proves D-093 again, update the 16.3.8 comments and
+  AGENTS.md."
+- **What:** E00-T13's diff may also name `tests/e2e/form-memory.spec.ts`,
+  `tests/e2e/components-page-server.ts` and `AGENTS.md` (D-116 said the package files only). The
+  check that `next dev` 16.3.8's debug data in IndexedDB cannot stall a page after Back is dropped:
+  16.4 keeps that data in memory, so it has nothing to hold. The check's own server answers the page
+  `no-cache`, as 16.3.8's `next dev` did, in place of 16.4's `no-store`. `AGENTS.md` takes the block
+  `next dev` 16.4.2 writes.
+- **Why:** with `no-store` Firefox keeps no form state, so its control could not show the attribute
+  at work; the guard checks and the product are unchanged (production staff pages stay `no-store`).
+- **Revisit if:** a later Next.js stores page data in the browser again, or answers `next dev`'s pages
+  otherwise (read `components-page-server.ts`, 1. and 2.).
