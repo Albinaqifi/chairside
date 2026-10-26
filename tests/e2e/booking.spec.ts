@@ -44,7 +44,8 @@ const DAYS: Record<
     | 'slot'
     | 'saturday'
     | 'secondPress'
-    | 'bookTwice',
+    | 'bookTwice'
+    | 'closeTwice',
     string
   >
 > = {
@@ -63,6 +64,7 @@ const DAYS: Record<
     saturday: '2031-06-07', // a Saturday: no opening hours
     secondPress: '2031-06-03',
     bookTwice: '2031-06-04',
+    closeTwice: '2031-06-05', // E01-T05c's tester
   },
   firefox: {
     mouse: '2031-04-14',
@@ -79,6 +81,7 @@ const DAYS: Record<
     saturday: '2031-06-14',
     secondPress: '2031-06-10',
     bookTwice: '2031-06-11',
+    closeTwice: '2031-06-12',
   },
   webkit: {
     mouse: '2031-04-21',
@@ -95,6 +98,7 @@ const DAYS: Record<
     saturday: '2031-06-21',
     secondPress: '2031-06-17',
     bookTwice: '2031-06-18',
+    closeTwice: '2031-06-19',
   },
 };
 
@@ -1526,5 +1530,90 @@ test.describe('a double click on Book (E01-T05c, acceptance 3)', () => {
     } finally {
       await clear(day);
     }
+  });
+});
+
+// E01-T05c tester: a click on the grid within half a second of the drawer closing opens nothing,
+// whatever closed it (new-appointment.tsx, closedAt): a double click outside the drawer, whose first
+// click closes it and whose second lands on the grid, and a click right after Escape.
+test.describe('a click on the grid right after the drawer closed (E01-T05c, tester)', () => {
+  // As in the second-press checks: Dr. Planinska's column stays left of the drawer, under the overlay.
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  /** Whether the press came under 450 ms after the closing, by the page's clock; else noted. */
+  async function withinClosing(page: Page, label: string): Promise<boolean> {
+    const [second] = (await presses(page)).filter((press) => press.place === 'slot');
+    const [closed] = await closings(page);
+    if (!second || closed === undefined)
+      throw new Error(`${label}: no press on the grid, or no closing.`);
+    if (second.at - closed < 450) return true;
+    test.info().annotations.push({
+      type: 'not checked',
+      description: `${label}: the press came ${Math.round(second.at - closed)} ms after the closing`,
+    });
+    return false;
+  }
+
+  test('a double click outside it, 80, 150 and 250 ms apart: the first closes it, the second lands on the grid and opens nothing; nor does a click at once after Escape; from half a second on it opens', async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'closeTwice');
+    const actions = countActions(page);
+    await openCalendar(page, day);
+    const outside = await inColumn(page, 'Elena Planinska', offsetOf('14:07'));
+    await recordPresses(page);
+    let checked = 0;
+    for (const gap of [80, 150, 250]) {
+      const label = `outside, ${gap} ms`;
+      await newAppointment(page).click();
+      await expect(drawer(page)).toBeVisible();
+      await pressable(page);
+      await forget(page);
+      await page.mouse.click(outside.x, outside.y);
+      await page.waitForTimeout(gap);
+      await page.mouse.click(outside.x, outside.y);
+      await page.waitForTimeout(700);
+      expect(
+        (await presses(page)).map((press) => press.place),
+        label,
+      ).toEqual(['overlay', 'slot']);
+      if (await withinClosing(page, label)) {
+        checked += 1;
+        await expect(drawer(page), `${label}: no drawer opened`).toHaveCount(0);
+      } else if ((await drawer(page).count()) > 0) {
+        await closeDrawer(page);
+      }
+      await page.waitForTimeout(DOUBLE_CLICK_MS + 100);
+    }
+
+    // Escape, then at once a click on the grid.
+    await newAppointment(page).click();
+    await expect(drawer(page)).toBeVisible();
+    await forget(page);
+    await page.keyboard.press('Escape');
+    await page.mouse.click(outside.x, outside.y);
+    await page.waitForTimeout(700);
+    if (await withinClosing(page, 'Escape')) {
+      checked += 1;
+      await expect(drawer(page), 'Escape: no drawer opened').toHaveCount(0);
+    } else if ((await drawer(page).count()) > 0) {
+      await closeDrawer(page);
+    }
+    testInfo.annotations.push({ type: 'checked', description: `${checked} of 4 closings` });
+    expect(checked, 'at least one click on the grid checked within half a second').toBeGreaterThan(
+      0,
+    );
+
+    // From half a second after the closing, the grid's click opens the drawer on its slot.
+    await page.waitForTimeout(DOUBLE_CLICK_MS + 100);
+    await page.mouse.click(outside.x, outside.y);
+    const open = drawer(page);
+    await expect(open.getByLabel(t.start, { exact: true })).toHaveValue('14:00');
+    await expect(open.getByLabel(t.provider, { exact: true })).toHaveValue(
+      SEEDED_PROVIDERS.harbourStreetDentist,
+    );
+    await closeDrawer(page);
+    expect(actions.filter((action) => action.booking)).toEqual([]);
+    expect(await bookedOn(day)).toEqual([]);
   });
 });

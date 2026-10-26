@@ -6,7 +6,7 @@ import messages from '@/i18n/en.json';
 import { LOCALE } from '@/i18n/locale';
 import type { AppointmentStatus, DayAppointment, Provider } from '@/modules/scheduling';
 import type { OpeningHours } from '@/modules/tenancy';
-import { startChoices } from './booking-choices';
+import { startChoices, startValue } from './booking-choices';
 import { layoutDay, type CalendarDayView, type DayRows } from './day';
 import {
   DayCalendar,
@@ -674,6 +674,18 @@ describe('the quarter hour a click on an empty slot gives (E01-T05c, demo logic 
       }
       expect(slotStart(0, grid)).toBe(grid.from);
     }
+  });
+
+  // E01-T05c tester: a grid widened to the whole day by a visit at night (day.ts, gridSpan).
+  it('a grid from midnight to midnight: 00:00 at its top, 23:45 at its foot, both starts the drawer offers', () => {
+    const DAY = { from: 0, to: 24 * H };
+    const foot = 24 * H * PX_PER_MINUTE;
+    expect(slotStart(0, DAY)).toBe(0);
+    expect(startValue(slotStart(0, DAY))).toBe('00:00');
+    expect(slotStart(foot - 1, DAY)).toBe(23 * H + 45);
+    expect(slotStart(foot + 5, DAY)).toBe(23 * H + 45);
+    expect(startValue(slotStart(foot, DAY))).toBe('23:45');
+    expect(startChoices(DAY)).toHaveLength(96);
   });
 });
 
