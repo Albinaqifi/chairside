@@ -5,10 +5,27 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { CalendarDay } from '@/lib/calendar-day';
 import type { AppointmentStatus } from '@/modules/scheduling';
 import { cn } from '@/ui/cn';
+import { START_STEP_MINUTES, startChoices, type Slot } from './booking-choices';
 import type { AppointmentBlock, BreakBlock, CalendarDayView, Column, Placed, Span } from './day';
 
 /** Pixels per minute, the demo's scale (logic line 1519): an hour is 87 px. */
 export const PX_PER_MINUTE = 1.45;
+
+/** The pixels of a quarter hour of the grid, a start's step: 21.75. */
+const QUARTER_PX = START_STEP_MINUTES * PX_PER_MINUTE;
+
+/**
+ * The start a click on an empty slot gives (E01-T05c, demo logic line 1819): the quarter hour the
+ * pointer is in, `offset` pixels below the grid's top, counted from the grid's start as the demo counts
+ * it; the grid's last quarter at its foot, and its first above its top. Always one of the starts the
+ * drawer offers (./booking-choices.ts, startChoices). The demo's cap at 30 minutes before the end is
+ * not taken: the drawer warns when a time runs past the hours (E01-T05b).
+ */
+export function slotStart(offset: number, grid: Span): number {
+  const starts = startChoices(grid);
+  const index = Math.min(Math.max(Math.floor(offset / QUARTER_PX), 0), starts.length - 1);
+  return starts[index] ?? grid.from;
+}
 
 /** The statuses of the legend, as the demo orders its own (logic line 1833); "No reply yet" is E02's. */
 const LEGEND: readonly AppointmentStatus[] = [
@@ -94,6 +111,11 @@ export interface DayCalendarProps {
   notice?: ReactNode;
   /** New appointment and its drawer (E01-T05a), at the header's end, after the chips (demo line 237). */
   newAppointment?: ReactNode;
+  /**
+   * A click on an empty slot of an active provider's column (E01-T05c): its provider and quarter
+   * hour, and the click's time stamp. The grid takes no click without it.
+   */
+  onSlot?: (slot: Slot, at: number) => void;
 }
 
 /**
@@ -101,8 +123,9 @@ export interface DayCalendarProps {
  * the provider filter's chips (E01-T04b), the count of the appointments and columns shown, then a
  * column per provider shown on an hour grid, with the "now" line on today (E01-T04b), and the
  * statuses' legend. Drawn from what ./calendar-screen.tsx holds: the filter's choice and the clock
- * are the browser's. Nothing on the grid is clicked yet (E01-T05b, E01-T06); the header's New
- * appointment opens the booking drawer (E01-T05a). Every moment is shown in the clinic's zone
+ * are the browser's. The header's New appointment opens the booking drawer (E01-T05a), and so does a
+ * click on an empty slot of an active provider's column (E01-T05c); a block takes no click yet
+ * (E01-T06). Every moment is shown in the clinic's zone
  * (next-intl's formatter, D-015); the day, the hours of the grid and the weekday are no moments, so
  * they are formatted in UTC (CLAUDE.md, Dates and times).
  *
@@ -116,6 +139,7 @@ export function DayCalendar({
   nowMinute = null,
   notice = null,
   newAppointment = null,
+  onSlot,
 }: DayCalendarProps) {
   const t = useTranslations();
   const format = useFormatter();
@@ -190,7 +214,7 @@ export function DayCalendar({
               })}
         </p>
       )}
-      <DayGrid view={view} columns={columns} nowMinute={nowMinute} />
+      <DayGrid view={view} columns={columns} nowMinute={nowMinute} onSlot={onSlot} />
       <ul
         aria-label={t('calendar.legend')}
         className="mt-3 flex flex-wrap gap-4 text-small text-muted"
@@ -246,15 +270,24 @@ function ProviderChip({
 /**
  * The grid: the headers of the columns shown, the hours, each column's shading, lines and blocks,
  * and the "now" line across the columns at its minute (demo lines 273–275), drawn over them.
+ *
+ * With `onSlot`, an active provider's column takes a click on an empty slot (E01-T05c, demo line
+ * 260): a layer over its shading and lines, under its blocks, with the demo's `copy` cursor. The
+ * blocks' list lets a pointer through to it, and each block takes the pointer back, so a click on a
+ * visit or a break never reaches the layer. The layer is hidden from a screen reader and takes no
+ * focus: it offers nothing the keyboard could reach, whose way stays New appointment. An inactive
+ * provider's column, shown for a visit it holds, has none: no booking takes them (E01-T05a).
  */
 function DayGrid({
   view,
   columns,
   nowMinute,
+  onSlot,
 }: {
   view: CalendarDayView;
   columns: readonly Column[];
   nowMinute: number | null;
+  onSlot: ((slot: Slot, at: number) => void) | undefined;
 }) {
   const t = useTranslations();
   const format = useFormatter();
@@ -304,7 +337,24 @@ function DayGrid({
               />
             ))}
             <div aria-hidden="true" className="half-hour-lines absolute inset-0" />
-            <ul aria-labelledby={columnNameId(column)} className="absolute inset-0">
+            {onSlot && column.active && (
+              <div
+                aria-hidden="true"
+                data-slot-layer=""
+                className="absolute inset-0 cursor-copy"
+                onClick={(event) => {
+                  const top = event.currentTarget.getBoundingClientRect().top;
+                  onSlot(
+                    { providerId: column.providerId, start: slotStart(event.clientY - top, grid) },
+                    event.timeStamp,
+                  );
+                }}
+              />
+            )}
+            <ul
+              aria-labelledby={columnNameId(column)}
+              className="pointer-events-none absolute inset-0"
+            >
               {column.blocks.map((block) =>
                 block.kind === 'appointment' ? (
                   <AppointmentItem key={block.id} block={block} grid={grid} />
@@ -377,7 +427,7 @@ function AppointmentItem({ block, grid }: { block: AppointmentBlock; grid: Span 
     <li
       data-status={block.status}
       className={cn(
-        'absolute overflow-hidden rounded-control border px-2 py-1.25 text-provider-ink',
+        'pointer-events-auto absolute overflow-hidden rounded-control border px-2 py-1.25 text-provider-ink',
         STATUS_LOOK[block.status],
       )}
       style={placement(block, grid)}
@@ -423,7 +473,7 @@ function BreakItem({ block, grid }: { block: BreakBlock; grid: Span }) {
   return (
     <li
       data-break=""
-      className="hatched absolute overflow-hidden rounded-control border border-border px-2 py-1.25 text-muted"
+      className="hatched pointer-events-auto absolute overflow-hidden rounded-control border border-border px-2 py-1.25 text-muted"
       style={placement(block, grid)}
     >
       <div className="truncate text-small leading-tight font-semibold">{block.label}</div>

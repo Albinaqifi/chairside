@@ -6,8 +6,15 @@ import messages from '@/i18n/en.json';
 import { LOCALE } from '@/i18n/locale';
 import type { AppointmentStatus, DayAppointment, Provider } from '@/modules/scheduling';
 import type { OpeningHours } from '@/modules/tenancy';
+import { startChoices, startValue } from './booking-choices';
 import { layoutDay, type CalendarDayView, type DayRows } from './day';
-import { DayCalendar, dayHref, type DayCalendarProps } from './day-calendar';
+import {
+  DayCalendar,
+  dayHref,
+  PX_PER_MINUTE,
+  slotStart,
+  type DayCalendarProps,
+} from './day-calendar';
 
 // E01-T04a: the calendar's day as the server sends it, with next-intl's provider as the root layout
 // gives it: the message file and the clinic's zone (src/i18n/request.ts). Each case names the zone
@@ -631,5 +638,126 @@ describe('the 24-hour clock (E01-T04b, D-049): times of day, never the dates', (
     expect(text(blocks(html)[0]?.inside ?? '')).toContain(` ${time} Ana Brezovska `);
     expect(html).toMatch(/<h1[^>]*>Monday, October 26<\/h1>/);
     expect(text(html)).not.toMatch(/\b[AP]M\b/);
+  });
+});
+
+// E01-T05c: a click on an empty slot opens the booking drawer on that column's provider and the
+// quarter hour under the pointer (the click itself, in three browsers: tests/e2e/booking.spec.ts).
+describe('the quarter hour a click on an empty slot gives (E01-T05c, demo logic line 1819)', () => {
+  const GRID = { from: 8 * H, to: 18 * H };
+  /** The pixels of a quarter hour: 21.75. */
+  const QUARTER = 15 * PX_PER_MINUTE;
+
+  it("the quarter the pointer is in, counted from the grid's top", () => {
+    expect(slotStart(0, GRID)).toBe(8 * H);
+    expect(slotStart(QUARTER - 0.01, GRID)).toBe(8 * H);
+    expect(slotStart(QUARTER, GRID)).toBe(8 * H + 15);
+    // 10:37 is in the quarter from 10:30; 12:00 exactly is its own.
+    expect(slotStart((10 * H + 37 - 8 * H) * PX_PER_MINUTE, GRID)).toBe(10 * H + 30);
+    expect(slotStart(4 * 87, GRID)).toBe(12 * H);
+    expect(slotStart(4 * 87 - 0.01, GRID)).toBe(11 * H + 45);
+  });
+
+  it("the grid's last quarter at its foot, and its first above its top", () => {
+    const foot = (18 * H - 8 * H) * PX_PER_MINUTE;
+    expect(slotStart(foot - 1, GRID)).toBe(17 * H + 45);
+    expect(slotStart(foot, GRID)).toBe(17 * H + 45);
+    expect(slotStart(foot + 40, GRID)).toBe(17 * H + 45);
+    expect(slotStart(-3, GRID)).toBe(8 * H);
+  });
+
+  it('always a start the drawer offers, on a grid widened to the day’s blocks too', () => {
+    for (const grid of [GRID, { from: 6 * H, to: 21 * H }]) {
+      const starts = startChoices(grid);
+      for (let offset = -10; offset < (grid.to - grid.from) * PX_PER_MINUTE + 10; offset += 3.3) {
+        expect(starts).toContain(slotStart(offset, grid));
+      }
+      expect(slotStart(0, grid)).toBe(grid.from);
+    }
+  });
+
+  // E01-T05c tester: a grid widened to the whole day by a visit at night (day.ts, gridSpan).
+  it('a grid from midnight to midnight: 00:00 at its top, 23:45 at its foot, both starts the drawer offers', () => {
+    const DAY = { from: 0, to: 24 * H };
+    const foot = 24 * H * PX_PER_MINUTE;
+    expect(slotStart(0, DAY)).toBe(0);
+    expect(startValue(slotStart(0, DAY))).toBe('00:00');
+    expect(slotStart(foot - 1, DAY)).toBe(23 * H + 45);
+    expect(slotStart(foot + 5, DAY)).toBe(23 * H + 45);
+    expect(startValue(slotStart(foot, DAY))).toBe('23:45');
+    expect(startChoices(DAY)).toHaveLength(96);
+  });
+});
+
+describe("the layer a click on an empty slot lands on: an active provider's column only (E01-T05c)", () => {
+  /** Inactive, shown that day for a visit of theirs: no booking takes them (E01-T05a). */
+  const LEFT: Provider = {
+    ...LUMI,
+    id: '01970000-0000-7000-8000-000000000104',
+    name: 'Bojan Kamenov',
+    shortName: 'B. Kamenov',
+    active: false,
+  };
+  const day = monday({
+    providers: [PLANINSKA, KODRA, LEFT],
+    breaks: [
+      {
+        id: 'lunch',
+        providerId: PLANINSKA.id,
+        startMinute: 12 * H,
+        endMinute: 13 * H,
+        label: 'Lunch',
+      },
+    ],
+    appointments: [
+      visit(PLANINSKA, '2026-10-26T09:00:00Z', 10 * H, 30),
+      visit(LEFT, '2026-10-26T10:00:00Z', 11 * H, 30),
+    ],
+  });
+  const onSlot = () => undefined;
+
+  /** The provider of each column drawn, in order, and whether it has the layer. */
+  function columnsWithLayer(html: string): [string, boolean][] {
+    return [
+      ...html.matchAll(
+        /(<div aria-hidden="true" data-slot-layer=""[^>]*><\/div>)?<ul aria-labelledby="calendar-column-([^"]+)"/g,
+      ),
+    ].map(([, layer, id = '']) => [id, layer !== undefined]);
+  }
+
+  it("in each active provider's column, none in an inactive provider's column (component)", () => {
+    expect(columnsWithLayer(renderWith({ onSlot }, day))).toEqual([
+      [PLANINSKA.id, true],
+      [KODRA.id, true],
+      [LEFT.id, false],
+    ]);
+  });
+
+  it('none when the calendar takes no click on the grid', () => {
+    const html = renderWith({}, day);
+    expect(html).not.toContain('data-slot-layer');
+    expect(columnsWithLayer(html)).toHaveLength(3);
+  });
+
+  it('hidden from a screen reader, reached by no key, with the copy cursor; under the blocks, which take the pointer back', () => {
+    const html = renderWith({ onSlot }, day);
+    const layers = tags(html, 'div').filter((div) => div.has('data-slot-layer'));
+    expect(layers).toHaveLength(2);
+    for (const layer of layers) {
+      expect(layer.get('aria-hidden')).toBe('true');
+      expect([layer.has('role'), layer.has('tabindex')]).toEqual([false, false]);
+      expect(layer.get('class')?.split(' ')).toContain('cursor-copy');
+    }
+    // The blocks' list lets a pointer through to the layer; each block, a visit or a break, takes it.
+    for (const list of tags(html, 'ul').filter((ul) => ul.has('aria-labelledby'))) {
+      expect(list.get('class')?.split(' ')).toContain('pointer-events-none');
+    }
+    const blockItems = tags(html, 'li').filter(
+      (li) => li.has('data-status') || li.has('data-break'),
+    );
+    expect(blockItems).toHaveLength(3);
+    for (const item of blockItems) {
+      expect(item.get('class')?.split(' ')).toContain('pointer-events-auto');
+    }
   });
 });

@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page, type TestInfo } from '@playwrigh
 import pg from 'pg';
 import { SEEDED_CLINICS, SEEDED_PEOPLE, SEEDED_PROVIDERS } from '@/db/seed/seeded';
 import messages from '@/i18n/en.json' with { type: 'json' };
+import { DOUBLE_CLICK_MS } from '@/ui/double-click-guard';
 import { e2eDatabase } from './e2e-database.ts';
 import { APP } from './servers.ts';
 
@@ -17,6 +18,12 @@ import { APP } from './servers.ts';
 // provider, and its double click; a visit booked by someone else after the day was read, which the
 // refused Book's answer brings; a read on use while the warning shows; the warning line for a break.
 // The other visits are written as the migration role, as calendar.spec.ts writes its rows.
+//
+// E01-T05c, on days of June 2031: a click on an empty slot, a shaded one too, and on a block; a double
+// click's second press in the drawer, from an empty slot and from New appointment; a double click on
+// Book whose answer closes the drawer before its second click. The drawer drops a pointer's press for
+// half a second after it opens (src/ui/double-click-guard.ts), so every check here lets that half
+// second pass before its first press in the drawer (pressable()), as a person's first press comes.
 
 const t = messages.calendar.booking;
 
@@ -33,7 +40,12 @@ const DAYS: Record<
     | 'anyway'
     | 'meanwhile'
     | 'readWarning'
-    | 'breakLine',
+    | 'breakLine'
+    | 'slot'
+    | 'saturday'
+    | 'secondPress'
+    | 'bookTwice'
+    | 'closeTwice',
     string
   >
 > = {
@@ -48,6 +60,11 @@ const DAYS: Record<
     meanwhile: '2031-05-06',
     readWarning: '2031-05-07',
     breakLine: '2031-05-08',
+    slot: '2031-06-02', // E01-T05c's
+    saturday: '2031-06-07', // a Saturday: no opening hours
+    secondPress: '2031-06-03',
+    bookTwice: '2031-06-04',
+    closeTwice: '2031-06-05', // E01-T05c's tester
   },
   firefox: {
     mouse: '2031-04-14',
@@ -60,6 +77,11 @@ const DAYS: Record<
     meanwhile: '2031-05-13',
     readWarning: '2031-05-14',
     breakLine: '2031-05-15',
+    slot: '2031-06-09',
+    saturday: '2031-06-14',
+    secondPress: '2031-06-10',
+    bookTwice: '2031-06-11',
+    closeTwice: '2031-06-12',
   },
   webkit: {
     mouse: '2031-04-21',
@@ -72,6 +94,11 @@ const DAYS: Record<
     meanwhile: '2031-05-20',
     readWarning: '2031-05-21',
     breakLine: '2031-05-22',
+    slot: '2031-06-16',
+    saturday: '2031-06-21',
+    secondPress: '2031-06-17',
+    bookTwice: '2031-06-18',
+    closeTwice: '2031-06-19',
   },
 };
 
@@ -214,6 +241,17 @@ async function openCalendar(page: Page, day: string): Promise<void> {
   await page.waitForLoadState('networkidle');
 }
 
+/**
+ * Lets the drawer's half second pass after it opened, before the first press of a pointer in it: a
+ * press sooner is a double click's second, which it drops (E01-T05c, src/ui/double-click-guard.ts). A
+ * person's first press comes later; Playwright's comes at once. With the page's clock installed and
+ * paused, the half second is the page's fake clock's: Playwright stamps each event with its time.
+ */
+async function pressable(page: Page, clock: 'real' | 'paused' = 'real'): Promise<void> {
+  if (clock === 'paused') await page.clock.runFor(DOUBLE_CLICK_MS);
+  else await page.waitForTimeout(DOUBLE_CLICK_MS + 100);
+}
+
 /** A JavaScript value the page keeps until it is loaded again: there after a booking, no reload. */
 async function markPage(page: Page): Promise<void> {
   await page.evaluate(() => {
@@ -237,6 +275,7 @@ test.describe('booking an existing patient from New appointment (acceptance 1 an
       await expect(open).toBeVisible();
       const patient = open.getByRole('combobox', { name: t.patient });
       await expect(patient, 'the patient field has the focus first').toBeFocused();
+      await pressable(page);
       // Filled in: the day's opening (not the clinic's today), 30 minutes, the first column shown.
       await expect(open.getByLabel(t.start, { exact: true })).toHaveValue('08:00');
       await expect(open.getByLabel(t.length, { exact: true })).toHaveValue('30');
@@ -294,6 +333,7 @@ test.describe('booking an existing patient from New appointment (acceptance 1 an
   test('an archived patient shows with their label and cannot be picked', async ({ page }) => {
     await openCalendar(page, '2031-04-07');
     await newAppointment(page).click();
+    await pressable(page);
     const open = drawer(page);
     const patient = open.getByRole('combobox', { name: t.patient });
     await patient.fill('Planinska');
@@ -413,6 +453,7 @@ test.describe('after Book (acceptance 3)', () => {
       await expect(column(page, 'Mimoza Lumi')).toHaveCount(0);
 
       await newAppointment(page).click();
+      await pressable(page);
       const open = drawer(page);
       await open.getByRole('combobox', { name: t.patient }).fill('Mimoza K');
       await suggestions(open).filter({ hasText: 'Mimoza Kodra' }).click();
@@ -439,6 +480,7 @@ test.describe('after Book (acceptance 3)', () => {
     try {
       await openCalendar(page, day);
       await newAppointment(page).click();
+      await pressable(page);
       const open = drawer(page);
       await open.getByRole('combobox', { name: t.patient }).fill('Mimoza K');
       await suggestions(open).filter({ hasText: 'Mimoza Kodra' }).click();
@@ -472,6 +514,7 @@ test.describe('a read on use while the drawer is open (acceptance 9)', () => {
       await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
 
       await newAppointment(page).click();
+      await pressable(page, 'paused');
       const open = drawer(page);
       const patient = open.getByRole('combobox', { name: t.patient });
       await patient.fill('Mimoza K');
@@ -585,6 +628,7 @@ test.describe("the patient search's words in no address and no booking (acceptan
     try {
       await openCalendar(page, day);
       await newAppointment(page).click();
+      await pressable(page);
       const open = drawer(page);
       await open.getByRole('combobox', { name: t.patient }).fill(typed);
       await expect(suggestions(open)).toHaveCount(1);
@@ -814,6 +858,7 @@ test.describe('an overlap and Book anyway (E01-T05b, acceptance 1, 3 and 5)', ()
       await bookedElsewhere(day, '10:00', 30, ['Bojan', 'Kamenov']);
       await openCalendar(page, day);
       await newAppointment(page).click();
+      await pressable(page);
       const open = drawer(page);
       await open.getByRole('combobox', { name: t.patient }).fill('Mimoza K');
       await suggestions(open).filter({ hasText: 'Mimoza Kodra' }).click();
@@ -883,6 +928,7 @@ test.describe('a visit booked by someone else after the day was read (E01-T05b, 
       await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
       await markPage(page);
       await newAppointment(page).click();
+      await pressable(page, 'paused');
       const open = drawer(page);
       const patient = open.getByRole('combobox', { name: t.patient });
       await patient.fill('Mimoza K');
@@ -944,6 +990,7 @@ test.describe('a read on use while the warning shows (E01-T05b, acceptance 5)', 
       await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
 
       await newAppointment(page).click();
+      await pressable(page, 'paused');
       const open = drawer(page);
       const patient = open.getByRole('combobox', { name: t.patient });
       await patient.fill('Mimoza K');
@@ -1018,6 +1065,7 @@ test.describe('a warning line for a break (E01-T05b, acceptance 4)', () => {
     try {
       await openCalendar(page, day);
       await newAppointment(page).click();
+      await pressable(page);
       const open = drawer(page);
       await open.getByRole('combobox', { name: t.patient }).fill('Mimoza K');
       await suggestions(open).filter({ hasText: 'Mimoza Kodra' }).click();
@@ -1039,5 +1087,533 @@ test.describe('a warning line for a break (E01-T05b, acceptance 4)', () => {
     } finally {
       await clear(day);
     }
+  });
+});
+
+// E01-T05c: a click on an empty slot of the grid, and a double click's second press.
+
+/** Where a point is: its x and y on the page's window, in CSS pixels. */
+interface Point {
+  x: number;
+  y: number;
+}
+
+/** The middle of what a locator shows. */
+async function centre(locator: Locator): Promise<Point> {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error('Nothing shows there to point at.');
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+/** The point `offset` pixels below the top of `provider`'s column, in its middle. */
+async function inColumn(page: Page, provider: string, offset: number): Promise<Point> {
+  const box = await column(page, provider).boundingBox();
+  if (!box) throw new Error(`No column for ${provider}.`);
+  return { x: box.x + box.width / 2, y: box.y + offset };
+}
+
+/** The pixels from the grid's top (08:00 on these days) to a time of day: 1.45 a minute. */
+function offsetOf(time: string): number {
+  const [hours = 0, minutes = 0] = time.split(':').map(Number);
+  return (hours * 60 + minutes - 8 * 60) * 1.45;
+}
+
+/** True when a click at the point, the drawer closed, lands on an empty slot of the grid. */
+async function emptySlotAt(page: Page, at: Point): Promise<boolean> {
+  return page.evaluate(
+    ({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-slot-layer]') != null,
+    at,
+  );
+}
+
+/** Where a pointer's press landed: the grid's empty slot, the overlay, a part of the drawer, else. */
+type Place = 'slot' | 'overlay' | 'chip' | 'select' | 'book' | 'patient' | 'drawer' | 'other';
+
+interface Press {
+  at: number;
+  place: Place;
+}
+
+/**
+ * From now on, each pointer's press the page gets: its time stamp (the page's own clock, which the
+ * guard compares) and where it landed; and each moment the drawer went from the page, on the same
+ * clock. Read with presses() and closings(), emptied with forget(). A press the guard drops still
+ * reaches the document first: it is recorded in the capture phase.
+ */
+async function recordPresses(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const record = { presses: [] as { at: number; place: string }[], closings: [] as number[] };
+    (window as unknown as { record: typeof record }).record = record;
+    document.addEventListener(
+      'pointerdown',
+      (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const inDrawer = (selector: string) =>
+          target?.closest(`[data-slot="sheet-content"] ${selector}`) != null;
+        const place =
+          target === null
+            ? 'other'
+            : target.closest('[data-slot-layer]')
+              ? 'slot'
+              : target.closest('[data-slot="sheet-overlay"]')
+                ? 'overlay'
+                : inDrawer('[aria-pressed]')
+                  ? 'chip'
+                  : inDrawer('select')
+                    ? 'select'
+                    : inDrawer('button[type="submit"]')
+                      ? 'book'
+                      : inDrawer('[role="combobox"]')
+                        ? 'patient'
+                        : target.closest('[data-slot="sheet-content"]')
+                          ? 'drawer'
+                          : 'other';
+        record.presses.push({ at: event.timeStamp, place });
+      },
+      true,
+    );
+    let open = document.querySelector('[data-slot="sheet-content"]') !== null;
+    new MutationObserver(() => {
+      const now = document.querySelector('[data-slot="sheet-content"]') !== null;
+      if (open && !now) record.closings.push(performance.now());
+      open = now;
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+}
+async function presses(page: Page): Promise<Press[]> {
+  return page.evaluate(
+    () => (window as unknown as { record: { presses: Press[] } }).record.presses,
+  );
+}
+async function closings(page: Page): Promise<number[]> {
+  return page.evaluate(
+    () => (window as unknown as { record: { closings: number[] } }).record.closings,
+  );
+}
+async function forget(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const record = (window as unknown as { record: { presses: unknown[]; closings: unknown[] } })
+      .record;
+    record.presses.length = 0;
+    record.closings.length = 0;
+  });
+}
+
+/**
+ * Escape, and the drawer's closing: a click on the grid within half a second of it opens nothing
+ * (E01-T05c), so the next check's click waits that long.
+ */
+async function closeDrawer(page: Page): Promise<void> {
+  await page.keyboard.press('Escape');
+  await expect(drawer(page)).toBeHidden();
+  await page.waitForTimeout(DOUBLE_CLICK_MS + 100);
+}
+
+test.describe('a click on an empty slot (E01-T05c, acceptance 1)', () => {
+  // Tall enough for the whole grid, 08:00 to 18:00, to show without scrolling.
+  test.use({ viewport: { width: 1280, height: 1100 } });
+
+  test("opens the drawer on the column's provider and the quarter hour under the pointer, the grid's first and last quarter too; a click on a visit or a break opens nothing", async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'slot');
+    try {
+      // Dr. Planinska's visit at 10:00; her lunch is 12:00–13:00 every weekday.
+      await bookedElsewhere(day, '10:00', 30, ['Bojan', 'Kamenov']);
+      await openCalendar(page, day);
+      const foot = (await column(page, 'Mimoza Lumi').boundingBox())?.height ?? 0;
+      expect(foot, 'the grid runs 08:00 to 18:00').toBeCloseTo(10 * 60 * 1.45, 0);
+      const cases = [
+        // 10:37 is in the quarter from 10:30.
+        { column: 'Arben Kodra', offset: offsetOf('10:37'), start: '10:30', short: 'Dr. Kodra' },
+        // The grid's first quarter, a pixel under its top.
+        { column: 'Elena Planinska', offset: 1, start: '08:00', short: 'Dr. Planinska' },
+        // The grid's last quarter, a pixel above its foot.
+        { column: 'Mimoza Lumi', offset: foot - 1, start: '17:45', short: 'M. Lumi' },
+        // Right under Dr. Planinska's visit, which ends at 10:30.
+        {
+          column: 'Elena Planinska',
+          offset: offsetOf('10:31'),
+          start: '10:30',
+          short: 'Dr. Planinska',
+        },
+      ];
+      const ids: Record<string, string> = {
+        'Dr. Planinska': SEEDED_PROVIDERS.harbourStreetDentist,
+        'Dr. Kodra': SEEDED_PROVIDERS.harbourStreetSecondDentist,
+        'M. Lumi': SEEDED_PROVIDERS.harbourStreetHygienist,
+      };
+      for (const slot of cases) {
+        const label = `${slot.column} at ${slot.start}`;
+        const at = await inColumn(page, slot.column, slot.offset);
+        expect(await emptySlotAt(page, at), `${label}: an empty slot`).toBe(true);
+        await page.mouse.click(at.x, at.y);
+        const open = drawer(page);
+        await expect(open, label).toBeVisible();
+        await expect(open.getByLabel(t.start, { exact: true }), label).toHaveValue(slot.start);
+        await expect(open.getByLabel(t.provider, { exact: true }), label).toHaveValue(
+          ids[slot.short] ?? '',
+        );
+        await expect(open.getByRole('button', { name: /^Book / }), label).toHaveText(
+          `Book ${slot.start} with ${slot.short}`,
+        );
+        await expect(open.getByRole('combobox', { name: t.patient }), label).toBeFocused();
+        await closeDrawer(page);
+      }
+
+      // A visit's block and a break's, clicked in their middle: nothing opens, nothing is booked.
+      for (const block of ['li[data-status]', 'li[data-break]']) {
+        const at = await centre(column(page, 'Elena Planinska').locator(block));
+        await page.mouse.click(at.x, at.y);
+        await page.waitForTimeout(700);
+        await expect(drawer(page), block).toHaveCount(0);
+      }
+      expect(await bookedOn(day)).toHaveLength(1);
+    } finally {
+      await clear(day);
+    }
+  });
+
+  test('a shaded time: on a Saturday, closed all day, the drawer opens on the slot and says the clinic is closed', async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'saturday');
+    await openCalendar(page, day);
+    const at = await inColumn(page, 'Arben Kodra', offsetOf('09:20'));
+    expect(
+      await page.evaluate(
+        ({ x, y }) =>
+          document.elementsFromPoint(x, y).some((element) => element.hasAttribute('data-shaded')),
+        at,
+      ),
+      'a shaded time',
+    ).toBe(true);
+    await page.mouse.click(at.x, at.y);
+    const open = drawer(page);
+    await expect(open.getByLabel(t.start, { exact: true })).toHaveValue('09:15');
+    await expect(open.getByLabel(t.provider, { exact: true })).toHaveValue(
+      SEEDED_PROVIDERS.harbourStreetSecondDentist,
+    );
+    await expect(
+      open.getByText(t.warning.noHours.replace('{weekday}', 'Saturday'), { exact: true }),
+    ).toBeVisible();
+    await expect(open.getByRole('button', { name: /^Book / })).toHaveText(
+      'Book 09:15 with Dr. Kodra',
+    );
+    await closeDrawer(page);
+  });
+});
+
+/** What a double click's second press may land on in the drawer, and the overlay beside it. */
+type Target = 'chip' | 'select' | 'book' | 'overlay';
+const TARGETS: readonly Target[] = ['chip', 'select', 'book', 'overlay'];
+
+test.describe("a double click's second press in the drawer (E01-T05c, acceptance 2)", () => {
+  // At 1280 px the drawer covers the grid's right part: the chip opens over Dr. Kodra's column, the
+  // length select and Book over M. Lumi's, each over an empty slot; Dr. Planinska's column stays left
+  // of it, under the overlay.
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  /**
+   * Where each target opens, measured on the drawer opened once by New appointment (its entering
+   * done), then closed: the Checkup chip, the length select, Book; and a point of the overlay on Dr.
+   * Planinska's column, level with Book (measured before: the open drawer hides the page's roles).
+   */
+  async function targets(page: Page): Promise<Record<Target, Point>> {
+    const left = (await centre(column(page, 'Elena Planinska'))).x;
+    await newAppointment(page).click();
+    const open = drawer(page);
+    await expect(open).toBeVisible();
+    await page.waitForTimeout(400);
+    const book = await centre(open.getByRole('button', { name: /^Book / }));
+    const points: Record<Target, Point> = {
+      chip: await centre(open.getByRole('button', { name: 'Checkup', exact: true })),
+      select: await centre(open.getByLabel(t.length, { exact: true })),
+      book,
+      overlay: { x: left, y: book.y },
+    };
+    await closeDrawer(page);
+    for (const target of TARGETS) {
+      expect(await emptySlotAt(page, points[target]), `${target}: over an empty slot`).toBe(true);
+    }
+    return points;
+  }
+
+  /**
+   * Two clicks `gap` ms apart, the first at `opener`, the second at `at`, then whether the page got
+   * them as a double click: less than 450 ms apart by their time stamps (the drawer opens between
+   * them, so the guard's half second covers the second), a margin under the guard's 500. How far
+   * apart they reached the page is the page's to say: a busy machine sends them later than asked. A
+   * pair the page got further apart is marked "not checked", never passed.
+   */
+  async function doubleClick(
+    page: Page,
+    opener: Point,
+    at: Point,
+    gap: number,
+    label: string,
+  ): Promise<Press | null> {
+    await forget(page);
+    await page.mouse.click(opener.x, opener.y);
+    await page.waitForTimeout(gap);
+    await page.mouse.click(at.x, at.y);
+    await page.waitForTimeout(700);
+    const [first, second] = await presses(page);
+    if (!first || !second) throw new Error(`${label}: the page got fewer than two presses.`);
+    if (second.at - first.at < 450) return second;
+    test.info().annotations.push({
+      type: 'not checked',
+      description: `${label}: the two presses reached the page ${Math.round(second.at - first.at)} ms apart`,
+    });
+    return null;
+  }
+
+  /**
+   * How many of the twelve double clicks the page got as one, noted on the report; at least one of
+   * each target, or the check proved nothing for it.
+   */
+  function everyTargetChecked(checked: readonly Target[]): void {
+    test.info().annotations.push({
+      type: 'checked',
+      description: `${checked.length} of 12 double clicks`,
+    });
+    for (const target of TARGETS) {
+      expect(checked, `a double click checked on the ${target}`).toContain(target);
+    }
+  }
+
+  /** The drawer open, nothing chosen or sent, the focus in the patient field. */
+  async function nothingChanged(
+    page: Page,
+    bookings: { booking: boolean }[],
+    label: string,
+  ): Promise<void> {
+    const open = drawer(page);
+    await expect(open, `${label}: open`).toBeVisible();
+    await expect(open.locator('[aria-pressed="true"]'), `${label}: no chip pressed`).toHaveCount(0);
+    await expect(open.getByLabel(t.length, { exact: true }), `${label}: the length`).toHaveValue(
+      '30',
+    );
+    expect(
+      bookings.filter((action) => action.booking),
+      `${label}: nothing sent`,
+    ).toEqual([]);
+    await expect(
+      open.getByRole('combobox', { name: t.patient }),
+      `${label}: the focus in the patient field`,
+    ).toBeFocused();
+  }
+
+  test('from an empty slot under it, 80, 150 and 250 ms apart: on a chip, a select, Book or the overlay, nothing is chosen or sent and the focus stays in the patient field; Escape closes it; a press half a second on picks', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    const day = dayOf(testInfo, 'secondPress');
+    const actions = countActions(page);
+    await openCalendar(page, day);
+    const points = await targets(page);
+    await recordPresses(page);
+    const checked: Target[] = [];
+    for (const target of TARGETS) {
+      for (const gap of [80, 150, 250]) {
+        const label = `${target}, ${gap} ms`;
+        // A real double click: both presses at the one point, an empty slot until the drawer opens.
+        const second = await doubleClick(page, points[target], points[target], gap, label);
+        if (second) {
+          checked.push(target);
+          expect(second.place, `${label}: the second press on the ${target}`).toBe(target);
+          await nothingChanged(page, actions, label);
+        }
+        await closeDrawer(page);
+      }
+    }
+    everyTargetChecked(checked);
+
+    // A press from half a second on picks as before.
+    await page.mouse.click(points.chip.x, points.chip.y);
+    const open = drawer(page);
+    await expect(open).toBeVisible();
+    await pressable(page);
+    await page.mouse.click(points.chip.x, points.chip.y);
+    await expect(open.getByRole('button', { name: 'Checkup', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await closeDrawer(page);
+    expect(await bookedOn(day)).toEqual([]);
+  });
+
+  test('from New appointment, 80, 150 and 250 ms apart: its second press on a chip, a select, Book or the overlay chooses and sends nothing, and the focus stays in the patient field; Escape closes it', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    const day = dayOf(testInfo, 'secondPress');
+    const actions = countActions(page);
+    await openCalendar(page, day);
+    const points = await targets(page);
+    const opener = await centre(newAppointment(page));
+    await recordPresses(page);
+    const checked: Target[] = [];
+    for (const target of TARGETS) {
+      for (const gap of [80, 150, 250]) {
+        const label = `${target}, ${gap} ms`;
+        // The second press where the target opens: New appointment sits in the header, above them.
+        const second = await doubleClick(page, opener, points[target], gap, label);
+        if (second) {
+          checked.push(target);
+          expect(second.place, `${label}: the second press on the ${target}`).toBe(target);
+          await nothingChanged(page, actions, label);
+        }
+        await closeDrawer(page);
+      }
+    }
+    everyTargetChecked(checked);
+    expect(await bookedOn(day)).toEqual([]);
+  });
+});
+
+test.describe('a double click on Book (E01-T05c, acceptance 3)', () => {
+  // As in the check above: Book opens over an empty slot of M. Lumi's column.
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('its answer closes the drawer before the second click, which lands on the grid: one booking, and no drawer opens again', async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'bookTwice');
+    const actions = countActions(page);
+    try {
+      await openCalendar(page, day);
+      await newAppointment(page).click();
+      await pressable(page);
+      const open = drawer(page);
+      await open.getByRole('combobox', { name: t.patient }).fill('Mimoza K');
+      await suggestions(open).filter({ hasText: 'Mimoza Kodra' }).click();
+      await open.getByRole('button', { name: 'Checkup', exact: true }).click();
+      const book = open.getByRole('button', { name: 'Book 08:00 with Dr. Planinska' });
+      const at = await centre(book);
+      await recordPresses(page);
+
+      // The first click books; the second comes once the answer has closed the drawer, as soon as
+      // the check sees it gone: the double click whose second click is slower than the answer.
+      await page.mouse.click(at.x, at.y);
+      await open.waitFor({ state: 'hidden' });
+      await page.mouse.click(at.x, at.y);
+      await page.waitForTimeout(700);
+
+      const [, second] = await presses(page);
+      const [closed] = await closings(page);
+      if (!second || closed === undefined) throw new Error('No second press, or no closing.');
+      expect(second.place, 'the second click on the grid, an empty slot').toBe('slot');
+      // The grid's click is dropped within half a second of the closing: by the page's clock, the
+      // second press came this long after it (450 ms leaves a margin). A slower one is no double
+      // click, and not checked.
+      if (second.at - closed < 450) {
+        await expect(drawer(page), 'no drawer opened again').toHaveCount(0);
+      } else {
+        testInfo.annotations.push({
+          type: 'not checked',
+          description: `the second press came ${Math.round(second.at - closed)} ms after the closing`,
+        });
+      }
+      await page.waitForLoadState('networkidle');
+      expect(
+        actions.filter((action) => action.booking),
+        'one booking request',
+      ).toHaveLength(1);
+      expect(await bookedOn(day)).toMatchObject([
+        {
+          patient: 'Mimoza Kodra',
+          provider_id: SEEDED_PROVIDERS.harbourStreetDentist,
+          starts: '08:00',
+        },
+      ]);
+    } finally {
+      await clear(day);
+    }
+  });
+});
+
+// E01-T05c tester: a click on the grid within half a second of the drawer closing opens nothing,
+// whatever closed it (new-appointment.tsx, closedAt): a double click outside the drawer, whose first
+// click closes it and whose second lands on the grid, and a click right after Escape.
+test.describe('a click on the grid right after the drawer closed (E01-T05c, tester)', () => {
+  // As in the second-press checks: Dr. Planinska's column stays left of the drawer, under the overlay.
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  /** Whether the press came under 450 ms after the closing, by the page's clock; else noted. */
+  async function withinClosing(page: Page, label: string): Promise<boolean> {
+    const [second] = (await presses(page)).filter((press) => press.place === 'slot');
+    const [closed] = await closings(page);
+    if (!second || closed === undefined)
+      throw new Error(`${label}: no press on the grid, or no closing.`);
+    if (second.at - closed < 450) return true;
+    test.info().annotations.push({
+      type: 'not checked',
+      description: `${label}: the press came ${Math.round(second.at - closed)} ms after the closing`,
+    });
+    return false;
+  }
+
+  test('a double click outside it, 80, 150 and 250 ms apart: the first closes it, the second lands on the grid and opens nothing; nor does a click at once after Escape; from half a second on it opens', async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'closeTwice');
+    const actions = countActions(page);
+    await openCalendar(page, day);
+    const outside = await inColumn(page, 'Elena Planinska', offsetOf('14:07'));
+    await recordPresses(page);
+    let checked = 0;
+    for (const gap of [80, 150, 250]) {
+      const label = `outside, ${gap} ms`;
+      await newAppointment(page).click();
+      await expect(drawer(page)).toBeVisible();
+      await pressable(page);
+      await forget(page);
+      await page.mouse.click(outside.x, outside.y);
+      await page.waitForTimeout(gap);
+      await page.mouse.click(outside.x, outside.y);
+      await page.waitForTimeout(700);
+      expect(
+        (await presses(page)).map((press) => press.place),
+        label,
+      ).toEqual(['overlay', 'slot']);
+      if (await withinClosing(page, label)) {
+        checked += 1;
+        await expect(drawer(page), `${label}: no drawer opened`).toHaveCount(0);
+      } else if ((await drawer(page).count()) > 0) {
+        await closeDrawer(page);
+      }
+      await page.waitForTimeout(DOUBLE_CLICK_MS + 100);
+    }
+
+    // Escape, then at once a click on the grid.
+    await newAppointment(page).click();
+    await expect(drawer(page)).toBeVisible();
+    await forget(page);
+    await page.keyboard.press('Escape');
+    await page.mouse.click(outside.x, outside.y);
+    await page.waitForTimeout(700);
+    if (await withinClosing(page, 'Escape')) {
+      checked += 1;
+      await expect(drawer(page), 'Escape: no drawer opened').toHaveCount(0);
+    } else if ((await drawer(page).count()) > 0) {
+      await closeDrawer(page);
+    }
+    testInfo.annotations.push({ type: 'checked', description: `${checked} of 4 closings` });
+    expect(checked, 'at least one click on the grid checked within half a second').toBeGreaterThan(
+      0,
+    );
+
+    // From half a second after the closing, the grid's click opens the drawer on its slot.
+    await page.waitForTimeout(DOUBLE_CLICK_MS + 100);
+    await page.mouse.click(outside.x, outside.y);
+    const open = drawer(page);
+    await expect(open.getByLabel(t.start, { exact: true })).toHaveValue('14:00');
+    await expect(open.getByLabel(t.provider, { exact: true })).toHaveValue(
+      SEEDED_PROVIDERS.harbourStreetDentist,
+    );
+    await closeDrawer(page);
+    expect(actions.filter((action) => action.booking)).toEqual([]);
+    expect(await bookedOn(day)).toEqual([]);
   });
 });

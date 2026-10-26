@@ -228,3 +228,68 @@ describe("the drawer's choices, read when it opens", () => {
     });
   });
 });
+
+// E01-T05c: a click on an empty slot of the grid opens the drawer with the slot's start and provider
+// in place of the first ones (the quarter hour under the pointer: day-calendar.test.ts).
+describe('the drawer opened on an empty slot of the grid', () => {
+  /** Monday 26 October 2026, open 08:00–18:00, with A and B active and LEFT shown for a visit. */
+  const VIEW = {
+    ...layoutDay({
+      day: '2026-10-26',
+      today: '2026-10-26',
+      weekday: 1,
+      hours: [{ weekday: 1, opens: 8 * H, closes: 18 * H }],
+      closedDay: null,
+      providers: [],
+      breaks: [],
+      appointments: [],
+    }),
+    columns: [A, B, LEFT],
+  };
+  const NOW = { day: '2026-10-26', minute: 9 * H + 50 };
+
+  it("begins on the slot's start and provider, whatever the clock and the columns shown say", () => {
+    const choices = bookingChoices(VIEW, [], [A.providerId], NOW, {
+      providerId: B.providerId,
+      start: 14 * H + 45,
+    });
+    expect([choices.firstStart, choices.firstProviderId]).toEqual([14 * H + 45, B.providerId]);
+    // What it offers is New appointment's: every quarter of the grid, the active providers.
+    expect(choices).toEqual({
+      ...bookingChoices(VIEW, [], [A.providerId], NOW),
+      firstStart: 14 * H + 45,
+      firstProviderId: B.providerId,
+    });
+  });
+
+  it("the grid's first and last quarter, and a quarter outside the day's hours, are starts it offers", () => {
+    for (const start of [8 * H, 17 * H + 45]) {
+      expect(
+        bookingChoices(VIEW, [], [], NOW, { providerId: A.providerId, start }).firstStart,
+      ).toBe(start);
+    }
+    const closed = { ...VIEW, closed: { why: 'no_hours' as const }, open: null };
+    expect(
+      bookingChoices(closed, [], [], NOW, { providerId: A.providerId, start: 9 * H + 15 })
+        .firstStart,
+    ).toBe(9 * H + 15);
+  });
+
+  it('a slot it does not offer begins on the first one instead: an inactive provider, a time off the grid', () => {
+    const first = bookingChoices(VIEW, [], [B.providerId], NOW);
+    const inactive = bookingChoices(VIEW, [], [B.providerId], NOW, {
+      providerId: LEFT.providerId,
+      start: 11 * H,
+    });
+    expect([inactive.firstStart, inactive.firstProviderId]).toEqual([
+      11 * H,
+      first.firstProviderId,
+    ]);
+    for (const start of [7 * H + 45, 18 * H, 9 * H + 10]) {
+      expect(
+        bookingChoices(VIEW, [], [], NOW, { providerId: A.providerId, start }).firstStart,
+        String(start),
+      ).toBe(first.firstStart);
+    }
+  });
+});

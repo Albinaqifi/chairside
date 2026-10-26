@@ -71,7 +71,9 @@ type DialogContentProps = Omit<ComponentProps<typeof DialogPrimitive.Content>, '
  * A double click on what opens it leaves it open, as the drawer's does (E01-T05a,
  * ./double-click-guard.ts): for half a second after it opens, a pointer down outside it is ignored,
  * and so is a press of the close button by a pointer. Escape, and a key on the close button, always
- * close it.
+ * close it. And the double click's second press changes nothing in it, as in the drawer (E01-T05c):
+ * for that half second a pointer's press in it or on the overlay moves no focus and reaches no
+ * control; a key always works.
  */
 function DialogContent({
   title,
@@ -80,15 +82,27 @@ function DialogContent({
   children,
   onOpenAutoFocus,
   onPointerDownOutside,
+  onPointerDownCapture,
+  onMouseDownCapture,
+  onClickCapture,
+  onKeyDownCapture,
   ...props
 }: DialogContentProps) {
   const t = useTranslations('dialog');
-  const guard = useDoubleClickGuard({ onOpenAutoFocus, onPointerDownOutside });
+  const guard = useDoubleClickGuard({
+    onOpenAutoFocus,
+    onPointerDownOutside,
+    onPointerDownCapture,
+    onMouseDownCapture,
+    onClickCapture,
+    onKeyDownCapture,
+  });
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
         data-slot="dialog-overlay"
         className="fixed inset-0 z-40 bg-overlay"
+        {...guard.overlay}
       />
       <DialogPrimitive.Content
         data-slot="dialog-content"
