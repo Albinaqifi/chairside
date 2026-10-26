@@ -17,6 +17,18 @@ export function offersNewPatient(typed: string, picked: boolean): boolean {
 }
 
 /**
+ * True when the field shows "Add “…” as new patient" now: it is offered for the text typed
+ * (offersNewPatient) and the search for that text has answered with a list, found or not
+ * (`answered`: the trimmed text the last answered search was for; null before an answer, or after a
+ * failed or `clinic_changed` one). So it always comes with the matches above it, as in the demo,
+ * whose search answers at once: never alone while the search is on its way, when ArrowDown and Enter
+ * would add a second patient for one the search was about to list (review, E01-T05d).
+ */
+export function showsNewPatient(typed: string, picked: boolean, answered: string | null): boolean {
+  return offersNewPatient(typed, picked) && answered === typed.trim();
+}
+
+/**
  * True when Enter takes "Add … as new patient": it is offered and active. It is the last option,
  * after the `suggestionCount` suggestions, so the arrow keys reach it as one of them
  * (./suggestions.ts, moveActive over the suggestions and it).

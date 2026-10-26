@@ -251,12 +251,13 @@ describe('"Add … as new patient": the last option, from the third character (E
     expect(onPick).not.toHaveBeenCalled();
   });
 
-  it('the field offers it from the third character typed, not before, nor with a patient picked', () => {
+  // Review, required change 1: the server renders the field before any search has answered, so it
+  // offers nothing, from the third character either; once an answer comes, the list shows it after
+  // the matches (the SuggestionList cases above; showsNewPatient in new-patient.test.ts; the e2e check).
+  it('the field offers it not before the search for the text typed has answered, from the third character either', () => {
     expect(optionTexts(fieldWith('An'))).toEqual([]);
-    expect(optionTexts(fieldWith('Ana'))).toEqual(['calendar.booking.addNewPatient(Ana)']);
-    expect(optionTexts(fieldWith('  Ana Bre '))).toEqual([
-      'calendar.booking.addNewPatient(Ana Bre)',
-    ]);
+    expect(optionTexts(fieldWith('Ana'))).toEqual([]);
+    expect(optionTexts(fieldWith('  Ana Bre '))).toEqual([]);
     const picked = { id: ANA.id, firstName: 'Ana', lastName: 'Brezovska' };
     expect(optionTexts(fieldWith('Ana Brezovska', picked))).toEqual([]);
   });

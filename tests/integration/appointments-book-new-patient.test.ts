@@ -190,7 +190,7 @@ async function existing(place: Place, startsAt: string, minutes: number): Promis
 }
 
 describe('a new patient is added and booked in one go (acceptance 1)', () => {
-  it('one patient as typed, one appointment for them, and two audit rows of ids: patient.created, then appointment.created', async () => {
+  it('one patient as typed, one appointment for them, and two audit rows of ids: one patient.created, one appointment.created', async () => {
     const day = freshDay();
     const before = await written(skopje.clinic);
     const { data, id } = form(skopje, {
@@ -239,9 +239,11 @@ describe('a new patient is added and booked in one go (acceptance 1)', () => {
       },
     ]);
 
+    // One row of each, in no order of writing: both ids are UUID v7 made in one handler, unordered
+    // within a millisecond (src/lib/ids.ts), so the rows are put in a fixed order by their action.
     const audit = await admin.query(
       `select actor_type, actor_id, action, entity_type, entity_id, metadata
-         from audit_log where clinic_id = $1 and entity_id in ($2, $3) order by id`,
+         from audit_log where clinic_id = $1 and entity_id in ($2, $3) order by action desc`,
       [skopje.clinic, id, result.value.id],
     );
     expect(audit.rows).toEqual([

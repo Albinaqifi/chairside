@@ -11,7 +11,7 @@ import type { FieldControlProps } from '@/ui/field';
 import { Input } from '@/ui/input';
 import { searchPatients } from '../patients/actions';
 import { SEARCH_MAX_LENGTH, sendSearch, type SearchAnswer } from '../patients/search-answer';
-import { newPatientByEnter, offersNewPatient } from './new-patient';
+import { newPatientByEnter, offersNewPatient, showsNewPatient } from './new-patient';
 import { canPick, moveActive, pickedByEnter, suggestionsOf } from './suggestions';
 
 /** How long the field waits after the last key before it searches: the patient list's wait. */
@@ -51,8 +51,9 @@ function optionId(listId: string, index: number): string {
  * A click picks a suggestion on the pointer's press, the focus kept in the field.
  *
  * From the third character typed, with no patient picked, the list ends with "Add “…” as new patient"
- * (E01-T05d), whether the search found anyone or not: an option the arrow keys reach and Enter takes,
- * as a suggestion, or a press. It hands the drawer the text typed (`onNewPatient`), which shows the
+ * (E01-T05d), whether the search found anyone or not, once the search for the text now typed has
+ * answered (showsNewPatient): never before, so it never stands alone where the matches are about to
+ * come. An option the arrow keys reach and Enter takes, as a suggestion, or a press. It hands the drawer the text typed (`onNewPatient`), which shows the
  * new patient's fields in place of this one; back from them, the field is made again with that text
  * (`initialText`), the focus in it, and searches it again.
  */
@@ -88,7 +89,12 @@ export function PatientField({
   const [found, setFound] = useState<Found | null>(null);
   const [active, setActive] = useState(-1);
   const suggestions = found?.kind === 'found' ? found.suggestions : [];
-  const offered = offersNewPatient(typed, picked !== null);
+  // Offered only once the search for the text now typed has answered: never alone before the matches.
+  const offered = showsNewPatient(
+    typed,
+    picked !== null,
+    found?.kind === 'found' ? found.text : null,
+  );
   /** The options: the suggestions, then "Add … as new patient" when it is offered. */
   const options = suggestions.length + (offered ? 1 : 0);
   const shown = listOpen && options > 0;
@@ -191,8 +197,6 @@ export function PatientField({
           setTyped(text);
           if (picked) onPick(null);
           search(text);
-          // "Add … as new patient" needs no answer: it shows as the third character is typed.
-          if (offersNewPatient(text, false)) onListOpen(true);
         }}
         onKeyDown={onKeyDown}
         onFocus={() => {

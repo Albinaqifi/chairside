@@ -4,6 +4,7 @@ import {
   newPatientByEnter,
   newPatientFrom,
   offersNewPatient,
+  showsNewPatient,
   unreachable,
 } from './new-patient';
 import { moveActive } from './suggestions';
@@ -25,6 +26,27 @@ describe('"Add … as new patient" is offered from the third character (acceptan
 
   it('not while a patient is picked', () => {
     expect(offersNewPatient('Ana Brezovska', true)).toBe(false);
+  });
+});
+
+describe('"Add … as new patient" shows only once the search for the text typed has answered (review, required change 1)', () => {
+  it('before any answer, or after a failed or clinic_changed one (no text answered): not shown', () => {
+    expect(showsNewPatient('Mimoza K', false, null)).toBe(false);
+  });
+
+  it('the answer for the text typed, found or not: shown, spaces around the text aside', () => {
+    expect(showsNewPatient('Mimoza K', false, 'Mimoza K')).toBe(true);
+    expect(showsNewPatient(' Mimoza K ', false, 'Mimoza K')).toBe(true);
+  });
+
+  it('the answer for an earlier text, still on show while the next search runs: not shown', () => {
+    expect(showsNewPatient('Mimoza Ko', false, 'Mimoza K')).toBe(false);
+    expect(showsNewPatient('Mimoza', false, 'Mimoza K')).toBe(false);
+  });
+
+  it('answered, but under three characters or with a patient picked: not shown', () => {
+    expect(showsNewPatient('An', false, 'An')).toBe(false);
+    expect(showsNewPatient('Mimoza Kodra', true, 'Mimoza Kodra')).toBe(false);
   });
 });
 

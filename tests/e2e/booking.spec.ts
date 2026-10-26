@@ -25,8 +25,9 @@ import { APP } from './servers.ts';
 // half a second after it opens (src/ui/double-click-guard.ts), so every check here lets that half
 // second pass before its first press in the drawer (pressable()), as a person's first press comes.
 //
-// E01-T05d, on a day of July 2031: a new patient booked in one go, by pointer and by keyboard; the
-// patient it adds is removed with the visit.
+// E01-T05d, on days of July 2031: a new patient booked in one go, by pointer and by keyboard; the
+// patient it adds is removed with the visit. And (its review) "Add … as new patient" not before the
+// search has answered: the search's call held, ArrowDown and Enter add no one.
 
 const t = messages.calendar.booking;
 
@@ -49,7 +50,8 @@ const DAYS: Record<
     | 'secondPress'
     | 'bookTwice'
     | 'closeTwice'
-    | 'newPatient',
+    | 'newPatient'
+    | 'newPatientEarly',
     string
   >
 > = {
@@ -70,6 +72,7 @@ const DAYS: Record<
     bookTwice: '2031-06-04',
     closeTwice: '2031-06-05', // E01-T05c's tester
     newPatient: '2031-07-07', // E01-T05d's
+    newPatientEarly: '2031-07-08', // E01-T05d's review
   },
   firefox: {
     mouse: '2031-04-14',
@@ -88,6 +91,7 @@ const DAYS: Record<
     bookTwice: '2031-06-11',
     closeTwice: '2031-06-12',
     newPatient: '2031-07-14',
+    newPatientEarly: '2031-07-15',
   },
   webkit: {
     mouse: '2031-04-21',
@@ -106,6 +110,7 @@ const DAYS: Record<
     bookTwice: '2031-06-18',
     closeTwice: '2031-06-19',
     newPatient: '2031-07-21',
+    newPatientEarly: '2031-07-22',
   },
 };
 
@@ -1727,6 +1732,66 @@ test.describe('a new patient booked in one go (E01-T05d, acceptance 1, 2, 3 and 
         `delete from patients where clinic_id = $1 and first_name = 'Vesna' and last_name = $2`,
         [SEEDED_CLINICS.harbourStreet, lastName],
       );
+    }
+  });
+
+  test('not before the search has answered: ArrowDown and Enter before the answer add no one; the answer lists the patient first and "Add …" last, none highlighted (review, required change 1)', async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'newPatientEarly');
+    // A seeded patient's name, typed in one change: one search, for this text.
+    const typed = 'Mimoza K';
+    // The search's call (a server action whose body holds the words) is held until the keys are pressed.
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held = 0;
+    await page.route(`${APP}/calendar**`, async (route) => {
+      const request = route.request();
+      const search =
+        request.method() === 'POST' &&
+        request.headers()['next-action'] !== undefined &&
+        (request.postData() ?? '').includes('Mimoza');
+      if (!search) return route.fallback();
+      held++;
+      await released;
+      return route.continue();
+    });
+    try {
+      await openCalendar(page, day);
+      await newAppointment(page).click();
+      const open = drawer(page);
+      const patient = open.getByRole('combobox', { name: t.patient });
+      await expect(patient).toBeFocused();
+
+      await patient.fill(typed);
+      await expect.poll(() => held, { message: 'the search is sent, and held' }).toBe(1);
+      await expect(suggestions(open), 'no option before the answer').toHaveCount(0);
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Enter');
+      await expect(
+        open.getByLabel(messages.newPatient.firstName, { exact: true }),
+        "no new patient's fields",
+      ).toHaveCount(0);
+      await expect(patient).toHaveValue(typed);
+
+      // The answer: the patient found first, "Add …" last, and no option highlighted, so Enter now
+      // takes none of them.
+      release();
+      await expect(suggestions(open)).toHaveCount(2);
+      await expect(suggestions(open).first()).toContainText('Mimoza Kodra');
+      await expect(suggestions(open).last()).toHaveText(t.addNewPatient.replace('{text}', typed));
+      for (const option of await suggestions(open).all()) {
+        await expect(option).toHaveAttribute('aria-selected', 'false');
+      }
+      await page.keyboard.press('Enter');
+      await expect(open.getByLabel(messages.newPatient.firstName, { exact: true })).toHaveCount(0);
+      await expect(patient).toHaveValue(typed);
+      expect(await bookedOn(day)).toEqual([]);
+    } finally {
+      release();
+      await clear(day);
     }
   });
 });
