@@ -26,8 +26,10 @@ environment says; it needs no account but runs right before T07c, the rest of E0
 the accounts exist (owner). T12, the logger's net, comes from
 three Discovered lines of E00-T01 and E00-T05b (D-102). E01-T01a, E01-T01b, E01-T02a and E01-T02b
 come before T06b and T07, so a receptionist sees a patient list before Playwright and staging exist; T04c, T04d
-and T04e come before E01-T02a, which depends on them (D-087, D-093, D-096). The tasks sit in this
-file in the order before D-087, with T05a and T05b after T04e, and T12 last.
+and T04e come before E01-T02a, which depends on them (D-087, D-093, D-096). T13 comes from
+E01-T05c's test (D-116): new advisories in Next.js and Zod turned the dependency check red, and the
+owner put the upgrade ahead of every other merge. The tasks sit in this file in the order before
+D-087, with T05a and T05b after T04e, and T12 and T13 last.
 
 ---
 
@@ -1844,3 +1846,52 @@ review check, D-087). The error tracker (E07-T03).
       `logger.test.ts` cases are unchanged.
 - [ ] The auth library's log lines still say what happened (test).
 - [ ] `pnpm check` passes.
+
+---
+
+### E00-T13 · Next.js 16.4.2 and Zod 4.6.7: the dependency check green again
+
+- **Role:** builder · **Risk:** normal (two package files: the diff touches no area of
+  `test-strategy.md`'s table; the action wrappers and login it runs under are proven by the tests
+  that exist, unchanged, and a needed code change stops the task, below) · **Depends on:** none
+  (E00-T06a, Done)
+- **Read:** D-068, D-075 (the dependency check), D-116 · the architect section of
+  `handoffs/E00-T13.md`
+
+**Why.** `pnpm audit --prod` is red since 2026-10-26 on four advisories in what reaches staging and
+patient data (D-075): `next` 16.3.8, two critical remote code executions (the image optimizer with
+SVGs, `use cache` returning typed arrays) and a high denial of service through Server Actions, fixed
+in 16.4.1; `zod` 4.6.5, a high memory exhaustion on oversized collections, fixed in 4.6.6. `main`'s
+Monday run and every pull request are red on that step, and the pipeline stops on it. The owner,
+2026-10-26: upgrade, as a small task of its own, before the next merge (D-116).
+
+**Do.**
+- `pnpm add next@16.4.2 zod@4.6.7` and `pnpm add -D eslint-config-next@16.4.2`: exact versions, as
+  `package.json` holds them now, `eslint-config-next` at `next`'s version.
+- One copy of Zod (D-068): the lockfile alone moves `better-auth`'s Zod too (its range is `^4.5.4`);
+  `pnpm why zod` names one version. No `overrides`, no change to `pnpm-workspace.yaml`.
+- Nothing else moves: `better-auth` 1.7.7, `next-intl` 4.14.9, `react` and `react-dom` 19.2.8.
+- **No code, test or CI change.** When a check fails after the upgrade, stop and ask (agent rule 4,
+  a failing test rule 8): the owner decides between a fix in this task and another version.
+- The full ladder before the hand-off, all three browsers included: Next.js 16.4 changes the
+  framework's runtime, which only the journeys and the integration tests exercise.
+
+**Out of scope.** Any other upgrade: `next` 16.4.3 or later, `better-auth` (its exact pin is a
+Discovered line), TypeScript 7 or ESLint 10. The full audit's development advisories (`vite` under
+`vitest`, `esbuild` under `drizzle-kit`): printed only, they fail no run (D-075). Merging `main`
+into E01-T05c's branch, which comes after this merge (board, "Now").
+
+**Acceptance.**
+- [ ] `package.json` names `next` 16.4.2, `eslint-config-next` 16.4.2 and `zod` 4.6.7, exactly;
+      `pnpm list next zod eslint-config-next better-auth next-intl --depth 0` shows them, with
+      `better-auth` 1.7.7 and `next-intl` 4.14.9 unchanged.
+- [ ] `pnpm why zod` names one version, 4.6.7; `pnpm-workspace.yaml` is unchanged and no
+      `overrides` is added.
+- [ ] `pnpm audit --prod` answers "No known vulnerabilities found", locally and in the pull
+      request's CI run.
+- [ ] `git diff --name-only main...HEAD` names `package.json`, `pnpm-lock.yaml` and files under
+      `docs/`, nothing else; since the owner's answer of 2026-10-26 also
+      `tests/e2e/form-memory.spec.ts`, `tests/e2e/components-page-server.ts` and `AGENTS.md` (D-117).
+- [ ] `pnpm check`, `pnpm build` and `pnpm test:e2e` (Chromium, Firefox, WebKit) pass with no test
+      changed but those two (D-117), and the pull request's CI run is green.
+- [ ] The run on `main` after the merge is green (the owner merges; read in this task's Done pass).
