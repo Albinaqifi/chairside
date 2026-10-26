@@ -24,6 +24,9 @@ import { APP } from './servers.ts';
 // Book whose answer closes the drawer before its second click. The drawer drops a pointer's press for
 // half a second after it opens (src/ui/double-click-guard.ts), so every check here lets that half
 // second pass before its first press in the drawer (pressable()), as a person's first press comes.
+//
+// E01-T05d, on a day of July 2031: a new patient booked in one go, by pointer and by keyboard; the
+// patient it adds is removed with the visit.
 
 const t = messages.calendar.booking;
 
@@ -45,7 +48,8 @@ const DAYS: Record<
     | 'saturday'
     | 'secondPress'
     | 'bookTwice'
-    | 'closeTwice',
+    | 'closeTwice'
+    | 'newPatient',
     string
   >
 > = {
@@ -65,6 +69,7 @@ const DAYS: Record<
     secondPress: '2031-06-03',
     bookTwice: '2031-06-04',
     closeTwice: '2031-06-05', // E01-T05c's tester
+    newPatient: '2031-07-07', // E01-T05d's
   },
   firefox: {
     mouse: '2031-04-14',
@@ -82,6 +87,7 @@ const DAYS: Record<
     secondPress: '2031-06-10',
     bookTwice: '2031-06-11',
     closeTwice: '2031-06-12',
+    newPatient: '2031-07-14',
   },
   webkit: {
     mouse: '2031-04-21',
@@ -99,6 +105,7 @@ const DAYS: Record<
     secondPress: '2031-06-17',
     bookTwice: '2031-06-18',
     closeTwice: '2031-06-19',
+    newPatient: '2031-07-21',
   },
 };
 
@@ -286,7 +293,10 @@ test.describe('booking an existing patient from New appointment (acceptance 1 an
       // 1. Type part of the name. 2. Pick them.
       await patient.fill('Mimoza K');
       const suggestion = suggestions(open).filter({ hasText: 'Mimoza Kodra' });
-      await expect(suggestions(open)).toHaveCount(1);
+      // The one patient found, then "Add … as new patient", the list's last option from the third
+      // character (E01-T05d): two options once the search has answered.
+      await expect(suggestions(open)).toHaveCount(2);
+      await expect(suggestions(open).first()).toContainText('Mimoza Kodra');
       await suggestion.click();
       await expect(patient).toHaveValue('Mimoza Kodra');
       // 3. Pick a treatment: its length.
@@ -365,7 +375,10 @@ test.describe('by keyboard alone (acceptance 2)', () => {
 
       await page.keyboard.type('Mimoza K');
       const list = open.getByRole('listbox');
-      await expect(suggestions(open)).toHaveCount(1);
+      // The one patient found, then "Add … as new patient", the list's last option from the third
+      // character (E01-T05d): two options once the search has answered.
+      await expect(suggestions(open)).toHaveCount(2);
+      await expect(suggestions(open).first()).toContainText('Mimoza Kodra');
       await expect(patient).toHaveAttribute('aria-expanded', 'true');
       // Escape closes the list; the drawer stays.
       await page.keyboard.press('Escape');
@@ -631,7 +644,10 @@ test.describe("the patient search's words in no address and no booking (acceptan
       await pressable(page);
       const open = drawer(page);
       await open.getByRole('combobox', { name: t.patient }).fill(typed);
-      await expect(suggestions(open)).toHaveCount(1);
+      // The one patient found, then "Add … as new patient", the list's last option from the third
+      // character (E01-T05d): two options once the search has answered.
+      await expect(suggestions(open)).toHaveCount(2);
+      await expect(suggestions(open).first()).toContainText('Mimoza Kodra');
       // The search sent its words in a request's body, a POST to the calendar's own address.
       const searches = requests.filter((request) => request.action && holdsWord(request.body));
       expect(searches.length, 'the search sent its words').toBeGreaterThan(0);
@@ -1615,5 +1631,102 @@ test.describe('a click on the grid right after the drawer closed (E01-T05c, test
     await closeDrawer(page);
     expect(actions.filter((action) => action.booking)).toEqual([]);
     expect(await bookedOn(day)).toEqual([]);
+  });
+});
+
+test.describe('a new patient booked in one go (E01-T05d, acceptance 1, 2, 3 and 6)', () => {
+  /** Each browser's own new patient, so no browser finds another's. Invented names. */
+  const LAST_NAMES: Record<string, string> = {
+    chromium: 'Trajkovska',
+    firefox: 'Kostovska',
+    webkit: 'Shehu',
+  };
+
+  test('"Add … as new patient" by pointer and by keyboard, back to the search, then Book: one patient, one visit', async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'newPatient');
+    const lastName = LAST_NAMES[testInfo.project.name] ?? 'Trajkovska';
+    const typed = `Vesna ${lastName}`;
+    const addNew = t.addNewPatient.replace('{text}', typed);
+    const fields = messages.newPatient;
+    // Every address the page asks for: the new patient's words are in none (D-095).
+    const addresses: string[] = [];
+    page.on('request', (sent) => addresses.push(sent.url()));
+    try {
+      await openCalendar(page, day);
+      await newAppointment(page).click();
+      const open = drawer(page);
+      const patient = open.getByRole('combobox', { name: t.patient });
+      await expect(patient).toBeFocused();
+      await pressable(page);
+
+      // By pointer: the last option, whatever the search finds.
+      await patient.fill(typed);
+      const option = suggestions(open).last();
+      await expect(option).toHaveText(addNew);
+      await option.click();
+      const firstName = open.getByLabel(fields.firstName, { exact: true });
+      await expect(firstName, 'the focus in the first name').toBeFocused();
+      await expect(firstName).toHaveValue('Vesna');
+      await expect(open.getByLabel(fields.lastName, { exact: true })).toHaveValue(lastName);
+      await expect(open.getByText(t.unreachable)).toBeVisible();
+
+      // Back to the search: the text typed in it again.
+      await open.getByRole('button', { name: t.backToSearch }).click();
+      await expect(patient).toHaveValue(typed);
+      await expect(patient).toBeFocused();
+
+      // By keyboard: up from none is the last option; Enter takes it.
+      await expect(suggestions(open).last()).toHaveText(addNew);
+      await page.keyboard.press('ArrowUp');
+      await expect(suggestions(open).last()).toHaveAttribute('aria-selected', 'true');
+      await page.keyboard.press('Enter');
+      await expect(firstName).toBeFocused();
+      await expect(firstName).toHaveValue('Vesna');
+
+      // A phone: the line goes. A treatment, then Book.
+      await open.getByLabel(fields.phone, { exact: true }).fill('070 001 461');
+      await expect(open.getByText(t.unreachable)).toBeHidden();
+      await open.getByRole('button', { name: 'Filling', exact: true }).click();
+      await open.getByRole('button', { name: 'Book 08:00 with Dr. Planinska' }).click();
+
+      await expect(open).toBeHidden();
+      await expect(
+        page
+          .getByRole('region', { name: 'Notifications (F8)' })
+          .getByText(`Booked ${typed}, 08:00.`, { exact: true }),
+      ).toBeVisible();
+      await expect(column(page, 'Elena Planinska').locator('li[data-status]')).toContainText(typed);
+      expect(await bookedOn(day)).toEqual([
+        {
+          patient: typed,
+          provider_id: SEEDED_PROVIDERS.harbourStreetDentist,
+          title: 'Filling',
+          starts: '08:00',
+          minutes: 45,
+          status: 'booked',
+        },
+      ]);
+      const added = await db.query<{ id: string; phone_e164: string | null; created: string }>(
+        `select p.id, p.phone_e164,
+                (select count(*) from audit_log a
+                  where a.entity_id = p.id::text and a.action = 'patient.created')::text as created
+           from patients p where p.clinic_id = $1 and p.first_name = 'Vesna' and p.last_name = $2`,
+        [SEEDED_CLINICS.harbourStreet, lastName],
+      );
+      expect(added.rows.map((row) => [row.phone_e164, row.created])).toEqual([
+        ['+38970001461', '1'],
+      ]);
+      expect(
+        addresses.filter((address) => address.includes(lastName) || address.includes('Vesna')),
+      ).toEqual([]);
+    } finally {
+      await clear(day);
+      await db.query(
+        `delete from patients where clinic_id = $1 and first_name = 'Vesna' and last_name = $2`,
+        [SEEDED_CLINICS.harbourStreet, lastName],
+      );
+    }
   });
 });

@@ -157,6 +157,12 @@
       "providerNotBookable": "This provider takes no new appointments. Choose another provider.",
       "treatmentNotBookable": "This treatment is no longer offered. Choose another treatment.",
       "startSkipped": "The clocks skip this start on this day. Choose another time.",
+      "addNewPatient": "+ Add “{text}” as new patient",
+      "newPatient": "New patient",
+      "backToSearch": "Back to the search",
+      "unreachable": "No phone and no email: no reminder can reach this patient. Book still books the visit.",
+      "phoneImpossible": "The phone number does not look right. Check its digits; a number from another country starts with + and its country code.",
+      "newPatientForbidden": "Your role cannot add patients. Choose a patient who is already in the list.",
       "warning": {
         "overlap": "Overlaps {name}'s visit, {from}–{to}.",
         "anyway": "You can still book it with Book anyway.",

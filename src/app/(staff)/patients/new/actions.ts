@@ -4,36 +4,27 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { refuse, staffAction, staffRead } from '@/app/_lib/actions';
 import * as patients from '@/modules/patients';
+import {
+  EMAIL_MAX,
+  email,
+  FULL_NAME_MAX,
+  name,
+  NAME_MAX,
+  NOTES_MAX,
+  optional,
+  phone,
+  PHONE_MAX,
+} from './patient-fields';
 
 /*
  * Adding a patient (E01-T02b): the new-patient form sends createPatient, and asks
  * findLikelyDuplicates, as a field is left, who the patient being typed may already be. What the
  * input alone settles is checked here and shown at its field (a name missing, an email that is no
  * email, a date that is no date); the phone needs the clinic's country, which only the handler's
- * transaction reads, so its problem is the handler's refusal, shown above the button (D-098).
+ * transaction reads, so its problem is the handler's refusal, shown above the button (D-098). The
+ * fields a new patient shares with the booking drawer's quick one are in ./patient-fields.ts
+ * (E01-T05d).
  */
-
-/** The longest each field may be, in characters (a guardian's is a full name; RFC 5321's email). */
-const NAME_MAX = 100;
-const FULL_NAME_MAX = 200;
-const PHONE_MAX = 40;
-const EMAIL_MAX = 254;
-const NOTES_MAX = 2000;
-
-/**
- * A field the form may leave empty: a form sends '' for it, which is none (null), never "Fill this
- * in."; so is blank text, and a field not sent at all.
- */
-function optional<S extends z.ZodType>(field: S) {
-  return z.preprocess(
-    (value) =>
-      value === undefined || (typeof value === 'string' && value.trim() === '') ? null : value,
-    field.nullable(),
-  );
-}
-
-/** A first or last name: trimmed, then not empty. */
-const name = z.string().trim().min(1).max(NAME_MAX);
 
 /**
  * The browser's date field: a calendar date, YYYY-MM-DD, checked as one (2031-02-30 is none). It
@@ -45,10 +36,8 @@ const newPatient = z.object({
   firstName: name,
   lastName: name,
   dateOfBirth,
-  /** As typed: the handler reads it with the clinic's country (patients.create). */
-  phone: optional(z.string().trim().max(PHONE_MAX)),
-  /** Trimmed and lower-cased, then checked. */
-  email: optional(z.string().trim().toLowerCase().max(EMAIL_MAX).pipe(z.email())),
+  phone,
+  email,
   /** Any two lower-case letters (D-053): the select offers the message file's languages. */
   language: z.string().regex(/^[a-z]{2}$/),
   guardianName: optional(z.string().trim().max(FULL_NAME_MAX)),

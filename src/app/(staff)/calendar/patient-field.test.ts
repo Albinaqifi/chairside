@@ -134,6 +134,7 @@ function field(picked: PickedPatient | null = null): string {
     onPick: vi.fn(),
     listOpen: false,
     onListOpen: vi.fn(),
+    onNewPatient: vi.fn(),
   });
   const frame: ComponentProps<typeof FrameClinic> = { clinicId: CLINIC, children: element };
   return renderToString(createElement(FrameClinic, frame));
@@ -168,5 +169,105 @@ describe('the patient search keeps nothing in the browser (acceptance 8, D-095)'
     const [listbox] = tags(html, 'ul');
     expect(listbox?.get('id')).toBe(box?.get('aria-controls'));
     expect(listbox?.has('hidden')).toBe(true);
+  });
+});
+
+// E01-T05d, acceptance 2: "Add “…” as new patient", the suggestions' last option.
+
+/** The field made with `initialText`, as it is made again back from the new patient's fields. */
+function fieldWith(initialText: string, picked: PickedPatient | null = null): string {
+  const element = createElement(PatientField, {
+    field: { id: 'booking-patient', name: 'patientId' },
+    picked,
+    onPick: vi.fn(),
+    listOpen: false,
+    onListOpen: vi.fn(),
+    initialText,
+    onNewPatient: vi.fn(),
+  });
+  const frame: ComponentProps<typeof FrameClinic> = { clinicId: CLINIC, children: element };
+  return renderToString(createElement(FrameClinic, frame));
+}
+
+describe('"Add … as new patient": the last option, from the third character (E01-T05d, acceptance 2)', () => {
+  it('after the suggestions, its own option, the text typed in it', () => {
+    const html = renderToString(
+      createElement(SuggestionList, list({ newPatient: 'Ana Bre', onNewPatient: vi.fn() })),
+    );
+    const options = tags(html, 'li');
+    expect(options.map((option) => option.get('role'))).toEqual([
+      'option',
+      'option',
+      'option',
+      'option',
+    ]);
+    expect(options.map((option) => option.get('id'))).toEqual([
+      'patients-found-option-0',
+      'patients-found-option-1',
+      'patients-found-option-2',
+      'patients-found-option-3',
+    ]);
+    expect(optionTexts(html).at(-1)).toBe('calendar.booking.addNewPatient(Ana Bre)');
+    expect(options.at(-1)?.has('aria-disabled')).toBe(false);
+  });
+
+  it('with no suggestions, the only option', () => {
+    const html = renderToString(
+      createElement(SuggestionList, list({ suggestions: [], newPatient: 'Vesna' })),
+    );
+    expect(optionTexts(html)).toEqual(['calendar.booking.addNewPatient(Vesna)']);
+    expect(tags(html, 'li')[0]?.get('id')).toBe('patients-found-option-0');
+  });
+
+  it('not offered: no such option', () => {
+    expect(optionTexts(renderToString(createElement(SuggestionList, list())))).toHaveLength(3);
+  });
+
+  it('reached by the arrow keys: marked selected when active, as a suggestion is', () => {
+    const html = renderToString(
+      createElement(SuggestionList, list({ newPatient: 'Ana Bre', active: 3 })),
+    );
+    expect(tags(html, 'li').map((option) => option.get('aria-selected'))).toEqual([
+      'false',
+      'false',
+      'false',
+      'true',
+    ]);
+  });
+
+  it('a press takes it, the focus kept in the field until the new fields take it', () => {
+    const onNewPatient = vi.fn();
+    const onPick = vi.fn();
+    const ul = SuggestionList(
+      list({ newPatient: 'Ana Bre', onNewPatient, onPick }),
+    ) as ReactElement<{ children: ReactNode[] }>;
+    const options = ul.props.children as ReactElement<{
+      onMouseDown: (event: { preventDefault: () => void }) => void;
+    }>[];
+    const press = { preventDefault: vi.fn() };
+    options.at(-1)?.props.onMouseDown(press);
+    expect(press.preventDefault).toHaveBeenCalledOnce();
+    expect(onNewPatient).toHaveBeenCalledOnce();
+    expect(onPick).not.toHaveBeenCalled();
+  });
+
+  it('the field offers it from the third character typed, not before, nor with a patient picked', () => {
+    expect(optionTexts(fieldWith('An'))).toEqual([]);
+    expect(optionTexts(fieldWith('Ana'))).toEqual(['calendar.booking.addNewPatient(Ana)']);
+    expect(optionTexts(fieldWith('  Ana Bre '))).toEqual([
+      'calendar.booking.addNewPatient(Ana Bre)',
+    ]);
+    const picked = { id: ANA.id, firstName: 'Ana', lastName: 'Brezovska' };
+    expect(optionTexts(fieldWith('Ana Brezovska', picked))).toEqual([]);
+  });
+
+  it('back from the new patient: the box holds the text typed again, and no patient is picked', () => {
+    const html = fieldWith('Ana Bre');
+    const [box] = tags(html, 'input').filter((input) => input.get('role') === 'combobox');
+    expect(box?.get('value')).toBe('Ana Bre');
+    const hidden = tags(html, 'input').filter((input) => input.get('type') === 'hidden');
+    expect(hidden.map((input) => [input.get('name'), input.get('value')])).toEqual([
+      ['patientId', ''],
+    ]);
   });
 });

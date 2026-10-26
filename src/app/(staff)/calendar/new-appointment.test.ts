@@ -50,6 +50,8 @@ const CLINIC = '01970000-0000-7000-8000-0000000000f5';
 const H = 60;
 const DENTIST = '01970000-0000-7000-8000-0000000004a1';
 const HYGIENIST = '01970000-0000-7000-8000-0000000004b2';
+/** The id the drawer made for a new patient (E01-T05d). */
+const NEW_PATIENT_ID = '01970000-0000-7000-8000-0000000007d1';
 const CHECKUP: TreatmentType = {
   id: '01970000-0000-7000-8000-000000000601',
   name: 'Checkup',
@@ -76,6 +78,8 @@ const CHOICES: BookingChoices = {
 
 const FIRST: Booking = {
   patient: null,
+  newPatient: null,
+  searchText: '',
   treatmentId: null,
   start: 9 * H,
   length: 30,
@@ -126,6 +130,7 @@ function render(
     choices: { ...CHOICES, ...options.choices },
     view: options.view ?? VIEW,
     booking: { ...FIRST, ...booking },
+    newPatientId: NEW_PATIENT_ID,
     onChange: vi.fn(),
     listOpen: false,
     onListOpen: vi.fn(),
@@ -728,5 +733,144 @@ describe('a warning line for a break, the hours or a closed day; Book still book
       book: 'Book anyway, 12:00 with Dr. Planinska',
       anyway: 'true',
     });
+  });
+});
+
+// E01-T05d: a new patient in one go. The drawer shows the new patient's fields in place of the search
+// once "Add … as new patient" is taken (./patient-field.test.ts, ./new-patient.test.ts).
+
+/** A new patient as the drawer holds them, from the words "Vesna Trajkovska". */
+const VESNA = {
+  typed: 'Vesna Trajkovska',
+  firstName: 'Vesna',
+  lastName: 'Trajkovska',
+  phone: '',
+  email: '',
+};
+
+describe('the new patient: fields of the booking, filled from the words typed (E01-T05d)', () => {
+  it('first name, last name, phone and email in place of the search, the names as typed, the drawer’s id hidden', () => {
+    const html = render({ newPatient: VESNA });
+    expect(tags(html, 'input').find((input) => input.get('role') === 'combobox')).toBeUndefined();
+    const named = [...tags(html, 'input'), ...tags(html, 'select')]
+      .map((field) => field.get('name'))
+      .filter((name) => name !== undefined);
+    expect(named.sort()).toEqual(
+      [
+        'day',
+        'email',
+        'firstName',
+        'lastName',
+        'length',
+        'newPatientId',
+        'phone',
+        'providerId',
+        'start',
+        'treatmentTypeId',
+      ].sort(),
+    );
+    const byName = (name: string) =>
+      tags(html, 'input').find((input) => input.get('name') === name);
+    expect(byName('firstName')?.get('value')).toBe('Vesna');
+    expect(byName('lastName')?.get('value')).toBe('Trajkovska');
+    expect(byName('phone')?.get('type')).toBe('tel');
+    expect(byName('email')?.get('type')).toBe('email');
+    expect(byName('newPatientId')?.get('type')).toBe('hidden');
+    expect(byName('newPatientId')?.get('value')).toBe(NEW_PATIENT_ID);
+    // Each named by its label.
+    for (const name of ['firstName', 'lastName', 'phone', 'email']) {
+      const id = byName(name)?.get('id') ?? '';
+      expect(html).toContain(`for="${id}"`);
+    }
+  });
+
+  it('no field of the new patient sets an autocomplete of its own (D-095, acceptance 6)', () => {
+    const html = render({ newPatient: { ...VESNA, phone: '070 001 234' } });
+    expect(tags(html, 'form')[0]?.get('autocomplete')).toBe('off');
+    for (const field of [...tags(html, 'input'), ...tags(html, 'select')]) {
+      expect(field.has('autocomplete'), field.get('name')).toBe(false);
+    }
+  });
+
+  it('"Back to the search" is a button that sends nothing', () => {
+    const html = render({ newPatient: VESNA });
+    const back = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)].find(
+      ([, , inside = '']) => text(inside) === messages.calendar.booking.backToSearch,
+    );
+    expect(back?.[1]).toContain('type="button"');
+  });
+
+  it('back to the search: the box holds the text typed again (acceptance 2)', () => {
+    const html = render({ newPatient: null, searchText: 'Vesna Trajkovska' });
+    const box = tags(html, 'input').find((input) => input.get('role') === 'combobox');
+    expect(box?.get('value')).toBe('Vesna Trajkovska');
+  });
+
+  it('a problem of a name or the email shows at its field (acceptance 4)', () => {
+    const html = render(
+      { newPatient: { ...VESNA, firstName: '', email: 'vesna' } },
+      {
+        answer: {
+          kind: 'invalid',
+          fields: new Map([
+            ['firstName', 'missing'],
+            ['email', 'invalidFormat'],
+          ]),
+        },
+      },
+    );
+    for (const [name, problem] of [
+      ['firstName', messages.form.fieldErrors.missing],
+      ['email', messages.form.fieldErrors.invalidFormat],
+    ] as const) {
+      const input = tags(html, 'input').find((found) => found.get('name') === name);
+      expect(input?.get('aria-invalid'), name).toBe('true');
+      const errorId = input?.get('aria-describedby') ?? '';
+      expect(text(new RegExp(`<p id="${errorId}"[^>]*>([^<]*)</p>`).exec(html)?.[1] ?? '')).toBe(
+        problem,
+      );
+    }
+  });
+
+  it.each([
+    ['phone_impossible', messages.calendar.booking.phoneImpossible],
+    ['new_patient_forbidden', messages.calendar.booking.newPatientForbidden],
+  ])('%s: its text, in an alert above Book (acceptance 4, D-098)', (code, message) => {
+    const html = render({ newPatient: VESNA }, { answer: { kind: 'refused', code } });
+    const alert = /<p role="alert"[^>]*>([\s\S]*?)<\/p>/.exec(html);
+    expect(text(alert?.[1] ?? '')).toBe(message);
+    expect(html.indexOf('role="alert"')).toBeLessThan(html.indexOf('type="submit"'));
+  });
+
+  it("the impossible phone's text is the new-patient page's", () => {
+    expect(messages.calendar.booking.phoneImpossible).toBe(messages.newPatient.phoneImpossible);
+  });
+});
+
+describe('without a phone and an email: a line says no reminder can reach them, and Book still books (E01-T05d, acceptance 3)', () => {
+  const line = messages.calendar.booking.unreachable;
+
+  it('neither: the line, under the fields, in a live region; Book as ever', () => {
+    const html = render({ newPatient: VESNA });
+    expect(text(html)).toContain(line);
+    const status = html.indexOf(line);
+    expect(html.lastIndexOf('role="status"', status)).toBeGreaterThan(html.indexOf('name="email"'));
+    expect(text(html)).toContain('Book 09:00 with Dr. Planinska');
+  });
+
+  it('a phone or an email: no line', () => {
+    expect(text(render({ newPatient: { ...VESNA, phone: '070 001 234' } }))).not.toContain(line);
+    expect(
+      text(render({ newPatient: { ...VESNA, email: 'vesna.trajkovska@example.test' } })),
+    ).not.toContain(line);
+  });
+
+  it('a picked patient: no line', () => {
+    const picked = {
+      id: '01970000-0000-7000-8000-0000000011aa',
+      firstName: 'Ana',
+      lastName: 'Brezovska',
+    };
+    expect(text(render({ patient: picked }))).not.toContain(line);
   });
 });
