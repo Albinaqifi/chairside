@@ -632,6 +632,46 @@ describe('one active type per name, trimmed and in any case (acceptance 5)', () 
     ]);
   });
 
+  // E01-T09a tester: the edit takes the same lock. An active type renamed to a name while another
+  // change takes that name: the second waits for the first, then is name_taken.
+  it.each([
+    { what: 'a rename, then an add of the new name', second: 'add' },
+    { what: 'two renames of two types to one name', second: 'rename' },
+  ] as const)('$what, at once: the second waits, then is name_taken', async ({ second }) => {
+    const crown = await setUpType(clinicA, { name: 'Crown' });
+    const bridge = await setUpType(clinicA, { name: 'Bridge' });
+    const fields = (name: string) => ({ name, minutes: 30, price: null, needsAftercare: false });
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let firstPid = 0;
+    let firstWritten = () => {};
+    const written = new Promise<void>((resolve) => (firstWritten = resolve));
+    const one = withTenant(clinicA, async (tx) => {
+      firstPid = await backendPid(tx);
+      const result = await scheduling.changeTreatmentType(tx, crown, fields('Inlay'), new Date());
+      firstWritten();
+      await held;
+      return result;
+    });
+    await Promise.race([written, one]);
+    const two = withTenant(clinicA, (tx) =>
+      second === 'add'
+        ? scheduling.addTreatmentType(tx, fields('INLAY'), new Date())
+        : scheduling.changeTreatmentType(tx, bridge, fields(' inlay '), new Date()),
+    );
+    try {
+      await waitingBehind(firstPid);
+    } finally {
+      release();
+    }
+    expect(await one).toEqual({ ok: true });
+    expect(await two).toEqual({ ok: false, code: 'name_taken' });
+    expect((await typesOf(clinicA)).map((row) => `${row.name} ${row.active}`).sort()).toEqual([
+      'Bridge true',
+      'Inlay true',
+    ]);
+  });
+
   it('two clinics may each have an active type of one name, and wait on nothing of the other', async () => {
     await setUpType(clinicB, { name: 'Filling' });
     as('owner');
