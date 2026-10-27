@@ -1657,7 +1657,13 @@ test.describe('a new patient booked in one go (E01-T05d, acceptance 1, 2, 3 and 
     const fields = messages.newPatient;
     // Every address the page asks for: the new patient's words are in none (D-095).
     const addresses: string[] = [];
-    page.on('request', (sent) => addresses.push(sent.url()));
+    // The tester's (acceptance 6): the booking's request, whose body carries the new patient's words.
+    const bookingBodies: string[] = [];
+    page.on('request', (sent) => {
+      addresses.push(sent.url());
+      const body = sent.postData() ?? '';
+      if (sent.method() === 'POST' && body.includes('newPatientId')) bookingBodies.push(body);
+    });
     try {
       await openCalendar(page, day);
       await newAppointment(page).click();
@@ -1726,6 +1732,10 @@ test.describe('a new patient booked in one go (E01-T05d, acceptance 1, 2, 3 and 
       expect(
         addresses.filter((address) => address.includes(lastName) || address.includes('Vesna')),
       ).toEqual([]);
+      expect(bookingBodies, 'one booking request').toHaveLength(1);
+      for (const word of ['Vesna', lastName, '070 001 461']) {
+        expect(bookingBodies[0], 'the booking request’s body').toContain(word);
+      }
     } finally {
       await clear(day);
       await db.query(

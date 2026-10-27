@@ -34,6 +34,21 @@ vi.mock('next/headers', () => ({
 const cache = vi.hoisted(() => ({ refresh: vi.fn(), revalidatePath: vi.fn() }));
 vi.mock('next/cache', () => cache);
 
+// The tester's (E01-T05d): a role without patients.manage, which no role is today. While
+// `permission.withoutPatientsManage` is set, can() answers no for that permission alone; the wrapper's
+// calendar.manage and everything else are answered as ever.
+const permission = vi.hoisted(() => ({ withoutPatientsManage: false }));
+vi.mock('@/modules/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/auth')>();
+  return {
+    ...actual,
+    can: (...args: Parameters<typeof actual.can>) =>
+      permission.withoutPatientsManage && args[2] === 'patients.manage'
+        ? false
+        : actual.can(...args),
+  };
+});
+
 const admin = migratorPool();
 
 /** One clinic's rows: a provider, a treatment type, an active and an archived patient. */
@@ -110,6 +125,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   request.clinic = skopje.clinic;
+  permission.withoutPatientsManage = false;
   cache.refresh.mockClear();
   cache.revalidatePath.mockClear();
 });
@@ -555,5 +571,87 @@ describe('patients.create with an id given (E01-T05d)', () => {
     if (!first.ok || !second.ok) throw new Error('refused');
     expect(first.created && second.created).toBe(true);
     expect(first.id).not.toBe(second.id);
+  });
+});
+
+describe("the tester's: a new patient where the booking or the request goes wrong writes nothing (E01-T05d)", () => {
+  it('a role without patients.manage: new_patient_forbidden, nothing written; a picked patient still books', async () => {
+    permission.withoutPatientsManage = true;
+    const before = await written(skopje.clinic);
+    const { data, id } = form(skopje, { day: freshDay() });
+    expect(await bookAppointment(skopje.clinic, data)).toEqual({
+      ok: false,
+      error: { code: 'new_patient_forbidden' },
+    });
+    expect(await written(skopje.clinic)).toEqual(before);
+    expect(await count('select count(*) as n from patients where id = $1', id)).toBe(0);
+
+    const picked = form(skopje, {
+      day: freshDay(),
+      newPatientId: undefined,
+      firstName: undefined,
+      lastName: undefined,
+      phone: undefined,
+      email: undefined,
+    }).data;
+    picked.append('patientId', skopje.marko);
+    expect((await bookAppointment(skopje.clinic, picked)).ok).toBe(true);
+  });
+
+  it('a start the clocks skip (Skopje, 2032-03-28 02:30): start_skipped, no patient, no audit row', async () => {
+    const before = await written(skopje.clinic);
+    const { data, id } = form(skopje, { day: '2032-03-28', start: '02:30' });
+    expect(await bookAppointment(skopje.clinic, data)).toEqual({
+      ok: false,
+      error: { code: 'start_skipped' },
+    });
+    expect(await written(skopje.clinic)).toEqual(before);
+    expect(await count('select count(*) as n from patients where id = $1', id)).toBe(0);
+  });
+
+  it("another clinic's provider: provider_not_bookable, no patient in either clinic", async () => {
+    const counts = async () => [await written(skopje.clinic), await written(other.clinic)];
+    const before = await counts();
+    const { data, id } = form(skopje, { day: freshDay(), providerId: other.dentist });
+    expect(await bookAppointment(skopje.clinic, data)).toEqual({
+      ok: false,
+      error: { code: 'provider_not_bookable' },
+    });
+    expect(await counts()).toEqual(before);
+    expect(await count('select count(*) as n from patients where id = $1', id)).toBe(0);
+  });
+
+  it("sent with clinic A's id while the request is in clinic B: clinic_changed, no patient in either", async () => {
+    request.clinic = other.clinic;
+    const counts = async () => [await written(skopje.clinic), await written(other.clinic)];
+    const before = await counts();
+    const { data, id } = form(skopje, { day: freshDay() });
+    expect(await bookAppointment(skopje.clinic, data)).toEqual({
+      ok: false,
+      error: { code: 'clinic_changed' },
+    });
+    expect(await counts()).toEqual(before);
+    expect(await count('select count(*) as n from patients where id = $1', id)).toBe(0);
+  });
+
+  it('names at the edge: Cyrillic names of 100 characters book as typed; 101 is invalid_input at its field', async () => {
+    const long = 'Ж'.repeat(100);
+    const { data, id } = form(skopje, { day: freshDay(), firstName: 'Весна', lastName: long });
+    expect((await bookAppointment(skopje.clinic, data)).ok).toBe(true);
+    const stored = await admin.query('select first_name, last_name from patients where id = $1', [
+      id,
+    ]);
+    expect(stored.rows).toEqual([{ first_name: 'Весна', last_name: long }]);
+
+    const before = await written(skopje.clinic);
+    const result = await bookAppointment(
+      skopje.clinic,
+      form(skopje, { day: freshDay(), lastName: `${long}Ж` }).data,
+    );
+    if (result.ok || result.error.code !== 'invalid_input' || !('issues' in result.error)) {
+      throw new Error('expected invalid_input');
+    }
+    expect(result.error.issues.map((issue) => issue.path[0])).toEqual(['lastName']);
+    expect(await written(skopje.clinic)).toEqual(before);
   });
 });
