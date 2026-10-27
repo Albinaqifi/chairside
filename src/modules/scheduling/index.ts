@@ -18,4 +18,19 @@ export {
 } from './booking';
 export { breaksOnWeekday, listProviders, type Provider, type ProviderBreak } from './providers';
 export { activeTreatmentTypes, type TreatmentType } from './treatment-types';
+// E01-T09a: the catalogue as Settings keeps it.
+export {
+  addTreatmentType,
+  changeTreatmentType,
+  clinicTreatmentTypes,
+  setTreatmentTypeActive,
+  TREATMENT_PRICE_MAX,
+  TREATMENT_TYPE_NAME_MAX,
+  type AddTreatmentTypeResult,
+  type CatalogueType,
+  type ChangeTreatmentTypeResult,
+  type SetTreatmentTypeActiveRefusal,
+  type SetTreatmentTypeActiveResult,
+  type TreatmentTypeFields,
+} from './treatment-types';
 export { lastAndNextVisits, type PatientVisits } from './visits';

@@ -19,6 +19,7 @@ import { ClinicDetailsForm } from '@/app/(staff)/settings/clinic-details-form';
 import { ClosedDays } from '@/app/(staff)/settings/closed-days';
 import { OpeningHoursForm } from '@/app/(staff)/settings/opening-hours-form';
 import SettingsPage from '@/app/(staff)/settings/page';
+import { TreatmentTypes } from '@/app/(staff)/settings/treatment-types';
 import { Sidebar } from '@/app/(staff)/sidebar';
 import VisitPage from '@/app/(staff)/visit/page';
 import { closeDb } from '@/db/client';
@@ -517,6 +518,43 @@ describe('the Settings page (E01-T08a)', () => {
       const sections = elementsOf<ComponentProps<typeof ClosedDays>>(page, ClosedDays);
       expect(sections.map((section) => section.key)).toEqual([chosen]);
       expect(sections[0]?.props.days).toEqual(days);
+    }
+  });
+
+  // E01-T09a: the Treatment types tab keyed by the clinic and given its types and currency only.
+  it("an owner: the Treatment types tab keyed by the clinic, given that clinic's types, the active first, and its currency", async () => {
+    request.cookie = await signInCookie(
+      await memberAs('owner', [firstClinic, secondClinic]),
+      PASSWORD,
+      freshAddress(),
+    );
+    await admin.query('delete from treatment_types where clinic_id = any($1)', [
+      [firstClinic, secondClinic],
+    ]);
+    const ids = { old: newId(), crown: newId(), second: newId() };
+    for (const [id, clinicId, name, active] of [
+      [ids.old, firstClinic, 'Bleaching', false],
+      [ids.crown, firstClinic, 'Crown', true],
+      [ids.second, secondClinic, 'Second clinic type', true],
+    ] as const) {
+      await insertRow(admin, 'treatment_types', {
+        id,
+        clinic_id: clinicId,
+        name,
+        default_duration_min: 45,
+        active,
+      });
+    }
+    for (const [chosen, listed] of [
+      [firstClinic, [ids.crown, ids.old]],
+      [secondClinic, [ids.second]],
+    ] as const) {
+      request.clinic = chosen;
+      const page = await SettingsPage();
+      const tabs = elementsOf<ComponentProps<typeof TreatmentTypes>>(page, TreatmentTypes);
+      expect(tabs.map((tab) => tab.key)).toEqual([chosen]);
+      expect(tabs[0]?.props.types.map((type) => type.id)).toEqual(listed);
+      expect(tabs[0]?.props.currency).toBe('MKD');
     }
   });
 });
