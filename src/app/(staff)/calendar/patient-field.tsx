@@ -11,6 +11,7 @@ import type { FieldControlProps } from '@/ui/field';
 import { Input } from '@/ui/input';
 import { searchPatients } from '../patients/actions';
 import { SEARCH_MAX_LENGTH, sendSearch, type SearchAnswer } from '../patients/search-answer';
+import { newPatientByEnter, offersNewPatient, showsNewPatient } from './new-patient';
 import { canPick, moveActive, pickedByEnter, suggestionsOf } from './suggestions';
 
 /** How long the field waits after the last key before it searches: the patient list's wait. */
@@ -48,6 +49,13 @@ function optionId(listId: string, index: number): string {
  * the form, Tab leaves the field. Escape closes the list, then the drawer: Radix hears Escape first,
  * on the document, so the drawer asks whether the list is open (`listOpen`, kept by the drawer).
  * A click picks a suggestion on the pointer's press, the focus kept in the field.
+ *
+ * From the third character typed, with no patient picked, the list ends with "Add “…” as new patient"
+ * (E01-T05d), whether the search found anyone or not, once the search for the text now typed has
+ * answered (showsNewPatient): never before, so it never stands alone where the matches are about to
+ * come. An option the arrow keys reach and Enter takes, as a suggestion, or a press. It hands the drawer the text typed (`onNewPatient`), which shows the
+ * new patient's fields in place of this one; back from them, the field is made again with that text
+ * (`initialText`), the focus in it, and searches it again.
  */
 export function PatientField({
   field,
@@ -55,6 +63,8 @@ export function PatientField({
   onPick,
   listOpen,
   onListOpen,
+  initialText = '',
+  onNewPatient,
 }: {
   /** The StaffField's control props: its id names the box, its name the hidden value. */
   field: FieldControlProps;
@@ -62,6 +72,10 @@ export function PatientField({
   onPick: (patient: PickedPatient | null) => void;
   listOpen: boolean;
   onListOpen: (open: boolean) => void;
+  /** The text the field starts with: what was typed before the new patient's fields. */
+  initialText?: string;
+  /** "Add … as new patient" taken, with the text typed. */
+  onNewPatient: (typed: string) => void;
 }) {
   const t = useTranslations('calendar.booking');
   const names = useTranslations('patients');
@@ -71,14 +85,29 @@ export function PatientField({
   const box = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const sent = useRef(0);
-  const [typed, setTyped] = useState('');
+  const [typed, setTyped] = useState(initialText);
   const [found, setFound] = useState<Found | null>(null);
   const [active, setActive] = useState(-1);
   const suggestions = found?.kind === 'found' ? found.suggestions : [];
-  const shown = listOpen && suggestions.length > 0;
+  // Offered only once the search for the text now typed has answered: never alone before the matches.
+  const offered = showsNewPatient(
+    typed,
+    picked !== null,
+    found?.kind === 'found' ? found.text : null,
+  );
+  /** The options: the suggestions, then "Add … as new patient" when it is offered. */
+  const options = suggestions.length + (offered ? 1 : 0);
+  const shown = listOpen && options > 0;
 
   // A search still waiting when the drawer closes is never sent.
   useEffect(() => () => clearTimeout(timer.current), []);
+
+  // Back from the new patient's fields (E01-T05d): the focus in the field, as it is made, which then
+  // searches the text again (onFocus), so its suggestions and "Add … as new patient" show as they did.
+  const startText = useRef(initialText);
+  useEffect(() => {
+    if (startText.current.trim() !== '') box.current?.focus();
+  }, []);
 
   function search(text: string) {
     clearTimeout(timer.current);
@@ -98,7 +127,10 @@ export function PatientField({
           const rows = suggestionsOf(answer.list.rows);
           setFound({ kind: 'found', text: text.trim(), suggestions: rows });
           // Opened only while the field has the focus: not after the person moved on.
-          onListOpen(rows.length > 0 && document.activeElement === box.current);
+          onListOpen(
+            (rows.length > 0 || offersNewPatient(text, false)) &&
+              document.activeElement === box.current,
+          );
         } else {
           setFound({ kind: answer.kind });
           onListOpen(false);
@@ -116,18 +148,30 @@ export function PatientField({
     onPick({ id: row.id, firstName: row.firstName, lastName: row.lastName });
   }
 
+  function takeNewPatient() {
+    clearTimeout(timer.current);
+    sent.current++; // an answer still on its way is dropped
+    setActive(-1);
+    onListOpen(false);
+    onNewPatient(typed);
+  }
+
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     const key = event.key;
     if (key === 'Enter') {
-      // Implicit submission would send the booking: here Enter picks the active suggestion, or
-      // does nothing.
+      // Implicit submission would send the booking: here Enter picks the active suggestion, takes
+      // "Add … as new patient", or does nothing.
       event.preventDefault();
+      if (shown && newPatientByEnter(suggestions.length, active, offered)) {
+        takeNewPatient();
+        return;
+      }
       const row = shown ? pickedByEnter(suggestions, active) : null;
       if (row) pick(row);
     } else if (key === 'ArrowDown' || key === 'ArrowUp') {
-      if (suggestions.length === 0) return;
+      if (options === 0) return;
       event.preventDefault();
-      setActive(moveActive(shown ? active : -1, suggestions.length, key));
+      setActive(moveActive(shown ? active : -1, options, key));
       onListOpen(true);
     }
   }
@@ -156,7 +200,9 @@ export function PatientField({
         }}
         onKeyDown={onKeyDown}
         onFocus={() => {
-          if (!picked && suggestions.length > 0) onListOpen(true);
+          if (!picked && options > 0) onListOpen(true);
+          // Made again with the text typed (back from a new patient): searched once more.
+          if (!picked && found === null && typed.trim() !== '') search(typed);
         }}
         onBlur={() => onListOpen(false)}
       />
@@ -169,6 +215,8 @@ export function PatientField({
           active={active}
           shown={shown}
           onPick={pick}
+          newPatient={offered ? typed.trim() : null}
+          onNewPatient={takeNewPatient}
         />
         {/* Always there, so a screen reader reads what appears in it. */}
         <div role="status">
@@ -199,6 +247,8 @@ export function PatientField({
  * or deceased one with their label (as the patient list shows it), disabled: a press on them picks
  * nothing (owner, D-113). The active suggestion, moved by the arrow keys, is the field's
  * aria-activedescendant. A press keeps the focus in the field, so the list stays until it picks.
+ * The last option, when offered, is "Add “…” as new patient" (E01-T05d, demo line 1335), in the
+ * link colour, reached and taken as a suggestion is.
  */
 export function SuggestionList({
   listId,
@@ -206,15 +256,73 @@ export function SuggestionList({
   active,
   shown,
   onPick,
+  newPatient = null,
+  onNewPatient,
 }: {
   listId: string;
   suggestions: readonly PatientRow[];
   active: number;
   shown: boolean;
   onPick: (row: PatientRow) => void;
+  /** The text typed, trimmed, when "Add … as new patient" is offered; null when it is not. */
+  newPatient?: string | null;
+  onNewPatient?: () => void;
 }) {
   const t = useTranslations('calendar.booking');
   const names = useTranslations('patients');
+  const newIndex = suggestions.length;
+  const options = suggestions.map((row, index) => {
+    const pickable = canPick(row);
+    return (
+      <li
+        key={row.id}
+        id={optionId(listId, index)}
+        role="option"
+        aria-selected={index === active}
+        aria-disabled={pickable ? undefined : true}
+        tabIndex={-1}
+        onMouseDown={(event) => {
+          event.preventDefault(); // the focus stays in the field
+          if (pickable) onPick(row);
+        }}
+        className={cn(
+          'flex items-center justify-between gap-2 border-t border-border px-3 py-2.25 first:border-t-0',
+          pickable ? 'cursor-pointer hover:bg-primary-soft' : 'cursor-default text-muted',
+          index === active && 'bg-primary-soft',
+        )}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate font-medium">
+            {names('fullName', { first: row.firstName, last: row.lastName })}
+          </span>
+          {row.status !== 'active' && <Badge variant={row.status}>{names(row.status)}</Badge>}
+        </span>
+        <span className="shrink-0 text-small text-muted">{row.phone ?? names('noPhone')}</span>
+      </li>
+    );
+  });
+  // One list of options, the new patient last: the list's children stay its options alone.
+  if (newPatient !== null) {
+    options.push(
+      <li
+        key="new-patient"
+        id={optionId(listId, newIndex)}
+        role="option"
+        aria-selected={newIndex === active}
+        tabIndex={-1}
+        onMouseDown={(event) => {
+          event.preventDefault(); // the focus stays in the field until the new fields take it
+          onNewPatient?.();
+        }}
+        className={cn(
+          'cursor-pointer border-t border-border px-3 py-2.25 font-medium text-link first:border-t-0 hover:bg-primary-soft',
+          newIndex === active && 'bg-primary-soft',
+        )}
+      >
+        {t('addNewPatient', { text: newPatient })}
+      </li>,
+    );
+  }
   return (
     <ul
       id={listId}
@@ -223,36 +331,7 @@ export function SuggestionList({
       hidden={!shown}
       className="mt-2 overflow-hidden rounded-control border border-border bg-surface"
     >
-      {suggestions.map((row, index) => {
-        const pickable = canPick(row);
-        return (
-          <li
-            key={row.id}
-            id={optionId(listId, index)}
-            role="option"
-            aria-selected={index === active}
-            aria-disabled={pickable ? undefined : true}
-            tabIndex={-1}
-            onMouseDown={(event) => {
-              event.preventDefault(); // the focus stays in the field
-              if (pickable) onPick(row);
-            }}
-            className={cn(
-              'flex items-center justify-between gap-2 border-t border-border px-3 py-2.25 first:border-t-0',
-              pickable ? 'cursor-pointer hover:bg-primary-soft' : 'cursor-default text-muted',
-              index === active && 'bg-primary-soft',
-            )}
-          >
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-medium">
-                {names('fullName', { first: row.firstName, last: row.lastName })}
-              </span>
-              {row.status !== 'active' && <Badge variant={row.status}>{names(row.status)}</Badge>}
-            </span>
-            <span className="shrink-0 text-small text-muted">{row.phone ?? names('noPhone')}</span>
-          </li>
-        );
-      })}
+      {options}
     </ul>
   );
 }

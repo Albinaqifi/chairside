@@ -2,6 +2,7 @@
 
 import { useFormatter, useTimeZone, useTranslations } from 'next-intl';
 import {
+  useEffect,
   useId,
   useImperativeHandle,
   useLayoutEffect,
@@ -11,11 +12,13 @@ import {
   type Ref,
 } from 'react';
 import { StaffField, StaffForm } from '@/app/_lib/staff-form';
+import { newId } from '@/lib/ids';
 import type { TreatmentType } from '@/modules/scheduling';
 import { Button } from '@/ui/button';
 import { cn } from '@/ui/cn';
 import { withinDoubleClick } from '@/ui/double-click-guard';
 import type { FieldControlProps } from '@/ui/field';
+import { Input } from '@/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/ui/native-select';
 import { Sheet, SheetBody, SheetContent, SheetTrigger } from '@/ui/sheet';
 import { bookAppointment } from './actions';
@@ -31,6 +34,7 @@ import {
 } from './booking-choices';
 import { anyWarning, bookingWarnings, NO_WARNINGS, type BookingWarnings } from './booking-warnings';
 import type { CalendarDayView } from './day';
+import { newPatientFrom, unreachable } from './new-patient';
 import { PatientField, type PickedPatient } from './patient-field';
 
 /** A time of the day the drawer shows, "10:30": no moment, so in UTC, as the grid's hours are. */
@@ -141,9 +145,25 @@ export interface NewAppointmentHandle {
   openAt: (slot: Slot, at: number) => void;
 }
 
+/**
+ * A new patient being booked (E01-T05d): their fields as typed, and the search's text they started
+ * from, which "Back to the search" puts back.
+ */
+export interface NewPatientDraft {
+  typed: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+}
+
 /** What the person has chosen so far. */
 export interface Booking {
   patient: PickedPatient | null;
+  /** The new patient's fields, shown in place of the search; null while the search shows. */
+  newPatient: NewPatientDraft | null;
+  /** What the search starts with: back from a new patient, the text typed before (E01-T05d). */
+  searchText: string;
   /** None until one is picked: no booking takes a treatment by default (scope-v1.md). */
   treatmentId: string | null;
   /** Minutes from the day's local midnight. */
@@ -170,8 +190,13 @@ export function BookingDrawer({
 }) {
   const t = useTranslations('calendar.booking');
   const format = useFormatter();
+  // The new patient's id, made once per opening (this component is keyed by it) and sent with a new
+  // patient, so the same booking sent twice adds them once (E01-T05d, test-strategy.md Duplicates).
+  const [newPatientId] = useState(newId);
   const [booking, setBooking] = useState<Booking>({
     patient: null,
+    newPatient: null,
+    searchText: '',
     treatmentId: null,
     start: choices.firstStart,
     length: FIRST_LENGTH,
@@ -206,6 +231,7 @@ export function BookingDrawer({
           choices={choices}
           view={view}
           booking={booking}
+          newPatientId={newPatientId}
           onChange={(change) => setBooking((before) => ({ ...before, ...change }))}
           listOpen={listOpen}
           onListOpen={setListOpen}
@@ -219,8 +245,8 @@ export function BookingDrawer({
 /**
  * The booking's form (demo lines 1328–1360): a StaffForm, sending the frame's clinic (D-092), that
  * keeps nothing in the browser (D-093, D-095): no field sets an `autocomplete` of its own. The
- * patient, picked from the search; the treatment's chips, none pressed until one is picked, each
- * setting the length to its own; the start, the length and the provider, each the browser's own
+ * patient, picked from the search, or a new one's fields in its place (E01-T05d); the treatment's
+ * chips, none pressed until one is picked, each setting the length to its own; the start, the length and the provider, each the browser's own
  * select; the day the calendar shows, hidden. Book names the time and the provider (demo logic
  * line 2127). A problem of the input shows at its field; the clinic's refusals above Book (D-098).
  *
@@ -235,6 +261,7 @@ export function BookingForm({
   choices,
   view,
   booking,
+  newPatientId,
   onChange,
   listOpen,
   onListOpen,
@@ -244,6 +271,8 @@ export function BookingForm({
   /** The day the calendar holds now. */
   view: CalendarDayView;
   booking: Booking;
+  /** The id a new patient is added under: the drawer's, one per opening (E01-T05d). */
+  newPatientId: string;
   onChange: (change: Partial<Booking>) => void;
   listOpen: boolean;
   onListOpen: (open: boolean) => void;
@@ -258,8 +287,10 @@ export function BookingForm({
     format.dateTime(new Date(Date.UTC(2000, 0, 1, 0, minutes)), TIME_OF_DAY);
   const treatment = choices.treatmentTypes.find((type) => type.id === booking.treatmentId) ?? null;
   const provider = choices.providers.find((found) => found.id === booking.providerId) ?? null;
-  const patientName = booking.patient
-    ? names('fullName', { first: booking.patient.firstName, last: booking.patient.lastName })
+  // The toast names the patient: the one picked, or the new one by the names typed.
+  const named = booking.newPatient ?? booking.patient;
+  const patientName = named
+    ? names('fullName', { first: named.firstName.trim(), last: named.lastName.trim() })
     : '';
   const warnings = view.day === choices.day ? bookingWarnings(view, booking) : NO_WARNINGS;
   const anyway = warnings.overlaps.length > 0;
@@ -275,6 +306,8 @@ export function BookingForm({
         provider_not_bookable: t('providerNotBookable'),
         treatment_not_bookable: t('treatmentNotBookable'),
         start_skipped: t('startSkipped'),
+        phone_impossible: t('phoneImpossible'),
+        new_patient_forbidden: t('newPatientForbidden'),
       }}
       submitLabel={
         provider
@@ -288,19 +321,37 @@ export function BookingForm({
     >
       <input type="hidden" name="day" value={choices.day} />
       {anyway && <input type="hidden" name="anyway" value="true" />}
-      <StaffField
-        name="patientId"
-        label={t('patient')}
-        render={(field) => (
-          <PatientField
-            field={field}
-            picked={booking.patient}
-            onPick={(patient) => onChange({ patient })}
-            listOpen={listOpen}
-            onListOpen={onListOpen}
-          />
-        )}
-      />
+      {booking.newPatient ? (
+        <NewPatientFields
+          id={newPatientId}
+          draft={booking.newPatient}
+          onChange={(change) =>
+            booking.newPatient && onChange({ newPatient: { ...booking.newPatient, ...change } })
+          }
+          onBack={(typed) => onChange({ newPatient: null, searchText: typed })}
+        />
+      ) : (
+        <StaffField
+          name="patientId"
+          label={t('patient')}
+          render={(field) => (
+            <PatientField
+              field={field}
+              picked={booking.patient}
+              onPick={(patient) => onChange({ patient })}
+              listOpen={listOpen}
+              onListOpen={onListOpen}
+              initialText={booking.searchText}
+              onNewPatient={(typed) =>
+                onChange({
+                  patient: null,
+                  newPatient: { typed, email: '', ...newPatientFrom(typed) },
+                })
+              }
+            />
+          )}
+        />
+      )}
       <StaffField
         name="treatmentTypeId"
         label={<span id={treatmentLabel}>{t('treatment')}</span>}
@@ -467,6 +518,108 @@ function BookingWarning({
           {warnings.overlaps.length > 0 && <p>{t('anyway')}</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The new patient's fields (E01-T05d; scope-v1.md, quick add), in place of the patient search: first
+ * name, last name, phone and email, fields of the booking's form, not a form of their own (D-113),
+ * which come filled from the words typed (./new-patient.ts), the focus in the first one. Each is
+ * checked as the new-patient page's is, a problem shown at its field; an impossible phone is the
+ * handler's refusal, above Book (D-098). No field sets an `autocomplete` of its own: the booking's
+ * StaffForm keeps nothing in the browser (D-093, D-095), and their words go in the booking's request
+ * body. Without a phone and an email, a line under them says no reminder can reach the patient, and
+ * Book still books. "Back to the search" (a button that sends nothing) shows the search again with
+ * the text typed. The hidden `newPatientId` is the drawer's id for them.
+ */
+function NewPatientFields({
+  id,
+  draft,
+  onChange,
+  onBack,
+}: {
+  id: string;
+  draft: NewPatientDraft;
+  onChange: (change: Partial<NewPatientDraft>) => void;
+  onBack: (typed: string) => void;
+}) {
+  const t = useTranslations('calendar.booking');
+  const fields = useTranslations('newPatient');
+  const first = useRef<HTMLInputElement>(null);
+  const legend = useId();
+  // The focus in the first field as they show: the search that had it is gone.
+  useEffect(() => {
+    first.current?.focus();
+  }, []);
+  return (
+    <div role="group" aria-labelledby={legend} className="grid gap-3">
+      <p id={legend} className="font-medium">
+        {t('newPatient')}
+      </p>
+      <input type="hidden" name="newPatientId" value={id} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <StaffField
+          name="firstName"
+          label={fields('firstName')}
+          render={(field) => (
+            <Input
+              {...field}
+              ref={first}
+              value={draft.firstName}
+              onChange={(event) => onChange({ firstName: event.currentTarget.value })}
+            />
+          )}
+        />
+        <StaffField
+          name="lastName"
+          label={fields('lastName')}
+          render={(field) => (
+            <Input
+              {...field}
+              value={draft.lastName}
+              onChange={(event) => onChange({ lastName: event.currentTarget.value })}
+            />
+          )}
+        />
+        <StaffField
+          name="phone"
+          label={fields('phone')}
+          render={(field) => (
+            <Input
+              {...field}
+              type="tel"
+              value={draft.phone}
+              onChange={(event) => onChange({ phone: event.currentTarget.value })}
+            />
+          )}
+        />
+        <StaffField
+          name="email"
+          label={fields('email')}
+          render={(field) => (
+            <Input
+              {...field}
+              type="email"
+              value={draft.email}
+              onChange={(event) => onChange({ email: event.currentTarget.value })}
+            />
+          )}
+        />
+      </div>
+      {/* Always there, so a screen reader reads the line when it appears. */}
+      <div role="status">
+        {unreachable(draft.phone, draft.email) && (
+          <p className="rounded-control border border-warn-border bg-warn-bg px-3 py-2">
+            {t('unreachable')}
+          </p>
+        )}
+      </div>
+      <div>
+        <Button type="button" variant="secondary" onClick={() => onBack(draft.typed)}>
+          {t('backToSearch')}
+        </Button>
+      </div>
     </div>
   );
 }
