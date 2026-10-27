@@ -2258,3 +2258,27 @@ architecture), `changed` (differs from the original files), `process`.
   at work; the guard checks and the product are unchanged (production staff pages stay `no-store`).
 - **Revisit if:** a later Next.js stores page data in the browser again, or answers `next dev`'s pages
   otherwise (read `components-page-server.ts`, 1. and 2.).
+
+### D-118 · E01-T05d Done: the patient field's Enter fix goes into E01-T06 (owner); E01-T09 split in three; a linked provider's kind is locked and an inactive provider keeps its visits and its login's access (owner)
+- **Origin:** E01-T05d's Done pass and E01-T09's Ready pass, 2026-10-27 (PR #77; `handoffs/E01-T05d.md`,
+  `handoffs/E01-T09a.md`). **Owner, 2026-10-27:** the patient field's Enter fix not now but in
+  E01-T06; a provider linked to a login keeps its kind in Settings, and making a provider inactive
+  changes no one's access; a provider with visits ahead is made inactive with a warning of how many. The
+  split and the fields are the architect's.
+- **What:**
+  - **E01-T06 takes the fix** (`message`, the review's and delta review's suggestion of E01-T05d): each
+    search answer clears the highlighted row, so Enter never takes a row the person did not see lit.
+  - **E01-T09 → E01-T09a** (treatment types, first: a clinic made by `clinic:create` books nothing
+    without them), **E01-T09b** (providers), **E01-T09c** (their order and weekly breaks). No field of
+    the three is a number field (the length a select, the price a text, the colour a range), so the
+    number texts (E00-T04c) wait for the first one, on the Discovered list, and no task here changes
+    `StaffForm`, `StaffField` or the action input (D-093).
+  - **A linked provider** (`memberships.provider_id`): its kind is locked in Settings, as an owner's
+    aftercare approval follows a linked dentist's kind (D-051); an inactive provider still gives its
+    kind through `clinics_for_user()`, unchanged (E01-T01a left this to E01-T09). Access is the Staff
+    tab's (E04-T02).
+  - **An inactive provider** keeps every appointment; its visits ahead stay booked and on the calendar.
+- **Why:** each Settings tab is one session's worth (E01-T05a and E01-T05d came to twice their
+  estimate); a permission that changes from a Settings field would make a Settings task critical.
+- **Revisit if:** E04-T02 builds the Staff tab (the link and the kind may move there together); a
+  clinic asks for a provider's visits to be moved when they leave.
