@@ -71,3 +71,126 @@ export async function breaksOnWeekday(
 function minutesOfTime(column: Column) {
   return sql<number>`(extract(epoch from ${column}) / 60)::float8`;
 }
+
+/*
+ * The providers as Settings keeps them (E01-T09b): every provider of the clinic with its kind, and
+ * one added. Changing one, and making one inactive or active again, is E01-T09d; the order and the
+ * breaks E01-T09c. Never deleted (data-model.md: the app role has no DELETE on the table). A
+ * provider's name, short name and chair are no patient's, but never go in a log or an error's
+ * message either.
+ */
+
+/** A provider's kinds, as the table's check names them (data-model.md). */
+export const PROVIDER_KINDS = ['dentist', 'hygienist', 'other'] as const;
+
+export type ProviderKind = (typeof PROVIDER_KINDS)[number];
+
+/** The longest a provider's name may be, in characters, once trimmed. */
+export const PROVIDER_NAME_MAX = 100;
+
+/** The longest a provider's short name may be, in characters, once trimmed: the calendar's chips. */
+export const PROVIDER_SHORT_NAME_MAX = 12;
+
+/** The longest a provider's chair label may be, in characters, once trimmed. */
+export const PROVIDER_CHAIR_MAX = 100;
+
+/** The highest hue a provider's colour may have, in degrees: the table's check is 0–359. */
+export const PROVIDER_HUE_MAX = 359;
+
+/**
+ * One provider as the Settings tab lists it: the calendar's Provider and its kind. A read of its
+ * own, so the calendar's Provider, which many of its tests build, stays as it is.
+ */
+export interface ClinicProvider extends Provider {
+  kind: ProviderKind;
+}
+
+/** What Settings sets of a new provider. */
+export interface ProviderFields {
+  /** Trimmed here; not empty, at most PROVIDER_NAME_MAX characters. */
+  name: string;
+  /** Trimmed here; not empty, at most PROVIDER_SHORT_NAME_MAX characters. */
+  shortName: string;
+  kind: ProviderKind;
+  /** Trimmed here; not empty, at most PROVIDER_CHAIR_MAX characters. */
+  chairLabel: string;
+  /** A whole number of degrees, 0 to PROVIDER_HUE_MAX. */
+  colorHue: number;
+}
+
+/** Every provider of the clinic, active or not, with its kind, in the calendar's order. */
+export async function clinicProviders(tx: TenantTransaction): Promise<ClinicProvider[]> {
+  const rows = await tx
+    .select({
+      id: providers.id,
+      name: providers.name,
+      shortName: providers.shortName,
+      kind: providers.kind,
+      chairLabel: providers.chairLabel,
+      colorHue: providers.colorHue,
+      active: providers.active,
+    })
+    .from(providers)
+    .orderBy(asc(providers.sortOrder), asc(providers.name), asc(providers.id));
+  return rows.map((row) => ({ ...row, kind: providerKind(row.kind) }));
+}
+
+/**
+ * Adds a provider to the clinic of this transaction, active, its texts trimmed, created and updated
+ * at `now`, last in the calendar's order: its `sort_order` one above the clinic's highest, 0 for its
+ * first. No lock (D-119): two adds at once may share a `sort_order`, which the calendar's order
+ * breaks by name and id, and E01-T09c's move renumbers. A value the caller's schema should have
+ * refused is an Error.
+ */
+export async function addProvider(
+  tx: TenantTransaction,
+  fields: ProviderFields,
+  now: Date,
+): Promise<{ id: string }> {
+  const values = storableProvider(fields);
+  const [added] = await tx
+    .insert(providers)
+    .values({
+      clinicId: sql`current_clinic_id()`,
+      ...values,
+      // Row-Level Security limits the subquery to the clinic's own providers.
+      sortOrder: sql`(select coalesce(max(${providers.sortOrder}) + 1, 0) from ${providers})`,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning({ id: providers.id });
+  if (!added) throw new Error('addProvider: the provider was not written');
+  return { id: added.id };
+}
+
+/** A kind as the table holds it; the check allows no other, so another is an Error. */
+function providerKind(kind: string): ProviderKind {
+  const known = PROVIDER_KINDS.find((each) => each === kind);
+  if (!known) throw new Error('clinicProviders: a provider has a kind the table does not allow');
+  return known;
+}
+
+/**
+ * The fields to store, the texts trimmed, when they can be stored; an Error when not: the caller's
+ * schema refuses each first, at its field. The values are never in the error's message.
+ */
+function storableProvider(fields: ProviderFields): ProviderFields {
+  const name = fields.name.trim();
+  const shortName = fields.shortName.trim();
+  const chairLabel = fields.chairLabel.trim();
+  if (
+    name === '' ||
+    name.length > PROVIDER_NAME_MAX ||
+    shortName === '' ||
+    shortName.length > PROVIDER_SHORT_NAME_MAX ||
+    chairLabel === '' ||
+    chairLabel.length > PROVIDER_CHAIR_MAX ||
+    !PROVIDER_KINDS.includes(fields.kind) ||
+    !Number.isInteger(fields.colorHue) ||
+    fields.colorHue < 0 ||
+    fields.colorHue > PROVIDER_HUE_MAX
+  ) {
+    throw new Error('addProvider: the provider cannot be stored');
+  }
+  return { name, shortName, kind: fields.kind, chairLabel, colorHue: fields.colorHue };
+}

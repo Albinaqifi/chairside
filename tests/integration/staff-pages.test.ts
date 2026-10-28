@@ -18,6 +18,7 @@ import { PlaceholderPage } from '@/app/(staff)/placeholder-page';
 import { ClinicDetailsForm } from '@/app/(staff)/settings/clinic-details-form';
 import { ClosedDays } from '@/app/(staff)/settings/closed-days';
 import { OpeningHoursForm } from '@/app/(staff)/settings/opening-hours-form';
+import { Providers } from '@/app/(staff)/settings/providers';
 import SettingsPage from '@/app/(staff)/settings/page';
 import { TreatmentTypes } from '@/app/(staff)/settings/treatment-types';
 import { Sidebar } from '@/app/(staff)/sidebar';
@@ -555,6 +556,47 @@ describe('the Settings page (E01-T08a)', () => {
       expect(tabs.map((tab) => tab.key)).toEqual([chosen]);
       expect(tabs[0]?.props.types.map((type) => type.id)).toEqual(listed);
       expect(tabs[0]?.props.currency).toBe('MKD');
+    }
+  });
+
+  // E01-T09b: the Providers tab keyed by the clinic and given that clinic's providers only, in the
+  // calendar's order (D-098).
+  it("an owner: the Providers tab keyed by the clinic, given that clinic's providers in the calendar's order", async () => {
+    request.cookie = await signInCookie(
+      await memberAs('owner', [firstClinic, secondClinic]),
+      PASSWORD,
+      freshAddress(),
+    );
+    await admin.query('delete from providers where clinic_id = any($1)', [
+      [firstClinic, secondClinic],
+    ]);
+    const ids = { later: newId(), first: newId(), second: newId() };
+    for (const [id, clinicId, name, sortOrder, active] of [
+      [ids.later, firstClinic, 'Ana Probna', 2, false],
+      [ids.first, firstClinic, 'Vera Vzorec', 1, true],
+      [ids.second, secondClinic, 'Second clinic provider', 1, true],
+    ] as const) {
+      await insertRow(admin, 'providers', {
+        id,
+        clinic_id: clinicId,
+        name,
+        short_name: name.slice(0, 12),
+        kind: 'dentist',
+        chair_label: 'Chair 1',
+        color_hue: 120,
+        active,
+        sort_order: sortOrder,
+      });
+    }
+    for (const [chosen, listed] of [
+      [firstClinic, [ids.first, ids.later]],
+      [secondClinic, [ids.second]],
+    ] as const) {
+      request.clinic = chosen;
+      const page = await SettingsPage();
+      const tabs = elementsOf<ComponentProps<typeof Providers>>(page, Providers);
+      expect(tabs.map((tab) => tab.key)).toEqual([chosen]);
+      expect(tabs[0]?.props.providers.map((provider) => provider.id)).toEqual(listed);
     }
   });
 });
