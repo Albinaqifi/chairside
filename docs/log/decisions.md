@@ -2330,3 +2330,29 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a clinic with many providers finds the heading a poor place for the keyboard after
   Up and Down (E01-T11 watches); a clinic wants a break on one date only; E04-T02 links logins to
   providers (the kind lock's read must then come after the provider's row lock, Discovered, `data`).
+
+### D-121 · E01-T09e Done: E01-T03 split in two, the profile and then the edit with its lock; the profile's Book button not now (owner); the flaky booking case goes into the edit
+- **Origin:** E01-T09e's Done pass and E01-T03's Ready pass, 2026-10-28 (PR #88;
+  `handoffs/E01-T09e.md`, `handoffs/E01-T03a.md`, `handoffs/E01-T03b.md`). **Owner, 2026-10-28:**
+  tried the Providers tab's Breaks dialog (add, overlap refused, hatched, warned, remove), all fine, the
+  button stays left of Edit; the profile's **Book appointment** button (the drawer opened for that
+  patient) is **not now**. The split and the rest are the architect's.
+- **What:**
+  - **E01-T03 → E01-T03a** (the profile: `/patients/[id]`, one `patient.viewed` row per view, the next
+    visit, the history, the sections that exist, about 400 lines) and **E01-T03b** (the edit page, the
+    status, `patients.update`, the refusal while a visit is ahead, the lock, about 500). The old task
+    came to about 900 lines against the Definition of Ready's 400. T03a first: the edit page opens from
+    the profile and needs its audited read. Order: T09e → T03a → T03b → T06.
+  - **The booking and an archive take turns on the patient's row** (D-114's rule, how): the edit takes
+    the row `for update` and then reads the visits ahead; the booking's `patientStatus` takes it
+    `for share`, before the provider's `for update`. Patient first on both sides, so no deadlock.
+    No migration, no new permission.
+  - **The profile has no Book appointment button** until the owner asks (`speed`, Discovered): the
+    demo's button needs the drawer to take a patient from outside, which is its own change in the
+    booking drawer. The Edit button arrives with T03b.
+  - **The flaky case** (`appointments-book-new-patient` › "sent twice at once (anyway: true)" answered
+    `internal` once under load, `message`) is folded into T03b, which changes the same locks.
+- **Why:** each part one session; a visit-ahead rule that is only checked, not locked, leaves a visit
+  with no reminder, silently (D-113, D-114). The Book button is a speed feature, not a safety one.
+- **Revisit if:** the receptionist trial (Q-09) asks for the button on the profile; T03a runs far over
+  400 lines (then the history is its own task); a role must not see every patient (D-096).

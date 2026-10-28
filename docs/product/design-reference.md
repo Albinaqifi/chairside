@@ -37,7 +37,7 @@ The markup uses a small template language: `{{ name }}` is a value, `<sc-for>` i
 | Calendar: header and day view | 215–283 | 1812–1847 | E01-T04a, E01-T04b (D-108); New appointment (237) E01-T05a, a click on an empty slot (260, logic 1819) E01-T05c (D-113, D-114) |
 | Calendar: week view | 284–314 | 1835–1845 | E01-T07 |
 | Patients list | 316–347 | 1849–1858 | E01-T02a |
-| Patient profile | 348–446 | 1860–1880, 1690–1719 | E01-T03, then later epics |
+| Patient profile | 348–446 | 1860–1880, 1690–1719 | E01-T03a (D-121; no Book button, no status badge in the demo), E01-T03b (the edit), then later epics |
 | Automations: rule list and editor | 455–529 | 1882–1897 | E05-T08 |
 | Automations: care plans | 530–569 | 1995–2003 | E05-T03 |
 | Automations: aftercare library | 570–611 | 2004–2010 | E06-T04 |
