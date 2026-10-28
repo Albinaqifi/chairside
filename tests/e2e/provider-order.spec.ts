@@ -7,7 +7,7 @@ import {
   type TestInfo,
 } from '@playwright/test';
 import pg from 'pg';
-import { SEEDED_CLINICS } from '@/db/seed/seeded';
+import { SEEDED_CLINICS, SEEDED_PROVIDERS } from '@/db/seed/seeded';
 import messages from '@/i18n/en.json' with { type: 'json' };
 import { e2eDatabase } from './e2e-database.ts';
 import { APP, OWNER_SESSION } from './servers.ts';
@@ -64,6 +64,25 @@ async function removeOwn(prefix: string): Promise<void> {
     SONCOGLED,
     prefix,
   ]);
+}
+
+/**
+ * Removes what a check wrote and, once no check of this file has providers left, gives the seeded
+ * dentist her seeded place back. A move renumbers the clinic 0 ... n-1, so she ends at 0 where the seed
+ * has her at 1, and providers.spec.ts expects a provider added after her to come at 2 or more: the
+ * place is hers by the seed, a check that moves things puts it back. One statement, so another
+ * browser's check that has just written its providers (all at 100 and on) is never met by a tie.
+ */
+async function leave(prefix: string): Promise<void> {
+  await removeOwn(prefix);
+  await db.query(
+    `update providers set sort_order = 1
+      where clinic_id = $1 and id = $2 and sort_order = 0
+        and not exists (select 1 from providers other
+                         where other.clinic_id = $1 and other.id <> $2
+                           and (starts_with(other.name, 'Order ') or starts_with(other.name, 'Twice ')))`,
+    [SONCOGLED, SEEDED_PROVIDERS.soncogledDentist],
+  );
 }
 
 interface NewProvider {
@@ -275,17 +294,9 @@ test.describe("the providers' order in Settings (E01-T09c)", () => {
         const names = await storedOrder([upper.name, lower.name]);
         return names.indexOf(lower.name) > names.indexOf(upper.name);
       };
-      console.log(
-        'DBG',
-        JSON.stringify(
-          await page
-            .locator('li')
-            .evaluateAll((lis) => lis.map((li) => (li as HTMLElement).innerText)),
-        ),
-      );
       await pressUntil(page, () => downIn(providerRow(page, lower.name)), below);
     } finally {
-      await removeOwn(prefix);
+      await leave(prefix);
     }
   });
 
@@ -329,7 +340,7 @@ test.describe("the providers' order in Settings (E01-T09c)", () => {
         expect(sent.count(), 'actions sent for one double click').toBe(1);
         expect(await audited('provider.moved', third.name)).toBe(1);
       } finally {
-        await removeOwn(prefix);
+        await leave(prefix);
       }
     });
   }
