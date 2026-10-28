@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { closeDb } from '@/db/client';
 import { withTenant } from '@/db/tenant';
 import { CLINIC_COOKIE } from '@/lib/cookies';
@@ -87,7 +87,6 @@ describe('the view row names the patient as the record does', () => {
     request.cookie = await signInCookie(email, PASSWORD, freshAddress());
     patientId = await patientBornOn(clinic, '1990-01-01');
   });
-  beforeEach(() => undefined);
 
   it('an address in capital letters shows the patient and records the patient’s own id', async () => {
     const { default: Page } = await import('@/app/(staff)/patients/[id]/page');
