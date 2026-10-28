@@ -7,9 +7,9 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
 Order: T01a → T01b → T02a → T02b → T04a and T08a side by side (two checkouts, D-110) → T04b and T08b
-side by side (D-111) → T05a and T08c side by side (D-112, D-113) → T05b → T05c → T05d → T09a → T09b → T09d → T09c, T03 → T06 →
+side by side (D-111) → T05a and T08c side by side (D-112, D-113) → T05b → T05c → T05d → T09a → T09b → T09d → T09c → T09e → T03a → T03b → T06 →
 T07, T10 → T08d → T11. With E00 (D-087, D-090, D-091, D-093, D-096, D-108, D-110, D-111, D-112, D-113,
-D-114, D-115, D-118, D-119):
+D-114, D-115, D-118, D-119, D-120, D-121):
 E00-T05a → T01a → T01b → E00-T04c → E00-T04d → E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 →
 T04a and T08a → T04b and T08b → T05a and T08c → T05b → T05c → T05d → T09 and the rest, so a receptionist sees a patient list before
 Playwright and staging exist. T01 is split in two (D-091): the schema and the provider link (T01a), the seed (T01b). T02 is
@@ -31,7 +31,9 @@ T09 is split in three (D-118), each a Settings tab or part of one: the treatment
 a clinic made by `clinic:create` has none and books nothing; the providers (T09b); their order and
 weekly breaks (T09c), on T09b's tab. T09b is split again (D-119), as T09a came to 940 lines against an
 estimate of 300: the providers' list and add (T09b); changing a provider and making one inactive or
-active again (T09d); T09c follows T09d.
+active again (T09d); T09c follows T09d. T09c is split in two (D-120): the providers' order (T09c) and their weekly breaks
+(T09e). T03 is split in two (D-121), as the profile and the edit with its lock came to about 900 lines of product
+code: the profile (T03a); editing a patient, the status and the lock (T03b).
 
 ---
 
@@ -383,53 +385,163 @@ Latin and Cyrillic as one (the owner's, later).
 
 ---
 
-### E01-T03 · Patient profile, and editing a patient's details
+### E01-T03a · Patient profile
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T02b, E01-T05a (the booking's patient
-  check, `patients.patientStatus`)
-- **Read:** `scope` (Patients list and profile) · `design-ref` (demo lines 348–446; logic
-  1860–1880) · D-033, D-040, D-095, D-096, D-113, D-114 · `handoffs/E01-T02b.md` (the patient form) ·
-  `handoffs/E01-T05a.md` (the reviewer's suggestion 1)
+**Ready** (split from E01-T03 and refined by the architect when E01-T09e was Done, 2026-10-28, D-121).
 
-**Why.** One place that answers "what is going on with this patient?", and where their details are
-put right. Editing came from E01-T02 (D-096): it shows the same record.
+- **Role:** builder · **Risk:** normal (no area of `test-strategy.md`'s table: the record-view row is the
+  wrapper's own, no new permission, table or message) · **Depends on:** E01-T02b, E01-T05a, E01-T04a
+  (the clinic's today in its zone) — all Done
+- **Read:** `scope` (Patients list and profile) · `design-ref` (demo lines 348–446; logic 1860–1880) ·
+  `security-privacy.md` section 10 (a record view) · D-033, D-040, D-096, D-098, D-121 ·
+  `handoffs/E01-T02b.md` ("what is already there": the phone as written, the fields) · the architect
+  section of `handoffs/E01-T03a.md`
+
+**Why.** One place that answers "what is going on with this patient?", and the page every later patient
+screen (messages, care plan, treatment plan) hangs on. Half of the old E01-T03: with the edit and its
+lock (T03b) it came to about 900 lines of product code with comments (D-121).
 
 **Do.**
-- Profile page: header (name, age, phone, email, patient since), buttons "Book appointment"
-  (opens the new-appointment drawer once T05 exists; until then disabled), next appointment
-  card, visit history (completed appointments), notes, status, guardian.
-- Sections that later epics fill are **not rendered as fake content**: Messages (E02), Care
-  plan (E05), Treatment plan (E06), Communication switches (E02).
-- Opening a profile writes a "viewed patient record" audit row.
-- **Editing the details** (from E01-T02, D-096): `/patients/<id>/edit`, reached from the profile:
-  E01-T02b's form with the patient's values, and their status (active, archived, deceased).
-  `patients.update` in the module, the phone and email read as on create. Audit: `patient.updated`,
-  naming the fields that changed, never their values; opening the edit page is a record view too.
-  A row of the patients list opens the profile.
-- **A patient with visits ahead stays active** (E01-T05a review, `message`; owner, 2026-10-19,
-  D-114): setting archived or deceased is refused while the patient has a visit ahead that holds the
-  chair (not cancelled or a no-show), above the button, and the page lists those visits; the desk
-  cancels or moves them first (E01-T06: until it exists, such a patient stays active). Nothing
-  changes by itself. Such a visit would get no reminder (E02-T05), silently: D-113's reason. The
-  booking (`patients.patientStatus`, E01-T05a, read without a lock today) and this edit take turns on
-  the patient's row, so an archive and a booking at once cannot leave a visit ahead of a patient who
-  is not active.
-- A patient id of another clinic, or of none, answers not found on both pages.
+- **`/patients/[id]`** (`src/app/(staff)/patients/[id]/page.tsx`). An id that is no UUID, or no patient of the
+  clinic (another clinic's included, which Row-Level Security hides), answers not found (`notFound()`),
+  and writes no audit row.
+- **`readPatient`**, a `staffRead` with `permission: 'every_member'` (Q-11, D-096) and an `audit` declaration
+  (`patient.viewed`, entity `patient`, the patient's id): one row per render of the page, written in the
+  read's own transaction, none for a refusal. The page calls `.forPage`. Opening it from the list or by
+  address is a view; a list, a search or a hover is not (`security-privacy.md` section 10). The list's
+  links to a profile never set `prefetch={true}`: an audited page rendered by a prefetch would write a
+  row nobody opened (Discovered, E00-T03 review).
+- **`patients` (new `profile.ts`, exported from `index.ts`).** `patientProfile(tx, id)`: the row's fields the
+  page shows (names, date of birth, phone as `phoneAsWritten` shows it, email, language, guardian name,
+  notes, status, `createdAt`), or null. `ageOn(dateOfBirth, today)`: whole years on a calendar day, a pure
+  function (a birthday not yet come, 29 February in a year without one, a day of birth after `today`
+  is none).
+- **`scheduling` (new function in `visits.ts`).** `patientVisits(tx, patientId, now)`: the next visit and the
+  history of one patient, each with its provider's name and its treatment type's name. Next: the first
+  `booked` or `confirmed` appointment that has not ended at `now`, as `lastAndNextVisits` reads it (keep
+  one rule: share the filter, do not copy it). History: `completed` appointments, newest first, at most 20.
+  Cancelled and no-show are neither. Provider and treatment type are scheduling's own tables.
+- **The page** composes them in the action (modules never read each other's tables, rule 1): header (name,
+  age, phone, email, "Patient since", the language, the date of birth; a status badge for archived and
+  deceased, the demo has none), the next-appointment card, visit history, notes under the label "Not a
+  clinical record", the guardian: when a guardian is named the page says the phone and email are theirs
+  (D-033). Two columns as the demo's, one on a phone. A moment (`createdAt`, a visit's start) goes through
+  next-intl's formatter and the clinic's zone; the date of birth is a calendar date, formatted from
+  `new Date('YYYY-MM-DD')` with `timeZone: 'UTC'` and tested in a zone behind UTC (D-098). A time is the
+  24-hour clock. A patient with no date of birth, phone, email or visit shows a plain "none" text, never
+  a made-up value.
+- **Sections that later epics fill are not rendered**, not even as empty cards: Messages (E02),
+  Communication (E02), Care plan (E05), Treatment plan (E06), "Send plan to patient" (v1.1).
+- **A row of the patients list opens the profile** (the name is the link). The patient list's Discovered
+  note about keys and clinics stays as it is (`patient-list.tsx`'s key).
+- Every text in `en.json`; the page renders `<PageClinic clinicId={…} />`; the page starts from
+  `currentStaff()` (conventions).
+
+**Out of scope.** Editing, the status, the lock and the edit link (E01-T03b). A **Book appointment** button
+(owner, 2026-10-28: not now; Discovered, `speed`, to be weighed after the receptionist trial). Messages,
+care plan, treatment plan, communication switches, orthodontic cards. Appointment details (E01-T06). A
+patient of deleted or anonymised state (nothing sets one yet, D-098's Discovered line).
 
 **Acceptance.**
-- [ ] The profile shows real data for seeded patients; an archived or deceased patient is clearly marked.
-- [ ] Opening a profile, or the edit page, creates one audit row per view.
-- [ ] Layout matches the demo's two-column profile for the sections that exist (screenshot in the handoff note).
-- [ ] No placeholder or invented data is shown for sections that do not exist yet.
-- [ ] Every edit writes one audit row naming the fields that changed, never their values
-      (integration test).
-- [ ] A patient of the other clinic answers not found on both pages, and no row is written
-      (integration test).
+- [ ] The profile of a seeded patient shows their real data: name, age, phone, email, "Patient since", the
+      language, the guardian when named, notes, the next appointment with provider and treatment, and the
+      completed visits newest first, at most 20 (integration for the reads; component test for the page;
+      screenshots of the two columns in the handoff note, the seed's invented data only).
+- [ ] An archived or deceased patient is clearly marked (component test).
+- [ ] Opening the profile writes one `patient.viewed` row (ids and the entity only); the list, a search and a
+      hover write none; an unknown id, a non-UUID and **a patient of the other clinic** answer not found and
+      write no row (integration as each role; e2e: a click on a list row, one row).
+- [ ] Cancelled and no-show visits are neither the next visit nor in the history; a visit that ended
+      unmarked is not the next (integration).
+- [ ] `ageOn`: the birthday today, tomorrow, yesterday, 29 February, a date of birth in the future (unit).
+      The date of birth and a moment are shown right in a zone behind UTC and one far ahead (component
+      test names the zones, D-098, D-099).
+- [ ] None of Messages, Care plan, Treatment plan, Communication or a Book button is rendered (component
+      test: their texts are absent).
+- [ ] No personal value in a log line, an error or an audit row (the wrapper's own checks hold; one test reads
+      the audit row's metadata).
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
+
+---
+
+### E01-T03b · Editing a patient, and no archive while a visit is ahead
+
+**Planned until E01-T03a is Done** (split from E01-T03 and refined by the architect when E01-T09e was Done, 2026-10-28, D-121); it is Ready then, with a check of T03a's leftovers.
+
+- **Role:** builder · **Risk:** normal (the status gate guards messages, but no area of `test-strategy.md`'s
+  table changes: no tenant table, login, permission or message; the lock is a read-side change in booking)
+  · **Depends on:** E01-T03a (the profile; the audited read), E01-T02b (the form), E01-T05d (the
+  booking) — Done, T03a once it is
+- **Read:** `scope` (Patients list and profile) · D-033, D-040, D-092, D-093, D-095, D-098, D-113, D-114,
+  D-121 · `handoffs/E01-T02b.md` (the patient form) · `handoffs/E01-T05a.md` (the reviewer's suggestion
+  1, the tester's lines) · `handoffs/E01-T05d.md` (the new patient's own id) · the architect section of
+  `handoffs/E01-T03b.md`
+
+**Why.** Details change: a new phone, a corrected name, a returning archived patient. The status is the
+owner's rule (D-114): a patient with a visit ahead is not archived or marked deceased, since E02 sends
+no reminder to either, silently.
+
+**Do.**
+- **An Edit button on the profile** (for `patients.manage`, every member) opens **`/patients/[id]/edit`**: the
+  new-patient form (E01-T02b) filled with the patient's values, and the status (a select: active, archived,
+  deceased; any change from any status is allowed, so an archived patient is made active here, D-113).
+  Share the form's fields with the new-patient page instead of copying them (`patient-fields.ts`,
+  `NewPatientForm`); the new page and the booking drawer's quick patient behave as before. No field sets
+  an `autocomplete` of its own (D-093, D-095). The page is an audited read like the profile's
+  (`patient.viewed`, one row per view); not found as the profile's. Saving goes to the profile, with a
+  toast.
+- **`patients.update(tx, id, changes, now)`.** Locks the patient's row `for update` first. Reads the phone
+  with the clinic's country and the email as `create` does (`phone_impossible` refused); returns the names of
+  the fields that changed (none: nothing written, no audit row, no `updated_at`), `not_found` for none.
+  Setting `archived` or `deceased` is **refused as `visits_ahead`** while the patient has a visit ahead that
+  holds the chair: a `scheduling.visitsAhead(tx, patientId, now)` that returns the appointments not
+  cancelled, not no-show, not completed, that have not ended at `now`, soonest first, limit 20, with provider
+  and treatment type. The action asks it after the lock and refuses  (a code only); the page then reads
+  the list with a `staffRead` of its own and shows it above the button (date, time in the clinic's zone, provider, treatment) and says to cancel or move
+  them first. Until E01-T06 exists the desk cannot, so such a patient stays active; that is the owner's
+  rule (D-114). Nothing changes by itself.
+- **The booking and the edit take turns on the patient's row** (E01-T05a review, `message`). Today
+  `patients.patientStatus` reads without a lock; the booking action's read takes the row **`for share`**
+  (held to the end of its transaction, with the provider's `for update` after it: the same order as the
+  edit's, patient first, so no deadlock). The edit's `for update` then waits for a booking in flight, and
+  sees its visit; a booking that starts after the edit waits for it and sees the new status. The new
+  patient in one go (E01-T05d) inserts the patient in the same transaction: unchanged. `FOR SHARE` needs
+  the app role's UPDATE privilege on `patients`, which it has; check it with a probe before relying on it.
+- **Audit `patient.updated`** through `staffAction`: entity `patient`, metadata `{ fields: ['phone', …] }`:
+  the names of the changed fields as **values** of the array (the audit check refuses a personal field name
+  as a **key**, never as a value), never the values. One row per save that changed something.
+- **The flaky case** (Discovered, E01-T09e builder, `message`): `appointments-book-new-patient.test.ts` ›
+  "sent twice at once (anyway: true)" answered `internal` instead of `already_booked` once in a full run
+  under load. This task changes the same locks, so it owns it: first read what the failing run's log line
+  carries (a code, no value); the working guess is a lock or connection wait past the 5 s limit under
+  load, in which case make the wait of the test's two transactions deterministic (a barrier, not a longer
+  timeout) and say so; if it is a real race in the booking, fix it and prove it with a test that fails first.
+  No expectation is loosened (rule 8).
+
+**Out of scope.** The profile (T03a). Cancelling or moving a visit from the list (E01-T06). A merge of
+duplicates (E04-T06). Deleting or anonymising (E07-T05). The consent switches (E02). A history of past edits.
+
+**Acceptance.**
+- [ ] A save changes the fields, trims and normalises as create does, writes one `patient.updated` row naming
+      the fields changed and never their values, and goes to the profile with a toast (integration for
+      the module and the row; component test for the page).
+- [ ] A save with nothing changed writes no row and no `updated_at` (integration).
+- [ ] An impossible phone is refused above the button, nothing written; a field the schema settles shows at
+      its field (unit, component).
+- [ ] Opening the edit page writes one `patient.viewed` row; a patient of the other clinic, an unknown id
+      and a non-UUID answer not found on both pages, with no row written (integration as each role).
+- [ ] The action as every role and as the other clinic's owner (`action-permissions.test.ts` has its entries).
 - [ ] No field of the edit form has an `autocomplete` of its own (unit test).
-- [ ] Archived or deceased is refused, nothing written, while a visit ahead holds the chair, and the
-      page lists it; with only cancelled or no-show visits ahead, or none, it is saved (integration).
-- [ ] An archive and a booking of that patient at once: one waits for the other, and no visit ahead
-      holds the chair for a patient who is not active (integration).
+- [ ] Archived or deceased is refused, nothing written, while a booked, confirmed or arrived visit that has not
+      ended is ahead, and the page lists it; with only cancelled, no-show or completed visits, or visits
+      ended, or none, it is saved; back to active is always saved (integration).
+- [ ] An archive and a booking of that patient at once, in both orders and with concurrent transactions:
+      one waits for the other, and no visit ahead holds the chair for a patient who is not active
+      (integration, concurrent; the test fails without the `for share`).
+- [ ] The flaky case: its cause named in the handoff note, the test deterministic or the race fixed, and
+      the case run 20 times in a row green (integration).
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers: an edit saved, an archive refused with
+      a visit ahead) and `pnpm audit --prod` pass.
 
 ---
 
@@ -1536,7 +1648,7 @@ as they are.
 
 ### E01-T09e · Settings: the providers' weekly breaks
 
-**Ready** (refined by the architect when E01-T09c was Done, 2026-10-28, D-120).
+**Done** (refined by the architect when E01-T09c was Done, 2026-10-28, D-120; merged 2026-10-28, PR #88).
 
 - **Role:** builder · **Risk:** normal (no area of `test-strategy.md`'s table: no tenant table, login, permission, link or message changes) · **Depends on:** E01-T09c (Done: the row buttons; the tab's file)
 - **Read:** `scope` (Settings) · `data-model` (`provider_breaks`) · D-018, D-114, D-118, D-120 ·
