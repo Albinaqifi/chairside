@@ -54,11 +54,10 @@ afterAll(async () => {
 });
 
 describe('the age is on the clinic’s today, not the server’s or UTC’s', () => {
-  // 2026-10-06T12:30Z is 01:30 on 7 October in Auckland and 01:30 on 6 October in Pago Pago's
-  // neighbour (UTC-11): 2026-10-06T12:30Z is 01:30 on the 6th there too. The birthday is 7 October.
+  // The birthday is 7 October. 2026-10-06T12:30Z is still the 6th in UTC and already 01:30 on the 7th
+  // in Auckland (UTC+13 in October); 2026-10-07T05:00Z is the 7th in UTC and still 18:00 on the 6th
+  // in Pago Pago (UTC-11).
   const BEFORE_MIDNIGHT_UTC = new Date('2026-10-06T12:30:00Z');
-  // 2026-10-07T05:00Z is 18:00 on 6 October in Pago Pago (UTC-11) and 19:00 on 7 October in Auckland... no:
-  // Auckland is UTC+13 in October, so 18:00 on the 7th.
   const BIRTHDAY_UTC_MORNING = new Date('2026-10-07T05:00:00Z');
 
   it('a clinic far ahead of UTC has the birthday while UTC still has the day before', async () => {
