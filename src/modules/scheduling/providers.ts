@@ -1,6 +1,6 @@
-import { asc, eq, sql, type Column } from 'drizzle-orm';
+import { and, asc, count, eq, gt, notInArray, sql, type Column } from 'drizzle-orm';
 import type { TenantTransaction } from '@/db/tenant';
-import { providerBreaks, providers } from './schema';
+import { appointments, providerBreaks, providers } from './schema';
 
 /** One calendar column: a dentist, a hygienist or another provider (D-019). */
 export interface Provider {
@@ -73,9 +73,9 @@ function minutesOfTime(column: Column) {
 }
 
 /*
- * The providers as Settings keeps them (E01-T09b): every provider of the clinic with its kind, and
- * one added. Changing one, and making one inactive or active again, is E01-T09d; the order and the
- * breaks E01-T09c. Never deleted (data-model.md: the app role has no DELETE on the table). A
+ * The providers as Settings keeps them (E01-T09b, E01-T09d): every provider of the clinic with its
+ * kind, one added, one changed, one made inactive and active again; the order and the breaks are
+ * E01-T09c. Never deleted (data-model.md: the app role has no DELETE on the table). A
  * provider's name, short name and chair are no patient's, but never go in a log or an error's
  * message either.
  */
@@ -105,7 +105,7 @@ export interface ClinicProvider extends Provider {
   kind: ProviderKind;
 }
 
-/** What Settings sets of a new provider. */
+/** What Settings sets of a provider, new or changed. */
 export interface ProviderFields {
   /** Trimmed here; not empty, at most PROVIDER_NAME_MAX characters. */
   name: string;
@@ -147,7 +147,7 @@ export async function addProvider(
   fields: ProviderFields,
   now: Date,
 ): Promise<{ id: string }> {
-  const values = storableProvider(fields);
+  const values = storableProvider(fields, 'addProvider');
   const [added] = await tx
     .insert(providers)
     .values({
@@ -163,6 +163,111 @@ export async function addProvider(
   return { id: added.id };
 }
 
+/**
+ * Why a provider was not changed: no provider of the clinic by that id (Row-Level Security shows no
+ * other clinic's), or, for one whose kind is locked, a kind other than its own.
+ */
+export type ChangeProviderResult =
+  { ok: true } | { ok: false; code: 'not_found' | 'provider_linked' };
+
+/**
+ * Sets a provider's name, short name, kind, chair and colour (the texts trimmed), and its
+ * `updated_at` to `now`, active or not; whether it is active and its place in the order stay as they
+ * are. `kindLocked` is the caller's word that a login is linked to the provider (auth's
+ * linkedProviderIds, read in this transaction), whose kind an owner's aftercare approval follows
+ * (D-051; owner, D-118): then a kind other than the stored one is refused as `provider_linked`, with
+ * nothing written, and the stored one saves with the other fields. The row is locked while it is
+ * read, so two changes at once are one after the other. The appointments booked with the provider
+ * are not touched. A value the caller's schema should have refused is an Error.
+ */
+export async function changeProvider(
+  tx: TenantTransaction,
+  id: string,
+  fields: ProviderFields,
+  now: Date,
+  { kindLocked }: { kindLocked: boolean },
+): Promise<ChangeProviderResult> {
+  const values = storableProvider(fields, 'changeProvider');
+  const [stored] = await tx
+    .select({ kind: providers.kind })
+    .from(providers)
+    .where(thisProvider(id))
+    .for('update');
+  if (!stored) return { ok: false, code: 'not_found' };
+  if (kindLocked && stored.kind !== values.kind) return { ok: false, code: 'provider_linked' };
+  await tx
+    .update(providers)
+    .set({ ...values, updatedAt: now })
+    .where(thisProvider(id));
+  return { ok: true };
+}
+
+/**
+ * Why a provider was not made active or inactive: no provider of the clinic by that id; or one that
+ * is so already (a second tab, or a press the list did not drop).
+ */
+export type SetProviderActiveRefusal = 'not_found' | 'already_active' | 'already_inactive';
+
+export type SetProviderActiveResult = { ok: true } | { ok: false; code: SetProviderActiveRefusal };
+
+/**
+ * Makes a provider active or inactive, its `updated_at` then `now`. An inactive provider is offered to
+ * no new booking (booking.ts: provider_not_bookable) and keeps every appointment, its visits ahead
+ * still booked and on the calendar (owner, D-118); a login linked to it keeps its access, as nothing
+ * of memberships changes here. The update holds only for a row in the other state, so of two presses
+ * at once the second finds nothing to change and is refused: the state changes once.
+ */
+export async function setProviderActive(
+  tx: TenantTransaction,
+  id: string,
+  active: boolean,
+  now: Date,
+): Promise<SetProviderActiveResult> {
+  const changed = await tx
+    .update(providers)
+    .set({ active, updatedAt: now })
+    .where(and(thisProvider(id), eq(providers.active, !active)))
+    .returning({ id: providers.id });
+  if (changed.length > 0) return { ok: true };
+  const [stored] = await tx
+    .select({ active: providers.active })
+    .from(providers)
+    .where(thisProvider(id));
+  if (!stored) return { ok: false, code: 'not_found' };
+  return { ok: false, code: active ? 'already_active' : 'already_inactive' };
+}
+
+/** The statuses of a visit that will not happen, or has: none of them is a visit ahead. */
+const NOT_AHEAD = ['cancelled', 'no_show', 'completed'];
+
+/**
+ * How many of the provider's visits are ahead at `now`: not cancelled, no-show or completed, and
+ * ending after `now`, so a visit under way counts, as lastAndNextVisits counts one (visits.ts). The
+ * toast after a provider is made inactive says this many stay booked (owner, D-118).
+ */
+export async function visitsAhead(
+  tx: TenantTransaction,
+  providerId: string,
+  now: Date,
+): Promise<number> {
+  const [row] = await tx
+    .select({ visits: count() })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.providerId, providerId),
+        notInArray(appointments.status, NOT_AHEAD),
+        gt(appointments.endsAt, now),
+      ),
+    );
+  return row?.visits ?? 0;
+}
+
+/** The provider of this id, in the clinic of this transaction: Row-Level Security's, named here too. */
+function thisProvider(id: string) {
+  return and(eq(providers.clinicId, sql`current_clinic_id()`), eq(providers.id, id));
+}
+
 /** A kind as the table holds it; the check allows no other, so another is an Error. */
 function providerKind(kind: string): ProviderKind {
   const known = PROVIDER_KINDS.find((each) => each === kind);
@@ -174,7 +279,7 @@ function providerKind(kind: string): ProviderKind {
  * The fields to store, the texts trimmed, when they can be stored; an Error when not: the caller's
  * schema refuses each first, at its field. The values are never in the error's message.
  */
-function storableProvider(fields: ProviderFields): ProviderFields {
+function storableProvider(fields: ProviderFields, caller: string): ProviderFields {
   const name = fields.name.trim();
   const shortName = fields.shortName.trim();
   const chairLabel = fields.chairLabel.trim();
@@ -190,7 +295,7 @@ function storableProvider(fields: ProviderFields): ProviderFields {
     fields.colorHue < 0 ||
     fields.colorHue > PROVIDER_HUE_MAX
   ) {
-    throw new Error('addProvider: the provider cannot be stored');
+    throw new Error(`${caller}: the provider cannot be stored`);
   }
   return { name, shortName, kind: fields.kind, chairLabel, colorHue: fields.colorHue };
 }

@@ -14,7 +14,7 @@ import { ClinicDetailsForm } from './clinic-details-form';
 import { ClosedDays } from './closed-days';
 import { weekValues } from './opening-hours';
 import { OpeningHoursForm } from './opening-hours-form';
-import { readProviders } from './provider-actions';
+import { readLinkedProviders, readProviders } from './provider-actions';
 import { Providers } from './providers';
 import { readTreatmentTypes } from './treatment-type-actions';
 import { TreatmentTypes } from './treatment-types';
@@ -53,6 +53,10 @@ export default async function SettingsPage() {
   const providers = await readProviders.forPage({});
   if (!providers.ok) {
     throw new Error(`The providers could not be read (${providers.error.code}).`);
+  }
+  const linked = await readLinkedProviders.forPage({});
+  if (!linked.ok) {
+    throw new Error(`The linked providers could not be read (${linked.error.code}).`);
   }
   const catalogue = await readTreatmentTypes.forPage({});
   if (!catalogue.ok) {
@@ -115,7 +119,11 @@ export default async function SettingsPage() {
         </TabsContent>
         <TabsContent value="providers">
           <div className="rounded-card border border-border bg-surface px-5.5 py-5">
-            <Providers key={staff.clinic.clinicId} providers={providers.value} />
+            <Providers
+              key={staff.clinic.clinicId}
+              providers={providers.value}
+              linked={linked.value}
+            />
           </div>
         </TabsContent>
         <TabsContent value="treatments">

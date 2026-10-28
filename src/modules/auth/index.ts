@@ -17,7 +17,13 @@ export {
   EXAMPLE_AUTH_SECRET,
   type AuthSettingsProblem,
 } from './auth-secret';
-export { activeMembership, addMembership, clinicsForUser, type Membership } from './memberships';
+export {
+  activeMembership,
+  addMembership,
+  clinicsForUser,
+  linkedProviderIds,
+  type Membership,
+} from './memberships';
 export {
   can,
   EXTRA_PERMISSIONS,
