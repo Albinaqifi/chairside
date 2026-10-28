@@ -1536,12 +1536,11 @@ as they are.
 
 ### E01-T09e · Settings: the providers' weekly breaks
 
-**Planned, refined by the architect when E01-T09c is Done (D-120).** What is settled now, so the
-refinement keeps it:
+**Ready** (refined by the architect when E01-T09c was Done, 2026-10-28, D-120).
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T09c (the row buttons; the tab's file)
+- **Role:** builder · **Risk:** normal (no area of `test-strategy.md`'s table: no tenant table, login, permission, link or message changes) · **Depends on:** E01-T09c (Done: the row buttons; the tab's file)
 - **Read:** `scope` (Settings) · `data-model` (`provider_breaks`) · D-018, D-114, D-118, D-120 ·
-  `handoffs/E01-T09d.md`, `handoffs/E01-T09c.md`
+  `handoffs/E01-T09d.md`, `handoffs/E01-T09c.md` ("what is already there" in each)
 
 **Why.** A lunch break is hatched on the grid and warned about in the drawer (E01-T05b), but only the
 seed can make one. The second half of the old E01-T09c; about 520 lines of product code with comments
@@ -1549,19 +1548,37 @@ seed can make one. The second half of the old E01-T09c; about 520 lines of produ
 order did not share a session with it.
 
 **Do.**
-- **A Breaks button in each row** (inactive ones too) opens a dialog (E01-T09a's `EditType` pattern: its
-  content mounts only while open) that lists the provider's breaks by weekday and start, each with
-  weekday, times, label and a Remove (a `StaffForm` of its own), and under a line the form that adds
-  one: weekday (a select, Monday first), start and end (the opening hours' selects, 15-minute steps,
-  24-hour clock), label (required, at most 40 characters). The dialog's list takes no pointer click for
-  `SETTLE_MS` after its rows change, as the closed days'.
-- **A break may not overlap another of the same provider on the same weekday** (back to back is fine:
-  12:00–13:00 and 13:00–14:00): refused above the button as `break_overlaps`; `ends` after `starts` is
-  the schema's, shown at the field. Kept by `scheduling` under the provider's row lock (`for update`),
-  not by a constraint, so two adds at once keep one; `data-model.md`'s row says so.
-- **Remove** deletes the row (breaks are deleted, `data-model.md`); a second press on a break already
-  gone is `not_found`, no audit row. Audit rows of ids: `provider.break_added`, `provider.break_removed`.
-- The Settings page reads the clinic's breaks in a `staffRead` of its own (`readProviders` stays).
+- **`scheduling` (`providers.ts`, exported from `index.ts` in the block of E01-T09b / d / c).**
+  `clinicBreaks(tx)`: every break of the clinic, by weekday, start, id, with its provider's id, weekday, `starts` and
+  `ends` as `HH:MM` values (the opening hours' `timeValue`, `src/app/(staff)/settings/opening-hours.ts`), label.
+  `addProviderBreak(tx, { providerId, weekday, starts, ends, label }, now)`: first `thisProvider` with
+  `for update` (the provider's row, as `changeProvider`), then reads that provider's breaks on that weekday
+  and refuses `break_overlaps` when `starts < other.ends and other.starts < ends` (back to back is no
+  overlap), else inserts. `removeProviderBreak(tx, breakId)`: deletes the clinic's row by id and returns its
+  provider id, or `not_found`. Refusals are codes, nothing thrown (`not_found`, `break_overlaps`).
+  `PROVIDER_BREAK_LABEL_MAX = 40`, exported as the name limits are. The label is trimmed and not empty.
+- **Two actions** in `provider-actions.ts`, `settings.manage`, each in `action-permissions.test.ts`:
+  `addBreak` (audit `provider.break_added`, `entityType: 'provider_break'`, `entityId: { result: 'id' }`,
+  metadata the provider id and the weekday) and `removeBreak` (`provider.break_removed`, the break's id as
+  entity). Both `refresh()`. The input schema: UUIDs, weekday 1 to 7, the two times as `HH:MM`
+  (`minutesOfTimeValue`), `ends` after `starts` as a Zod issue at the `ends` field, the label.
+- **The page** reads the clinic's breaks in `readBreaks`, a `staffRead` of its own (`readProviders` and
+  `clinicProviders` stay as they are), and gives them to `Providers`.
+- **A Breaks button in each row** (inactive ones too, before Edit) opens a dialog (E01-T09a's `EditType`
+  pattern: its content mounts only while open) that lists the provider's breaks by weekday and start, each
+  with weekday, times, label and a Remove (a `StaffForm` of its own, the break's id hidden), or one line when
+  there is none, and under a line the form that adds one: weekday (a select, Monday first,
+  `WEEKDAY_FIELDS`), start and end (selects of `timeChoices`, 15-minute steps, 24-hour clock; the
+  start starts at 12:00 and the end at 13:00), label (required, at most 40 characters). The dialog's list
+  takes no pointer click for `SETTLE_MS` after its rows change, as the closed days'. After an add the form
+  is mounted anew and the keyboard is at the weekday; after a Remove at the dialog's heading.
+  Weekday names and times by next-intl, texts in `en.json` (`settings.providers`).
+- **A break may not overlap another of the same provider on the same weekday**: refused above the button
+  as `break_overlaps`; `ends` after `starts` is the schema's, shown at the field. Kept by `scheduling` under
+  the provider's row lock, not by a constraint, so two adds at once keep one; `data-model.md`'s row says
+  so (already changed by this refinement).
+- **Remove** deletes the row (breaks are deleted, `data-model.md`; the app role has DELETE on the table); a
+  second press on a break already gone is `not_found`, no audit row.
 
 **Out of scope.** Changing a break in place (remove and add). Breaks on one date only. A provider's own
 working hours. Showing a break's overlap with the opening hours (the drawer already warns, E01-T05b).
@@ -1571,6 +1588,8 @@ working hours. Showing a break's overlap with the opening hours (the drawer alre
       removed one is gone from both (integration; e2e, three browsers).
 - [ ] A break overlapping another of the same provider and weekday is refused, nothing written; back to
       back is accepted; two adds at once keep one (integration, concurrent transactions).
+- [ ] A label empty or over 40 characters, `ends` not after `starts` and a weekday outside 1 to 7 are refused at
+      the field or the schema, nothing written (unit, integration).
 - [ ] A double click on a break's Remove removes one break, once (e2e, three browsers).
 - [ ] Every change audited, only `settings.manage`, clinic B's provider or break refused (unit,
       integration).
