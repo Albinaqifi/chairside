@@ -9,13 +9,13 @@ States: `Planned` → `Ready` → `In progress` → `Built` → `Reviewed` → `
 ## Now
 
 - **Milestone:** M0 Foundation, with M1's first tasks (D-087)
-- **Next task to start:** `E01-T09b` (Ready), `/pipeline E01-T09b`: the Providers tab on Settings, the list and add. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
+- **Next task to start:** `E01-T09d` (Ready), `/pipeline E01-T09d`: change a provider, make one inactive and active again, on the Providers tab. E00-T07f (Ready) and E00-T07c wait for the Render and monitor accounts (owner, D-109)
 - **Decisions it waits on:** none (D-118 and D-119 settled E01-T09's)
 
 ## Next (in order)
 
 1. E00-T07f, then E00-T07c, once the owner has the Render and monitor accounts ("Owner actions"; not yet on 2026-10-11): E00-T07f needs no account but goes right before staging (owner, D-109); until then the rest of E01 goes first
-2. The rest of E01, in the epic's own order (D-087): E01-T09b (Ready), E01-T09d, E01-T09c (D-118, D-119), then E01-T03 … E01-T10, then E01-T08d (Ready: the closed days' double click, `message`; owner: at the end of E01, D-115), then E01-T11; E00-T06c before the first journey that sets "now" (D-100)
+2. The rest of E01, in the epic's own order (D-087): E01-T09d (Ready), E01-T09c (D-118, D-119), then E01-T03 … E01-T10, then E01-T08d (Ready: the closed days' double click, `message`; owner: at the end of E01, D-115), then E01-T11; E00-T06c before the first journey that sets "now" (D-100)
 3. E00-T12, before E02 (owner, 2026-10-03; D-102)
 
 ## Blocked
@@ -89,8 +89,8 @@ Fully specified.
 | E01-T08d | Settings: a double click on a closed day's Remove changes nothing else, wherever the page scrolls | builder | normal | **Ready** | From E01-T08c's delta review (`message`), open when PR #66 was merged; after E01-T10, before E01-T11 (owner, D-115). A small fix in `closed-days.tsx` and its e2e checks. See `handoffs/E01-T08d.md` |
 | E01-T09 | Settings: providers and treatment types | builder | normal | split (D-118) | Into E01-T09a … E01-T09d, the next four rows (E01-T09b split again, D-119); no number field in them, so the number texts wait on the Discovered list |
 | E01-T09a | Settings: treatment types | builder | normal | **Done** | Merged by the owner (PR #80). `main` green (run 40665534759). The Treatment types tab: add, edit in a dialog, make inactive and active again with the closed days' double-click settle, one active type per name under a lock, the price a text in the clinic's currency; about 940 lines against 300, no fix round; the owner tried it and kept the layout. Leftovers: the money digits → `data-model.md`, the spec → `CLAUDE.md`, the tab → `design-reference.md`, the SWC cache → `README.md`; the Add double click (`speed`) and the WebKit "now" line (`slice`) stay on the Discovered list; two struck. See `handoffs/E01-T09a.md` |
-| E01-T09b | Settings: providers, the list and add | builder | normal | **Tested** | From E01-T09 (D-118), split again (D-119): the Providers tab, the list and Add (the colour a range with its tints), first as a clinic made by `clinic:create` has no provider. About 650 lines. See `handoffs/E01-T09b.md` |
-| E01-T09d | Settings: change a provider, make one inactive and active again | builder | normal | Planned | Split from E01-T09b (D-119); Ready once E01-T09b is Done (its Done pass checks it). Edit in a dialog; a linked provider's kind locked, no one's access changed; Make inactive with a toast of the visits ahead that stay booked (owner, D-118). About 500 lines. See `handoffs/E01-T09b.md` |
+| E01-T09b | Settings: providers, the list and add | builder | normal | **Done** | Merged by the owner (PR #82). `main` green (run 40697231356). The Providers tab: the list with kind, chair and colour swatch, and Add with the colour a range of hues beside its tints; about 470 lines against 650, no fix round, no finding; the owner tried it and kept the layout and the plain range. Leftovers: the add form's double click (`speed`) joins the Discovered line for E01-T11; the range's hue track struck. See `handoffs/E01-T09b.md` |
+| E01-T09d | Settings: change a provider, make one inactive and active again | builder | normal | Ready | Split from E01-T09b (D-119), refined 2026-10-28. Edit in a dialog; a linked provider's kind locked, no one's access changed; Make inactive with a toast of the visits ahead that stay booked (owner, D-118). About 550 lines. See `handoffs/E01-T09d.md` |
 | E01-T09c | Settings: the providers' order and weekly breaks | builder | normal | Planned | From E01-T09 (D-118), on E01-T09d's tab (D-119); refined after it |
 | E01-T10 | Today screen, first version | builder | normal | Planned | |
 | E01-T11 | Journey J2 and a hard look at scheduling | tester | normal | Planned | Owner: receptionist trial if possible (Q-09). E00-T06c first if J2 sets "now" (D-100). J2 through the calendar, and the accessibility check on its pages (E01-T04a) and on Settings as its owner (E01-T08a), with the booking drawer open (E01-T05a); the first click after a pause and the drawer's search timed on staging (E01-T04b, E01-T05a) |
@@ -244,6 +244,7 @@ Outline. Needs E07-T00.
 - E01-T05c · Booking: a click on an empty slot, and a double click's second press changes nothing · merged 2026-10-26 (PR #72)
 - E01-T05d · Booking: a new patient in one go · merged 2026-10-27 (PR #77)
 - E01-T09a · Settings: treatment types · merged 2026-10-28 (PR #80)
+- E01-T09b · Settings: providers, the list and add · merged 2026-10-28 (PR #82)
 
 ## Owner actions (standing)
 
