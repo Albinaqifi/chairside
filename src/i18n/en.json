@@ -257,6 +257,27 @@
       "alreadyInactive": "This treatment type is already inactive: it was changed meanwhile, in another tab or by someone else. Reload the page to see it as it is now.",
       "alreadyActive": "This treatment type is already active: it was changed meanwhile, in another tab or by someone else. Reload the page to see it as it is now.",
       "activeNameTaken": "An active treatment type has this name. Make that one inactive first, or rename this one."
+    },
+    "providers": {
+      "tab": "Providers",
+      "heading": "Providers",
+      "intro": "Each provider is a column on the calendar, in this order, and a choice in the booking drawer.",
+      "none": "No providers yet. Add the first one below: until then nothing can be booked.",
+      "inactive": "Inactive",
+      "kinds": {
+        "dentist": "Dentist",
+        "hygienist": "Hygienist",
+        "other": "Other"
+      },
+      "name": "Name",
+      "shortName": "Short name (on the calendar)",
+      "kind": "Kind",
+      "chair": "Chair",
+      "colour": "Colour",
+      "colourSample": "A visit on the calendar",
+      "add": "Add provider",
+      "adding": "Adding…",
+      "added": "Provider added."
     }
   },
   "placeholder": {

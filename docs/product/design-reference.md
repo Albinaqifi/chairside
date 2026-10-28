@@ -147,6 +147,11 @@ every staff form's button, then the add form under a line; E01-T08c, kept by the
 D-115), the Treatment types tab in Settings (each row its name, a muted line of length, price and
 "Needs aftercare", an "Inactive" pill on an inactive one, then Edit, which opens a dialog, and Make
 inactive at its right; the add form under a line; E01-T09a, kept by the owner on 2026-10-28), the
+Providers tab in Settings, before Treatment types (each row a swatch of the provider's colour, a
+circle of its tint and edge with a dot of its strong shade, its name, an "Inactive" pill on an
+inactive one, and a muted line of short name, kind and chair; no button in a row before E01-T09d; the
+add form under a line, two fields a row, the colour a range of hues with the swatch and a visit's
+block in the provider's tints beside it; E01-T09b, proposed to the owner), the
 new-patient page
 (E01-T02b: the demo's only new patient is the booking drawer's quick one, lines 1335 and
 2120–2131, E01-T05d; its list has no "New patient" button). Build them

@@ -153,6 +153,11 @@ const ACTIONS: Record<string, Record<string, ScopeRow | 'userAction'>> = {
     deactivateTreatmentType: 'Staff, settings, audit log, results panel',
     activateTreatmentType: 'Staff, settings, audit log, results panel',
   },
+  // E01-T09b: the Providers tab.
+  'src/app/(staff)/settings/provider-actions.ts': {
+    readProviders: 'Staff, settings, audit log, results panel',
+    addProvider: 'Staff, settings, audit log, results panel',
+  },
   'src/app/_lib/clinic-time-zone.ts': { clinicTimeZone: 'No area of the table: every member' },
 };
 

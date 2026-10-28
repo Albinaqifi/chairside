@@ -123,7 +123,7 @@ tests/e2e/            End-to-end journeys and checks in real browsers (Playwrigh
                       (E00-T05b), the calendar's filter, reading on use and "now" line (E01-T04b),
                       the booking drawer (E01-T05a), a double click on a closed day's Remove (E01-T08c),
                       the Treatment types tab: add, then book with it, and a double click on Make inactive
-                      (E01-T09a).
+                      (E01-T09a), the Providers tab: add with its colour, then book with it (E01-T09b).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 Dockerfile            The one image staging and production run (D-007, D-103): the web by default,
