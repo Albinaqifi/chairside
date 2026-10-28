@@ -23,6 +23,7 @@ vi.mock('./provider-actions', () => ({
   changeProvider: vi.fn(),
   deactivateProvider: vi.fn(),
   activateProvider: vi.fn(),
+  moveProvider: vi.fn(),
 }));
 
 const CLINIC = '01970000-0000-7000-8000-0000000000ca';
@@ -155,8 +156,9 @@ describe('the Providers tab, as the server sends it (E01-T09b)', () => {
   it('each provider in the order handed: its name, short name, kind and chair; an inactive one says so (acceptance 4)', () => {
     const text = textOf(renderTab(PROVIDERS));
     expect(text).toMatch(
-      // Each row's buttons after its details since E01-T09d.
-      /Mira Testova Dr\. Testova · Dentist · Chair 1 Edit Make inactive Petar Primerov Inactive Dr\. Primerov · Other · Chair 3 Edit Make active Ana Probna Ana · Hygienist · Hygiene room Edit Make inactive/,
+      // Each row's buttons after its details since E01-T09d; Up and Down first since E01-T09c (the
+      // first row has no Up, the last no Down).
+      /Mira Testova Dr\. Testova · Dentist · Chair 1 Down Edit Make inactive Petar Primerov Inactive Dr\. Primerov · Other · Chair 3 Up Down Edit Make active Ana Probna Ana · Hygienist · Hygiene room Up Edit Make inactive/,
     );
     expect(text).not.toContain(t.none);
   });
@@ -220,13 +222,16 @@ describe("each row's buttons, and the edit's fields (E01-T09d)", () => {
   it('each row: an Edit that opens a dialog, outside every form, and a form of its own sending the id, hidden: Make inactive, or Make active', () => {
     const html = renderTab(PROVIDERS, [FIRST]);
     const all = forms(html);
-    expect(all).toHaveLength(4);
+    // Since E01-T09c a row has its Up and Down before its state button: the first row no Up, the
+    // last no Down, so the forms are FIRST: Down, Make inactive; GONE: Up, Down, Make active;
+    // SECOND: Up, Make inactive; then the add form. The state buttons are forms 1, 4 and 6.
+    expect(all).toHaveLength(8);
     const expected = [
-      [FIRST, t.deactivate],
-      [GONE, t.activate],
-      [SECOND, t.deactivate],
+      [FIRST, t.deactivate, 1],
+      [GONE, t.activate, 4],
+      [SECOND, t.deactivate, 6],
     ] as const;
-    expected.forEach(([id, label], index) => {
+    expected.forEach(([id, label, index]) => {
       const row = all[index];
       expect(tags(row?.inside ?? '', 'input')).toEqual([
         new Map([
@@ -241,12 +246,9 @@ describe("each row's buttons, and the edit's fields (E01-T09d)", () => {
     expect(edits).toHaveLength(3);
     expect(edits.every((edit) => edit.get('type') === 'button')).toBe(true);
     // D-093: every form keeps nothing in the browser.
-    expect(all.map((form) => tags(form.whole, 'form')[0]?.get('autocomplete'))).toEqual([
-      'off',
-      'off',
-      'off',
-      'off',
-    ]);
+    expect(all.map((form) => tags(form.whole, 'form')[0]?.get('autocomplete'))).toEqual(
+      all.map(() => 'off'),
+    );
   });
 
   it("the edit's fields start at the provider's own values; not linked, the kind is a select like the add form's", () => {
@@ -351,5 +353,69 @@ describe('the toast after Make inactive (E01-T09d)', () => {
     expect(translate('deactivatedWithVisits', { count: 12 })).toBe(
       'Provider made inactive. 12 visits ahead stay booked with them.',
     );
+  });
+});
+
+// E01-T09c, acceptance 2 (the page's side): each row's Up and Down. What a press does, and the double
+// click, needs a browser (tests/e2e/provider-order.spec.ts); what the request does is
+// tests/integration/provider-order.test.ts.
+describe("each row's Up and Down (E01-T09c)", () => {
+  /** The labels of each row's submit buttons, by the row's group name, in the order of the page. */
+  function buttonsByRow(html: string): Map<string, string[]> {
+    const rows = new Map<string, string[]>();
+    for (const [, name = '', inside = ''] of html.matchAll(
+      /<div[^>]*role="group"[^>]*aria-label="([^"]*)"[^>]*>([\s\S]*?)<\/li>/g,
+    )) {
+      rows.set(
+        name,
+        [...inside.matchAll(/<button\b[^>]*>([^<]*)<\/button>/g)].map(([, label = '']) => label),
+      );
+    }
+    return rows;
+  }
+
+  it('the first row has no Up and the last no Down; every other row has both, before Edit and the state button', () => {
+    expect(buttonsByRow(renderTab(PROVIDERS))).toEqual(
+      new Map([
+        ['Mira Testova', [t.moveDown, t.edit, t.deactivate]],
+        ['Petar Primerov, inactive', [t.moveUp, t.moveDown, t.edit, t.activate]],
+        ['Ana Probna', [t.moveUp, t.edit, t.deactivate]],
+      ]),
+    );
+  });
+
+  it('an inactive provider has them as an active one has', () => {
+    const rows = buttonsByRow(renderTab(PROVIDERS));
+    expect(rows.get('Petar Primerov, inactive')).toContain(t.moveUp);
+    expect(rows.get('Petar Primerov, inactive')).toContain(t.moveDown);
+  });
+
+  it("each is a form of its own sending the provider's id and its direction, hidden, a submit button, and nothing remembered", () => {
+    const html = renderTab(PROVIDERS);
+    const moves = forms(html).filter((form) => form.inside.includes('name="direction"'));
+    expect(moves).toHaveLength(4);
+    const sent = moves.map((form) => tags(form.inside, 'input').map((input) => input.get('value')));
+    expect(sent).toEqual([
+      [FIRST, 'down'],
+      [GONE, 'up'],
+      [GONE, 'down'],
+      [SECOND, 'up'],
+    ]);
+    for (const form of moves) {
+      expect(tags(form.whole, 'form')[0]?.get('autocomplete')).toBe('off');
+      expect(tags(form.inside, 'input').every((input) => input.get('type') === 'hidden')).toBe(
+        true,
+      );
+    }
+    expect(
+      moves.map(
+        (form) => /<button[^>]*type="submit"[^>]*>([^<]*)<\/button>/.exec(form.inside)?.[1],
+      ),
+    ).toEqual([t.moveDown, t.moveUp, t.moveDown, t.moveUp]);
+  });
+
+  it('a single provider has neither; none sits outside the rows', () => {
+    const html = renderTab([PROVIDERS[0]!]);
+    expect(buttonsByRow(html)).toEqual(new Map([['Mira Testova', [t.edit, t.deactivate]]]));
   });
 });
