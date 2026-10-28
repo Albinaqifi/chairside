@@ -683,3 +683,92 @@ describe('only settings.manage, and only its own clinic (acceptance 5)', () => {
     expect(await providerAudit(clinicB)).toEqual([]);
   });
 });
+
+// E01-T09d, the tester's cases: the edges of the count, a crafted request, and presses at once.
+describe("the tester's edges (E01-T09d)", () => {
+  it('the visits ahead at a fixed now: one ending at now is not ahead, one ending a millisecond after it is, one starting at it is; of the statuses, booked, confirmed and arrived count, completed, cancelled and no-show do not', async () => {
+    const id = await setUpProvider(clinicA);
+    const at = (time: string) => new Date(`2031-03-18T${time}Z`);
+    // One visit at 08:00-08:30; then one of each status, an hour apart from 10:00 (booked first).
+    await setUpVisit(id, at('08:00:00'), at('08:30:00'));
+    for (const [index, status] of scheduling.APPOINTMENT_STATUSES.entries()) {
+      const hour = String(10 + index).padStart(2, '0');
+      await setUpVisit(id, at(`${hour}:00:00`), at(`${hour}:30:00`), status);
+    }
+    const ahead = (now: Date) => withTenant(clinicA, (tx) => scheduling.visitsAhead(tx, id, now));
+    // A millisecond before the first visit ends: it is ahead, with booked, confirmed and arrived.
+    expect(await ahead(at('08:29:59.999'))).toBe(4);
+    // At its end: no longer ahead.
+    expect(await ahead(at('08:30:00'))).toBe(3);
+    // At the booked visit's start it still counts; at its end it does not.
+    expect(await ahead(at('10:00:00'))).toBe(3);
+    expect(await ahead(at('10:30:00'))).toBe(2);
+  });
+
+  it('a crafted edit that also sends active and sortOrder: those ignored, the provider still active at its place, the fields changed', async () => {
+    const id = await setUpProvider(clinicA, { sortOrder: 4 });
+    as('owner');
+    expect(
+      await changeProvider(clinicA, editForm(id, { active: 'false', sortOrder: '0' })),
+    ).toEqual({ ok: true, value: { id } });
+    expect(await providerRow(id)).toMatchObject({
+      name: 'Ana Probna',
+      kind: 'hygienist',
+      active: true,
+      sort_order: 4,
+    });
+  });
+
+  it("a linked provider's kind sent twice, its own and another, in either order: never another kind stored", async () => {
+    const id = await setUpProvider(clinicA, { kind: 'dentist' });
+    await linkLogin(id);
+    as('owner');
+    for (const kinds of [
+      ['dentist', 'other'],
+      ['other', 'dentist'],
+    ]) {
+      const data = editForm(id);
+      data.delete('kind');
+      for (const kind of kinds) data.append('kind', kind);
+      const answer = await changeProvider(clinicA, data);
+      if (!answer.ok) expect(['provider_linked', 'invalid_input']).toContain(answer.error.code);
+      expect(await providerRow(id), kinds.join(',')).toMatchObject({ kind: 'dentist' });
+    }
+  });
+
+  it('two presses of Make active at once: the state changes once, one is already_active, one audit row', async () => {
+    const id = await setUpProvider(clinicA, { active: false });
+    as('owner');
+    const answers = await Promise.all([
+      activateProvider(clinicA, idForm(id)),
+      activateProvider(clinicA, idForm(id)),
+    ]);
+    expect(answers.map((answer) => answer.ok).sort()).toEqual([false, true]);
+    expect(answers.find((answer) => !answer.ok)).toEqual({
+      ok: false,
+      error: { code: 'already_active' },
+    });
+    expect(await providerRow(id)).toMatchObject({ active: true });
+    expect((await providerAudit(clinicA)).map((row) => row.action)).toEqual(['provider.activated']);
+  });
+
+  it('an edit and a Make inactive at once (two tabs): both land, the provider inactive with the new fields, two audit rows', async () => {
+    const id = await setUpProvider(clinicA);
+    as('owner');
+    const [edited, deactivated] = await Promise.all([
+      changeProvider(clinicA, editForm(id)),
+      deactivateProvider(clinicA, idForm(id)),
+    ]);
+    expect(edited).toEqual({ ok: true, value: { id } });
+    expect(deactivated).toEqual({ ok: true, value: { id, visitsAhead: 0 } });
+    expect(await providerRow(id)).toMatchObject({
+      name: 'Ana Probna',
+      kind: 'hygienist',
+      active: false,
+    });
+    expect((await providerAudit(clinicA)).map((row) => row.action).sort()).toEqual([
+      'provider.deactivated',
+      'provider.updated',
+    ]);
+  });
+});

@@ -1,4 +1,4 @@
-import { NextIntlClientProvider } from 'next-intl';
+import { createTranslator, NextIntlClientProvider } from 'next-intl';
 import { createElement, type ComponentProps, type ReactElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -330,5 +330,26 @@ describe("the tab's fields and the scheduling module agree", () => {
 
   it('hueStyle sets --provider-hue, which the theme’s tints read', () => {
     expect(hueStyle(37)).toEqual({ '--provider-hue': '37' });
+  });
+});
+
+// E01-T09d, the tester's case: the toast after Make inactive names how many visits ahead stay booked,
+// in the singular and the plural (acceptance 3); with none, the tab shows the plain one (onDone).
+describe('the toast after Make inactive (E01-T09d)', () => {
+  it('names the count: one visit, two and twelve visits', () => {
+    const translate = createTranslator({
+      locale: LOCALE,
+      messages,
+      namespace: 'settings.providers',
+    });
+    expect(translate('deactivatedWithVisits', { count: 1 })).toBe(
+      'Provider made inactive. 1 visit ahead stays booked with them.',
+    );
+    expect(translate('deactivatedWithVisits', { count: 2 })).toBe(
+      'Provider made inactive. 2 visits ahead stay booked with them.',
+    );
+    expect(translate('deactivatedWithVisits', { count: 12 })).toBe(
+      'Provider made inactive. 12 visits ahead stay booked with them.',
+    );
   });
 });
