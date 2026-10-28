@@ -2307,3 +2307,26 @@ architecture), `changed` (differs from the original files), `process`.
   each a size E01-T09a's session carried.
 - **Revisit if:** E01-T09d comes to far more than 650 lines; the Staff tab (E04-T02) moves the kind lock
   there (D-118).
+
+### D-120 · E01-T09d Done: E01-T09c split in two, the providers' order first and the weekly breaks after; the Providers tab's Edit and Make inactive kept (owner)
+- **Origin:** E01-T09d's Done pass and E01-T09c's Ready pass, 2026-10-28 (PR #84;
+  `handoffs/E01-T09d.md`, `handoffs/E01-T09c.md`). **Owner, 2026-10-28:** tried the Providers tab's
+  Edit, the locked kind, Make inactive with its toast and Make active, all fine; the layout kept. The
+  split and the fields are the architect's.
+- **What:**
+  - **E01-T09c → E01-T09c** (the order: Up and Down in each row, about 220 lines) and **E01-T09e**
+    (the weekly breaks: a Breaks dialog in each row, add and remove, no overlap on a weekday, about
+    520). The order first: it is small, and the breaks' dialog then lands on a tab whose row buttons
+    are final. T09a → T09b → T09d → T09c → T09e.
+  - **A move renumbers the clinic's providers** 0 … n−1 under one `for update` of all of them (ordered
+    by `id`), so two moves at once leave each provider in one place and two adds that shared a
+    `sort_order` (D-119) are numbered apart. The keyboard goes to the section's heading after a move.
+  - **A break's overlap rule** (no two breaks of a provider overlap on a weekday, back to back allowed)
+    is kept by `scheduling` under the provider's row lock, not by a constraint: no migration, as the
+    treatment types' names (E01-T09a).
+- **Why:** the old E01-T09c measured against E01-T09d's 510 lines (the add half 470, a whole tab 940)
+  comes to about 740, over the 650 at which D-119 asked for a split; the two halves are each one
+  outcome.
+- **Revisit if:** a clinic with many providers finds the heading a poor place for the keyboard after
+  Up and Down (E01-T11 watches); a clinic wants a break on one date only; E04-T02 links logins to
+  providers (the kind lock's read must then come after the provider's row lock, Discovered, `data`).
