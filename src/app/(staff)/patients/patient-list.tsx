@@ -216,9 +216,16 @@ export function PatientTable({ query, rows }: { query: string; rows: readonly Pa
               <tr key={row.id} className="border-t border-border">
                 <td className={cell}>
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate font-semibold">
+                    {/* E01-T03a: the name opens the profile. prefetch={false}: opening it is a record
+                        view, audited (security-privacy.md section 10); a prefetch would render it
+                        and write a row nobody opened. */}
+                    <Link
+                      href={`/patients/${row.id}`}
+                      prefetch={false}
+                      className="truncate font-semibold hover:text-link-hover"
+                    >
                       {t('fullName', { first: row.firstName, last: row.lastName })}
-                    </span>
+                    </Link>
                     {/* -my-0.5: the pill is taller than the line; its row keeps the others' height. */}
                     {row.status !== 'active' && (
                       <Badge variant={row.status} className="-my-0.5">

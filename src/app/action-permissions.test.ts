@@ -131,6 +131,8 @@ const ACTIONS: Record<string, Record<string, ScopeRow | 'userAction'>> = {
     demoAnswer: 'No area of the table: every member',
     demoOwnerOnly: 'Staff, settings, audit log, results panel',
   },
+  // E01-T03a: a patient's profile, a read of the patients area as the list is (Q-11, D-096).
+  'src/app/(staff)/patients/[id]/actions.ts': { readPatient: 'Calendar, patients, booking' },
   'src/app/(staff)/patients/actions.ts': { searchPatients: 'Calendar, patients, booking' },
   'src/app/(staff)/patients/new/actions.ts': {
     createPatient: 'Calendar, patients, booking',

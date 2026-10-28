@@ -2,7 +2,7 @@
  * A clinic's patients (data-model.md section 2). Public API of the patients module: list and search
  * them (E01-T02a), add one and find who they may already be (E01-T02b), as
  * `import * as patients from '@/modules/patients'`, then `patients.create(tx, patient, now)`; their
- * names by id, for the calendar's day (E01-T04a).
+ * names by id, for the calendar's day (E01-T04a); one patient's profile (E01-T03a).
  */
 export { create, type CreateRefusal, type CreateResult, type NewPatient } from './create';
 export {
@@ -12,6 +12,7 @@ export {
   type TypedPatient,
 } from './duplicates';
 export {
+  ageOn,
   LIST_LIMIT,
   listPatients,
   PATIENT_STATUSES,
@@ -20,6 +21,7 @@ export {
   type PatientStatus,
 } from './list';
 export { patientNames, type PatientName } from './names';
+export { patientProfile, type PatientProfile } from './profile'; // E01-T03a: the profile page
 export { patientStatus } from './status'; // E01-T05a: only an active patient is booked (D-113)
 // E01-T08a: the clinic's own phone on Settings is read and shown as a patient's is (D-097). Here, as
 // `patients` imports `tenancy`, which so cannot import them back.
