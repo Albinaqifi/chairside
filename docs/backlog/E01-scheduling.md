@@ -1247,8 +1247,8 @@ review, `none`). A quieter Remove (owner, D-115). The drawers' and dialogs' guar
 
 ### E01-T09 · Settings: providers and treatment types
 
-Split in three (D-118), E01-T09b split again (D-119): E01-T09a, E01-T09b, E01-T09d and E01-T09c, the
-next four sections, in that order. Every field of them is a select, a text, a checkbox or a range, so
+Split in three (D-118), E01-T09b split again (D-119), E01-T09c split again (D-120): E01-T09a,
+E01-T09b, E01-T09d, E01-T09c and E01-T09e, the next five sections, in that order. Every field of them is a select, a text, a checkbox or a range, so
 none is a number field and the number texts (E00-T04c) wait for the first one, on the Discovered list.
 
 ---
@@ -1390,6 +1390,14 @@ the breaks (E01-T09c). Linking a login to a provider (Staff, E04-T02). A provide
 
 ### E01-T09d · Settings: change a provider, make one inactive and active again
 
+**As built** (Done 2026-10-28, PR #84): as planned, about 510 lines of product code with comments
+against the 550 estimated, no fix round, no finding of the reviewer, the tester or the delta review.
+Also: `ProviderFields` is exported for its component test; the kind's hidden field sends the stored
+kind beside the disabled select; `visitsAhead` counts a visit `arrived` or under way. The layout is
+kept (owner, 2026-10-28). One narrow race is left (Discovered, `data`, → E04-T00): the kind lock
+reads the logins' links before it locks the provider's row, which cannot matter before E04-T02 links
+a login. The text below is the plan as it was.
+
 - **Role:** builder · **Risk:** normal (a Settings tab's row actions; the kind of a provider linked to
   a login is locked, so no one's permission changes, owner, D-118; no wrapper, `StaffForm`, permission,
   policy or table change) · **Depends on:** E01-T09b (the Providers tab), E01-T09a (the row buttons and
@@ -1466,33 +1474,106 @@ files stay as they are.
 
 ---
 
-### E01-T09c · Settings: the providers' order and weekly breaks
+### E01-T09c · Settings: the providers' order
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T09d (the Providers tab and the row
-  buttons with their settle)
-- **Read:** `scope` (Settings) · `data-model` (`provider_breaks`) · D-018, D-114, D-118, D-119 ·
-  `handoffs/E01-T09b.md`, `handoffs/E01-T09d.md`; refined before it starts
+- **Role:** builder · **Risk:** normal (a Settings tab's row buttons; no wrapper, `StaffForm`,
+  permission, policy or table change) · **Depends on:** E01-T09d (the Providers tab, its row buttons
+  and their settle) — Done
+- **Read:** `scope` (Settings) · `data-model` (`providers`) · D-093, D-119, D-120 · the architect
+  section of `handoffs/E01-T09c.md` ("what is already there") · `handoffs/E01-T09d.md`, its builder
+  section
 
-**Why.** The calendar's columns follow the clinic's order, and a lunch break is hatched on the grid and
-warned about in the drawer (E01-T05b). Split from E01-T09 (D-118).
+**Why.** The calendar's columns follow the clinic's order, and a new provider is always last
+(E01-T09b). A clinic wants its dentist before its hygienist. Split from the old E01-T09c (D-120): the
+order alone, about 220 lines of product code with comments (the module 60, the action 45, the tab 75,
+texts and page 40); the weekly breaks are E01-T09e.
 
 **Do.**
-- **The order:** Up and Down in each row of the Providers tab, each a `StaffForm` of its own as E01-T09a's
-  row buttons, with the same double-click settle;
-  a move writes the new order of every provider in one transaction, the clinic's providers locked.
-- **Weekly breaks** per provider, under its row or in its edit: weekday, start, end, label; add and
-  remove (breaks are deleted, `data-model.md`); a break that overlaps another of the same provider on
-  the same weekday is refused above the button; times in the 24-hour clock, as the opening hours.
-- Audit rows of ids for a move, an added and a removed break.
+- **Up and Down** in each row, for every provider, inactive ones too (their place is kept for when they
+  are made active): each a `StaffForm` of its own with the provider's id and the direction hidden,
+  beside Edit and Make inactive, named as those are (the row's group is labelled with the provider's
+  name). The first row has no Up and the last no Down: the button is not rendered, and the other
+  buttons stay where they are (the builder proposes the layout in the note, rule 10). The same
+  double-click settle as the other row buttons (the list takes no pointer click for `SETTLE_MS` after
+  its rows change; here the row itself moves under the pointer, so a second press would move the
+  provider again), and the keyboard goes to the section's heading after a move, as there.
+- `scheduling.moveProvider(tx, { providerId, direction }, now)` through the index: it locks every
+  provider of the clinic in one statement (`for update`, ordered by `id`, so two moves cannot wait on
+  each other), reads the order as the calendar does (`sort_order`, name, id), swaps the provider with its
+  neighbour in that list and writes `sort_order` = position (0, 1, 2 …) of every provider whose value
+  differs, `updated_at` from `now`. So providers that share a `sort_order` (two adds at once, D-119)
+  are numbered apart by the first move. A provider not in the clinic is `not_found`, one with no
+  neighbour that way `already_first` or `already_last`: refused, nothing written, no audit row.
+- The action `moveProvider` in `provider-actions.ts`: `settings.manage`, input a UUID and
+  `up` or `down`, the three refusals as codes shown above the button, one audit row `provider.moved`
+  about the provider (metadata `{ direction }`, ids and codes only), `refresh()` when it is done, a
+  short `doneMessage` ("Provider moved."). The calendar's columns, the filter chips and the booking
+  drawer's provider select read `listProviders`, in the same order, so they follow with no change
+  there (a test shows it).
 
-**Out of scope.** Breaks on one date only; a provider's own working hours.
+**Out of scope.** The weekly breaks (E01-T09e). Dragging a row. A new provider's place (last,
+E01-T09b). The keyboard staying on the moved row (it goes to the heading, as after Make inactive;
+D-120, "Revisit if"). A shared hook for the settle: it is copied a fourth time and the tabs' files stay
+as they are.
 
 **Acceptance.**
-- [ ] Up and Down change the calendar's columns; two moves at once leave every provider in one place
-      (integration; e2e).
-- [ ] An added break is hatched on the calendar and warned about in the drawer; a removed one is gone;
-      an overlapping one refused (integration; e2e).
-- [ ] Every change audited, only `settings.manage`, clinic B's rows refused (unit, integration).
+- [ ] Up and Down change the tab's order, the calendar's columns and the drawer's provider select; the
+      appointments are unchanged (integration; e2e, three browsers).
+- [ ] The first row has no Up and the last no Down (component); a crafted request for either is
+      `already_first` or `already_last`, a provider of clinic B or an unknown id `not_found`: nothing
+      written, no audit row (integration).
+- [ ] Two moves at once, of different providers and of the same one, leave every provider in exactly
+      one place, the positions 0 … n−1 each once; providers that shared a `sort_order` are numbered
+      apart (integration, concurrent transactions).
+- [ ] An inactive provider is moved as an active one is, and stays inactive (integration).
+- [ ] A double click on Up or Down (80, 150 and 250 ms between the clicks) moves the provider one step,
+      once (e2e, three browsers).
+- [ ] Every move writes one audit row of ids; only `settings.manage`; the action is in
+      `action-permissions.test.ts` (unit, integration as each role).
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
+
+---
+
+### E01-T09e · Settings: the providers' weekly breaks
+
+**Planned, refined by the architect when E01-T09c is Done (D-120).** What is settled now, so the
+refinement keeps it:
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T09c (the row buttons; the tab's file)
+- **Read:** `scope` (Settings) · `data-model` (`provider_breaks`) · D-018, D-114, D-118, D-120 ·
+  `handoffs/E01-T09d.md`, `handoffs/E01-T09c.md`
+
+**Why.** A lunch break is hatched on the grid and warned about in the drawer (E01-T05b), but only the
+seed can make one. The second half of the old E01-T09c; about 520 lines of product code with comments
+(the module 110, the actions 100, the fields 40, the dialog 220, texts and page 50), which is why the
+order did not share a session with it.
+
+**Do.**
+- **A Breaks button in each row** (inactive ones too) opens a dialog (E01-T09a's `EditType` pattern: its
+  content mounts only while open) that lists the provider's breaks by weekday and start, each with
+  weekday, times, label and a Remove (a `StaffForm` of its own), and under a line the form that adds
+  one: weekday (a select, Monday first), start and end (the opening hours' selects, 15-minute steps,
+  24-hour clock), label (required, at most 40 characters). The dialog's list takes no pointer click for
+  `SETTLE_MS` after its rows change, as the closed days'.
+- **A break may not overlap another of the same provider on the same weekday** (back to back is fine:
+  12:00–13:00 and 13:00–14:00): refused above the button as `break_overlaps`; `ends` after `starts` is
+  the schema's, shown at the field. Kept by `scheduling` under the provider's row lock (`for update`),
+  not by a constraint, so two adds at once keep one; `data-model.md`'s row says so.
+- **Remove** deletes the row (breaks are deleted, `data-model.md`); a second press on a break already
+  gone is `not_found`, no audit row. Audit rows of ids: `provider.break_added`, `provider.break_removed`.
+- The Settings page reads the clinic's breaks in a `staffRead` of its own (`readProviders` stays).
+
+**Out of scope.** Changing a break in place (remove and add). Breaks on one date only. A provider's own
+working hours. Showing a break's overlap with the opening hours (the drawer already warns, E01-T05b).
+
+**Acceptance.**
+- [ ] An added break is hatched on the calendar on that weekday and warned about in the drawer; a
+      removed one is gone from both (integration; e2e, three browsers).
+- [ ] A break overlapping another of the same provider and weekday is refused, nothing written; back to
+      back is accepted; two adds at once keep one (integration, concurrent transactions).
+- [ ] A double click on a break's Remove removes one break, once (e2e, three browsers).
+- [ ] Every change audited, only `settings.manage`, clinic B's provider or break refused (unit,
+      integration).
 - [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---
