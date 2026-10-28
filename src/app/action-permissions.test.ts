@@ -145,6 +145,14 @@ const ACTIONS: Record<string, Record<string, ScopeRow | 'userAction'>> = {
     addClosedDay: 'Staff, settings, audit log, results panel',
     removeClosedDay: 'Staff, settings, audit log, results panel',
   },
+  // E01-T09a: the Treatment types tab.
+  'src/app/(staff)/settings/treatment-type-actions.ts': {
+    readTreatmentTypes: 'Staff, settings, audit log, results panel',
+    addTreatmentType: 'Staff, settings, audit log, results panel',
+    changeTreatmentType: 'Staff, settings, audit log, results panel',
+    deactivateTreatmentType: 'Staff, settings, audit log, results panel',
+    activateTreatmentType: 'Staff, settings, audit log, results panel',
+  },
   'src/app/_lib/clinic-time-zone.ts': { clinicTimeZone: 'No area of the table: every member' },
 };
 
