@@ -2282,3 +2282,28 @@ architecture), `changed` (differs from the original files), `process`.
   estimate); a permission that changes from a Settings field would make a Settings task critical.
 - **Revisit if:** E04-T02 builds the Staff tab (the link and the kind may move there together); a
   clinic asks for a provider's visits to be moved when they leave.
+
+### D-119 · E01-T09a Done: E01-T09b split again, the providers' list and add, then changing one and making one inactive; the Treatment types tab's layout kept (owner)
+- **Origin:** E01-T09a's Done pass and E01-T09b's Ready pass, 2026-10-28 (PR #80;
+  `handoffs/E01-T09a.md`, `handoffs/E01-T09b.md`). **Owner, 2026-10-28:** tried the Treatment types
+  tab, all fine; its layout kept. The split and the fields are the architect's.
+- **What:**
+  - **E01-T09b → E01-T09b** (the Providers tab: the list and add, about 650 lines) and **E01-T09d**
+    (Edit, the linked provider's kind locked, Make inactive and active again with the visits ahead
+    counted, about 500). **E01-T09c** (order and breaks) follows E01-T09d: T09a → T09b → T09d → T09c.
+    A clinic made by `clinic:create` has no provider, so Add comes first, as the types did.
+  - **The toast that says how many visits stay booked** is shown by the row form's `onDone(value)` with
+    `useToast()`, in place of `doneMessage`'s toast: `StaffForm` keeps a fixed `doneMessage` and is
+    not changed (D-093).
+  - **A new provider's `sort_order`** is one above the clinic's highest, with no lock: two adds at once
+    may share one, which the calendar's order breaks by name and id and E01-T09c's move renumbers.
+  - **Sizes:** E01-T09a came to 940 lines of product code with comments against 300 estimated, with no
+    fix round (E01-T05a and E01-T05d also came to about twice theirs). A Ready pass sizes a task from
+    the measured lines of the one it repeats, not from a smaller task's.
+  - `data-model.md` "Money" now says the digits of a minor unit are `Intl`'s (RSD and ALL have none,
+    where ISO 4217 says two) and that a price has no currency of its own: the code already did it.
+- **Why:** E01-T09b as planned (350 lines) would come to about 1,100: a tab with five fields and a
+  colour, a link check, a count and a toast. Two tasks of about 500 to 650 are each one outcome and
+  each a size E01-T09a's session carried.
+- **Revisit if:** E01-T09d comes to far more than 650 lines; the Staff tab (E04-T02) moves the kind lock
+  there (D-118).

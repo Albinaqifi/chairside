@@ -346,6 +346,11 @@ in `BETTER_AUTH_URL`. Each checkout's `docker compose stop` stops only its own c
   `.next/`. Delete the `.next` folder and run it again.
 - **`pnpm dev` answers "not found" for a page that exists:** Next.js sometimes starts that way on
   Windows. Save the page's file (no change needed), or stop and start `pnpm dev` again.
+- **Every Next.js command fails with `ERR_SWC_NATIVE_CACHE` (seen on one Windows machine):** the
+  `@swc/core` addon refuses its cache folder in `%LOCALAPPDATA%\swc`. For the session, set
+  `SWC_NATIVE_BINDING_CACHE` to a folder inside the checkout (two builder and tester sessions used
+  `node_modules\.cache\swc-native`; PowerShell: `$env:SWC_NATIVE_BINDING_CACHE = "<folder>"`) and run
+  the command again. Nothing in the repository depends on it.
 - **Cannot connect to the database:** start Docker Desktop, then `docker compose up -d --wait`.
 - **Port 5433 is already in use:** another program uses it. Stop that program, or set `DB_PORT` in
   `.env` to a free port and use that port in the three database URLs there too.
