@@ -3,7 +3,7 @@
  * scheduling module: other modules read its tables only through these functions (module rule 1).
  * The calendar's day (E01-T04a): the providers, their breaks on a weekday, the appointments of a day.
  * Booking (E01-T05a): an appointment booked, and the treatment types a booking can take.
- * Settings: the treatment types (E01-T09a) and the providers (E01-T09b, E01-T09d).
+ * Settings: the treatment types (E01-T09a) and the providers (E01-T09b, E01-T09d, E01-T09c).
  */
 export {
   APPOINTMENT_STATUSES,
@@ -18,12 +18,14 @@ export {
   type NewBooking,
 } from './booking';
 export { breaksOnWeekday, listProviders, type Provider, type ProviderBreak } from './providers';
-// E01-T09b, E01-T09d: the providers as Settings keeps them.
+// E01-T09b, E01-T09d, E01-T09c: the providers as Settings keeps them.
 export {
   addProvider,
   changeProvider,
   clinicProviders,
+  moveProvider,
   PROVIDER_CHAIR_MAX,
+  PROVIDER_DIRECTIONS,
   PROVIDER_HUE_MAX,
   PROVIDER_KINDS,
   PROVIDER_NAME_MAX,
@@ -32,6 +34,9 @@ export {
   visitsAhead,
   type ChangeProviderResult,
   type ClinicProvider,
+  type MoveProviderRefusal,
+  type MoveProviderResult,
+  type ProviderDirection,
   type ProviderFields,
   type ProviderKind,
   type SetProviderActiveRefusal,

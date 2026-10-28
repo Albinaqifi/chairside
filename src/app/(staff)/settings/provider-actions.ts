@@ -7,13 +7,14 @@ import * as auth from '@/modules/auth';
 import * as scheduling from '@/modules/scheduling';
 
 /*
- * The Providers tab (E01-T09b, E01-T09d): the owner's alone (settings.manage, scope-v1.md), as every
+ * The Providers tab (E01-T09b, E01-T09d, E01-T09c): the owner's alone (settings.manage, scope-v1.md), as every
  * Settings action. What the input alone settles is the schema's, shown at its field (D-098): a name,
  * short name or chair empty or too long, a kind the select does not offer, a hue that is no whole
  * number of degrees from 0 to 359. A provider's name may repeat, as two people may share one. What
  * needs the clinic's rows is the handler's refusal, shown above the button: a kind changed on a
  * provider linked to a login (provider_linked), a provider not there (not_found), a state it has
- * already (already_inactive, already_active). Each change writes one audit row about the provider, of
+ * already (already_inactive, already_active), a move with no place that way (already_first,
+ * already_last). Each change writes one audit row about the provider, of
  * ids alone: a provider's name and chair are no patient's, and never logged either.
  */
 
@@ -132,6 +133,33 @@ export const deactivateProvider = staffAction(
     const visitsAhead = await scheduling.visitsAhead(tx, input.providerId, now);
     refresh();
     return { id: input.providerId, visitsAhead };
+  },
+);
+
+/**
+ * Moves a provider one place up or down the order (scheduling.moveProvider), sent by its row's Up or
+ * Down with the id and the direction hidden, with one audit row, provider.moved, about the provider
+ * (metadata: the direction). Inactive providers move as active ones do. The calendar's columns, the
+ * filter chips and the booking drawer's select read the same order (listProviders), so they follow.
+ * Refused, with nothing written: not_found, already_first (Up on the first), already_last (Down on
+ * the last).
+ */
+export const moveProvider = staffAction(
+  {
+    permission: 'settings.manage',
+    input: providerId.extend({ direction: z.enum(scheduling.PROVIDER_DIRECTIONS) }),
+    audit: {
+      action: 'provider.moved',
+      entityType: 'provider',
+      entityId: ({ input }) => input.providerId,
+      metadata: ({ input }) => ({ direction: input.direction }),
+    },
+  },
+  async ({ input, tx, now }) => {
+    const moved = await scheduling.moveProvider(tx, input, now);
+    if (!moved.ok) return refuse(moved.code);
+    refresh();
+    return { id: input.providerId };
   },
 );
 

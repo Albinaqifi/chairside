@@ -161,6 +161,7 @@ const ACTIONS: Record<string, Record<string, ScopeRow | 'userAction'>> = {
     changeProvider: 'Staff, settings, audit log, results panel',
     deactivateProvider: 'Staff, settings, audit log, results panel',
     activateProvider: 'Staff, settings, audit log, results panel',
+    moveProvider: 'Staff, settings, audit log, results panel',
   },
   'src/app/_lib/clinic-time-zone.ts': { clinicTimeZone: 'No area of the table: every member' },
 };

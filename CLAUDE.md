@@ -125,7 +125,8 @@ tests/e2e/            End-to-end journeys and checks in real browsers (Playwrigh
                       the Treatment types tab: add, then book with it, and a double click on Make inactive
                       (E01-T09a), the Providers tab: add with its colour, then book with it (E01-T09b);
                       change one, the linked one's kind locked, make inactive and active again, and a
-                      double click on Make inactive (E01-T09d).
+                      double click on Make inactive (E01-T09d); move one up and down in the order and
+                      a double click on Up (E01-T09c).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 Dockerfile            The one image staging and production run (D-007, D-103): the web by default,

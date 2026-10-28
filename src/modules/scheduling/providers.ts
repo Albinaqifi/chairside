@@ -74,8 +74,8 @@ function minutesOfTime(column: Column) {
 
 /*
  * The providers as Settings keeps them (E01-T09b, E01-T09d): every provider of the clinic with its
- * kind, one added, one changed, one made inactive and active again; the order and the breaks are
- * E01-T09c. Never deleted (data-model.md: the app role has no DELETE on the table). A
+ * kind, one added, one changed, one made inactive and active again, one moved up or down (E01-T09c);
+ * the breaks are E01-T09e. Never deleted (data-model.md: the app role has no DELETE on the table). A
  * provider's name, short name and chair are no patient's, but never go in a log or an error's
  * message either.
  */
@@ -235,6 +235,57 @@ export async function setProviderActive(
     .where(thisProvider(id));
   if (!stored) return { ok: false, code: 'not_found' };
   return { ok: false, code: active ? 'already_active' : 'already_inactive' };
+}
+
+/** Which way a provider moves in the clinic's order: towards the first column, or the last. */
+export const PROVIDER_DIRECTIONS = ['up', 'down'] as const;
+
+export type ProviderDirection = (typeof PROVIDER_DIRECTIONS)[number];
+
+/**
+ * Why a provider was not moved: no provider of the clinic by that id, or one with no neighbour that
+ * way (the first cannot go up, the last cannot go down: a second tab, or a press the list did not
+ * drop).
+ */
+export type MoveProviderRefusal = 'not_found' | 'already_first' | 'already_last';
+
+export type MoveProviderResult = { ok: true } | { ok: false; code: MoveProviderRefusal };
+
+/**
+ * Moves a provider one place up or down the clinic's order (E01-T09c): swaps it with its neighbour in
+ * the order the calendar reads (`sort_order`, name, id), inactive ones too, and writes `sort_order` =
+ * the place (0, 1, 2 ...) of every provider whose value is another, `updated_at` `now`. So providers
+ * that share a `sort_order` (two adds at once, D-119) are numbered apart by the first move, and the
+ * clinic's places are 0 ... n-1, each once, afterwards.
+ *
+ * All the clinic's providers are locked first, in one statement ordered by `id`, so two moves at once
+ * wait on each other in the same order and cannot deadlock, and the second reads the order the first
+ * left. The order is read in a statement of its own after the locks, by the database's own ordering
+ * (its collation sorts the names), as the calendar reads it. A provider added meanwhile is not locked
+ * and keeps its value: it stays last, or ties, as D-119 allows.
+ */
+export async function moveProvider(
+  tx: TenantTransaction,
+  { providerId, direction }: { providerId: string; direction: ProviderDirection },
+  now: Date,
+): Promise<MoveProviderResult> {
+  await tx.select({ id: providers.id }).from(providers).orderBy(asc(providers.id)).for('update');
+  const order = await tx
+    .select({ id: providers.id, sortOrder: providers.sortOrder })
+    .from(providers)
+    .orderBy(asc(providers.sortOrder), asc(providers.name), asc(providers.id));
+  const at = order.findIndex((each) => each.id === providerId);
+  if (at < 0) return { ok: false, code: 'not_found' };
+  const to = direction === 'up' ? at - 1 : at + 1;
+  if (to < 0) return { ok: false, code: 'already_first' };
+  if (to >= order.length) return { ok: false, code: 'already_last' };
+  const swapped = order.map((each) => each.id);
+  [swapped[at], swapped[to]] = [swapped[to]!, swapped[at]!];
+  for (const [place, id] of swapped.entries()) {
+    if (order.find((each) => each.id === id)?.sortOrder === place) continue;
+    await tx.update(providers).set({ sortOrder: place, updatedAt: now }).where(thisProvider(id));
+  }
+  return { ok: true };
 }
 
 /** The statuses of a visit that will not happen, or has: none of them is a visit ahead. */
