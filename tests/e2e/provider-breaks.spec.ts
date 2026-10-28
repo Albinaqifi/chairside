@@ -179,9 +179,14 @@ async function openBreaks(page: Page, name: string): Promise<Locator> {
   return dialog;
 }
 
-/** The dialog's add form. */
+/**
+ * The dialog's add form.  is matched inside the form, so it names the button from the page: a
+ * locator that starts at the dialog would look for a dialog inside the form and never find one.
+ */
 const addForm = (dialog: Locator) =>
-  dialog.locator('form').filter({ has: dialog.getByRole('button', { name: t.breakAdd }) });
+  dialog
+    .locator('form')
+    .filter({ has: dialog.page().getByRole('button', { name: t.breakAdd, exact: true }) });
 
 /** Fills and sends the add form; the times are the selects' values. */
 async function addBreakIn(
@@ -209,6 +214,21 @@ async function openCalendar(page: Page, day: string): Promise<void> {
     )
     .toBe(true);
   await page.waitForLoadState('networkidle');
+}
+
+/**
+ * Closes the dialog with Escape once the add's toast is gone: the toast is one of Radix's layers, as the
+ * dialog is, and until it has gone the Escape is its own and the dialog stays open (booking.spec.ts,
+ * closeToast; @radix-ui/react-dismissable-layer 1.1.19).
+ */
+async function closeWithEscape(page: Page, dialog: Locator): Promise<void> {
+  await page.keyboard.press('Escape');
+  await expect(
+    page.getByRole('region', { name: 'Notifications (F8)' }).getByRole('listitem'),
+    'no toast up when the dialog closes',
+  ).toHaveCount(0);
+  if (await dialog.isVisible()) await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
 }
 
 /** The server actions the page sends from now on. */
@@ -254,8 +274,7 @@ test.describe("the providers' weekly breaks in Settings (E01-T09e)", () => {
       const form = addForm(dialog);
       await expect(form.getByLabel(t.breakLabel, { exact: true })).toHaveValue('');
       await expect(form.getByLabel(t.breakWeekday, { exact: true })).toBeFocused();
-      await page.keyboard.press('Escape');
-      await expect(dialog).toBeHidden();
+      await closeWithEscape(page, dialog);
 
       // Hatched in the provider's column on that weekday.
       await openCalendar(page, day);
