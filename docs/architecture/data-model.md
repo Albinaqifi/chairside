@@ -17,7 +17,11 @@ decision (agent rules 4 and 11).
 - Every table: `created_at`, and `updated_at` where rows change.
 - Lists of allowed values (statuses, roles) are Postgres enums or text with a check constraint.
 - Phone numbers are stored in E.164 format (`+381641234567`). Emails lower-cased.
-- Money: integer minor units (cents) plus the clinic's currency. Optional everywhere in v1.
+- Money: integer minor units plus the clinic's currency. Optional everywhere in v1. A stored amount
+  has no currency of its own: a clinic that changes its currency reads every price it holds in the
+  new one. The digits of a minor unit are the ones `Intl` gives the currency (CLDR): two for MKD and
+  EUR, none for JPY, and none for RSD and ALL too, where ISO 4217 says two (E01-T09a). An export or a
+  report that shows a price takes the digits the same way.
 - No personal data in `jsonb` "metadata" columns of logs and events: ids and codes only.
 
 Legend for the "When" column: the epic that creates the table.

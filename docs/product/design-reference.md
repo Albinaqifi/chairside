@@ -144,7 +144,10 @@ closed days (a line above the grid that says why the day is closed and the day s
 E01-T04a, kept by the owner on 2026-10-12; no lunch shown on it, E01-T04b), the closed days in
 Settings (on the Opening hours tab, under the week: each day with its label and a Remove, teal as
 every staff form's button, then the add form under a line; E01-T08c, kept by the owner on 2026-10-19,
-D-115), the new-patient page
+D-115), the Treatment types tab in Settings (each row its name, a muted line of length, price and
+"Needs aftercare", an "Inactive" pill on an inactive one, then Edit, which opens a dialog, and Make
+inactive at its right; the add form under a line; E01-T09a, kept by the owner on 2026-10-28), the
+new-patient page
 (E01-T02b: the demo's only new patient is the booking drawer's quick one, lines 1335 and
 2120–2131, E01-T05d; its list has no "New patient" button). Build them
 from the same tokens and components, in the same tone. When a layout

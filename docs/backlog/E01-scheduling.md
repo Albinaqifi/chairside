@@ -7,9 +7,9 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
 Order: T01a → T01b → T02a → T02b → T04a and T08a side by side (two checkouts, D-110) → T04b and T08b
-side by side (D-111) → T05a and T08c side by side (D-112, D-113) → T05b → T05c → T05d → T09a → T09b → T09c, T03 → T06 →
+side by side (D-111) → T05a and T08c side by side (D-112, D-113) → T05b → T05c → T05d → T09a → T09b → T09d → T09c, T03 → T06 →
 T07, T10 → T08d → T11. With E00 (D-087, D-090, D-091, D-093, D-096, D-108, D-110, D-111, D-112, D-113,
-D-114, D-115, D-118):
+D-114, D-115, D-118, D-119):
 E00-T05a → T01a → T01b → E00-T04c → E00-T04d → E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 →
 T04a and T08a → T04b and T08b → T05a and T08c → T05b → T05c → T05d → T09 and the rest, so a receptionist sees a patient list before
 Playwright and staging exist. T01 is split in two (D-091): the schema and the provider link (T01a), the seed (T01b). T02 is
@@ -29,7 +29,9 @@ one go (T05d). T08c was merged with its last review's change open, a double clic
 Remove while the list's heading is above the window: it is T08d, after T10 and before T11 (owner, D-115).
 T09 is split in three (D-118), each a Settings tab or part of one: the treatment types (T09a), first, as
 a clinic made by `clinic:create` has none and books nothing; the providers (T09b); their order and
-weekly breaks (T09c), on T09b's tab.
+weekly breaks (T09c), on T09b's tab. T09b is split again (D-119), as T09a came to 940 lines against an
+estimate of 300: the providers' list and add (T09b); changing a provider and making one inactive or
+active again (T09d); T09c follows T09d.
 
 ---
 
@@ -1245,13 +1247,23 @@ review, `none`). A quieter Remove (owner, D-115). The drawers' and dialogs' guar
 
 ### E01-T09 · Settings: providers and treatment types
 
-Split in three (D-118): E01-T09a, E01-T09b and E01-T09c, the next three sections. Every field of
-the three is a select, a text, a checkbox or a range, so none is a number field and the number texts
-(E00-T04c) wait for the first one, on the Discovered list.
+Split in three (D-118), E01-T09b split again (D-119): E01-T09a, E01-T09b, E01-T09d and E01-T09c, the
+next four sections, in that order. Every field of them is a select, a text, a checkbox or a range, so
+none is a number field and the number texts (E00-T04c) wait for the first one, on the Discovered list.
 
 ---
 
 ### E01-T09a · Settings: treatment types
+
+**As built** (Done 2026-10-28, PR #80): as planned, but about 940 lines of product code with comments
+against the 300 estimated (D-119), no fix round. Also: the one-active-type-per-name rule is kept under
+a transaction advisory lock of the clinic's catalogue (a clinic with no type has no row to lock), the
+names compared in JavaScript so a database that does not lower Cyrillic still sees one name; a second
+press on a type's state is refused (`already_inactive`, `already_active`), no audit row; a price above
+the column's integer is `price_too_high`; the length schema takes any whole 1–1440 minutes, as the
+select keeps a type's own length outside its steps. Left as known: a double click on Add sends the
+empty form that replaces it (Discovered, `speed`; the closed days' add the same). The layout, which the
+demo lacks, is kept (owner, 2026-10-28). The text below is the plan as it was.
 
 - **Role:** builder · **Risk:** normal (a Settings tab and its actions, as E01-T08c's; no wrapper,
   `StaffForm`, permission, policy or table change) · **Depends on:** E01-T08a (the Settings page and
@@ -1290,7 +1302,7 @@ of product code with comments, sized from E01-T08c.
   `treatment_type.updated`, `treatment_type.deactivated`, `treatment_type.activated`.
 - A change to a type does not touch the appointments booked with it: their title and length stay.
 
-**Out of scope.** Providers and breaks (E01-T09b, E01-T09c). The aftercare priority and texts (E06).
+**Out of scope.** Providers and breaks (E01-T09b, E01-T09d, E01-T09c). The aftercare priority and texts (E06).
 Numbers' own error texts (D-118: no number field here).
 
 **Acceptance.**
@@ -1312,63 +1324,130 @@ Numbers' own error texts (D-118: no number field here).
 
 ---
 
-### E01-T09b · Settings: providers
+### E01-T09b · Settings: providers, the list and add
 
-- **Role:** builder · **Risk:** normal (a Settings tab and its actions; the kind of a provider linked
-  to a login is locked, so no one's permission changes, owner, D-118; no wrapper, `StaffForm`,
-  permission, policy or table change) · **Depends on:** E01-T09a (the tab pattern it repeats),
-  E01-T04a (the calendar its criteria name)
-- **Read:** `scope` (Settings) · `data-model` (`memberships`, `providers`) · `design-ref` (Provider
-  colours; "Screens the demo does not have") · D-019, D-051, D-091, D-092, D-098, D-113, D-118 · the
-  architect section of `handoffs/E01-T09a.md`
+- **Role:** builder · **Risk:** normal (a Settings tab and its actions, as E01-T09a's; no wrapper,
+  `StaffForm`, `StaffField`, permission, policy or table change) · **Depends on:** E01-T09a (the tab
+  pattern it repeats), E01-T04a (the calendar its criteria name) — both Done
+- **Read:** `scope` (Settings) · `data-model` (`providers`) · `design-ref` (Provider colours; "Screens
+  the demo does not have") · D-019, D-093, D-098, D-118, D-119 · the architect section of
+  `handoffs/E01-T09b.md`
 
-**Why.** A clinic's chairs and people change: a new hygienist, a dentist who leaves. Split from
-E01-T09 (D-118). About 350 lines of product code with comments.
+**Why.** A clinic made by `clinic:create` has no provider, so it books nothing (E01-T05a), as it had no
+treatment type before E01-T09a. The first half of the providers (D-118); the second is E01-T09d
+(D-119). About 650 lines of product code with comments, sized from E01-T09a's measured 940 for a tab
+with four fields, an edit dialog and a row button (its estimate was 300).
 
 **Do.**
 - **A Providers tab** on Settings, before Treatment types: the clinic's providers in the calendar's
-  order (`listProviders`), each its name, short name, kind, chair and a swatch of its colour, and
-  "Inactive" on an inactive one.
-- **Add and edit:** name and short name (required, trimmed, at most 100 and 12 characters), kind (the
-  browser's own select: dentist, hygienist, other), chair label (required), colour: a range from 0 to
-  359 (`<input type="range">`, the stored hue) with the provider's tints beside it (the theme's
-  formula, `design-reference.md`). A new provider goes last in the order.
-- **A provider linked to a login** (`memberships.provider_id`): the kind is shown and cannot be
-  changed, with a line that says why; the handler refuses a changed kind for it (`provider_linked`),
-  as an owner's aftercare approval follows a linked dentist's kind (D-051, owner, D-118). The auth
-  module says which of the clinic's providers are linked (its index; module rule 1).
-- **Make inactive and active again**, never delete: a button in the row as in E01-T09a, with its
-  double click's guard. An inactive
-  provider gets no new booking (`provider_not_bookable`, as today) and keeps every appointment; one
-  with visits ahead (from now, not cancelled or no-show) is made inactive, and the toast says how many
-  stay booked (owner, D-118); the calendar shows them on their days, as it does today. A linked one
-  is made inactive too, and its login keeps its access (owner, D-118).
-- `scheduling` functions through its index: add, change, set active, the count of visits ahead (`now`
-  passed in); each sets `updated_at`. Audit rows of ids: `provider.created`, `provider.updated`,
-  `provider.deactivated`, `provider.activated`.
+  order (`sort_order`, then name, then id), each its name, short name, kind, chair and a swatch of its
+  colour, and "Inactive" on an inactive one (none can be made so before E01-T09d); one line that says
+  none yet for an empty list. No button in a row yet.
+- **Add:** one `StaffForm` under the list, as the treatment types' (E01-T09a): name (required,
+  trimmed, at most 100 characters), short name (required, trimmed, at most 12), kind (the browser's own
+  select: dentist, hygienist, other), chair label (required, trimmed, at most 100), colour: an
+  `<input type="range">` from 0 to 359, the stored hue, starting at 200 (the theme's own), with the
+  provider's tints beside it. The hue arrives as a text of whole digits and the schema reads it as
+  E01-T09a's length is (a text, then a number, a problem at the field through `ctx.addIssue`): no number
+  field (D-118). A new provider goes last: `sort_order` one above the clinic's highest, 0 for its first.
+- **The tints** are the theme's (`globals.css`: `--color-provider-tint`, `-edge`, `-strong`, `-ink`
+  read `--provider-hue`, which the swatch's element sets inline); no new colour. They follow the range
+  as it is dragged (a client component); the form sends the hue.
+- `scheduling` functions through its index: every provider of the clinic with its kind (a read of
+  Settings' own: `listProviders` and its `Provider` serve the calendar and stay as they are), and add,
+  which sets `created_at` and `updated_at` from `now`. No lock for the order: two adds at once may share
+  a `sort_order`, which the calendar's order breaks by name and id and E01-T09c's move renumbers
+  (D-119). Audit row of ids: `provider.created`.
+- The calendar and the drawer change nothing: a new provider is a column and a choice through what they
+  read today. The Settings page's comment names the tabs to come: Providers is no longer one.
 
-**Out of scope.** The order and the breaks (E01-T09c). Linking a login to a provider (Staff, E04-T02).
-A provider's own working hours.
+**Out of scope.** Changing a provider, making one inactive or active again (E01-T09d). The order and
+the breaks (E01-T09c). Linking a login to a provider (Staff, E04-T02). A provider's own working hours.
 
 **Acceptance.**
-- [ ] A new provider is a column on the calendar and a choice in the drawer; made inactive, neither on
-      a day without their visits, a booking with them refused, their visits ahead still booked and on
-      the calendar, and the toast names how many (integration; e2e, three browsers).
-- [ ] A linked provider's kind cannot be changed (the field locked; a crafted request refused as
-      `provider_linked`, nothing written), and making them inactive leaves the login's permissions as
-      they were (integration).
+- [ ] A provider added on the tab is a column on the calendar and a choice in the booking drawer, and
+      books (integration; e2e, three browsers: add, then book with it).
+- [ ] The first provider of a clinic with none has `sort_order` 0, the next one above the highest. A
+      name or short name empty or too long, a chair empty, a hue outside 0–359 or not whole digits:
+      shown at its field, nothing written (unit and integration, a crafted request too).
 - [ ] The colour range's value is the stored hue and the swatch follows it (component).
+- [ ] The tab lists the clinic's providers with kind, chair and swatch in the calendar's order, an
+      inactive one with "Inactive" (integration, with an inactive one the test makes).
+- [ ] Every add writes one audit row of ids (metadata `{}`); only `settings.manage` reads or adds, each
+      new action in `action-permissions.test.ts`; clinic B's providers are not in clinic A's list
+      (unit, integration as each role).
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
+
+---
+
+### E01-T09d · Settings: change a provider, make one inactive and active again
+
+- **Role:** builder · **Risk:** normal (a Settings tab's row actions; the kind of a provider linked to
+  a login is locked, so no one's permission changes, owner, D-118; no wrapper, `StaffForm`, permission,
+  policy or table change) · **Depends on:** E01-T09b (the Providers tab), E01-T09a (the row buttons and
+  their settle)
+- **Read:** `scope` (Settings) · `data-model` (`memberships`, `providers`) · D-051, D-091, D-093,
+  D-098, D-118, D-119 · the architect section of `handoffs/E01-T09b.md`, and E01-T09b's builder section
+  once it exists
+
+**Why.** A clinic's chairs and people change: a new name, a dentist who leaves. Split from E01-T09b
+(D-119). About 500 lines of product code with comments.
+
+**Do.**
+- **Edit** in each row: the fields of the add form in a dialog (E01-T09a's), colour range and tints as
+  the add form's.
+- **A provider linked to a login** (`memberships.provider_id`, a membership of the clinic active or
+  disabled): the kind is shown and cannot be changed, with a line that says why; the handler refuses a
+  kind that differs from the stored one (`provider_linked`, above the button), as an owner's aftercare
+  approval follows a linked dentist's kind (D-051, owner, D-118). A disabled select sends nothing, so the
+  dialog sends the kind in a hidden field and the handler accepts the stored one with the other fields.
+  The auth module says which of the clinic's providers are linked (a function through its index; module
+  rule 1); a crafted request cannot skip the check.
+- **Make inactive and active again**, never delete: a `StaffForm` of its own in the row with the id
+  hidden, as E01-T09a's, with the same double click guard (the list takes no pointer click for
+  `SETTLE_MS` after its rows change). A second press on a state is refused (`already_inactive`,
+  `already_active`), no audit row.
+- **An inactive provider** gets no new booking (`provider_not_bookable`, as today) and keeps every
+  appointment. One with visits ahead (a start from `now` on, status not cancelled or no-show) is made
+  inactive, and the toast says how many stay booked (owner, D-118): the action's answer carries the
+  count and the row form's `onDone(value)` shows it with `useToast()` in place of `doneMessage`'s (one
+  toast shows at a time, the next replaces it; `StaffForm` is not changed, D-093). With none ahead,
+  `doneMessage` stands. The calendar shows them on their days, as it does today. A linked one is made
+  inactive too, and its login keeps its access (owner, D-118): nothing of `memberships` changes.
+- `scheduling` functions through its index: change, set active, the count of visits ahead (`now`
+  passed in); each sets `updated_at` from `now`. Audit rows of ids: `provider.updated`,
+  `provider.deactivated`, `provider.activated`.
+
+**Out of scope.** The order and the breaks (E01-T09c). Linking a login to a provider and its access
+(Staff, E04-T02). Moving a leaving provider's visits (D-118, "Revisit if").
+
+**Acceptance.**
+- [ ] A provider's name, short name, kind (when not linked), chair and colour changed on the tab show
+      on the calendar's column and in the drawer; appointments already booked are unchanged
+      (integration; e2e).
+- [ ] A linked provider's kind cannot be changed (the field locked; a crafted request refused as
+      `provider_linked`, nothing written); the same kind saves with the other fields; making them
+      inactive leaves the login as it was (the membership and `clinics_for_user()` unchanged;
+      integration).
+- [ ] A provider made inactive: not a column on a day without their visits, not a choice in the
+      drawer, a booking with them refused (`provider_not_bookable`), their visits ahead still booked
+      and on the calendar, and the toast names how many; made active again, all of it back
+      (integration; e2e, three browsers).
+- [ ] A double click on a row's Make inactive (80, 150 and 250 ms between the clicks) changes one
+      provider, once (e2e, three browsers).
 - [ ] Every change writes one audit row of ids; only `settings.manage`; every new action in
-      `action-permissions.test.ts`; clinic B's provider by its id refused (unit, integration).
+      `action-permissions.test.ts`; clinic B's provider by its id refused, nothing written (unit,
+      integration).
 - [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---
 
 ### E01-T09c · Settings: the providers' order and weekly breaks
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T09b (the Providers tab)
-- **Read:** `scope` (Settings) · `data-model` (`provider_breaks`) · D-018, D-114, D-118 ·
-  `handoffs/E01-T09b.md`; refined before it starts
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T09d (the Providers tab and the row
+  buttons with their settle)
+- **Read:** `scope` (Settings) · `data-model` (`provider_breaks`) · D-018, D-114, D-118, D-119 ·
+  `handoffs/E01-T09b.md`, `handoffs/E01-T09d.md`; refined before it starts
 
 **Why.** The calendar's columns follow the clinic's order, and a lunch break is hatched on the grid and
 warned about in the drawer (E01-T05b). Split from E01-T09 (D-118).
