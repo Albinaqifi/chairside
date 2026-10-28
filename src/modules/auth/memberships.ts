@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import type { TenantTransaction } from '@/db/tenant';
 import { isUuid, newId } from '@/lib/ids';
@@ -83,6 +83,22 @@ export async function activeMembership(
     status: row.status === 'disabled' ? 'disabled' : 'active',
     providerId: row.providerId,
   };
+}
+
+/**
+ * The providers of the clinic of this transaction that a membership is linked to (its provider_id),
+ * active or disabled, each once (E01-T09d): Settings locks their kind, which an owner's aftercare
+ * approval follows (D-051; owner, D-118). A disabled membership counts too, as it may be made active
+ * again with its link. Row-Level Security limits the read to the clinic's own memberships; nothing
+ * else of them is read.
+ */
+export async function linkedProviderIds(tx: TenantTransaction): Promise<string[]> {
+  const rows = await tx
+    .selectDistinct({ providerId: memberships.providerId })
+    .from(memberships)
+    .where(isNotNull(memberships.providerId))
+    .orderBy(asc(memberships.providerId));
+  return rows.flatMap((row) => (row.providerId === null ? [] : [row.providerId]));
 }
 
 /**

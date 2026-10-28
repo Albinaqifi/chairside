@@ -277,7 +277,25 @@
       "colourSample": "A visit on the calendar",
       "add": "Add provider",
       "adding": "Adding…",
-      "added": "Provider added."
+      "added": "Provider added.",
+      "inactiveName": "{name}, inactive",
+      "edit": "Edit",
+      "editTitle": "Edit {name}",
+      "kindLocked": "A login is linked to this provider, so the kind stays as it is: what the login may do follows it.",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Provider saved.",
+      "deactivate": "Make inactive",
+      "deactivating": "Making inactive…",
+      "deactivated": "Provider made inactive.",
+      "deactivatedWithVisits": "Provider made inactive. {count, plural, one {# visit ahead stays booked with them.} other {# visits ahead stay booked with them.}}",
+      "activate": "Make active",
+      "activating": "Making active…",
+      "activated": "Provider made active again.",
+      "providerLinked": "A login is linked to this provider, so its kind cannot be changed. Keep the kind as it was.",
+      "notFound": "This provider is no longer there. Reload the page to see the providers as they are now.",
+      "alreadyInactive": "This provider is already inactive: it was changed meanwhile, in another tab or by someone else. Reload the page to see it as it is now.",
+      "alreadyActive": "This provider is already active: it was changed meanwhile, in another tab or by someone else. Reload the page to see it as it is now."
     }
   },
   "placeholder": {
