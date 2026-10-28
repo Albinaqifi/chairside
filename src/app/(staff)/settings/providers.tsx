@@ -3,7 +3,12 @@
 import { useTranslations } from 'next-intl';
 import { useEffect, useId, useRef, useState, type Ref } from 'react';
 import { StaffField, StaffForm } from '@/app/_lib/staff-form';
-import type { ClinicProvider, ProviderDirection, ProviderKind } from '@/modules/scheduling';
+import type {
+  ClinicBreak,
+  ClinicProvider,
+  ProviderDirection,
+  ProviderKind,
+} from '@/modules/scheduling';
 import { Badge } from '@/ui/badge';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTrigger } from '@/ui/dialog';
@@ -17,6 +22,7 @@ import {
   deactivateProvider,
   moveProvider,
 } from './provider-actions';
+import { ProviderBreaks } from './provider-breaks';
 import { FIRST_HUE, HUE_MAX, hueStyle, KIND_CHOICES } from './provider-fields';
 
 /**
@@ -47,14 +53,16 @@ const NEW_PROVIDER: ProviderValues = {
 };
 
 /**
- * The Providers tab (E01-T09b, E01-T09d, E01-T09c; the demo has no such screen,
+ * The Providers tab (E01-T09b, E01-T09d, E01-T09c, E01-T09e; the demo has no such screen,
  * design-reference.md): the clinic's providers in the calendar's order, each with its name, short
  * name, kind, chair and a swatch of its colour; an inactive one says so. Each row has an Up and a
- * Down (not the first's Up, nor the last's Down), an Edit, which opens the provider's form in a
- * dialog, and a Make inactive or Make active, each a StaffForm of its own with the id hidden, as the
+ * Down (not the first's Up, nor the last's Down), a Breaks, which opens the provider's weekly breaks
+ * in a dialog (./provider-breaks.tsx), an Edit, which opens the provider's form in a dialog, and a
+ * Make inactive or Make active, each a StaffForm of its own with the id hidden, as the
  * Treatment types tab's rows. Under the list, under a line, the form that adds one. Its page keys
  * it by the clinic (D-098), so a render for another clinic starts it from that clinic's providers.
  * `linked`: the providers a login is linked to, whose kind the Edit dialog locks (owner, D-118).
+ * `breaks`: every weekly break of the clinic, of which each row's dialog lists its provider's.
  *
  * Every form here is a StaffForm: it sends the frame's clinic (D-092) and keeps nothing in the
  * browser (D-093), no field asking for an `autocomplete` of its own. When one is done, the action
@@ -69,9 +77,11 @@ const NEW_PROVIDER: ProviderValues = {
 export function Providers({
   providers,
   linked,
+  breaks,
 }: {
   providers: readonly ClinicProvider[];
   linked: readonly string[];
+  breaks: readonly ClinicBreak[];
 }) {
   const t = useTranslations('settings.providers');
   const heading = useRef<HTMLHeadingElement>(null);
@@ -114,6 +124,7 @@ export function Providers({
               isFirst={index === 0}
               isLast={index === providers.length - 1}
               kindLocked={linked.includes(provider.id)}
+              breaks={breaks.filter((each) => each.providerId === provider.id)}
               onStateChanged={() => heading.current?.focus()}
             />
           ))}
@@ -136,7 +147,7 @@ export function Providers({
 
 /**
  * One provider: a swatch of its colour, its name, "Inactive" when it is, and a muted line of its
- * short name, kind and chair; its Edit; and its Make inactive or Make active, a StaffForm of its own
+ * short name, kind and chair; its Breaks and its Edit; and its Make inactive or Make active, a StaffForm of its own
  * whose only field is the id, hidden. A group named by the provider (", inactive" for an inactive
  * one, as two may share a name), so each button is read with the provider it acts on.
  *
@@ -149,12 +160,14 @@ function ProviderRow({
   isFirst,
   isLast,
   kindLocked,
+  breaks,
   onStateChanged,
 }: {
   provider: ClinicProvider;
   isFirst: boolean;
   isLast: boolean;
   kindLocked: boolean;
+  breaks: readonly ClinicBreak[];
   onStateChanged: () => void;
 }) {
   const t = useTranslations('settings.providers');
@@ -179,13 +192,14 @@ function ProviderRow({
         </div>
         <div className="flex flex-wrap items-start justify-end gap-2">
           {/* Up and Down first, the row's right edge being Make inactive's: the first row has no Up
-              and the last no Down, and Edit and the state button stay where they are. */}
+              and the last no Down, and Breaks, Edit and the state button stay where they are. */}
           {isFirst ? null : (
             <MoveProvider provider={provider} direction="up" onMoved={onStateChanged} />
           )}
           {isLast ? null : (
             <MoveProvider provider={provider} direction="down" onMoved={onStateChanged} />
           )}
+          <ProviderBreaks provider={provider} breaks={breaks} />
           <EditProvider provider={provider} kindLocked={kindLocked} />
           {/* Keyed by the state, so a provider made inactive gets a new form, its answer not carried. */}
           {provider.active ? (

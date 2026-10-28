@@ -74,7 +74,7 @@ function inFrame(children: ReactElement): string {
 }
 
 const renderTab = (providers: readonly ClinicProvider[], linked: readonly string[] = []) =>
-  inFrame(createElement(Providers, { providers, linked }));
+  inFrame(createElement(Providers, { providers, linked, breaks: [] }));
 
 /** The colour field alone, in a StaffForm as the tab has it, starting at `hue`. */
 function renderColour(hue?: number): string {
@@ -157,8 +157,8 @@ describe('the Providers tab, as the server sends it (E01-T09b)', () => {
     const text = textOf(renderTab(PROVIDERS));
     expect(text).toMatch(
       // Each row's buttons after its details since E01-T09d; Up and Down first since E01-T09c (the
-      // first row has no Up, the last no Down).
-      /Mira Testova Dr\. Testova · Dentist · Chair 1 Down Edit Make inactive Petar Primerov Inactive Dr\. Primerov · Other · Chair 3 Up Down Edit Make active Ana Probna Ana · Hygienist · Hygiene room Up Edit Make inactive/,
+      // first row has no Up, the last no Down); Breaks before Edit since E01-T09e.
+      /Mira Testova Dr\. Testova · Dentist · Chair 1 Down Breaks Edit Make inactive Petar Primerov Inactive Dr\. Primerov · Other · Chair 3 Up Down Breaks Edit Make active Ana Probna Ana · Hygienist · Hygiene room Up Breaks Edit Make inactive/,
     );
     expect(text).not.toContain(t.none);
   });
@@ -242,8 +242,9 @@ describe("each row's buttons, and the edit's fields (E01-T09d)", () => {
       ]);
       expect(row?.inside).toMatch(new RegExp(`<button[^>]*type="submit"[^>]*>${label}</button>`));
     });
+    // Two dialogs a row since E01-T09e: its Breaks and its Edit.
     const edits = tags(html, 'button').filter((button) => button.get('aria-haspopup') === 'dialog');
-    expect(edits).toHaveLength(3);
+    expect(edits).toHaveLength(6);
     expect(edits.every((edit) => edit.get('type') === 'button')).toBe(true);
     // D-093: every form keeps nothing in the browser.
     expect(all.map((form) => tags(form.whole, 'form')[0]?.get('autocomplete'))).toEqual(
@@ -377,9 +378,9 @@ describe("each row's Up and Down (E01-T09c)", () => {
   it('the first row has no Up and the last no Down; every other row has both, before Edit and the state button', () => {
     expect(buttonsByRow(renderTab(PROVIDERS))).toEqual(
       new Map([
-        ['Mira Testova', [t.moveDown, t.edit, t.deactivate]],
-        ['Petar Primerov, inactive', [t.moveUp, t.moveDown, t.edit, t.activate]],
-        ['Ana Probna', [t.moveUp, t.edit, t.deactivate]],
+        ['Mira Testova', [t.moveDown, t.breaks, t.edit, t.deactivate]],
+        ['Petar Primerov, inactive', [t.moveUp, t.moveDown, t.breaks, t.edit, t.activate]],
+        ['Ana Probna', [t.moveUp, t.breaks, t.edit, t.deactivate]],
       ]),
     );
   });
@@ -416,6 +417,8 @@ describe("each row's Up and Down (E01-T09c)", () => {
 
   it('a single provider has neither; none sits outside the rows', () => {
     const html = renderTab([PROVIDERS[0]!]);
-    expect(buttonsByRow(html)).toEqual(new Map([['Mira Testova', [t.edit, t.deactivate]]]));
+    expect(buttonsByRow(html)).toEqual(
+      new Map([['Mira Testova', [t.breaks, t.edit, t.deactivate]]]),
+    );
   });
 });

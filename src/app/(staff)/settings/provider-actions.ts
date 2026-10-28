@@ -5,16 +5,18 @@ import { z } from 'zod';
 import { refuse, staffAction, staffRead } from '@/app/_lib/actions';
 import * as auth from '@/modules/auth';
 import * as scheduling from '@/modules/scheduling';
+import { minutesOfTimeValue } from './opening-hours';
 
 /*
- * The Providers tab (E01-T09b, E01-T09d, E01-T09c): the owner's alone (settings.manage, scope-v1.md), as every
+ * The Providers tab (E01-T09b, E01-T09d, E01-T09c, E01-T09e): the owner's alone (settings.manage, scope-v1.md), as every
  * Settings action. What the input alone settles is the schema's, shown at its field (D-098): a name,
  * short name or chair empty or too long, a kind the select does not offer, a hue that is no whole
  * number of degrees from 0 to 359. A provider's name may repeat, as two people may share one. What
  * needs the clinic's rows is the handler's refusal, shown above the button: a kind changed on a
  * provider linked to a login (provider_linked), a provider not there (not_found), a state it has
  * already (already_inactive, already_active), a move with no place that way (already_first,
- * already_last). Each change writes one audit row about the provider, of
+ * already_last), a break that overlaps another of the provider's that weekday (break_overlaps), a
+ * break already removed (not_found). Each change writes one audit row about the provider, of
  * ids alone: a provider's name and chair are no patient's, and never logged either.
  */
 
@@ -182,5 +184,100 @@ export const activateProvider = staffAction(
     if (!set.ok) return refuse(set.code);
     refresh();
     return { id: input.providerId };
+  },
+);
+
+/**
+ * The clinic's weekly breaks, of every provider, for the Settings page (forPage): the Breaks dialog of
+ * each row lists its provider's. A break's label is no patient's: no audit row.
+ */
+export const readBreaks = staffRead(
+  { permission: 'settings.manage', input: z.object({}) },
+  async ({ tx }) => scheduling.clinicBreaks(tx),
+);
+
+/**
+ * A weekday of the form: the select's value, a text of one digit 1 to 7 (Monday first), read as the
+ * ISO weekday. Another text is a problem at the field; nothing here throws (CLAUDE.md, Logs).
+ */
+const weekday = z
+  .string()
+  .regex(/^[1-7]$/)
+  .transform(Number);
+
+/**
+ * A time of the form: the select's value, `HH:MM` (opening-hours.ts). Kept as that text, which the
+ * scheduling module stores as a time, never read through a clock.
+ */
+const timeOfDay = z.string().superRefine((value, ctx) => {
+  if (minutesOfTimeValue(value) === null) {
+    ctx.addIssue({ code: 'invalid_format', format: 'time', message: 'time' });
+  }
+});
+
+const breakFields = z
+  .object({
+    providerId: z.uuid(),
+    weekday,
+    starts: timeOfDay,
+    ends: timeOfDay,
+    label: requiredText(scheduling.PROVIDER_BREAK_LABEL_MAX),
+  })
+  // The end after the start is a problem of the end's field. It stays quiet when a time above is no
+  // time, which has its own problem.
+  .superRefine((fields, ctx) => {
+    const starts = minutesOfTimeValue(fields.starts);
+    const ends = minutesOfTimeValue(fields.ends);
+    if (starts !== null && ends !== null && ends <= starts) {
+      ctx.addIssue({ code: 'custom', path: ['ends'], message: 'ends' });
+    }
+  });
+
+/**
+ * Adds a weekly break to a provider, active or not (scheduling.addProviderBreak), with one audit row,
+ * provider.break_added, about the new break (metadata: the provider's id and the weekday). The
+ * calendar hatches it on that weekday and the booking drawer warns about it through what they read
+ * today (breaksOnWeekday). Refused, with nothing written: not_found (no provider of the clinic by
+ * that id), break_overlaps (another break of the provider that weekday: back to back is fine).
+ */
+export const addBreak = staffAction(
+  {
+    permission: 'settings.manage',
+    input: breakFields,
+    audit: {
+      action: 'provider.break_added',
+      entityType: 'provider_break',
+      entityId: { result: 'id' },
+      metadata: ({ input }) => ({ providerId: input.providerId, weekday: input.weekday }),
+    },
+  },
+  async ({ input, tx, now }) => {
+    const added = await scheduling.addProviderBreak(tx, input, now);
+    if (!added.ok) return refuse(added.code);
+    refresh();
+    return { id: added.id };
+  },
+);
+
+/**
+ * Removes a weekly break (scheduling.removeProviderBreak), sent by its row's Remove with the break's
+ * id hidden, with one audit row, provider.break_removed, about the break. A break already gone (a
+ * second press, another tab) is refused as not_found, with no audit row.
+ */
+export const removeBreak = staffAction(
+  {
+    permission: 'settings.manage',
+    input: z.object({ breakId: z.uuid() }),
+    audit: {
+      action: 'provider.break_removed',
+      entityType: 'provider_break',
+      entityId: ({ input }) => input.breakId,
+    },
+  },
+  async ({ input, tx }) => {
+    const removed = await scheduling.removeProviderBreak(tx, input.breakId);
+    if (!removed.ok) return refuse(removed.code);
+    refresh();
+    return { id: input.breakId };
   },
 );

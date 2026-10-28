@@ -14,7 +14,7 @@ import { ClinicDetailsForm } from './clinic-details-form';
 import { ClosedDays } from './closed-days';
 import { weekValues } from './opening-hours';
 import { OpeningHoursForm } from './opening-hours-form';
-import { readLinkedProviders, readProviders } from './provider-actions';
+import { readBreaks, readLinkedProviders, readProviders } from './provider-actions';
 import { Providers } from './providers';
 import { readTreatmentTypes } from './treatment-type-actions';
 import { TreatmentTypes } from './treatment-types';
@@ -57,6 +57,10 @@ export default async function SettingsPage() {
   const linked = await readLinkedProviders.forPage({});
   if (!linked.ok) {
     throw new Error(`The linked providers could not be read (${linked.error.code}).`);
+  }
+  const breaks = await readBreaks.forPage({});
+  if (!breaks.ok) {
+    throw new Error(`The providers' breaks could not be read (${breaks.error.code}).`);
   }
   const catalogue = await readTreatmentTypes.forPage({});
   if (!catalogue.ok) {
@@ -123,6 +127,7 @@ export default async function SettingsPage() {
               key={staff.clinic.clinicId}
               providers={providers.value}
               linked={linked.value}
+              breaks={breaks.value}
             />
           </div>
         </TabsContent>

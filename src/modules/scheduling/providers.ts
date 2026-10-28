@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gt, notInArray, sql, type Column } from 'drizzle-orm';
+import { and, asc, count, eq, gt, lt, notInArray, sql, type Column } from 'drizzle-orm';
 import type { TenantTransaction } from '@/db/tenant';
 import { appointments, providerBreaks, providers } from './schema';
 
@@ -74,10 +74,10 @@ function minutesOfTime(column: Column) {
 
 /*
  * The providers as Settings keeps them (E01-T09b, E01-T09d): every provider of the clinic with its
- * kind, one added, one changed, one made inactive and active again, one moved up or down (E01-T09c);
- * the breaks are E01-T09e. Never deleted (data-model.md: the app role has no DELETE on the table). A
- * provider's name, short name and chair are no patient's, but never go in a log or an error's
- * message either.
+ * kind, one added, one changed, one made inactive and active again, one moved up or down (E01-T09c),
+ * and their weekly breaks (E01-T09e). A provider is never deleted (data-model.md: the app role has no
+ * DELETE on the table); a break is. A provider's name, short name, chair and a break's label are no
+ * patient's, but never go in a log or an error's message either.
  */
 
 /** A provider's kinds, as the table's check names them (data-model.md). */
@@ -286,6 +286,151 @@ export async function moveProvider(
     await tx.update(providers).set({ sortOrder: place, updatedAt: now }).where(thisProvider(id));
   }
   return { ok: true };
+}
+
+/** The longest a break's label may be, in characters, once trimmed. */
+export const PROVIDER_BREAK_LABEL_MAX = 40;
+
+/**
+ * One weekly break as Settings lists it (E01-T09e): the provider's, the ISO weekday, its two times as
+ * `HH:MM` values (`HH:MM:SS` when a stored time has seconds), local times in the clinic's zone, and
+ * its label. The calendar reads breaks as minutes (ProviderBreak); this is the dialog's own read.
+ */
+export interface ClinicBreak {
+  id: string;
+  providerId: string;
+  weekday: number;
+  starts: string;
+  ends: string;
+  label: string;
+}
+
+/** What Settings sets of a new break. */
+export interface NewProviderBreak {
+  providerId: string;
+  /** ISO weekday, 1 = Monday … 7 = Sunday. */
+  weekday: number;
+  /** `HH:MM`, before `ends`. */
+  starts: string;
+  /** `HH:MM`, after `starts`; 24:00 is the end of the day. */
+  ends: string;
+  /** Trimmed here; not empty, at most PROVIDER_BREAK_LABEL_MAX characters. */
+  label: string;
+}
+
+/** Every break of the clinic, by weekday, start and id, of active and inactive providers alike. */
+export async function clinicBreaks(tx: TenantTransaction): Promise<ClinicBreak[]> {
+  return tx
+    .select({
+      id: providerBreaks.id,
+      providerId: providerBreaks.providerId,
+      weekday: providerBreaks.weekday,
+      starts: timeText(providerBreaks.starts),
+      ends: timeText(providerBreaks.ends),
+      label: providerBreaks.label,
+    })
+    .from(providerBreaks)
+    .orderBy(asc(providerBreaks.weekday), asc(providerBreaks.starts), asc(providerBreaks.id));
+}
+
+/** A `time` column as its value text: `HH:MM`, or `HH:MM:SS` when it has seconds. */
+function timeText(column: Column) {
+  return sql<string>`regexp_replace(${column}::text, ':00$', '')`;
+}
+
+/**
+ * Why a break was not added: no provider of the clinic by that id, or a break of the same provider
+ * that weekday it overlaps. Back to back is no overlap: one that ends at 13:00 and one that starts
+ * at 13:00 are fine.
+ */
+export type AddProviderBreakResult =
+  { ok: true; id: string } | { ok: false; code: 'not_found' | 'break_overlaps' };
+
+/**
+ * Adds a weekly break to a provider, active or not, created and updated at `now`. The provider's row is
+ * locked first, as changeProvider locks it, so two adds at once for one provider are one after the
+ * other and the second reads the first: the overlap rule is kept here, not by a constraint (D-120),
+ * and of two overlapping adds at once one is written. Refused, nothing written: `not_found`,
+ * `break_overlaps`. A value the caller's schema should have refused (the label, the weekday, the
+ * times, `ends` not after `starts`) is an Error, with nothing of it in the message.
+ */
+export async function addProviderBreak(
+  tx: TenantTransaction,
+  fields: NewProviderBreak,
+  now: Date,
+): Promise<AddProviderBreakResult> {
+  const values = storableBreak(fields);
+  const [locked] = await tx
+    .select({ id: providers.id })
+    .from(providers)
+    .where(thisProvider(values.providerId))
+    .for('update');
+  if (!locked) return { ok: false, code: 'not_found' };
+  const [clash] = await tx
+    .select({ id: providerBreaks.id })
+    .from(providerBreaks)
+    .where(
+      and(
+        eq(providerBreaks.clinicId, sql`current_clinic_id()`),
+        eq(providerBreaks.providerId, values.providerId),
+        eq(providerBreaks.weekday, values.weekday),
+        lt(providerBreaks.starts, values.ends),
+        gt(providerBreaks.ends, values.starts),
+      ),
+    )
+    .limit(1);
+  if (clash) return { ok: false, code: 'break_overlaps' };
+  const [added] = await tx
+    .insert(providerBreaks)
+    .values({ clinicId: sql`current_clinic_id()`, ...values, createdAt: now, updatedAt: now })
+    .returning({ id: providerBreaks.id });
+  if (!added) throw new Error('addProviderBreak: the break was not written');
+  return { ok: true, id: added.id };
+}
+
+/**
+ * Removes a break of the clinic by its id and gives its provider's id; `not_found` when there is none,
+ * as when a second press comes after the first's answer. Breaks are deleted (data-model.md).
+ */
+export async function removeProviderBreak(
+  tx: TenantTransaction,
+  breakId: string,
+): Promise<{ ok: true; providerId: string } | { ok: false; code: 'not_found' }> {
+  const [removed] = await tx
+    .delete(providerBreaks)
+    .where(
+      and(eq(providerBreaks.clinicId, sql`current_clinic_id()`), eq(providerBreaks.id, breakId)),
+    )
+    .returning({ providerId: providerBreaks.providerId });
+  return removed ? { ok: true, providerId: removed.providerId } : { ok: false, code: 'not_found' };
+}
+
+/** A time of day as seconds from midnight, or null when it is no `HH:MM` or `HH:MM:SS`, or 24:00. */
+function secondsOfDay(value: string): number | null {
+  const match = /^(?:([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?|(24):00(?::00)?)$/.exec(value);
+  if (!match) return null;
+  if (match[4] !== undefined) return 24 * 3600;
+  return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3] ?? 0);
+}
+
+/** The values to store, the label trimmed, when they can be stored; an Error when not. */
+function storableBreak(fields: NewProviderBreak): NewProviderBreak {
+  const label = fields.label.trim();
+  const starts = secondsOfDay(fields.starts);
+  const ends = secondsOfDay(fields.ends);
+  if (
+    label === '' ||
+    label.length > PROVIDER_BREAK_LABEL_MAX ||
+    !Number.isInteger(fields.weekday) ||
+    fields.weekday < 1 ||
+    fields.weekday > 7 ||
+    starts === null ||
+    ends === null ||
+    ends <= starts
+  ) {
+    throw new Error('addProviderBreak: the break cannot be stored');
+  }
+  return { ...fields, label };
 }
 
 /** The statuses of a visit that will not happen, or has: none of them is a visit ahead. */
