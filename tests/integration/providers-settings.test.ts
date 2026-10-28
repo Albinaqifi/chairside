@@ -468,3 +468,70 @@ describe('only settings.manage reads or adds (acceptance 5)', () => {
     expect(await providerAudit(clinicB)).toEqual([]);
   });
 });
+
+// Tester, E01-T09b: cases the builder's file did not have.
+describe('tester: a clinic with no provider, and a crafted request with fields the form lacks', () => {
+  it('a clinic with no provider at all (as clinic:create leaves it): no column, no choice; its first provider added is the one column and choice, sort_order 0, and books', async () => {
+    as('owner');
+    const empty = await readCalendarDay(clinicA, { day: DAY });
+    if (!empty.ok) throw new Error('not read');
+    expect(empty.value.view.columns).toEqual([]);
+    expect(bookableProviders(empty.value.view.columns)).toEqual([]);
+    const added = await addProvider(clinicA, providerForm({ shortName: 'Dr. Prva' }));
+    if (!added.ok) throw new Error('not added');
+    expect((await providersOf(clinicA)).map((row) => [row.id, row.sort_order])).toEqual([
+      [added.value.id, 0],
+    ]);
+    const read = await readCalendarDay(clinicA, { day: DAY });
+    if (!read.ok) throw new Error('not read');
+    expect(read.value.view.columns.map((column) => column.providerId)).toEqual([added.value.id]);
+    expect(bookableProviders(read.value.view.columns)).toEqual([
+      { id: added.value.id, shortName: 'Dr. Prva' },
+    ]);
+    const booked = await bookAppointment(clinicA, bookingForm(added.value.id));
+    expect(booked).toMatchObject({ ok: true, value: { providerId: added.value.id } });
+  });
+
+  it("fields the form does not have, crafted in (an id, clinic B's id, inactive, an order, a moment): ignored; the provider is clinic A's, active, last, a new id", async () => {
+    await setUpProvider(clinicA, { name: 'Ana Probna', sortOrder: 4 });
+    as('owner', clinicA);
+    const craftedId = newId();
+    const form = providerForm({ name: 'Mira Testova' });
+    for (const [name, value] of Object.entries({
+      id: craftedId,
+      clinicId: clinicB,
+      clinic_id: clinicB,
+      active: 'false',
+      sortOrder: '-9',
+      sort_order: '-9',
+      createdAt: '2001-01-01T00:00:00Z',
+    })) {
+      form.append(name, value);
+    }
+    const added = await addProvider(clinicA, form);
+    if (!added.ok) throw new Error(`refused: ${added.error.code}`);
+    expect(added.value.id).not.toBe(craftedId);
+    const row = (await providersOf(clinicA)).find((each) => each.name === 'Mira Testova');
+    expect(row).toMatchObject({ id: added.value.id, active: true, sort_order: 5 });
+    expect(row!.created_at.getFullYear()).toBeGreaterThan(2001);
+    expect(await providersOf(clinicB)).toEqual([]);
+    expect(await providerAudit(clinicB)).toEqual([]);
+  });
+
+  it('a name, short name and chair in Cyrillic at their limits (100, 12, 100 characters): stored as typed', async () => {
+    as('owner');
+    const fields = {
+      name: 'Ж'.repeat(100),
+      shortName: 'Њ'.repeat(12),
+      chairLabel: 'Ч'.repeat(100),
+    };
+    const added = await addProvider(clinicA, providerForm(fields));
+    if (!added.ok) throw new Error(`refused: ${added.error.code}`);
+    expect(await providersOf(clinicA)).toMatchObject([
+      { name: fields.name, short_name: fields.shortName, chair_label: fields.chairLabel },
+    ]);
+    const over = await addProvider(clinicA, providerForm({ shortName: 'Њ'.repeat(13) }));
+    expect(over).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+    expect(await providersOf(clinicA)).toHaveLength(1);
+  });
+});
