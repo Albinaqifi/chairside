@@ -34,7 +34,9 @@ export interface ProfileRead {
 export const readPatient = staffRead(
   {
     permission: 'every_member',
-    input: z.object({ patientId: z.uuid() }),
+    // Lower case: Postgres reads a uuid in any case, but the audit row stores the text, and a later
+    // "who viewed this patient" (`entity_id = <id>`) must find a view however the address was typed.
+    input: z.object({ patientId: z.uuid().transform((id) => id.toLowerCase()) }),
     audit: {
       action: 'patient.viewed',
       entityType: 'patient',
