@@ -1326,6 +1326,14 @@ Numbers' own error texts (D-118: no number field here).
 
 ### E01-T09b · Settings: providers, the list and add
 
+**As built** (Done 2026-10-28, PR #82): as planned, about 470 lines of product code with comments
+against the 650 estimated, no fix round, no finding of the reviewer, the tester or the delta review.
+Also: a provider's name may repeat (two people may share one), so the handler refuses nothing and the
+form has no `refusals`; the hue "360" is `too_big` and reads "This is too long." (the number texts wait,
+D-118), only a crafted request can send it. The layout and the plain colour range, which the demo
+lacks, are kept (owner, 2026-10-28); a hue track on the range is struck. The text below is the plan as
+it was.
+
 - **Role:** builder · **Risk:** normal (a Settings tab and its actions, as E01-T09a's; no wrapper,
   `StaffForm`, `StaffField`, permission, policy or table change) · **Depends on:** E01-T09a (the tab
   pattern it repeats), E01-T04a (the calendar its criteria name) — both Done
@@ -1385,41 +1393,56 @@ the breaks (E01-T09c). Linking a login to a provider (Staff, E04-T02). A provide
 - **Role:** builder · **Risk:** normal (a Settings tab's row actions; the kind of a provider linked to
   a login is locked, so no one's permission changes, owner, D-118; no wrapper, `StaffForm`, permission,
   policy or table change) · **Depends on:** E01-T09b (the Providers tab), E01-T09a (the row buttons and
-  their settle)
+  their settle) — both Done
 - **Read:** `scope` (Settings) · `data-model` (`memberships`, `providers`) · D-051, D-091, D-093,
-  D-098, D-118, D-119 · the architect section of `handoffs/E01-T09b.md`, and E01-T09b's builder section
-  once it exists
+  D-098, D-118, D-119 · the architect sections of `handoffs/E01-T09b.md` (the Ready pass and the Done
+  pass, 2026-10-28) and its builder section
 
 **Why.** A clinic's chairs and people change: a new name, a dentist who leaves. Split from E01-T09b
-(D-119). About 500 lines of product code with comments.
+(D-119). About 550 lines of product code with comments, sized from E01-T09b's measured 470 for the add
+half and E01-T09a's 940 for the whole of a tab; D-119 revisits the split above 650.
 
 **Do.**
-- **Edit** in each row: the fields of the add form in a dialog (E01-T09a's), colour range and tints as
-  the add form's.
+- **Edit** in each row, inactive ones too (a leaving person's name may change): the fields of the add
+  form in a dialog (E01-T09a's, `EditType`), colour range and tints as the add form's (`ColourField`,
+  exported by `providers.tsx`; its `ProviderFields` starts empty and takes the values to start with, as `TypeFields`
+  does).
 - **A provider linked to a login** (`memberships.provider_id`, a membership of the clinic active or
   disabled): the kind is shown and cannot be changed, with a line that says why; the handler refuses a
   kind that differs from the stored one (`provider_linked`, above the button), as an owner's aftercare
   approval follows a linked dentist's kind (D-051, owner, D-118). A disabled select sends nothing, so the
   dialog sends the kind in a hidden field and the handler accepts the stored one with the other fields.
-  The auth module says which of the clinic's providers are linked (a function through its index; module
-  rule 1); a crafted request cannot skip the check.
+  The auth module says which of the clinic's providers are linked: a function through its index that
+  takes the `tx` (module rule 1; the app role may read `memberships`, under its policy), whose answer
+  the Settings page reads in a `staffRead` of its own (`readProviders` and its tests stay as they are)
+  and hands to the tab; the handler reads it again in its own transaction, so a crafted request cannot
+  skip the check.
 - **Make inactive and active again**, never delete: a `StaffForm` of its own in the row with the id
   hidden, as E01-T09a's, with the same double click guard (the list takes no pointer click for
-  `SETTLE_MS` after its rows change). A second press on a state is refused (`already_inactive`,
-  `already_active`), no audit row.
+  `SETTLE_MS` after its rows change: here the row does not move, but its button turns into Make active
+  under the pointer, which is the same hazard). The keyboard goes to the section's heading after a
+  change, as there. A second press on a state is refused (`already_inactive`, `already_active`), no
+  audit row; the state is set by an update that holds only for the other state, so two presses at once
+  change it once.
 - **An inactive provider** gets no new booking (`provider_not_bookable`, as today) and keeps every
-  appointment. One with visits ahead (a start from `now` on, status not cancelled or no-show) is made
-  inactive, and the toast says how many stay booked (owner, D-118): the action's answer carries the
-  count and the row form's `onDone(value)` shows it with `useToast()` in place of `doneMessage`'s (one
-  toast shows at a time, the next replaces it; `StaffForm` is not changed, D-093). With none ahead,
+  appointment. A provider with visits ahead is made inactive and the toast says how many stay booked
+  (owner, D-118). A visit ahead is one that is not cancelled, no-show or completed and ends after
+  `now` (as `lastAndNextVisits` counts a visit under way). The action's answer carries the count and
+  the row form's `onDone(value)` shows it with `useToast()` in place of `doneMessage`'s (`StaffForm`
+  shows `doneMessage` first and calls `onDone` after it; one toast shows at a time, the next replaces
+  it; `StaffForm` is not changed, D-093); the text is an ICU plural in `en.json`. With none ahead,
   `doneMessage` stands. The calendar shows them on their days, as it does today. A linked one is made
-  inactive too, and its login keeps its access (owner, D-118): nothing of `memberships` changes.
+  inactive too, and its login keeps its access (owner, D-118): nothing of `memberships` changes, and the
+  calendar already shows every column on a day where a member's own column is missing (`shownColumns`).
 - `scheduling` functions through its index: change, set active, the count of visits ahead (`now`
   passed in); each sets `updated_at` from `now`. Audit rows of ids: `provider.updated`,
   `provider.deactivated`, `provider.activated`.
 
 **Out of scope.** The order and the breaks (E01-T09c). Linking a login to a provider and its access
-(Staff, E04-T02). Moving a leaving provider's visits (D-118, "Revisit if").
+(Staff, E04-T02). Moving a leaving provider's visits (D-118, "Revisit if"). The add form's double click
+(Discovered, `speed`, → E01-T11): repeat the pattern, do not fix it, and it is no finding of this task.
+A shared hook for the settle: it is copied a third time as the treatment types' is, and the two tabs'
+files stay as they are.
 
 **Acceptance.**
 - [ ] A provider's name, short name, kind (when not linked), chair and colour changed on the tab show
@@ -1428,11 +1451,12 @@ the breaks (E01-T09c). Linking a login to a provider (Staff, E04-T02). A provide
 - [ ] A linked provider's kind cannot be changed (the field locked; a crafted request refused as
       `provider_linked`, nothing written); the same kind saves with the other fields; making them
       inactive leaves the login as it was (the membership and `clinics_for_user()` unchanged;
-      integration).
+      integration). The Edit of a seeded linked provider shows the kind locked (e2e, opened and closed,
+      nothing saved).
 - [ ] A provider made inactive: not a column on a day without their visits, not a choice in the
       drawer, a booking with them refused (`provider_not_bookable`), their visits ahead still booked
-      and on the calendar, and the toast names how many; made active again, all of it back
-      (integration; e2e, three browsers).
+      and on the calendar, and the toast names how many; a cancelled, no-show or past visit is not
+      counted; made active again, all of it back (integration; e2e, three browsers).
 - [ ] A double click on a row's Make inactive (80, 150 and 250 ms between the clicks) changes one
       provider, once (e2e, three browsers).
 - [ ] Every change writes one audit row of ids; only `settings.manage`; every new action in
