@@ -20,13 +20,16 @@ export {
 // E01-T06a: the appointment state machine, the only writer of an appointment's status.
 export { appointmentChanged, type AppointmentChanged, type AppointmentChangedHook } from './events';
 export {
+  allowedActions,
   nextAppointmentStatus,
   STATUS_ACTIONS,
+  statusFactsOf,
   type NextStatus,
   type StatusAction,
   type StatusActor,
   type StatusFacts,
   type StatusRefusal,
+  type VisitMoments,
 } from './status-machine';
 export {
   CANCEL_REASON_MAX,

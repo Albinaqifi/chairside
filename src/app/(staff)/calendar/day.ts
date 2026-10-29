@@ -5,6 +5,7 @@ import type {
   DayAppointment,
   Provider,
   ProviderBreak,
+  StatusAction,
   TreatmentType,
 } from '@/modules/scheduling';
 import type { ClosedDay, OpeningHours } from '@/modules/tenancy';
@@ -90,10 +91,16 @@ export interface AppointmentBlock extends Placed {
   /** When it starts and ends, ISO: the page shows the time in the clinic's zone. */
   startsAt: string;
   endsAt: string;
+  patientId: string;
   patient: PatientName;
   title: string;
   status: AppointmentStatus;
   note: string;
+  /**
+   * What the desk may do to it now: the buttons of its drawer (E01-T06b), as the module computed them
+   * at the read (scheduling.appointmentsOnDay). The browser never works them out.
+   */
+  actions: StatusAction[];
 }
 
 export interface BreakBlock extends Placed {
@@ -224,10 +231,12 @@ function columnOf(
       id: appointment.id,
       startsAt: appointment.startsAt.toISOString(),
       endsAt: appointment.endsAt.toISOString(),
+      patientId: appointment.patientId,
       patient: appointment.patient,
       title: appointment.title,
       status: appointment.status,
       note: appointment.note,
+      actions: appointment.actions,
       ...spanOf(appointment),
       lane: 0,
       lanes: 1,
@@ -396,4 +405,21 @@ function floorHour(minutes: number): number {
 
 function ceilHour(minutes: number): number {
   return Math.ceil(minutes / 60) * 60;
+}
+
+/**
+ * The visit with this id in the day, with the column it is in: any column, shown or not (the
+ * provider filter hides columns, not visits). The appointment drawer shows the visit as the day held
+ * now has it (E01-T06b); null for a visit the day no longer holds, and for a break's id.
+ */
+export function visitById(
+  view: CalendarDayView,
+  appointmentId: string,
+): { block: AppointmentBlock; column: Column } | null {
+  for (const column of view.columns) {
+    for (const block of column.blocks) {
+      if (block.kind === 'appointment' && block.id === appointmentId) return { block, column };
+    }
+  }
+  return null;
 }

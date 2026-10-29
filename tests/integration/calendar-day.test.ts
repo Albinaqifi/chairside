@@ -418,7 +418,14 @@ describe('nothing of the other clinic (acceptance 1)', () => {
         names: [...(await patientNames(tx, [a.ana, a.bojan])).keys()].sort(),
         providers: (await listProviders(tx)).map((p) => p.id),
         breaks: (await breaksOnWeekday(tx, 1)).map((found) => found.providerId),
-        appointments: (await appointmentsOnDay(tx, '2026-10-26', 'Europe/Skopje')).map((v) => v.id),
+        appointments: (
+          await appointmentsOnDay(
+            tx,
+            '2026-10-26',
+            'Europe/Skopje',
+            new Date('2026-10-26T08:00:00Z'),
+          )
+        ).map((v) => v.id),
         hours: (await openingHours(tx)).map((h) => [h.weekday, h.opens, h.closes]),
         closed: await closedDaysBetween(tx, '2026-10-01', '2026-11-30'),
       }));

@@ -71,6 +71,7 @@ function visit(
     endsAt: new Date(startsAt.getTime() + minutes * 60_000),
     startMinute: from,
     endMinute: from + minutes,
+    actions: [],
     patient: { firstName: 'Ana', lastName: 'Brezovska' },
     ...fields,
   };

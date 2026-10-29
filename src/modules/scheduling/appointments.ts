@@ -2,6 +2,7 @@ import { and, asc, gt, lt, sql, type Column } from 'drizzle-orm';
 import type { TenantTransaction } from '@/db/tenant';
 import type { CalendarDay } from '@/lib/calendar-day';
 import { appointments } from './schema';
+import { allowedActions, statusFactsOf, type StatusAction } from './status-machine';
 
 /** An appointment's statuses (D-018); "No reply yet" is derived, not stored (E02-T12). */
 export const APPOINTMENT_STATUSES = [
@@ -33,6 +34,11 @@ export interface DayAppointment {
   startMinute: number;
   /** Minutes from the day's local midnight to its end: past 1440 when it ends the next day. */
   endMinute: number;
+  /**
+   * What the desk may do to it at the `now` of the read: the actions the state machine allows for a
+   * staff actor (allowedActions), from the same facts the change uses. The calendar's buttons.
+   */
+  actions: StatusAction[];
 }
 
 /**
@@ -41,11 +47,15 @@ export interface DayAppointment {
  * day into its two midnights and each moment into its local time (`AT TIME ZONE`), so the computer's
  * zone and the session's play no part. `timeZone` is the clinic's (clinicPlace); the database must
  * know it by that name (D-110).
+ *
+ * `now` is the moment of the read: each appointment's `actions` are those the state machine allows
+ * then (E01-T06b). The confirmation's and the completion's moments are read for that and not returned.
  */
 export async function appointmentsOnDay(
   tx: TenantTransaction,
   day: CalendarDay,
   timeZone: string,
+  now: Date,
 ): Promise<DayAppointment[]> {
   const midnight = sql`${day}::date::timestamp`;
   const dayStarts = sql`(${midnight} at time zone ${timeZone})`;
@@ -62,13 +72,23 @@ export async function appointmentsOnDay(
       note: appointments.note,
       startsAt: appointments.startsAt,
       endsAt: appointments.endsAt,
+      confirmedAt: appointments.confirmedAt,
+      completedAt: appointments.completedAt,
       startMinute: minutesFromMidnight(appointments.startsAt),
       endMinute: minutesFromMidnight(appointments.endsAt),
     })
     .from(appointments)
     .where(and(lt(appointments.startsAt, nextDayStarts), gt(appointments.endsAt, dayStarts)))
     .orderBy(asc(appointments.startsAt), asc(appointments.id));
-  return rows.map((row) => ({ ...row, status: toStatus(row.status) }));
+  return rows.map(({ confirmedAt, completedAt, ...row }) => {
+    const status = toStatus(row.status);
+    const facts = statusFactsOf(
+      { startsAt: row.startsAt, confirmedAt, completedAt },
+      now,
+      timeZone,
+    );
+    return { ...row, status, actions: allowedActions(status, facts) };
+  });
 }
 
 function toStatus(value: string): AppointmentStatus {

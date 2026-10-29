@@ -308,7 +308,7 @@ describe('the row as stored (acceptance 4)', () => {
   it('the calendar then shows it at the local time chosen, on those days too', async () => {
     const id = await booked(newYork, { day: '2026-11-01', startMinute: 11 * H });
     const view = await withTenant(newYork.clinic, (tx) =>
-      scheduling.appointmentsOnDay(tx, '2026-11-01', 'America/New_York'),
+      scheduling.appointmentsOnDay(tx, '2026-11-01', 'America/New_York', NOW),
     );
     expect(view.filter((found) => found.id === id).map((found) => found.startMinute)).toEqual([
       11 * H,
@@ -386,8 +386,8 @@ describe('a clinic in Pacific/Auckland, far ahead of UTC (tester)', () => {
   it('the calendar shows it on its own day at the local time chosen, not on the UTC day', async () => {
     const id = await booked(auckland, { ...inAuckland, day: '2026-09-27', startMinute: 11 * H });
     const [onItsDay, onTheUtcDay] = await withTenant(auckland.clinic, async (tx) => [
-      await scheduling.appointmentsOnDay(tx, '2026-09-27', 'Pacific/Auckland'),
-      await scheduling.appointmentsOnDay(tx, '2026-09-26', 'Pacific/Auckland'),
+      await scheduling.appointmentsOnDay(tx, '2026-09-27', 'Pacific/Auckland', NOW),
+      await scheduling.appointmentsOnDay(tx, '2026-09-26', 'Pacific/Auckland', NOW),
     ]);
     expect(onItsDay.filter((found) => found.id === id).map((found) => found.startMinute)).toEqual([
       11 * H,

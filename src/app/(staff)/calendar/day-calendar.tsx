@@ -111,11 +111,18 @@ export interface DayCalendarProps {
   notice?: ReactNode;
   /** New appointment and its drawer (E01-T05a), at the header's end, after the chips (demo line 237). */
   newAppointment?: ReactNode;
+  /** The appointment drawer (E01-T06b), when a visit is opened: it opens in a portal, so it sits anywhere. */
+  appointmentDrawer?: ReactNode;
   /**
    * A click on an empty slot of an active provider's column (E01-T05c): its provider and quarter
    * hour, and the click's time stamp. The grid takes no click without it.
    */
   onSlot?: (slot: Slot, at: number) => void;
+  /**
+   * A click or Enter on a visit's block (E01-T06b): its id, for the appointment drawer. Without it a
+   * block is text, as it was drawn before the drawer.
+   */
+  onOpen?: (appointmentId: string) => void;
 }
 
 /**
@@ -124,8 +131,8 @@ export interface DayCalendarProps {
  * column per provider shown on an hour grid, with the "now" line on today (E01-T04b), and the
  * statuses' legend. Drawn from what ./calendar-screen.tsx holds: the filter's choice and the clock
  * are the browser's. The header's New appointment opens the booking drawer (E01-T05a), and so does a
- * click on an empty slot of an active provider's column (E01-T05c); a block takes no click yet
- * (E01-T06). Every moment is shown in the clinic's zone
+ * click on an empty slot of an active provider's column (E01-T05c); a visit's block is a button that
+ * opens the appointment drawer (E01-T06b), a break's opens nothing. Every moment is shown in the clinic's zone
  * (next-intl's formatter, D-015); the day, the hours of the grid and the weekday are no moments, so
  * they are formatted in UTC (CLAUDE.md, Dates and times).
  *
@@ -139,7 +146,9 @@ export function DayCalendar({
   nowMinute = null,
   notice = null,
   newAppointment = null,
+  appointmentDrawer = null,
   onSlot,
+  onOpen,
 }: DayCalendarProps) {
   const t = useTranslations();
   const format = useFormatter();
@@ -205,6 +214,7 @@ export function DayCalendar({
         })}
       </p>
       {notice}
+      {appointmentDrawer}
       {view.closed && (
         <p className="mb-3 rounded-control border border-border bg-outside-hours px-3 py-2">
           {view.closed.why === 'closed_day'
@@ -214,7 +224,13 @@ export function DayCalendar({
               })}
         </p>
       )}
-      <DayGrid view={view} columns={columns} nowMinute={nowMinute} onSlot={onSlot} />
+      <DayGrid
+        view={view}
+        columns={columns}
+        nowMinute={nowMinute}
+        onSlot={onSlot}
+        onOpen={onOpen}
+      />
       <ul
         aria-label={t('calendar.legend')}
         className="mt-3 flex flex-wrap gap-4 text-small text-muted"
@@ -283,11 +299,13 @@ function DayGrid({
   columns,
   nowMinute,
   onSlot,
+  onOpen,
 }: {
   view: CalendarDayView;
   columns: readonly Column[];
   nowMinute: number | null;
   onSlot: ((slot: Slot, at: number) => void) | undefined;
+  onOpen: ((appointmentId: string) => void) | undefined;
 }) {
   const t = useTranslations();
   const format = useFormatter();
@@ -357,7 +375,7 @@ function DayGrid({
             >
               {column.blocks.map((block) =>
                 block.kind === 'appointment' ? (
-                  <AppointmentItem key={block.id} block={block} grid={grid} />
+                  <AppointmentItem key={block.id} block={block} grid={grid} onOpen={onOpen} />
                 ) : (
                   <BreakItem key={block.id} block={block} grid={grid} />
                 ),
@@ -417,21 +435,27 @@ function ColumnHeader({ column }: { column: Column }) {
  * A visit: its time and its patient's name, its title, and a tag line: its note when it has one,
  * else its status's name, none for confirmed and completed (the demo's rule). Its status's name is
  * read out where no tag says it.
+ *
+ * With `onOpen` its text is one button that fills the block (E01-T06b), the key and the pointer both
+ * working it, named by that text: the time, the patient, the title and the status. It is
+ * `data-appointment` of the visit's id, which the drawer puts the focus back on when it closes. A
+ * click on it does not reach the empty slot behind (that layer is a sibling under the list).
  */
-function AppointmentItem({ block, grid }: { block: AppointmentBlock; grid: Span }) {
+function AppointmentItem({
+  block,
+  grid,
+  onOpen,
+}: {
+  block: AppointmentBlock;
+  grid: Span;
+  onOpen: ((appointmentId: string) => void) | undefined;
+}) {
   const t = useTranslations();
   const format = useFormatter();
   const status = t(`appointmentStatus.${block.status}`);
   const tag = block.note !== '' ? block.note : UNTAGGED.has(block.status) ? '' : status;
-  return (
-    <li
-      data-status={block.status}
-      className={cn(
-        'pointer-events-auto absolute overflow-hidden rounded-control border px-2 py-1.25 text-provider-ink',
-        STATUS_LOOK[block.status],
-      )}
-      style={placement(block, grid)}
-    >
+  const text = (
+    <>
       <div className="flex items-start justify-between gap-1.5">
         <div className="min-w-0 truncate text-small leading-tight">
           <span className="font-bold tabular-nums">
@@ -464,6 +488,29 @@ function AppointmentItem({ block, grid }: { block: AppointmentBlock; grid: Span 
         </div>
       )}
       {tag !== status && <span className="sr-only">{status}</span>}
+    </>
+  );
+  return (
+    <li
+      data-status={block.status}
+      className={cn(
+        'pointer-events-auto absolute overflow-hidden rounded-control border text-provider-ink',
+        STATUS_LOOK[block.status],
+      )}
+      style={placement(block, grid)}
+    >
+      {onOpen ? (
+        <button
+          type="button"
+          data-appointment={block.id}
+          onClick={() => onOpen(block.id)}
+          className="block size-full cursor-pointer px-2 py-1.25 text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus focus-visible:outline-solid"
+        >
+          {text}
+        </button>
+      ) : (
+        <div className="px-2 py-1.25">{text}</div>
+      )}
     </li>
   );
 }
