@@ -131,7 +131,7 @@ tests/e2e/            End-to-end journeys and checks in real browsers (Playwrigh
                       (E01-T09e); a click on a patient list row opens the profile and is one
                       `patient.viewed` row, an unknown address is a 404 (E01-T03a); an edit saved and the same form
                       refused as changing nothing, an archive refused with a visit ahead and saved once it is
-                      cancelled (E01-T03b).
+                      cancelled, and a double click on Save changes saves once (E01-T03b).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 Dockerfile            The one image staging and production run (D-007, D-103): the web by default,
