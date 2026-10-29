@@ -1,30 +1,22 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useFormatter, useMessages, useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { startTransition, useRef, useState, type FocusEvent } from 'react';
 import { useFrameClinic } from '@/app/_lib/frame-clinic';
-import { StaffField, StaffForm } from '@/app/_lib/staff-form';
-import type messages from '@/i18n/en.json';
+import { StaffForm } from '@/app/_lib/staff-form';
 import type { LikelyDuplicate } from '@/modules/patients';
-import { Input } from '@/ui/input';
-import { NativeSelect, NativeSelectOption } from '@/ui/native-select';
-import { Textarea } from '@/ui/textarea';
 import { createPatient, findLikelyDuplicates } from './actions';
 import { sendCheck, typedOf } from './duplicate-answer';
-
-/** A code of the message file's `languages` group: a language a patient's messages are written in. */
-type Language = keyof typeof messages.languages;
+import { PatientFormFields } from './patient-form-fields';
 
 /** A date of birth is a calendar date: shown on its own day in every zone, "Jan 1, 1990" (D-098). */
 const BIRTH_DATE = { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' } as const;
 
 /**
- * The new-patient form (E01-T02b): a StaffForm with the patient's names, date of birth, language,
- * phone and email, a guardian's name and notes. It sends the frame's clinic (D-092) and keeps
- * nothing in the browser: no field sets an `autocomplete` of its own, so StaffForm's "off" holds for
- * each (D-093, D-095). The language is the browser's own select of the message file's `languages`,
- * the first one chosen (D-053). As a field the check reads is left, the form asks who the patient
+ * The new-patient form (E01-T02b): a StaffForm with the patient's fields (PatientFormFields,
+ * shared with the edit page, E01-T03b). It sends the frame's clinic (D-092) and keeps nothing in the
+ * browser (D-093, D-095). As a field the check reads is left, the form asks who the patient
  * may already be, and names them above the button; the button still saves (D-033).
  *
  * When the patient is added, the form goes to the list, and stays disabled until it is gone: the
@@ -33,8 +25,6 @@ const BIRTH_DATE = { day: 'numeric', month: 'short', year: 'numeric', timeZone: 
  */
 export function NewPatientForm() {
   const t = useTranslations('newPatient');
-  const languageName = useTranslations('languages');
-  const languages = Object.keys(useMessages().languages) as Language[];
   const router = useRouter();
   const clinicId = useFrameClinic();
   const [added, setAdded] = useState(false);
@@ -75,67 +65,9 @@ export function NewPatientForm() {
         pendingLabel={t('adding')}
         className="max-w-2xl"
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <StaffField
-            name="firstName"
-            label={t('firstName')}
-            render={(field) => <Input {...field} onBlur={check} />}
-          />
-          <StaffField
-            name="lastName"
-            label={t('lastName')}
-            render={(field) => <Input {...field} onBlur={check} />}
-          />
-          <StaffField
-            name="dateOfBirth"
-            label={t('dateOfBirth')}
-            render={(field) => <Input {...field} type="date" onBlur={check} />}
-          />
-          <StaffField
-            name="language"
-            label={t('language')}
-            render={(field) => (
-              <NativeSelect {...field} defaultValue={languages[0]}>
-                {languages.map((code) => (
-                  <NativeSelectOption key={code} value={code}>
-                    {languageName(code)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            )}
-          />
-          <StaffField
-            name="phone"
-            label={t('phone')}
-            render={(field) => <Input {...field} type="tel" onBlur={check} />}
-          />
-          <StaffField
-            name="email"
-            label={t('email')}
-            render={(field) => <Input {...field} type="email" onBlur={check} />}
-          />
-        </div>
-        <StaffField
-          name="guardianName"
-          label={t('guardianName')}
-          render={(field) => {
-            // The line under the field, read with it, after its problem when it has one.
-            const hint = `${field.id}-hint`;
-            const describedBy = [field['aria-describedby'], hint].filter(Boolean).join(' ');
-            return (
-              <>
-                <Input {...field} aria-describedby={describedBy} />
-                <p id={hint} className="text-small text-muted">
-                  {t('guardianHint')}
-                </p>
-              </>
-            );
-          }}
-        />
-        <div>
-          <StaffField name="notes" label={t('notes')} render={(field) => <Textarea {...field} />} />
+        <PatientFormFields onBlur={check}>
           <DuplicateWarning duplicates={duplicates} />
-        </div>
+        </PatientFormFields>
       </StaffForm>
     </fieldset>
   );

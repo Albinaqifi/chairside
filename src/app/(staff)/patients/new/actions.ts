@@ -5,14 +5,11 @@ import { z } from 'zod';
 import { refuse, staffAction, staffRead } from '@/app/_lib/actions';
 import * as patients from '@/modules/patients';
 import {
+  dateOfBirth,
   EMAIL_MAX,
-  email,
-  FULL_NAME_MAX,
-  name,
   NAME_MAX,
-  NOTES_MAX,
   optional,
-  phone,
+  patientDetails,
   PHONE_MAX,
 } from './patient-fields';
 
@@ -27,25 +24,6 @@ import {
  */
 
 /**
- * The browser's date field: a calendar date, YYYY-MM-DD, checked as one (2031-02-30 is none). It
- * sends a date it cannot read, half typed, as '': stored as none, like a field left empty.
- */
-const dateOfBirth = optional(z.iso.date());
-
-const newPatient = z.object({
-  firstName: name,
-  lastName: name,
-  dateOfBirth,
-  phone,
-  email,
-  /** Any two lower-case letters (D-053): the select offers the message file's languages. */
-  language: z.string().regex(/^[a-z]{2}$/),
-  guardianName: optional(z.string().trim().max(FULL_NAME_MAX)),
-  /** Not a clinical record; '' for none. */
-  notes: z.string().trim().max(NOTES_MAX),
-});
-
-/**
  * Adds a patient to the clinic (patients.manage: every member, scope-v1.md), with one audit row,
  * patient.created, that holds ids and codes only. Answers the new id only. An impossible phone is
  * refused as phone_impossible, with nothing written. When it is done, the patient list is read
@@ -55,7 +33,7 @@ const newPatient = z.object({
 export const createPatient = staffAction(
   {
     permission: 'patients.manage',
-    input: newPatient,
+    input: patientDetails,
     audit: { action: 'patient.created', entityType: 'patient', entityId: { result: 'id' } },
   },
   async ({ input, tx, now }) => {

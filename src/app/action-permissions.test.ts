@@ -133,6 +133,11 @@ const ACTIONS: Record<string, Record<string, ScopeRow | 'userAction'>> = {
   },
   // E01-T03a: a patient's profile, a read of the patients area as the list is (Q-11, D-096).
   'src/app/(staff)/patients/[id]/actions.ts': { readPatient: 'Calendar, patients, booking' },
+  // E01-T03b: the edit page's save is patients.manage, its list of visits ahead a read of every member.
+  'src/app/(staff)/patients/[id]/edit/actions.ts': {
+    updatePatient: 'Calendar, patients, booking',
+    readVisitsAhead: 'Calendar, patients, booking',
+  },
   'src/app/(staff)/patients/actions.ts': { searchPatients: 'Calendar, patients, booking' },
   'src/app/(staff)/patients/new/actions.ts': {
     createPatient: 'Calendar, patients, booking',

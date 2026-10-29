@@ -2,7 +2,8 @@
  * A clinic's patients (data-model.md section 2). Public API of the patients module: list and search
  * them (E01-T02a), add one and find who they may already be (E01-T02b), as
  * `import * as patients from '@/modules/patients'`, then `patients.create(tx, patient, now)`; their
- * names by id, for the calendar's day (E01-T04a); one patient's profile (E01-T03a).
+ * names by id, for the calendar's day (E01-T04a); one patient's profile (E01-T03a); saving their
+ * details (E01-T03b).
  */
 export { create, type CreateRefusal, type CreateResult, type NewPatient } from './create';
 export {
@@ -27,3 +28,11 @@ export { patientStatus } from './status'; // E01-T05a: only an active patient is
 // `patients` imports `tenancy`, which so cannot import them back.
 export { phoneAsWritten, readPhone } from './phone';
 export { phoneWithCountryCode } from './phone'; // E01-T08b: the clinic's phone on Settings (D-111)
+// E01-T03b: the edit page saves a patient's details.
+export {
+  update,
+  type ChangedField,
+  type PatientChanges,
+  type UpdateRefusal,
+  type UpdateResult,
+} from './update';
