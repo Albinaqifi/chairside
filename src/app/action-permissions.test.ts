@@ -127,6 +127,10 @@ const ACTIONS: Record<string, Record<string, ScopeRow | 'userAction'>> = {
     readCalendarDay: 'Calendar, patients, booking',
     bookAppointment: 'Calendar, patients, booking', // E01-T05a: every role books
   },
+  // E01-T06a: every role changes an appointment's status.
+  'src/app/(staff)/calendar/appointment-actions.ts': {
+    changeAppointmentStatus: 'Calendar, patients, booking',
+  },
   'src/app/(staff)/dev/components/actions.ts': {
     demoAnswer: 'No area of the table: every member',
     demoOwnerOnly: 'Staff, settings, audit log, results panel',

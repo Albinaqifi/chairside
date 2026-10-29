@@ -17,6 +17,24 @@ export {
   type BookingResult,
   type NewBooking,
 } from './booking';
+// E01-T06a: the appointment state machine, the only writer of an appointment's status.
+export { appointmentChanged, type AppointmentChanged, type AppointmentChangedHook } from './events';
+export {
+  nextAppointmentStatus,
+  STATUS_ACTIONS,
+  type NextStatus,
+  type StatusAction,
+  type StatusActor,
+  type StatusFacts,
+  type StatusRefusal,
+} from './status-machine';
+export {
+  CANCEL_REASON_MAX,
+  changeAppointmentStatus,
+  type StatusChange,
+  type StatusChangeRefusal,
+  type StatusChangeResult,
+} from './status-change';
 export { breaksOnWeekday, listProviders, type Provider, type ProviderBreak } from './providers';
 // E01-T09b, E01-T09d, E01-T09c, E01-T09e: the providers as Settings keeps them.
 export {
