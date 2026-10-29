@@ -7,9 +7,9 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
 Order: T01a → T01b → T02a → T02b → T04a and T08a side by side (two checkouts, D-110) → T04b and T08b
-side by side (D-111) → T05a and T08c side by side (D-112, D-113) → T05b → T05c → T05d → T09a → T09b → T09d → T09c → T09e → T03a → T03b → T06a → T06b → T06c → T06d →
+side by side (D-111) → T05a and T08c side by side (D-112, D-113) → T05b → T05c → T05d → T09a → T09b → T09d → T09c → T09e → T03a → T03b → T06a → T06b → T06e → T06c → T06d →
 T07, T10 → T08d → T11 → T12 → T13. With E00 (D-087, D-090, D-091, D-093, D-096, D-108, D-110, D-111, D-112, D-113,
-D-114, D-115, D-118, D-119, D-120, D-121, D-122):
+D-114, D-115, D-118, D-119, D-120, D-121, D-122, D-123):
 E00-T05a → T01a → T01b → E00-T04c → E00-T04d → E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 →
 T04a and T08a → T04b and T08b → T05a and T08c → T05b → T05c → T05d → T09 and the rest, so a receptionist sees a patient list before
 Playwright and staging exist. T01 is split in two (D-091): the schema and the provider link (T01a), the seed (T01b). T02 is
@@ -34,7 +34,7 @@ estimate of 300: the providers' list and add (T09b); changing a provider and mak
 active again (T09d); T09c follows T09d. T09c is split in two (D-120): the providers' order (T09c) and their weekly breaks
 (T09e). T03 is split in two (D-121), as the profile and the edit with its lock came to about 900 lines of product
 code: the profile (T03a); editing a patient, the status and the lock (T03b). T12, after T11, is the audit
-log's id case (T03a's `data` leftover; owner, 2026-10-29: not now, before E07-T01). T13, after T12, refuses an edit saved from a form opened before another person's save (T03b's `message` leftover; owner, 2026-10-29: not now, before E02). T06 is split in four (D-122), as the state machine and its writes, the drawer, the guards of drawers and dialogs, the move and two corrections came to far more than one session: the state machine and the status changes, no screen (T06a); the drawer with its status buttons and the cancel dialog (T06b); moving a visit, the day too (owner), and restoring one (T06c); Book next visit and a visit under way on the profile and the list (owner: on both; T06d).
+log's id case (T03a's `data` leftover; owner, 2026-10-29: not now, before E07-T01). T13, after T12, refuses an edit saved from a form opened before another person's save (T03b's `message` leftover; owner, 2026-10-29: not now, before E02). T06 is split in four (D-122), as the state machine and its writes, the drawer, the guards of drawers and dialogs, the move and two corrections came to far more than one session: the state machine and the status changes, no screen (T06a); the drawer with its status buttons and the cancel dialog (T06b); moving a visit, the day too (owner), and restoring one (T06c); Book next visit and a visit under way on the profile and the list (owner: on both; T06d). T06b is split again (D-123), as its list came to about 650 lines of product code against 400 once the code was read: the drawer from a block with the status buttons the state machine allows, but Cancel (T06b); the cancel dialog, the two guards of drawers and dialogs and the booking drawer's Enter fix (T06e), after it and before the move, whose form sits in the same drawer.
 
 ---
 
@@ -1028,15 +1028,16 @@ E01-T03). The language: the new-patient page's first, changed on the profile (E0
 **Split** (D-122): the task came to far more than one session (the state machine and its writes, the drawer,
 the guards of drawers and dialogs, the move, two corrections to the profile and the booking drawer). Four
 tasks, in this order: **E01-T06a** the state machine and the status changes (no screen) → **E01-T06b** the
-drawer with its status buttons and the cancel dialog → **E01-T06c** moving a visit and restoring one →
-**E01-T06d** "Book next visit" and a visit under way on the profile and the list. The criteria of the old
-task are spread over them; each is in exactly one.
+drawer with its status buttons → **E01-T06e** the cancel dialog and the guards of drawers and dialogs
+(T06b split again, D-123) → **E01-T06c** moving a visit and restoring one → **E01-T06d** "Book next visit"
+and a visit under way on the profile and the list. The criteria of the old task are spread over them; each
+is in exactly one.
 
 ---
 
 ### E01-T06a · Appointment status: the state machine and its changes
 
-**Ready** (split from E01-T06 and refined by the architect when E01-T03b was Done, 2026-10-29, D-122; checked against `main` at `ff88320`).
+**Done** (merged by the owner, PR #94, 2026-10-29). Split from E01-T06 and refined by the architect when E01-T03b was Done (D-122; checked against `main` at `ff88320`).
 
 - **Role:** builder · **Risk:** normal (no area of `test-strategy.md`'s second-review table: no migration,
   wrapper, planner, link, consent or adapter changes; the board said critical while the task was an outline,
@@ -1117,76 +1118,42 @@ One pure function decides every change; nothing else may write `appointments.sta
 
 ---
 
-### E01-T06b · The appointment drawer: details, status buttons and the cancel dialog
+### E01-T06b · The appointment drawer: details and status buttons
 
-**Planned** (split from E01-T06, D-122). Ready when E01-T06a is Done; refined then against the code.
+**Ready** (split from E01-T06, D-122; split again, D-123; refined by the architect when E01-T06a was Done, 2026-10-29, checked against `main` at `2550792`). The cancel dialog went to E01-T06e: it is the first form inside a drawer, and the two guards of drawers and dialogs come with it.
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T06a, E01-T05c (the guard against a double
-  click's second press), E01-T05d (the patient field)
-- **Read:** `scope` (Appointment drawer) · `design-ref` (demo lines 1197–1258; logic 1937–1957) ·
-  `handoffs/E00-T04e.md` (the reviewer's suggestion 1) · `handoffs/E01-T05a.md` (the tester's Discovered
-  line 1) · `handoffs/E01-T05d.md` (the review's and the delta review's suggestion 1) · D-113, D-114, D-118, D-122
+- **Role:** builder · **Risk:** normal (no area of `test-strategy.md`'s second-review table: no migration, wrapper, planner, link or consent change; the action and its permission exist since E01-T06a) · **Depends on:** E01-T06a (Done), E01-T05c (Done: the guard against a double click's second press), E01-T05d (Done)
+- **Read:** `scope` (Appointment drawer) · `design-ref` (demo lines 1197–1258; logic 1937–1957) · `data-model` (Appointment state machine) · `src/modules/scheduling/status-machine.ts`, `status-change.ts` (E01-T06a) · `src/app/(staff)/settings/providers.tsx` (Make inactive: a `StaffForm` of its own with the id hidden) · D-098, D-108, D-122, D-123
 
-**Why.** The desk marks a patient in the chair, done, no-show or cancelled from the calendar, all day. A
-wrong press on a block must change nothing.
+**Why.** The desk marks a patient in the chair, done or no-show from the calendar, all day. A wrong press on a block must change nothing, and a button that the state machine would refuse must not be there: a visit marked wrong is a reminder to the wrong person, later.
 
 **Do.**
-- **A block opens the drawer** (the block becomes a button; the key and the pointer both work). The drawer
-  reads its visit from the shown day's data (the grid already shows the patient: not a record view, D-098),
-  so a read on use updates it and a visit gone from the day closes it. Header: the patient's name, the
-  treatment (the title), the time in the clinic's zone (24-hour), the provider, the status pill (the grid's
-  colours). **Update status**: the buttons the state machine allows for this visit, computed on the server
-  with the day's read (`nextAppointmentStatus`, the client never imports the module): In the chair, Done,
-  No-show, Cancel, Confirm (staff confirm, a booked visit), and Back (an undone arrival or completion). No
-  Restore here (E01-T06c). **Patient profile** links to `/patients/[id]` (`prefetch={false}`: a prefetch is a
-  `patient.viewed` row). Nothing else: no message timeline, aftercare, treatment plan or start-visit
-  placeholders (later epics).
-- **The cancel dialog** over the drawer asks who cancelled (the patient or the clinic, a select) and an
-  optional reason, in a `StaffForm`; cancelling is its only send.
-- **A form inside the drawer or the dialog sends only itself** (E00-T04e review, `message`; D-113): React
-  passes a `submit` on to every `onSubmit` above it in React's tree, portal too, and `StaffForm` sends from
-  `onSubmit`, so the cancel dialog's form would also send the form of a drawer under it. The drawer's and the
-  dialog's content stop a `submit` from leaving them (`src/ui/`); `StaffForm` is not changed for this.
-- **A drawer or dialog stays open while its form's request is on its way** (E01-T05a tester, `slice`, D-114):
-  Escape, Close and the overlay wait for the answer, so a refusal always shows above its button: the booking
-  drawer, this drawer and the cancel dialog. `StaffForm` tells its caller when it is sending (a prop,
-  `onSendingChange`; it sends from `onSubmit`, so `useFormStatus` does not see it). The sheet and the dialog
-  take a `busy` that blocks Escape, the overlay and Close.
-- **The drawer keeps to controls the double click's guard stops** (E01-T05c tester, `message`): the guard
-  (`src/ui/double-click-guard.ts`) drops a press by its `mousedown` and its `click`, so a control that acts on
-  the pointer's press (Radix's Select, DropdownMenu) would still act within the half second. The cancel
-  dialog's select is the browser's own (`NativeSelect`); the status controls are buttons.
-- **Enter in the booking drawer's patient field takes the row highlighted** (E01-T05d's review and delta
-  review, `message`: the wrong patient booked gets the reminders; owner, not now but here, D-118): each
-  answer that sets the suggestions clears the highlight (`setActive(-1)` in `search`,
-  `src/app/(staff)/calendar/patient-field.tsx`).
+- **The buttons are computed once, in the module.** `scheduling.appointmentsOnDay(tx, day, timeZone, now)` takes `now` and gives each appointment `actions: StatusAction[]`: the actions `nextAppointmentStatus` allows for a **staff** actor on that visit at `now` (so `no_show` appears once `startsAt <= now`, `undo_completion` only on the clinic's day of the completion, `confirm` only on a booked visit). It selects `confirmed_at` and `completed_at` for this and does not return them. The facts (`started`, `confirmed`, `sameDay`, `aftercareSent`, `beforeCutoff`) are built in **one function** that `changeAppointmentStatus` (`status-change.ts`, now inline) uses too, so the buttons and the change cannot drift apart. The client never imports the module. The calendar's read (`read-day.ts`) passes `now`; `AppointmentBlock` (`day.ts`) gains `patientId` and `actions`. `restore` and `cancel` are in the list when allowed; this task's drawer shows neither (below).
+- **A block opens the drawer.** The block's text is wrapped in a `type="button"` that fills it (the key and the pointer both work; its name is the time, the patient, the title and the status; a break opens nothing; a click on a block does not reach the empty-slot layer behind it, E01-T05c). The state is the opened visit's **id** in `CalendarScreen`; the drawer looks the visit up in the day it is shown (any column, filtered or not), so a read on use updates it and a visit gone from the day closes it (D-108, D-098: the grid already shows the patient, no record view). The drawer is `appointment-drawer.tsx` next to `new-appointment.tsx`, 420 px. Header (demo lines 1197–1201): the patient's name in the serif title, under it the treatment (`title`), the day and time in the clinic's zone (24-hour, `useFormatter`), the provider's name and chair (from the column); the status pill in the grid's colours (export the grid's maps; no new colours).
+- **Update status** (demo line 1212): the buttons for the actions the visit has, in this order and with these texts (the builder may adjust a text, in `en.json`): **In the chair** (`arrive`), **Done** (`complete`), **No-show** (`no_show`), **Confirm** (`confirm`; a booked visit, a phone call), **Undo in the chair** (`undo_arrival`), **Undo done** (`undo_completion`). **Cancel and Restore are not shown here** (T06e, T06c). Each is a `StaffForm` of its own with `appointmentId` and `action` hidden and one submit button, as Settings' Make inactive is (no `StaffForm` change); its `doneMessage` says what happened ("Marked in the chair."); `refusals` give a text to `not_allowed` ("This visit was changed meanwhile. Look at it again."), `too_early` ("A no-show can be marked once the visit has started."), and `not_found` ("This visit is no longer there."). A drawer with no button (a completed visit of another day, a cancelled or no-show one) shows a muted line instead, no empty heading. After a change the drawer stays open on the visit, which the action's `refresh()` has changed: the pill and the buttons follow the day's data at once, and the grid behind it too.
+- **Patient profile** is a link to `/patients/[id]` at the foot (demo line 1255), `prefetch={false}` (a prefetch is a `patient.viewed` row, E01-T03a). **Nothing else**: no message timeline, aftercare box, treatment plan, "start visit", Book next visit (T06d) or Time and Chair selects (T06c).
+- The booking drawer is left as it is (T06e touches it).
 
-**Out of scope.** Moving and restoring (E01-T06c). Book next visit (E01-T06d). The messages timeline,
-aftercare box, treatment plan, "start visit".
+**Out of scope.** Cancel and its dialog, the two guards of drawers and dialogs, the booking drawer's Enter fix (E01-T06e). Moving and restoring (E01-T06c). Book next visit and "In the chair now" on the profile and the list (E01-T06d). The messages timeline, aftercare box, treatment plan, "start visit".
 
 **Acceptance.**
-- [ ] Every transition T06a allows, except restore, works from the UI and shows on the grid at once; a
-      disallowed one has no button (e2e, one browser per transition; component test for the buttons by status).
-- [ ] Cancelling from the dialog over the drawer runs the cancel only: one request and one audit row, the
-      drawer's other form sends nothing (e2e in three browsers; the tester also by hand).
-- [ ] A double click on a block (80, 150 and 250 ms between the clicks), its second press on a status button:
-      the drawer open and no status changed (e2e, three browsers).
-- [ ] Escape, Close or the overlay while a request of the drawer or the dialog is on its way: it stays open
-      and shows the answer, a refusal too; the booking drawer as well (e2e, the answer held).
-- [ ] In the booking drawer, an arrow key pressed while a search runs, then its answer: no row is
-      highlighted and Enter takes none; with fewer rows than before, not "Add … as new patient" either
-      (component test, the answer held).
-- [ ] The drawer opens by the keyboard (Tab to the block, Enter), is labelled for a screen reader, and the
-      accessibility check passes on it (E01-T11 repeats it for the whole journey).
+- [ ] The buttons are exactly the changes the module allows: for every status, a visit before its start, at its start and after it, a completion today and on an earlier day of the clinic's zone (Skopje and New York, a 23- and a 25-hour day), `appointmentsOnDay`'s `actions` is the set of actions `changeAppointmentStatus` accepts for a staff actor on a copy of that visit (`restore` judged by the table alone: its chair re-check is T06c's) (integration; a minute).
+- [ ] The facts are one function: `changeAppointmentStatus` and `appointmentsOnDay` both call it (a unit test that fails if a fact is changed in one place only, or a review check named in the handoff note).
+- [ ] A click or Enter on a block opens the drawer with the patient's name, the treatment, the day and time (24-hour) in the clinic's zone, the provider, the status pill; a break block, an empty slot and the New appointment button behave as before (component tests; e2e in one browser).
+- [ ] Each of the six transitions works from the drawer and shows on the grid and in the drawer at once, and a disallowed one has no button: In the chair, Back out of it (Undo in the chair), Done, Undo done, No-show on a visit already started (book one in the past in the same spec: a walk-in is allowed, D-114), Confirm (e2e, one spec per browser in three browsers, about a minute each; a component test for the buttons by status).
+- [ ] A refusal (`not_allowed`, `too_early`, `not_found`) shows its text above the button and the drawer stays open; a visit that leaves the shown day (the day read again without it) closes the drawer (component tests, the answer held).
+- [ ] A double click on a block (80, 150 and 250 ms between the clicks), whose second press lands on a status button: the drawer open and no status changed (e2e, three browsers).
+- [ ] Opening the drawer writes no `patient.viewed` row; a click on Patient profile opens `/patients/[id]` and writes one (integration or e2e count of `audit_log`).
+- [ ] The drawer opens from the keyboard (Tab to the block, Enter), is named for a screen reader, Escape closes it and the focus goes back to the block that opened it (not to the page's top; Radix does this for its own Trigger only, so the drawer's `onCloseAutoFocus` puts it back, WebKit and Firefox on a Mac do not focus a clicked button); the accessibility check passes with the drawer open (E01-T11 repeats it for the whole journey).
 - [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---
 
 ### E01-T06c · Moving a visit and restoring one
 
-**Planned** (split from E01-T06, D-122; owner, 2026-10-29: the move changes the day too). Ready when E01-T06b is Done.
+**Planned** (split from E01-T06, D-122; owner, 2026-10-29: the move changes the day too). Ready when E01-T06e is Done.
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T06b, E01-T05b (the warning box)
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T06e (the drawer, and the guards a form with a dialog inside it needs), E01-T05b (the warning box)
 - **Read:** `scope` (Appointment drawer; New appointment drawer's warnings) · `src/modules/scheduling/chair.ts`
   and `booking.ts` (E01-T06a) · `src/app/(staff)/calendar/booking-warnings.ts` · D-020, D-114, D-122
 
@@ -1239,6 +1206,34 @@ every role and the other clinic's owner.
 **Acceptance.** (to be completed when it is refined) The list and the profile agree for a patient with an
 arrived visit, a booked one and neither; Book next visit opens the drawer with the patient and provider
 chosen and books them once; the double click guard holds.
+
+---
+
+### E01-T06e · The cancel dialog, and the guards of drawers and dialogs
+
+**Planned** (split from E01-T06b, D-123). Ready when E01-T06b is Done; refined then against the code. The size estimate is about 250 lines of product code.
+
+- **Role:** builder · **Risk:** normal (`StaffForm` and the drawer and dialog components are screen code, not an area of `test-strategy.md`'s second-review table; the action and its permission are E01-T06a's) · **Depends on:** E01-T06b
+- **Read:** `scope` (Appointment drawer) · `handoffs/E00-T04e.md` (the reviewer's suggestion 1) · `handoffs/E01-T05a.md` (the tester's Discovered line 1) · `handoffs/E01-T05d.md` (the review's and the delta review's suggestion 1) · `src/ui/sheet.tsx`, `dialog.tsx`, `double-click-guard.ts`, `src/app/_lib/staff-form.tsx` · D-113, D-114, D-118, D-122, D-123
+
+**Why.** A cancel records who cancelled and why, and a later message depends on it; a cancel sent by the wrong form, or lost because a drawer closed over a request, is a wrong state nobody sees.
+
+**Do.**
+- **The cancel dialog.** Cancel in the drawer's status buttons (when the visit's `actions` has `cancel`) opens a `Dialog` over the drawer: **Who cancelled** (the browser's own `NativeSelect`, options "The patient" and "The clinic", **no option chosen at first**: a wrong default is a wrong record, so the field is required and the schema's `invalid_input` shows at it) and an optional **reason** (a textarea, at most `CANCEL_REASON_MAX` characters). It is a `StaffForm` with `appointmentId` and `action=cancel` hidden; cancelling is its only send, and it closes on done. The drawer stays open on the cancelled visit.
+- **A form inside the drawer or the dialog sends only itself** (E00-T04e review, `message`; D-113): React passes a `submit` on to every `onSubmit` above it in React's tree, a portal too, and `StaffForm` sends from `onSubmit`, so a dialog rendered inside another form would also send that form. The drawer's and the dialog's content stop a `submit` from leaving them (`src/ui/sheet.tsx`, `dialog.tsx`); `StaffForm` is not changed for this. The first form with a dialog inside it is T06c's move form.
+- **A drawer or dialog stays open while its form's request is on its way** (E01-T05a tester, `slice`, D-114): Escape, Close and the overlay wait for the answer, so a refusal always shows above its button. `StaffForm` tells its caller when it is sending (a prop `onSendingChange`; it sends from `onSubmit`, so `useFormStatus` does not see it); the sheet's and the dialog's content take a `busy` that blocks Escape, the overlay and Close. Used by the booking drawer, the appointment drawer (its status forms) and the cancel dialog.
+- **The drawer keeps to controls the double click's guard stops** (E01-T05c tester, `message`): the guard drops a press by its `mousedown` and its `click`, so a control that acts on the pointer's press (Radix's Select, DropdownMenu) would still act within the half second. The cancel dialog's select is `NativeSelect`; the status controls are buttons.
+- **Enter in the booking drawer's patient field takes the row highlighted** (E01-T05d's review and delta review, `message`: the wrong patient booked gets the reminders; owner, not now but here, D-118): each answer that sets the suggestions clears the highlight (`setActive(-1)` in `search`, `src/app/(staff)/calendar/patient-field.tsx`).
+
+**Out of scope.** Moving and restoring (E01-T06c). Book next visit (E01-T06d). A change to what `StaffForm` shows or sends beyond `onSendingChange`.
+
+**Acceptance.**
+- [ ] Cancelling from the dialog over the drawer runs the cancel only: one request and one `appointment.status_changed` row, the drawer's other forms send nothing (e2e in three browsers; the tester also by hand); a test with a dialog inside a form proves the form does not send.
+- [ ] Who cancelled is required (nothing chosen: refused at the field, nothing written); the reason is kept in the row and in no audit row (E01-T06a's test stands).
+- [ ] Escape, Close or the overlay while a request of the drawer or the dialog is on its way: it stays open and shows the answer, a refusal too; the booking drawer as well (e2e, the answer held).
+- [ ] In the booking drawer, an arrow key pressed while a search runs, then its answer: no row is highlighted and Enter takes none; with fewer rows than before, not "Add … as new patient" either (component test, the answer held).
+- [ ] A double click on Cancel, the second press on the dialog's select or Cancel button: nothing is chosen or sent (e2e, three browsers).
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---
 

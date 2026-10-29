@@ -283,6 +283,9 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
 - Result pages; states for already confirmed, already cancelled, appointment in the past.
 - Invalid / expired page with the clinic-neutral wording and no data.
 - Cancelling creates a `patient_cancelled` attention item (task type added here) and triggers re-planning.
+- Confirm and cancel call `scheduling.changeAppointmentStatus` with `actor: 'patient'` (E01-T06a); a cancel
+  passes `cancelledBy: 'patient'` itself and `beforeCutoff` from the clinic's setting, as the function takes
+  both as given (E01-T06a review, `none`).
 
 **Out of scope.** "Ask for another time" (T10). Treatment plan link (v1.1).
 
