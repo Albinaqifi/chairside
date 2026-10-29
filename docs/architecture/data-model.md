@@ -94,7 +94,9 @@ under the provider's row lock (`already_booked`): one click books once.
 | cancelled, no_show | booked (restore) | staff; re-checks the overlap rule |
 | completed | arrived (undo) | staff, same day, and only while no aftercare was sent |
 
-Anything else is rejected. One pure function decides; every transition is audit-logged and
+Anything else is rejected. A moved visit goes back to *booked* and its confirmation is cleared (the patient
+confirmed the old time); a restored one is *booked* with the confirmation and the cancel columns cleared
+(D-122). One pure function decides; every transition is audit-logged and
 triggers re-planning of messages. "No reply yet" is **derived**: status `booked` and a
 reminder was sent.
 

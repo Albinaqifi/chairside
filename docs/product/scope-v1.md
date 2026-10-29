@@ -83,6 +83,10 @@ Legend: ✅ in v1 as designed · ✏️ in v1 but changed · ⏳ later · ❌ no
 ## Appointment drawer
 
 - ✅ Change time and provider. Status buttons: In the chair, Done, No-show, Cancel.
+- ✏️ The move also changes the **day** (a date field beside time and provider). A moved visit goes back to
+  *booked*: the patient confirmed the old time. A cancelled or no-show visit can be restored, with the same
+  overlap warning as booking. Staff can mark a booked visit *confirmed* (a phone call). (owner and
+  architect, D-122)
 - ✅ "Messages for this visit" timeline, from real message rows and events.
 - ✅ "Book next visit", "Patient profile", start the visit wrap-up.
 - ✏️ Status changes follow the state machine in `data-model.md`. Cancel asks who cancelled
@@ -95,6 +99,8 @@ Legend: ✅ in v1 as designed · ✏️ in v1 but changed · ⏳ later · ❌ no
 - ✅ List with search (name or phone) and filters. Columns: name, care plan, last visit, next
   visit. ✏️ Filters in v1: All, Due for a visit, Agreed to offers. ⏳ Orthodontics, Unfinished treatment.
 - ✅ Profile: header, next appointment, care plan card, messages, visit history, communication settings.
+- ✏️ A patient whose visit is under way (status *arrived*) shows "In the chair now" in the profile's next
+  visit and in the list's next-visit column, not "No appointment ahead". (owner, D-122)
 - ✏️ Profile also has: date of birth, language, guardian, notes ("not a clinical record"),
   status (active / archived / deceased). (D-033, D-040) A patient with a visit booked ahead is
   not archived or marked deceased until that visit is cancelled or moved. (owner, D-114)

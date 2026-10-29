@@ -2356,3 +2356,32 @@ architecture), `changed` (differs from the original files), `process`.
   with no reminder, silently (D-113, D-114). The Book button is a speed feature, not a safety one.
 - **Revisit if:** the receptionist trial (Q-09) asks for the button on the profile; T03a runs far over
   400 lines (then the history is its own task); a role must not see every patient (D-096).
+
+### D-122 · E01-T03b Done: E01-T06 split in four; a move changes the day, a moved visit goes back to booked; a visit under way shows on the profile and the list (owner); the stale edit form is E01-T13, not now (owner)
+- **Origin:** E01-T03b's Done pass and E01-T06's Ready pass, 2026-10-29 (PR #92;
+  `handoffs/E01-T03b.md`, `handoffs/E01-T06a.md`). **Owner, 2026-10-29:** tried the edit page's steps, all
+  fine; a patient in the chair (*arrived*) shows as "In the chair now" on the profile and the list; the
+  drawer's move changes the day too; the form that overwrites a colleague's save is **not now**: E01-T13,
+  after E01-T12 and before E02. The split and the rest are the architect's.
+- **What:**
+  - **E01-T06 → E01-T06a … T06d.** a: `nextAppointmentStatus`, `changeAppointmentStatus`, restore's chair
+    check, the event hook, the action and its audit row, no screen. b: the drawer from a block, the status
+    buttons, the cancel dialog (who cancelled, a reason), the two guards of drawers and dialogs (a form inside
+    sends only itself; a drawer stays open while a request is on its way), the booking drawer's Enter fix.
+    c: moving a visit (provider, day, start; lock the providers in id order) and restoring one. d: Book next
+    visit, and the visit under way on the profile and the list. The old task would have been about 1,600
+    lines against the Definition of Ready's 400. Order: T03b → T06a → T06b → T06c → T06d → T07, T10.
+  - **A moved visit goes back to *booked*** and its confirmation is cleared; a **restored** one is *booked*
+    with the confirmation and the cancel columns cleared. The patient confirmed the old time; E02 asks again.
+    `data-model.md` and `scope-v1.md` say so.
+  - **Risk of T06a … T06d is normal:** no area of `test-strategy.md`'s second-review table; the board's
+    "critical" was set while the task was an outline.
+  - **A restore needs an active patient** (D-113/D-114: a visit that holds the chair for an archived patient is
+    what the archive rule forbids), taken `for share` before the appointment and the provider.
+  - **E01-T13** (new, Ready): a form opened before someone else's save is refused (`changed_meanwhile`) by
+    the row's `updated_at`; the reviewer's `message` leftover of T03b.
+- **Why:** each part one session; a status written outside one function sends a message for the wrong state,
+  silently. A move that kept "confirmed" would show a yes the patient did not give for the new time.
+- **Revisit if:** a receptionist wants a move to keep its confirmation (a same-day shift of minutes); the
+  patient's own confirm and cancel (E02-T09) need facts the function lacks; T06b runs far over 500 lines
+  (then the guards are their own task).
