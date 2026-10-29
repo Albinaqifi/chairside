@@ -108,7 +108,8 @@
     "visitWith": "{what} with {provider}",
     "history": "Visit history",
     "noHistory": "No completed visits yet.",
-    "byProvider": "With {provider}"
+    "byProvider": "With {provider}",
+    "edit": "Edit"
   },
   "newPatient": {
     "title": "New patient",
@@ -131,6 +132,29 @@
       "born": "{name}, born {born}",
       "noBirthDate": "{name}, no date of birth",
       "addAnyway": "Check the list first. Add patient still adds a new patient."
+    }
+  },
+  "editPatient": {
+    "title": "Edit patient",
+    "intro": "Change what is wrong or out of date. Nothing is saved until you press Save changes.",
+    "back": "‹ Back to the patient",
+    "status": "Status",
+    "statuses": {
+      "active": "Active",
+      "archived": "Archived",
+      "deceased": "Deceased"
+    },
+    "save": "Save changes",
+    "saving": "Saving…",
+    "saved": "Changes saved.",
+    "phoneImpossible": "The phone number does not look right. Check its digits; a number from another country starts with + and its country code.",
+    "nothingChanged": "Nothing was changed.",
+    "visitsAhead": "This patient has a visit ahead, so they cannot be archived or marked deceased yet.",
+    "notFound": "This patient could not be found. Go back to the patient list.",
+    "ahead": {
+      "heading": "Visits ahead:",
+      "visit": "{when}: {what} with {provider}",
+      "cancelFirst": "Cancel or move these visits first, then change the status."
     }
   },
   "appointmentStatus": {

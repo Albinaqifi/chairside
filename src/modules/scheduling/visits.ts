@@ -103,3 +103,54 @@ export async function patientVisits(
   );
   return { next: next ?? null, history };
 }
+
+/** The most visits ahead a patient's list holds (E01-T03b). */
+export const VISITS_AHEAD_LIMIT = 20;
+
+/** A visit that holds the chair of a patient and is not over, as the edit page lists it. */
+export interface VisitAhead {
+  id: string;
+  startsAt: Date;
+  /** The treatment type's name; the appointment's own label when it has none. */
+  what: string;
+  providerName: string;
+}
+
+/**
+ * The visits that stand in the way of archiving a patient or marking them deceased (owner, D-114,
+ * E01-T03b): booked, confirmed or arrived, and not ended at `now` (a visit under way and not yet
+ * marked arrived still counts until it ends). Cancelled, no-show and completed visits do not hold the
+ * chair, nor do visits that ended. Soonest first, at most VISITS_AHEAD_LIMIT, with the provider's
+ * and the treatment type's name. (`visitsAhead` of providers.ts counts a provider's, not a patient's.)
+ */
+export async function patientVisitsAhead(
+  tx: TenantTransaction,
+  patientId: string,
+  now: Date,
+): Promise<VisitAhead[]> {
+  const rows = await tx
+    .select({
+      id: appointments.id,
+      startsAt: appointments.startsAt,
+      title: appointments.title,
+      treatmentName: treatmentTypes.name,
+      providerName: providers.name,
+    })
+    .from(appointments)
+    .innerJoin(providers, eq(providers.id, appointments.providerId))
+    .leftJoin(treatmentTypes, eq(treatmentTypes.id, appointments.treatmentTypeId))
+    .where(
+      and(
+        eq(appointments.patientId, patientId),
+        sql`${appointments.status} in ('booked', 'confirmed', 'arrived') and ${appointments.endsAt} > ${now}`,
+      ),
+    )
+    .orderBy(asc(appointments.startsAt), asc(appointments.id))
+    .limit(VISITS_AHEAD_LIMIT);
+  return rows.map((row) => ({
+    id: row.id,
+    startsAt: row.startsAt,
+    what: row.treatmentName ?? row.title,
+    providerName: row.providerName,
+  }));
+}

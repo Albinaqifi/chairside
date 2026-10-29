@@ -42,3 +42,28 @@ export const FIRST_LANGUAGE: string = Object.keys(messages.languages)[0] ?? 'en'
 
 /** Trimmed and lower-cased, then checked; or none. */
 export const email = optional(z.string().trim().toLowerCase().max(EMAIL_MAX).pipe(z.email()));
+
+/**
+ * The browser's date field: a calendar date, YYYY-MM-DD, checked as one (2031-02-30 is none). It
+ * sends a date it cannot read, half typed, as '': stored as none, like a field left empty.
+ */
+export const dateOfBirth = optional(z.iso.date());
+
+/**
+ * What the new-patient page and the edit page both send for a patient (E01-T03b): the details,
+ * checked once, so both refuse the same input at the same field. What the input alone settles is
+ * shown at its field; the phone needs the clinic's country, which only the handler's transaction
+ * reads, so its problem is the handler's refusal (D-098).
+ */
+export const patientDetails = z.object({
+  firstName: name,
+  lastName: name,
+  dateOfBirth,
+  phone,
+  email,
+  /** Any two lower-case letters (D-053): the select offers the message file's languages. */
+  language: z.string().regex(/^[a-z]{2}$/),
+  guardianName: optional(z.string().trim().max(FULL_NAME_MAX)),
+  /** Not a clinical record; '' for none. */
+  notes: z.string().trim().max(NOTES_MAX),
+});

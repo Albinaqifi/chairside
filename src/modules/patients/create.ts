@@ -43,8 +43,13 @@ export type CreateResult =
 /**
  * Adds one patient to the clinic of the transaction (its own row: current_clinic_id(), which the
  * policy checks too) and gives their id. With an id given and a patient by that id already there,
- * it writes nothing and says so (`created: false`): ON CONFLICT (id) DO NOTHING, which waits for a
- * transaction adding the same id at the same moment to end, then sees its row if it committed. The
+ * it writes nothing and says so (`created: false`): ON CONFLICT DO NOTHING, which waits for a
+ * transaction adding the same id at the same moment to end, then sees its row if it committed. It
+ * names no target on purpose: the id is unique twice (the primary key, and with the clinic, which
+ * the composite foreign keys need), and a target covers only the first. Two sends at once could
+ * pass that check together and meet in the second index, which raised a unique violation (23505)
+ * instead of doing nothing, and the booking answered `internal` for one of them (E01-T03b, the
+ * flaky "sent twice at once"). Those two are the table's only unique indexes. The
  * key is global: a patient of another clinic by that id, which Row-Level Security hides, also
  * writes nothing; the caller then finds no patient of its clinic by that id (patientStatus). The
  * phone is read with the clinic's own country, never with
@@ -82,7 +87,7 @@ export async function create(
       createdAt: now,
       updatedAt: now,
     })
-    .onConflictDoNothing({ target: patients.id })
+    .onConflictDoNothing()
     .returning({ id: patients.id });
   return { ok: true, id, created: written.length > 0 };
 }

@@ -4,6 +4,8 @@ import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { currentStaff } from '@/app/_lib/auth';
 import { PageClinic } from '@/app/_lib/frame-clinic';
+import { can } from '@/modules/auth';
+import { membershipExtras } from '../../navigation';
 import { readPatient } from './actions';
 import { PatientProfileView } from './patient-profile';
 
@@ -19,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * is a view of a patient record: each render writes one `patient.viewed` row, so the list's links
  * never prefetch it (prefetch={false}), as a prefetch would write a row nobody opened. An id that
  * is no UUID, or no patient of this clinic (another clinic's too), is a 404 and writes no row.
- * Editing, the status and the lock are E01-T03b's.
+ * Edit opens the edit page (E01-T03b) for whoever has patients.manage.
  */
 export default async function PatientProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const staff = await currentStaff();
@@ -33,7 +35,10 @@ export default async function PatientProfilePage({ params }: { params: Promise<{
   return (
     <div className="motion-safe:animate-enter">
       <PageClinic clinicId={staff.clinic.clinicId} />
-      <PatientProfileView read={read.value} />
+      <PatientProfileView
+        read={read.value}
+        canEdit={can(staff.clinic.role, membershipExtras(staff.clinic), 'patients.manage')}
+      />
     </div>
   );
 }

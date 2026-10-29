@@ -46,6 +46,7 @@ const VISIT_DONE = {
 function render(
   read: Partial<Omit<ProfileRead, 'profile'>> & { profile?: Partial<PatientProfile> },
   zone = 'Europe/Skopje',
+  canEdit = true,
 ) {
   const shown: ProfileRead = {
     profile: { ...ANA, ...read.profile },
@@ -56,7 +57,7 @@ function render(
     locale: LOCALE,
     messages,
     timeZone: zone,
-    children: createElement(PatientProfileView, { read: shown }),
+    children: createElement(PatientProfileView, { read: shown, canEdit }),
   };
   return renderToString(createElement(NextIntlClientProvider, provider));
 }
@@ -205,5 +206,19 @@ describe('moments and the date of birth in a zone behind UTC and one far ahead (
   it('a date of birth at the start of a month, in the zone furthest behind UTC', () => {
     const page = text(render({ profile: { dateOfBirth: '2016-02-01' } }, 'Pacific/Pago_Pago'));
     expect(page).toContain('February 1, 2016');
+  });
+});
+
+describe('the Edit link (E01-T03b)', () => {
+  it('opens the edit page of this patient', () => {
+    const html = render({});
+    expect(html).toContain(`href="/patients/${ANA.id}/edit"`);
+    expect(text(html)).toContain(t.edit);
+  });
+
+  it('is not drawn for a role without patients.manage', () => {
+    const html = render({}, 'Europe/Skopje', false);
+    expect(html).not.toContain('/edit"');
+    expect(text(html)).not.toContain(t.edit);
   });
 });

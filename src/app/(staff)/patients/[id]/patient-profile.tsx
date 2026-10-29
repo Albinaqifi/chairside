@@ -30,9 +30,11 @@ const SECTION = 'rounded-card border border-border bg-surface px-5 py-4.5';
  * demo shows for later epics are not drawn, not even empty (Messages, Communication, Care plan,
  * Treatment plan, Send plan, Book appointment): a card with nothing behind it tells the front desk
  * something is there. A value the patient has none of reads as plain text, never a made-up value.
- * Moments go through the formatter and the clinic's zone (src/i18n/request.ts).
+ * Moments go through the formatter and the clinic's zone (src/i18n/request.ts). `canEdit` (patients.manage,
+ * every member today) shows the Edit link to the edit page (E01-T03b); opening that page is a record
+ * view too, so the link never prefetches.
  */
-export function PatientProfileView({ read }: { read: ProfileRead }) {
+export function PatientProfileView({ read, canEdit }: { read: ProfileRead; canEdit: boolean }) {
   const t = useTranslations('patientProfile');
   const tPatients = useTranslations('patients');
   const format = useFormatter();
@@ -53,6 +55,15 @@ export function PatientProfileView({ read }: { read: ProfileRead }) {
           </h1>
           {profile.status !== 'active' && (
             <Badge variant={profile.status}>{tPatients(profile.status)}</Badge>
+          )}
+          {canEdit && (
+            <Link
+              href={`/patients/${profile.id}/edit`}
+              prefetch={false}
+              className="font-medium text-link hover:text-link-hover"
+            >
+              {t('edit')}
+            </Link>
           )}
         </div>
         <ul className="mt-1 flex flex-wrap gap-x-4 text-muted">
