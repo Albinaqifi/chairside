@@ -11,13 +11,13 @@ import { APP } from './servers.ts';
 // that lands on it must change nothing more. One day a browser, each check its own visits, removed
 // afterwards. The visits are written as the migration role, as appointment-drawer.spec.ts writes them.
 
-const DAYS: Record<string, Record<'triple' | 'double', string>> = {
-  chromium: { triple: '2032-03-02', double: '2032-03-09' },
-  firefox: { triple: '2032-03-03', double: '2032-03-10' },
-  webkit: { triple: '2032-03-04', double: '2032-03-11' },
+const DAYS: Record<string, Record<'triple' | 'double' | 'done', string>> = {
+  chromium: { triple: '2032-03-02', double: '2032-03-09', done: '2032-03-16' },
+  firefox: { triple: '2032-03-03', double: '2032-03-10', done: '2032-03-17' },
+  webkit: { triple: '2032-03-04', double: '2032-03-11', done: '2032-03-18' },
 };
 
-function dayOf(testInfo: TestInfo, check: 'triple' | 'double'): string {
+function dayOf(testInfo: TestInfo, check: 'triple' | 'double' | 'done'): string {
   const day = DAYS[testInfo.project.name]?.[check];
   if (!day) throw new Error(`No day for the browser ${testInfo.project.name}.`);
   return day;
@@ -150,6 +150,43 @@ test.describe('E01-T06b, the tester: presses that must change nothing they were 
           `${gap} ms between the presses: the visit is in the chair, not past it`,
         ).toBe('arrived');
         expect(await changeRows(id), `${gap} ms: one change written`).toBe(1);
+        await clear(day);
+      }
+    } finally {
+      await clear(day);
+    }
+  });
+
+  test('a double click on Done itself: one change, and Undo done redrawn under the second press changes nothing more', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(180_000);
+    const day = dayOf(testInfo, 'done');
+    try {
+      for (const gap of [40, 150, 250]) {
+        const id = await visit(day, '10:00');
+        await openCalendar(page, day);
+        await block(page).first().click();
+        const open = page.getByRole('dialog');
+        await expect(open).toBeVisible();
+        await page.waitForTimeout(DOUBLE_CLICK_MS + 100);
+        await open.getByRole('button', { name: 'In the chair', exact: true }).click();
+        await expect.poll(() => statusOf(id)).toBe('arrived');
+        // The buttons change under the first press; wait out the moment they take no press.
+        await page.waitForTimeout(1500);
+        const button = open.getByRole('button', { name: 'Done', exact: true });
+        const box = await button.boundingBox();
+        if (!box) throw new Error('No Done button.');
+        const x = box.x + box.width / 2;
+        const y = box.y + box.height / 2;
+        await page.mouse.click(x, y);
+        await page.waitForTimeout(gap);
+        await page.mouse.click(x, y);
+        await page.waitForTimeout(1500);
+        expect(await statusOf(id), `${gap} ms between the presses: done, not undone`).toBe(
+          'completed',
+        );
+        expect(await changeRows(id), `${gap} ms: two changes written in all`).toBe(2);
         await clear(day);
       }
     } finally {

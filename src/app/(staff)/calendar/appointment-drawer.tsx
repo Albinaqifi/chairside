@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { useFormatter, useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
 import { StaffForm } from '@/app/_lib/staff-form';
 import type { AppointmentStatus, StatusAction } from '@/modules/scheduling';
 import { Badge, type BadgeVariant } from '@/ui/badge';
 import { Button } from '@/ui/button';
+import { cn } from '@/ui/cn';
 import { Sheet, SheetBody, SheetContent, SheetFooter } from '@/ui/sheet';
 import { changeAppointmentStatus } from './appointment-actions';
 import type { AppointmentBlock, Column } from './day';
@@ -35,6 +37,17 @@ const SHOWN = [
 ] as const satisfies readonly StatusAction[];
 type Shown = (typeof SHOWN)[number];
 
+/**
+ * How long the status buttons take no click from a pointer once the buttons have changed (E01-T06b
+ * test finding 1, as the closed days' list, E01-T08c). A change redraws the buttons: "In the chair"
+ * is gone and "Done" stands in its cell, under a pointer that rests there. A person's double click
+ * sends its second press up to half a second after the first (Windows' default; its slowest setting
+ * is 0.9 s), and the first one's answer can be back before it, so the second would complete the
+ * visit. The moment starts when the buttons change, so it covers a second press however fast the
+ * answer came.
+ */
+const SETTLE_MS = 1_000;
+
 /** The close of the drawer puts the focus back on the block that opened it, if it is still there. */
 function focusBlock(appointmentId: string) {
   const blocks = document.querySelectorAll<HTMLElement>('[data-appointment]');
@@ -59,7 +72,8 @@ function focusBlock(appointmentId: string) {
  * buttons at once; a visit that the day no longer holds closes it (./calendar-screen.tsx). It stays
  * open after a change. Each button is a StaffForm of its own with the appointment and the action
  * hidden (as Settings' Make inactive is), so a double click sends one request and a refusal shows
- * above its button. On close the focus goes back to the visit's block: Radix does that for its own
+ * above its button. For a moment (SETTLE_MS) after the buttons change, the grid takes no pointer press:
+ * the buttons move under a resting pointer. On close the focus goes back to the visit's block: Radix does that for its own
  * trigger only, and a drawer opened from state has none (WebKit and Firefox on a Mac do not focus a
  * clicked button, so nothing else would hold it).
  *
@@ -82,6 +96,22 @@ export function AppointmentDrawer({
   const t = useTranslations();
   const format = useFormatter();
   const actions = SHOWN.filter((action: Shown) => block.actions.includes(action));
+  // The buttons as last rendered, compared while rendering: the commit that changes them is the one
+  // that stops their clicks, so no frame shows them changed and taking a press. Only the pointer's:
+  // a key, and assistive technology, act on the control they name, which no redraw changes under it.
+  const offered = actions.join();
+  const [rendered, setRendered] = useState(offered);
+  const [settling, setSettling] = useState(false);
+  if (rendered !== offered) {
+    setRendered(offered);
+    setSettling(true);
+  }
+  useEffect(() => {
+    if (!settling) return;
+    // A later change of the buttons (offered) starts the moment again.
+    const timer = setTimeout(() => setSettling(false), SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [settling, offered]);
   const startsAt = new Date(block.startsAt);
   const day = format.dateTime(startsAt, {
     weekday: 'long',
@@ -122,7 +152,7 @@ export function AppointmentDrawer({
               <h3 id="appointment-update-status" className="mb-2 text-small font-semibold">
                 {t('calendar.appointment.update')}
               </h3>
-              <div className="grid grid-cols-2 gap-2">
+              <div className={cn('grid grid-cols-2 gap-2', settling && 'pointer-events-none')}>
                 {actions.map((action) => (
                   <StatusButton key={`${block.id}-${action}`} block={block} action={action} />
                 ))}
