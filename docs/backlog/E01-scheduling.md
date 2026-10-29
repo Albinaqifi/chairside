@@ -8,7 +8,7 @@ thing a receptionist judges (risk R-09), so it should be in front of a real one 
 
 Order: T01a → T01b → T02a → T02b → T04a and T08a side by side (two checkouts, D-110) → T04b and T08b
 side by side (D-111) → T05a and T08c side by side (D-112, D-113) → T05b → T05c → T05d → T09a → T09b → T09d → T09c → T09e → T03a → T03b → T06 →
-T07, T10 → T08d → T11. With E00 (D-087, D-090, D-091, D-093, D-096, D-108, D-110, D-111, D-112, D-113,
+T07, T10 → T08d → T11 → T12. With E00 (D-087, D-090, D-091, D-093, D-096, D-108, D-110, D-111, D-112, D-113,
 D-114, D-115, D-118, D-119, D-120, D-121):
 E00-T05a → T01a → T01b → E00-T04c → E00-T04d → E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 →
 T04a and T08a → T04b and T08b → T05a and T08c → T05b → T05c → T05d → T09 and the rest, so a receptionist sees a patient list before
@@ -33,7 +33,8 @@ weekly breaks (T09c), on T09b's tab. T09b is split again (D-119), as T09a came t
 estimate of 300: the providers' list and add (T09b); changing a provider and making one inactive or
 active again (T09d); T09c follows T09d. T09c is split in two (D-120): the providers' order (T09c) and their weekly breaks
 (T09e). T03 is split in two (D-121), as the profile and the edit with its lock came to about 900 lines of product
-code: the profile (T03a); editing a patient, the status and the lock (T03b).
+code: the profile (T03a); editing a patient, the status and the lock (T03b). T12, after T11, is the audit
+log's id case (T03a's `data` leftover; owner, 2026-10-29: not now, before E07-T01).
 
 ---
 
@@ -387,7 +388,7 @@ Latin and Cyrillic as one (the owner's, later).
 
 ### E01-T03a · Patient profile
 
-**Ready** (split from E01-T03 and refined by the architect when E01-T09e was Done, 2026-10-28, D-121).
+**Done** (split from E01-T03 and refined by the architect when E01-T09e was Done, 2026-10-28, D-121; merged 2026-10-29, PR #90).
 
 - **Role:** builder · **Risk:** normal (no area of `test-strategy.md`'s table: the record-view row is the
   wrapper's own, no new permission, table or message) · **Depends on:** E01-T02b, E01-T05a, E01-T04a
@@ -466,16 +467,17 @@ patient of deleted or anonymised state (nothing sets one yet, D-098's Discovered
 
 ### E01-T03b · Editing a patient, and no archive while a visit is ahead
 
-**Planned until E01-T03a is Done** (split from E01-T03 and refined by the architect when E01-T09e was Done, 2026-10-28, D-121); it is Ready then, with a check of T03a's leftovers.
+**Ready** (split from E01-T03 and refined by the architect when E01-T09e was Done, 2026-10-28, D-121; checked against the built profile and made Ready when E01-T03a was Done, 2026-10-29).
 
 - **Role:** builder · **Risk:** normal (the status gate guards messages, but no area of `test-strategy.md`'s
   table changes: no tenant table, login, permission or message; the lock is a read-side change in booking)
   · **Depends on:** E01-T03a (the profile; the audited read), E01-T02b (the form), E01-T05d (the
-  booking) — Done, T03a once it is
+  booking) — all Done
 - **Read:** `scope` (Patients list and profile) · D-033, D-040, D-092, D-093, D-095, D-098, D-113, D-114,
-  D-121 · `handoffs/E01-T02b.md` (the patient form) · `handoffs/E01-T05a.md` (the reviewer's suggestion
-  1, the tester's lines) · `handoffs/E01-T05d.md` (the new patient's own id) · the architect section of
-  `handoffs/E01-T03b.md`
+  D-121 · `handoffs/E01-T02b.md` (the patient form) · `handoffs/E01-T03a.md` (the architect's and the
+  builder's sections, and the fix round: the lower-cased id) · `handoffs/E01-T05a.md` (the reviewer's
+  suggestion 1, the tester's lines) · `handoffs/E01-T05d.md` (the new patient's own id) · the architect
+  sections of `handoffs/E01-T03b.md`
 
 **Why.** Details change: a new phone, a corrected name, a returning archived patient. The status is the
 owner's rule (D-114): a patient with a visit ahead is not archived or marked deceased, since E02 sends
@@ -488,11 +490,21 @@ no reminder to either, silently.
   Share the form's fields with the new-patient page instead of copying them (`patient-fields.ts`,
   `NewPatientForm`); the new page and the booking drawer's quick patient behave as before. No field sets
   an `autocomplete` of its own (D-093, D-095). The page is an audited read like the profile's
-  (`patient.viewed`, one row per view); not found as the profile's. Saving goes to the profile, with a
-  toast.
+  (`patient.viewed`, one row per view); not found as the profile's. It calls the profile's own
+  `readPatient.forPage` (T03a: the same fields, the same view row, the same 404) rather than a second
+  read; the phone it fills in is `PatientProfile.phone`, the number as the clinic writes it (D-097), so a
+  form saved untouched must read back to the stored number (acceptance below). Saving goes to the
+  profile, with a toast; the profile's render is a view again, which is one more `patient.viewed` row.
 - **`patients.update(tx, id, changes, now)`.** Locks the patient's row `for update` first. Reads the phone
   with the clinic's country and the email as `create` does (`phone_impossible` refused); returns the names of
-  the fields that changed (none: nothing written, no audit row, no `updated_at`), `not_found` for none.
+  the fields that changed, `not_found` for none. **A save that changes nothing is refused as
+  `nothing_changed`, shown above the button ("Nothing was changed."), with nothing written, no
+  `updated_at` and no audit row:** the wrapper writes exactly one audit row for every handler that
+  returns (`actions.ts`, step 6), so the only way to write none is a refusal, which rolls back. Compare
+  the values as they will be stored (the phone as E.164, the email lower-cased, names and notes
+  trimmed, an empty optional field as null). The action's input is `patientId: z.uuid().transform(lower
+  case)` as `readPatient`'s is, since its audit `entityId` is read from the input (T03a, fix round 1);
+  no throw in the transform.
   Setting `archived` or `deceased` is **refused as `visits_ahead`** while the patient has a visit ahead that
   holds the chair: a `scheduling.visitsAhead(tx, patientId, now)` that returns the appointments not
   cancelled, not no-show, not completed, that have not ended at `now`, soonest first, limit 20, with provider
@@ -525,7 +537,11 @@ duplicates (E04-T06). Deleting or anonymising (E07-T05). The consent switches (E
 - [ ] A save changes the fields, trims and normalises as create does, writes one `patient.updated` row naming
       the fields changed and never their values, and goes to the profile with a toast (integration for
       the module and the row; component test for the page).
-- [ ] A save with nothing changed writes no row and no `updated_at` (integration).
+- [ ] A save with nothing changed is refused as `nothing_changed` and writes no row and no `updated_at`
+      (integration); the edit form of **every seeded patient**, sent as it is filled in (their phone as the
+      clinic writes it), is that refusal, so the phone reads back to the stored number (integration).
+- [ ] The audit row of a save names the patient by the stored lower-case id, whether the address and the
+      call wrote it in capitals or not (integration, as T03a's).
 - [ ] An impossible phone is refused above the button, nothing written; a field the schema settles shows at
       its field (unit, component).
 - [ ] Opening the edit page writes one `patient.viewed` row; a patient of the other clinic, an unknown id
@@ -1042,6 +1058,12 @@ E01-T03). The language: the new-patient page's first, changed on the profile (E0
   that acts on the pointer's press (Radix's Select or DropdownMenu trigger) would still act within the
   half second. The time and provider selects are the browser's own (`NativeSelect`) and the status
   controls are buttons; a control that acts on the press extends the guard first.
+- **A visit under way on the profile** (E01-T03a Discovered, `speed`): a patient in the chair (status
+  `arrived`) is neither the profile's next visit nor in its history, so the profile reads "No
+  appointment ahead" while the visit is under way, as the patient list's next visit does (both read
+  `booked` or `confirmed`). When this task adds the Arrived button, decide with the owner whether the
+  profile's card and the list show the visit under way, and change `scheduling.upcoming(now)` for
+  both together, never one (T03b's `visitsAhead` already counts `arrived`).
 - **Enter in the booking drawer's patient field takes the row highlighted** (E01-T05d's review and
   delta review, `message`: the wrong patient booked gets the reminders; owner, not now but here, as
   this task changes the booking drawer, D-118): the last answer's suggestions stay while the next
@@ -1770,3 +1792,47 @@ working hours. Showing a break's overlap with the opening hours (the drawer alre
 - [ ] A written findings list exists; nothing critical is open.
 
 **Milestone check (M1):** on staging, run a day for the demo clinic from the UI only.
+
+---
+
+### E01-T12 · The audit log stores every record id in one case
+
+**Ready** (from E01-T03a's fix round, a `data` leftover, made a task by the architect in E01-T03a's Done pass, 2026-10-29; owner: not now, after the rest of E01 and before E07-T01).
+
+- **Role:** builder · **Risk:** normal (no area of `test-strategy.md`'s table: the audit log's rows are not
+  tenant data, a permission or a message; one function of `audit` changes) · **Depends on:** E01-T03a (Done:
+  the first fix), E01-T09e (Done: the settings actions it covers)
+- **Read:** `security-privacy.md` section 10 (the audit log) · `handoffs/E01-T03a.md` (the tester's
+  finding 1 and the builder's fix round 1) · `src/modules/audit/record.ts`
+
+**Why.** The record view is the one trace of who read a patient. A uuid is the same id to Postgres in any
+case, but `audit_log.entity_id` is text: an action whose audit `entityId` comes from its input
+(`({ input }) => input.patientId`) writes the id as the caller typed it, so a later "who viewed or changed
+this record" (`entity_id = <id>`, E07-T01's viewer and the access report) misses the rows written under
+capitals. Only a direct call to a server action can type one (the app's own pages hold the stored,
+lower-case id), which is why it waits; E01-T03a lower-cases its own input, and E01-T03b's edit does the same.
+
+**Do.**
+- **One place:** `audit.record` stores `entityId` lower-cased, after it has checked that it is a UUID
+  (`checkedEntry` keeps the check; the stored value, not the check, changes). Every writer passes through
+  it: the action wrapper, `login-audit`, `clinic-create`, and the calendar's direct call. Do not edit each
+  declaration, and do not touch `readPatient`'s transform (it stays; it is harmless and tested).
+- A test that names the failure first: an action of each kind that takes its `entityId` from its input
+  (the providers' `changeProvider`, the treatment types' `changeTreatmentType`, `moveProvider`, the
+  breaks' remove) called with the id in capitals writes one row whose `entity_id` is the lower-case id.
+  A unit test of `record`/`checkedEntry` for the id in capitals, in mixed case and already lower-case; an
+  id that is no UUID is still refused as before.
+- Say in `security-privacy.md` section 10 that `entity_id` is stored lower-case, one line.
+- Does the same hold for ids inside `metadata`? Look, and write what you find in the note: none holds a
+  record id today (`{ fields }`, `{ date }`); if one does, one line in `discovered.md`, not a fix here.
+
+**Out of scope.** Rewriting existing rows (none are in production; the dev and test databases are rebuilt
+by `pnpm db:reset`). A new column. A check in lint for the input's case.
+
+**Acceptance.**
+- [ ] The audit row of each action named above, called with its id in capitals, holds the lower-case id
+      (integration; the test fails with the lower-casing taken out).
+- [ ] `record` with an id in capitals, mixed case and lower case stores lower case; a non-UUID is still
+      refused with the same error (unit).
+- [ ] `readPatient`'s own test and E01-T03a's capital-letter case still pass unchanged.
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
