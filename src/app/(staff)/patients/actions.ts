@@ -10,7 +10,7 @@ import { SEARCH_MAX_LENGTH } from './search-answer';
  * search box sends what is typed here, in the request's body, never in the page's address, which
  * the browser's history and the host's request log keep (D-095). Every member of a clinic sees
  * every patient of it (Q-11, D-096). No audit row: a list is not a patient record view
- * (security-privacy.md section 10); the profile, E01-T03, is. What is typed is the input's `text`, a
+ * (security-privacy.md section 10); the profile, E01-T03a, is. What is typed is the input's `text`, a
  * name the logger's net drops (src/lib/personal-fields.ts, E01-T02b).
  */
 export const searchPatients = staffRead(

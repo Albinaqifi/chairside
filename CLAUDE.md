@@ -128,7 +128,8 @@ tests/e2e/            End-to-end journeys and checks in real browsers (Playwrigh
                       double click on Make inactive (E01-T09d); move one up and down in the order and
                       a double click on Up (E01-T09c); add a weekly break in a provider's Breaks dialog,
                       see it hatched and warned about, remove it, and a double click on a break's Remove
-                      (E01-T09e).
+                      (E01-T09e); a click on a patient list row opens the profile and is one
+                      `patient.viewed` row, an unknown address is a 404 (E01-T03a).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 Dockerfile            The one image staging and production run (D-007, D-103): the web by default,

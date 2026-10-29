@@ -65,4 +65,12 @@ export {
   type SetTreatmentTypeActiveResult,
   type TreatmentTypeFields,
 } from './treatment-types';
-export { lastAndNextVisits, type PatientVisits } from './visits';
+// E01-T03a: patientVisits, the profile's next visit and history.
+export {
+  HISTORY_LIMIT,
+  lastAndNextVisits,
+  patientVisits,
+  type PatientVisit,
+  type PatientVisits,
+  type PatientVisitsOf,
+} from './visits';
