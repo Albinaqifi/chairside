@@ -1027,3 +1027,279 @@ describe('the action, as every role (acceptance 3)', () => {
     expect(await statusRows(id)).toBe(1);
   });
 });
+
+// Added by the tester (E01-T06a): the races and days the builder's cases leave out. Same helpers.
+
+/** True when some backend waits for a row lock, within three seconds (pg_locks, not a sleep). */
+async function lockWaiter(): Promise<boolean> {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const { rows } = await admin.query(
+      `select 1 from pg_locks where not granted and locktype in ('transactionid', 'tuple')`,
+    );
+    if (rows.length > 0) return true;
+    await new Promise((done) => setTimeout(done, 50));
+  }
+  return false;
+}
+
+function gate() {
+  let open: () => void = () => undefined;
+  const promise = new Promise<void>((done) => {
+    open = done;
+  });
+  return { promise, open };
+}
+
+describe('tester: two restores at once take turns on the provider', () => {
+  beforeEach(() => {
+    request.cookie = roleUsers['front_desk']!.cookie;
+    request.clinic = skopje.clinic;
+  });
+
+  it('two cancelled visits that overlap, restored at once: one is booked, the other is an overlap', async () => {
+    for (let race = 0; race < 4; race += 1) {
+      const providerId = await provider(skopje);
+      const first = await visit(skopje, providerId, { status: 'cancelled' });
+      const second = await visit(skopje, providerId, {
+        status: 'cancelled',
+        patientId: skopje.marko,
+        startsAt: '2031-03-03T11:15:00Z',
+      });
+      const answers = await Promise.all([
+        call(skopje.clinic, { appointmentId: first, action: 'restore' }),
+        call(skopje.clinic, { appointmentId: second, action: 'restore' }),
+      ]);
+      expect(
+        answers.filter((answer) => answer.ok),
+        `race ${race}`,
+      ).toHaveLength(1);
+      expect(answers.filter((answer) => !answer.ok)).toEqual([
+        { ok: false, error: { code: 'overlap' } },
+      ]);
+      const held = await count(
+        `select count(*) as n from appointments where id = any($1) and status = 'booked'`,
+        [first, second],
+      );
+      expect(held).toBe(1);
+      expect((await statusRows(first)) + (await statusRows(second))).toBe(1);
+    }
+  });
+
+  it('the same visit cancelled twice, restored at once: one is booked, the other is already_booked', async () => {
+    for (let race = 0; race < 4; race += 1) {
+      const providerId = await provider(skopje);
+      const first = await visit(skopje, providerId, { status: 'cancelled' });
+      const second = await visit(skopje, providerId, { status: 'no_show' });
+      const answers = await Promise.all([
+        call(skopje.clinic, { appointmentId: first, action: 'restore', anyway: true }),
+        call(skopje.clinic, { appointmentId: second, action: 'restore', anyway: true }),
+      ]);
+      expect(
+        answers.filter((answer) => answer.ok),
+        `race ${race}`,
+      ).toHaveLength(1);
+      expect(answers.filter((answer) => !answer.ok)).toEqual([
+        { ok: false, error: { code: 'already_booked' } },
+      ]);
+    }
+  });
+
+  it('the same visit restored twice at once: one wins, the other is not_allowed', async () => {
+    const id = await visit(skopje, await provider(skopje), { status: 'cancelled' });
+    const answers = await Promise.all([
+      call(skopje.clinic, { appointmentId: id, action: 'restore' }),
+      call(skopje.clinic, { appointmentId: id, action: 'restore' }),
+    ]);
+    expect(answers.filter((answer) => answer.ok)).toHaveLength(1);
+    expect(answers.filter((answer) => !answer.ok)).toEqual([
+      { ok: false, error: { code: 'not_allowed' } },
+    ]);
+    expect(await statusRows(id)).toBe(1);
+  });
+});
+
+describe('tester: a restore and archiving the patient take turns', () => {
+  async function racePatient(): Promise<string> {
+    const id = newId();
+    await insertRow(admin, 'patients', {
+      id,
+      clinic_id: skopje.clinic,
+      first_name: 'Race',
+      last_name: 'Patient',
+      language: 'en',
+      status: 'active',
+    });
+    return id;
+  }
+
+  const archive = (tx: TenantTransaction, patientId: string) =>
+    patients.update(
+      tx,
+      patientId,
+      {
+        firstName: 'Race',
+        lastName: 'Patient',
+        dateOfBirth: null,
+        phone: null,
+        email: null,
+        language: 'en',
+        guardianName: null,
+        notes: '',
+        status: 'archived',
+      },
+      NOW,
+      async () => (await scheduling.patientVisitsAhead(tx, patientId, NOW)).length > 0,
+    );
+
+  it('a restore in flight first: the archive waits, then finds the restored visit ahead', async () => {
+    const patientId = await racePatient();
+    const id = await visit(skopje, await provider(skopje), { status: 'cancelled', patientId });
+    const written = gate();
+    const hold = gate();
+    const emit = hook();
+    emit.mockImplementationOnce(async () => {
+      written.open();
+      await hold.promise;
+    });
+    const restore = run(skopje, (tx) => restoreOf(tx, id), emit);
+    await written.promise;
+    const archiving = withTenant(skopje.clinic, (tx) => archive(tx, patientId));
+    const waited = await lockWaiter();
+    hold.open();
+    const [restored, archived] = await Promise.all([restore, archiving]);
+
+    expect(waited, 'the archive waits for the restore').toBe(true);
+    expect(restored.ok).toBe(true);
+    expect(archived).toEqual({ ok: false, code: 'visits_ahead' });
+    const { rows } = await admin.query('select status from patients where id = $1', [patientId]);
+    expect(rows[0]).toEqual({ status: 'active' });
+  });
+
+  it('an archive in flight first: the restore waits, then is patient_not_bookable', async () => {
+    const patientId = await racePatient();
+    const id = await visit(skopje, await provider(skopje), { status: 'cancelled', patientId });
+    const written = gate();
+    const hold = gate();
+    const archiving = withTenant(skopje.clinic, async (tx) => {
+      const archived = await archive(tx, patientId);
+      written.open();
+      await hold.promise;
+      return archived;
+    });
+    await written.promise;
+    const emit = hook();
+    const restore = run(skopje, (tx) => restoreOf(tx, id), emit);
+    const waited = await lockWaiter();
+    hold.open();
+    const [archived, restored] = await Promise.all([archiving, restore]);
+
+    expect(waited, 'the restore waits for the archive').toBe(true);
+    expect(archived).toEqual({ ok: true, fields: ['status'] });
+    expect(restored).toEqual({ ok: false, code: 'patient_not_bookable' });
+    expect((await row(id)).status).toBe('cancelled');
+    expect(emit).not.toHaveBeenCalled();
+  });
+});
+
+describe('tester: the same day across a daylight-saving change', () => {
+  it('Skopje, 30 March 2031 (23 hours): completed 00:30, undone at 23:59 is the same day; at midnight is not', async () => {
+    const make = async () =>
+      visit(skopje, await provider(skopje), {
+        status: 'completed',
+        completedAt: '2031-03-29T23:30:00Z', // 00:30 on the 30th, before the clocks move
+        startsAt: '2031-03-29T22:00:00Z',
+      });
+    const same = await make();
+    expect(
+      await run(
+        skopje,
+        () => simple(same, 'undo_completion'),
+        hook(),
+        new Date('2031-03-30T21:59:00Z'), // 23:59 local, UTC+2
+      ),
+    ).toEqual({ ok: true, from: 'completed', to: 'arrived' });
+    const next = await make();
+    expect(
+      await run(
+        skopje,
+        () => simple(next, 'undo_completion'),
+        hook(),
+        new Date('2031-03-30T22:00:00Z'), // 00:00 on the 31st
+      ),
+    ).toEqual({ ok: false, code: 'not_allowed' });
+  });
+
+  it('Skopje, 26 October 2031 (25 hours): the day ends at 23:00 UTC', async () => {
+    const make = async () =>
+      visit(skopje, await provider(skopje), {
+        status: 'completed',
+        completedAt: '2031-10-25T22:30:00Z', // 00:30 on the 26th, still summer time
+        startsAt: '2031-10-25T21:30:00Z',
+      });
+    const same = await make();
+    expect(
+      await run(
+        skopje,
+        () => simple(same, 'undo_completion'),
+        hook(),
+        new Date('2031-10-26T22:59:00Z'),
+      ),
+    ).toEqual({ ok: true, from: 'completed', to: 'arrived' });
+    const next = await make();
+    expect(
+      await run(
+        skopje,
+        () => simple(next, 'undo_completion'),
+        hook(),
+        new Date('2031-10-26T23:00:00Z'),
+      ),
+    ).toEqual({ ok: false, code: 'not_allowed' });
+  });
+});
+
+describe('tester: a walk through the table keeps the columns coherent', () => {
+  it('confirm, arrive, undo, complete, undo: the confirmation is kept, the completion cleared', async () => {
+    const id = await visit(skopje, await provider(skopje));
+    const steps: [Simple, string][] = [
+      ['confirm', 'confirmed'],
+      ['arrive', 'arrived'],
+      ['undo_arrival', 'confirmed'],
+      ['arrive', 'arrived'],
+      ['complete', 'completed'],
+      ['undo_completion', 'arrived'],
+      ['complete', 'completed'],
+      ['undo_completion', 'arrived'],
+      ['undo_arrival', 'confirmed'],
+    ];
+    for (const [action, to] of steps) {
+      const done = await run(skopje, () => simple(id, action), hook());
+      expect(done, action).toMatchObject({ ok: true, to });
+      const stored = await row(id);
+      expect(stored.status).toBe(to);
+      expect(stored.confirmed_via, action).toBe('staff');
+      expect(iso(stored.confirmed_at), action).toBe(NOW.toISOString());
+      expect(stored.completed_at === null, action).toBe(to !== 'completed');
+    }
+    expect(await row(id)).toMatchObject({ cancelled_at: null, cancelled_by: null });
+  });
+
+  it('cancel, restore, cancel again: the restore clears everything, the second cancel has its own', async () => {
+    const id = await visit(skopje, await provider(skopje), {
+      status: 'confirmed',
+      confirmedAt: EARLIER,
+      confirmedVia: 'link',
+    });
+    expect((await run(skopje, () => cancelOf(id, 'first reason'), hook())).ok).toBe(true);
+    expect((await run(skopje, (tx) => restoreOf(tx, id), hook())).ok).toBe(true);
+    expect(await row(id)).toMatchObject({
+      status: 'booked',
+      confirmed_at: null,
+      confirmed_via: null,
+      cancelled_at: null,
+      cancelled_by: null,
+      cancel_reason: null,
+    });
+    expect((await run(skopje, () => cancelOf(id, null, 'patient'), hook())).ok).toBe(true);
+    expect(await row(id)).toMatchObject({ cancelled_by: 'patient', cancel_reason: null });
+  });
+});
