@@ -1086,7 +1086,8 @@ One pure function decides every change; nothing else may write `appointments.sta
   a `staffAction` with `calendar.manage` (every member). Input: `appointmentId` (`z.uuid()` lower-cased by a
   transform, no throw: it is the audit `entityId`, E01-T03a, E01-T12), `action`, and for `cancel`
   `cancelledBy` and `reason`, for `restore` `anyway`. One audit row, `appointment.status_changed`, metadata
-  `{ from, to }` (statuses, no reason). Refusals returned with `refuse()`: `not_found`, `not_allowed`,
+  `{ fromStatus, toStatus }` (statuses, no reason; not `from` and `to`, which the audit log refuses as personal
+  field names, `personal-fields.ts`). Refusals returned with `refuse()`: `not_found`, `not_allowed`,
   `too_early`, `overlap`, `already_booked`, `provider_not_bookable`, `patient_not_bookable`. After a change:
   `refresh()` and `revalidatePath('/patients')`, as `bookAppointment` does (the patient list's next visit has
   changed); an `overlap` or `already_booked` refusal refreshes too (the visit that blocks it is new to the

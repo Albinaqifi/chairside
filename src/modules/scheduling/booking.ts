@@ -1,18 +1,12 @@
-import { and, eq, gt, lt, notInArray, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { TenantTransaction } from '@/db/tenant';
 import { isCalendarDay, type CalendarDay } from '@/lib/calendar-day';
 import { newId } from '@/lib/ids';
-import type { AppointmentStatus } from './appointments';
+import { chairClashes, sameVisitHoldsChair } from './chair';
 import { appointments, providers, treatmentTypes } from './schema';
 
 /** Minutes in a day on the clinic's clock: a start is a local time from 00:00 up to 23:59. */
 const MINUTES_PER_DAY = 24 * 60;
-
-/**
- * The statuses whose visits no longer hold the chair: no booking is refused for one (data-model.md,
- * "No double booking").
- */
-const CHAIR_FREED = ['cancelled', 'no_show'] satisfies AppointmentStatus[];
 
 /** One appointment as the desk books it (E01-T05a), each value's form checked by the caller's schema. */
 export interface NewBooking {
@@ -126,32 +120,11 @@ export async function createAppointment(
   if (checked.rows[0]?.on_its_day !== true) return { ok: false, code: 'start_skipped' };
 
   // The same booking again: the moment compared in SQL, as the overlap's are.
-  const [same] = await tx
-    .select({ id: appointments.id })
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.patientId, booking.patientId),
-        eq(appointments.providerId, booking.providerId),
-        notInArray(appointments.status, CHAIR_FREED),
-        eq(appointments.startsAt, startsAt),
-      ),
-    )
-    .limit(1);
-  if (same) return { ok: false, code: 'already_booked' };
+  if (await sameVisitHoldsChair(tx, { ...booking, startsAt })) {
+    return { ok: false, code: 'already_booked' };
+  }
 
-  const [clash] = await tx
-    .select({ id: appointments.id })
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.providerId, booking.providerId),
-        notInArray(appointments.status, CHAIR_FREED),
-        lt(appointments.startsAt, endsAt),
-        gt(appointments.endsAt, startsAt),
-      ),
-    )
-    .limit(1);
+  const clash = await chairClashes(tx, { providerId: booking.providerId, startsAt, endsAt });
   if (clash && !booking.anyway) return { ok: false, code: 'overlap' };
 
   const id = newId();
@@ -166,7 +139,7 @@ export async function createAppointment(
     endsAt,
     status: 'booked',
     // Only over a real overlap, as it is when the row is written (D-020).
-    overlapOk: clash !== undefined,
+    overlapOk: clash,
     source: 'staff',
     createdBy: booking.createdBy,
     createdAt: now,
