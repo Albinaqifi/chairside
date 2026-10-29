@@ -2385,3 +2385,26 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** a receptionist wants a move to keep its confirmation (a same-day shift of minutes); the
   patient's own confirm and cancel (E02-T09) need facts the function lacks; T06b runs far over 500 lines
   (then the guards are their own task).
+
+### D-123 · E01-T06a Done: E01-T06b split again, the drawer with its status buttons and then the cancel dialog with the guards; the buttons come from the module
+- **Origin:** E01-T06a's Done pass and E01-T06b's Ready pass, 2026-10-29 (PR #94; `handoffs/E01-T06a.md`,
+  `handoffs/E01-T06b.md`). The owner had no question: every leftover was the architect's. Process, planning.
+- **What:**
+  - **E01-T06b → E01-T06b and E01-T06e.** T06b: a block opens the drawer, the status buttons the state
+    machine allows (not Cancel), the profile link. T06e: the cancel dialog, the guard that a form's `submit`
+    stays inside its drawer or dialog, the drawer and dialog that stay open while a request is on its way
+    (`StaffForm.onSendingChange`), the booking drawer's Enter fix. Order: T06a → T06b → T06e → T06c → T06d;
+    T06c depends on T06e (its move form has a dialog and requests in the same drawer).
+  - **The buttons are computed in the module:** `scheduling.appointmentsOnDay` takes `now` and returns each
+    visit's `actions`, from the state machine with the staff actor and the facts of one shared function that
+    `changeAppointmentStatus` uses too. The client imports no module, and a button the machine would refuse
+    cannot appear. A no-show is offered once the visit has started, not before.
+  - **Who cancelled has no default** in the cancel dialog (T06e): the field is required, as a wrong default
+    is a wrong record.
+  - **T06a's review leftovers:** the `cancelledBy` of a patient's cancel is one line in E02-T09's Do; the
+    restore's code for an archived patient is a note; `aftercareSent` waits for E06 (Discovered, → E06-T00).
+- **Why:** D-122's "Revisit if" (T06b far over 500 lines, then the guards are their own task) was met by
+  reading the code: the drawer, the read, the buttons, the dialog, two guards and the Enter fix came to about
+  650 lines of product code against the Definition of Ready's 400, and T05a showed the estimate is low.
+- **Revisit if:** T06b runs far over 450 lines (then the module's `actions` is its own task); the desk wants
+  No-show offered before the start; the receptionist trial (Q-09) finds "no default" slow for a cancel.
