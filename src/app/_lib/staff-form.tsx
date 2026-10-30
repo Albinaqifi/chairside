@@ -51,6 +51,13 @@ export interface StaffFormProps<In, Out, R extends string> {
   submitLabel: string;
   /** The submit button's text while the action runs ("Saving…"). */
   pendingLabel: string;
+  /**
+   * Told when the form starts sending (true) and when it has its answer (false), so a drawer or dialog
+   * holding it can stay open until then (`busy`, src/ui/sheet.tsx; E01-T06e). A form that is
+   * unmounted while it sends tells false as it goes, so a caller that counts its forms is never left
+   * waiting for one whose button left the page.
+   */
+  onSendingChange?: (sending: boolean) => void;
   className?: string;
   /** The fields: a StaffField for each. */
   children: ReactNode;
@@ -95,6 +102,7 @@ export function StaffForm<In, Out, R extends string = never>({
   refusals,
   submitLabel,
   pendingLabel,
+  onSendingChange,
   className,
   children,
 }: StaffFormProps<In, Out, R>) {
@@ -126,10 +134,32 @@ export function StaffForm<In, Out, R extends string = never>({
     { answer: IDLE, attempt: 0 },
   );
 
+  // What the caller is told (E01-T06e), once for each change: the caller's latest function, and the
+  // last thing told. It is told "sending" in the submit itself, so there is no moment between the
+  // request leaving and the drawer knowing (a transition's render comes later); "answered" once the
+  // answer is rendered, so a refusal is on the page before a drawer can close; and "answered" as the
+  // form leaves the page, so a caller that counts its forms is not left waiting for one whose button
+  // is gone.
+  const report = useRef(onSendingChange);
+  const told = useRef(false);
+  useEffect(() => {
+    report.current = onSendingChange;
+  });
+  function tell(now: boolean) {
+    if (told.current === now) return;
+    told.current = now;
+    report.current?.(now);
+  }
+  useEffect(() => {
+    if (!pending) tell(false);
+  }, [pending, state]);
+  useEffect(() => () => tell(false), []);
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (sending.current) return; // a second click or Enter while the first is on its way
     sending.current = true;
+    tell(true);
     const formData = new FormData(event.currentTarget);
     startTransition(() => dispatch(formData));
   }

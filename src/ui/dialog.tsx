@@ -54,6 +54,12 @@ type DialogContentProps = Omit<ComponentProps<typeof DialogPrimitive.Content>, '
   title: Exclude<ReactNode, null | undefined | boolean>;
   /** A line under the title, in the muted colour; a screen reader reads it with the dialog. */
   description?: ReactNode;
+  /**
+   * True while a request of a form inside is on its way (E01-T06e, E01-T05a tester): Escape, a press
+   * on the overlay and Close then leave it open, so the form's answer, a refusal too, shows above its
+   * button. The caller sets it from its forms' `onSendingChange` and clears it when they have answered.
+   */
+  busy?: boolean;
 };
 
 /**
@@ -74,24 +80,35 @@ type DialogContentProps = Omit<ComponentProps<typeof DialogPrimitive.Content>, '
  * close it. And the double click's second press changes nothing in it, as in the drawer (E01-T05c):
  * for that half second a pointer's press in it or on the overlay moves no focus and reaches no
  * control; a key always works.
+ *
+ * Two guards for the forms inside, as the drawer's (E01-T06e, ./sheet.tsx): while `busy` is set it
+ * stays open on Escape, the overlay and Close; and a `submit` from a form inside goes no further than
+ * its content, so a dialog opened from inside a form never sends that form.
  */
 function DialogContent({
   title,
   description,
   className,
   children,
+  busy = false,
   onOpenAutoFocus,
+  onEscapeKeyDown,
+  onInteractOutside,
   onPointerDownOutside,
   onPointerDownCapture,
   onMouseDownCapture,
   onClickCapture,
   onKeyDownCapture,
+  onSubmit,
   ...props
 }: DialogContentProps) {
   const t = useTranslations('dialog');
   const guard = useDoubleClickGuard({
     onOpenAutoFocus,
-    onPointerDownOutside,
+    onPointerDownOutside: (event) => {
+      onPointerDownOutside?.(event);
+      if (busy) event.preventDefault();
+    },
     onPointerDownCapture,
     onMouseDownCapture,
     onClickCapture,
@@ -110,6 +127,20 @@ function DialogContent({
           'fixed inset-x-4 top-1/2 z-40 mx-auto grid max-w-lg -translate-y-1/2 gap-4 rounded-card border border-border bg-surface p-6 text-text outline-none motion-safe:animate-drawer',
           className,
         )}
+        onEscapeKeyDown={(event) => {
+          onEscapeKeyDown?.(event);
+          if (busy) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event);
+          if (busy) event.preventDefault();
+        }}
+        onSubmit={(event) => {
+          onSubmit?.(event);
+          // React passes a `submit` on to every onSubmit above, through a portal too: a form in here
+          // sends itself only, never a form that holds this dialog's opener (E00-T04e review).
+          event.stopPropagation();
+        }}
         {...props}
         {...guard.content}
       >
@@ -129,6 +160,10 @@ function DialogContent({
         {children}
         <DialogClose
           {...guard.close}
+          onClick={(event) => {
+            guard.close.onClick(event);
+            if (busy) event.preventDefault();
+          }}
           className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-pill bg-border/50 text-text transition-colors outline-none hover:bg-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus focus-visible:outline-solid"
         >
           <XIcon aria-hidden="true" className="size-4" />

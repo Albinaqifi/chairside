@@ -250,7 +250,22 @@
         "undo_completion": {
           "label": "Undo done",
           "done": "Done undone: back in the chair."
+        },
+        "cancel": {
+          "label": "Cancel",
+          "done": "Visit cancelled."
         }
+      },
+      "cancelDialog": {
+        "title": "Cancel this visit",
+        "description": "Who cancelled is kept with the visit.",
+        "who": "Who cancelled",
+        "choose": "Choose who cancelled",
+        "patient": "The patient",
+        "staff": "The clinic",
+        "reason": "Reason (optional)",
+        "submit": "Cancel visit",
+        "pending": "Cancelling…"
       },
       "refusals": {
         "notAllowed": "This visit was changed meanwhile. Look at it again.",
@@ -559,6 +574,18 @@
       "description": "A question with a few fields, over the drawer's overlay.",
       "field": "A field: the first focus lands here",
       "close": "Close the dialog"
+    },
+    "nested": {
+      "heading": "A dialog inside a form",
+      "intro": "The outer form holds the dialog, and the dialog holds a form. Pressing the inner form's button sends the inner form only: the outer form's answer, a refusal, never shows.",
+      "open": "Open the inner form",
+      "title": "The inner form",
+      "outerRefused": "The outer form was sent as well.",
+      "outerSubmit": "Send the outer form",
+      "outerSubmitting": "Sending the outer form…",
+      "innerDone": "The inner form was sent.",
+      "innerSubmit": "Send the inner form",
+      "innerSubmitting": "Sending the inner form…"
     },
     "form": {
       "heading": "The form pattern",

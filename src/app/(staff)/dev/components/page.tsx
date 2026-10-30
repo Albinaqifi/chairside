@@ -27,7 +27,7 @@ import { Switch } from '@/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/tabs';
 import { Textarea } from '@/ui/textarea';
 import { DEMO_CHOICES } from './demo-choices';
-import { DemoForm, ToastDemo } from './demo-form';
+import { DemoForm, NestedFormDemo, ToastDemo } from './demo-form';
 
 /** Each status pill, with the key of its text under devComponents.badges (the demo's, ST). */
 const BADGES = [
@@ -305,6 +305,11 @@ export default async function ComponentsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      </Section>
+
+      <Section heading={t('nested.heading')}>
+        <p className="mb-4 max-w-xl text-muted">{t('nested.intro')}</p>
+        <NestedFormDemo />
       </Section>
 
       <Section heading={t('logo.heading')}>

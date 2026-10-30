@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { StaffField, StaffForm } from '@/app/_lib/staff-form';
 import { Button } from '@/ui/button';
 import { Checkbox } from '@/ui/checkbox';
+import { Dialog, DialogContent, DialogTrigger } from '@/ui/dialog';
 import { Input } from '@/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/ui/native-select';
 import { Switch } from '@/ui/switch';
@@ -114,5 +115,59 @@ export function ToastDemo() {
         {t('showAnother')}
       </Button>
     </div>
+  );
+}
+
+/**
+ * The fields a demo action needs, hidden, and the answer it should give: a form here has nothing to
+ * type, only a button to press.
+ */
+function AskedAnswer({ answer }: { answer: 'done' | 'refusal' }) {
+  return (
+    <>
+      <input type="hidden" name="note" value="Nested demo" />
+      <input type="hidden" name="code" value="1234" />
+      <input type="hidden" name="details" value="Nested demo" />
+      <input type="hidden" name="choice" value="first" />
+      <input type="hidden" name="answer" value={answer} />
+    </>
+  );
+}
+
+/**
+ * A dialog inside a form, and a form inside the dialog (E01-T06e, E00-T04e review). The outer form
+ * would answer with a refusal, the inner one is done. A `submit` from the inner form goes up React's
+ * tree through the dialog's portal, to the outer form's onSubmit: the dialog's content stops it
+ * (src/ui/dialog.tsx), so pressing the inner button sends the inner form only. The outer form's
+ * refusal showing means the guard is gone.
+ */
+export function NestedFormDemo() {
+  const t = useTranslations('devComponents.nested');
+  return (
+    <StaffForm
+      action={demoAnswer}
+      doneMessage={t('innerDone')}
+      refusals={{ demo_refused: t('outerRefused') }}
+      submitLabel={t('outerSubmit')}
+      pendingLabel={t('outerSubmitting')}
+      className="max-w-md"
+    >
+      <AskedAnswer answer="refusal" />
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="secondary">{t('open')}</Button>
+        </DialogTrigger>
+        <DialogContent title={t('title')}>
+          <StaffForm
+            action={demoAnswer}
+            doneMessage={t('innerDone')}
+            submitLabel={t('innerSubmit')}
+            pendingLabel={t('innerSubmitting')}
+          >
+            <AskedAnswer answer="done" />
+          </StaffForm>
+        </DialogContent>
+      </Dialog>
+    </StaffForm>
   );
 }
