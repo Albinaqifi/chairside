@@ -69,6 +69,7 @@ function visit(
     startMinute: from,
     endMinute: to,
     actions: [],
+    movable: true,
     patient: { firstName: 'Ana', lastName: 'Brezovska' },
     ...fields,
   };

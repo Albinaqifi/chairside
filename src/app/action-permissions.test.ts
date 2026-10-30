@@ -130,6 +130,7 @@ const ACTIONS: Record<string, Record<string, ScopeRow | 'userAction'>> = {
   // E01-T06a: every role changes an appointment's status.
   'src/app/(staff)/calendar/appointment-actions.ts': {
     changeAppointmentStatus: 'Calendar, patients, booking',
+    moveAppointment: 'Calendar, patients, booking', // E01-T06c: every role moves a visit
   },
   'src/app/(staff)/dev/components/actions.ts': {
     demoAnswer: 'No area of the table: every member',

@@ -3,6 +3,7 @@ import type { TenantTransaction } from '@/db/tenant';
 import { isCalendarDay, type CalendarDay } from '@/lib/calendar-day';
 import { newId } from '@/lib/ids';
 import { chairClashes, sameVisitHoldsChair } from './chair';
+import { startExists, startMoments } from './local-time';
 import { appointments, providers, treatmentTypes } from './schema';
 
 /** Minutes in a day on the clinic's clock: a start is a local time from 00:00 up to 23:59. */
@@ -109,15 +110,13 @@ export async function createAppointment(
     .where(eq(treatmentTypes.id, booking.treatmentTypeId));
   if (!treatment?.active) return { ok: false, code: 'treatment_not_bookable' };
 
-  // The moments stay in SQL, from the overlap check to the insert: PostgreSQL alone turns the local
-  // time into one, so no moment is read back and parsed here.
-  const localStart = sql`(${booking.day}::date::timestamp + make_interval(mins => ${booking.startMinute}))`;
-  const startsAt = sql`(${localStart} at time zone ${booking.timeZone})`;
+  // The moments stay in SQL, from the overlap check to the insert (./local-time.ts).
+  const moments = startMoments(booking.day, booking.startMinute, booking.timeZone);
+  const { startsAt } = moments;
   const endsAt = sql`(${startsAt} + make_interval(mins => ${booking.lengthMinutes}))`;
-  const checked = await tx.execute<{ on_its_day: boolean }>(
-    sql`select (${startsAt} at time zone ${booking.timeZone}) = ${localStart} as on_its_day`,
-  );
-  if (checked.rows[0]?.on_its_day !== true) return { ok: false, code: 'start_skipped' };
+  if (!(await startExists(tx, moments, booking.timeZone))) {
+    return { ok: false, code: 'start_skipped' };
+  }
 
   // The same booking again: the moment compared in SQL, as the overlap's are.
   if (await sameVisitHoldsChair(tx, { ...booking, startsAt })) {

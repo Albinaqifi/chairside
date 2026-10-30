@@ -467,6 +467,7 @@ function visitOf(
     startMinute: from,
     endMinute: to,
     actions: [],
+    movable: true,
     patient: { firstName, lastName },
   };
 }

@@ -53,6 +53,7 @@ function day(status: AppointmentStatus, note = ''): CalendarDayView {
         startMinute: 9 * H,
         endMinute: 9 * H + 30,
         actions: [],
+        movable: true,
         patient: { firstName: 'Ana', lastName: 'Brezovska' },
       },
     ],
