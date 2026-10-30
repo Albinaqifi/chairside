@@ -2434,3 +2434,28 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** T06f runs far over 500 lines (then Restore is its own task); the desk wants the move to
   keep "confirmed" when only the provider changes (D-122's "Revisit if" stands); the reads of other days
   make the form slow (receptionist trial, Q-09).
+
+
+### D-125 · E01-T06c Done: E01-T06f split again, the move form first and Restore after; a failed read of another day empties the warning box
+- **Origin:** E01-T06c's Done pass and E01-T06f's Ready pass, 2026-10-30 (PR #100; `handoffs/E01-T06c.md`,
+  `handoffs/E01-T06f.md`). The owner had no question: no screen existed to try, and every leftover was
+  `slice` or `none`. Process, planning.
+- **What:**
+  - **E01-T06f → E01-T06f and E01-T06g.** T06f: the drawer's move form with the warnings for the day it
+    moves to (about 320 lines). T06g: Restore with its overlap line (about 150). Order: T06c → T06f → T06g →
+    T06d. T06g needs T06f's warning box in a file of its own.
+  - **The form never moves the time under the person:** a change of day offers the new day's quarter hours
+    and keeps the typed time in the list; the providers are the new day's active ones.
+  - **A read of another day that fails** (or a clinic switched in another tab) empties the warning box and a
+    muted line says that day could not be checked; the server's check still counts. Showing the old day's
+    warnings for a new day would be wrong (a break is a weekday's).
+  - **A double click on Move** takes T06b's one-second settle on the Move button, because the form starts
+    again from the new place when the answer comes and a second press would send "nothing changed" over a
+    success.
+- **Why:** read against the code, the form (a date, a time, a provider, the box, eight refusals, the
+  settle), the other day's read with its ticket and the box moved to its own file came to about 320 lines
+  before Restore, and the four tasks before it ran 1.3 to 3 times their estimate (T06c: 330 against 230,
+  all in comments and test builders). D-124's "Revisit if" named this split.
+- **Revisit if:** T06f runs far over 450 lines (then the other day's read is its own task); the desk wants
+  the time and provider to stay as the person left them when the date changes to a closed day; the reads of
+  other days make the form slow (receptionist trial, Q-09).
