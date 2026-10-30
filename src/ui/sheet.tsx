@@ -54,6 +54,12 @@ type SheetContentProps = Omit<ComponentProps<typeof SheetPrimitive.Content>, 'ti
   title: Exclude<ReactNode, null | undefined | boolean>;
   /** A line under the title, in the muted colour; a screen reader reads it with the drawer. */
   description?: ReactNode;
+  /**
+   * True while a request of a form inside is on its way (E01-T06e, E01-T05a tester): Escape, a press
+   * on the overlay and Close then leave it open, so the form's answer, a refusal too, shows above its
+   * button. The caller sets it from its forms' `onSendingChange` and clears it when they have answered.
+   */
+  busy?: boolean;
   /** 420 px, the default (the appointment drawers), or 500 px (the aftercare review). */
   width?: 420 | 500;
 };
@@ -81,6 +87,11 @@ type SheetContentProps = Omit<ComponentProps<typeof SheetPrimitive.Content>, 'ti
  * And the double click's second press changes nothing in it (E01-T05c): for that half second a
  * pointer's press in it or on the overlay moves no focus and reaches no control, so the first field
  * keeps the focus; a key always works.
+ *
+ * Two guards for the forms inside (E01-T06e). While `busy` is set, the drawer stays open on Escape, on
+ * a press on the overlay and on Close. And a `submit` from a form inside goes no further than the
+ * drawer's content: React passes it up its tree through the portal, and a drawer or dialog opened from
+ * inside another form would send that form as well.
  */
 function SheetContent({
   title,
@@ -88,18 +99,25 @@ function SheetContent({
   width = 420,
   className,
   children,
+  busy = false,
   onOpenAutoFocus,
+  onEscapeKeyDown,
+  onInteractOutside,
   onPointerDownOutside,
   onPointerDownCapture,
   onMouseDownCapture,
   onClickCapture,
   onKeyDownCapture,
+  onSubmit,
   ...props
 }: SheetContentProps) {
   const t = useTranslations('drawer');
   const guard = useDoubleClickGuard({
     onOpenAutoFocus,
-    onPointerDownOutside,
+    onPointerDownOutside: (event) => {
+      onPointerDownOutside?.(event);
+      if (busy) event.preventDefault();
+    },
     onPointerDownCapture,
     onMouseDownCapture,
     onClickCapture,
@@ -120,6 +138,20 @@ function SheetContent({
           width === 500 ? 'w-125' : 'w-105',
           className,
         )}
+        onEscapeKeyDown={(event) => {
+          onEscapeKeyDown?.(event);
+          if (busy) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event);
+          if (busy) event.preventDefault();
+        }}
+        onSubmit={(event) => {
+          onSubmit?.(event);
+          // React passes a `submit` on to every onSubmit above, through a portal too: a form in here
+          // sends itself only, never a form that holds this drawer's opener (E00-T04e review).
+          event.stopPropagation();
+        }}
         {...props}
         {...guard.content}
       >
@@ -139,6 +171,10 @@ function SheetContent({
         {children}
         <SheetClose
           {...guard.close}
+          onClick={(event) => {
+            guard.close.onClick(event);
+            if (busy) event.preventDefault();
+          }}
           className="absolute top-5.5 right-6 inline-flex size-8 items-center justify-center rounded-pill bg-border/50 text-text transition-colors outline-none hover:bg-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus focus-visible:outline-solid"
         >
           <XIcon aria-hidden="true" className="size-4" />

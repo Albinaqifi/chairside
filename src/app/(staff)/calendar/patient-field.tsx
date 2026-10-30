@@ -123,6 +123,9 @@ export function PatientField({
       startTransition(async () => {
         const answer = await sendSearch(searchPatients, clinicId, text);
         if (ticket !== sent.current) return;
+        // The rows are new: an arrow key pressed while the search ran points at an old row, or at
+        // "Add … as new patient" (E01-T06e; E01-T05d review), which Enter would take.
+        setActive(-1);
         if (answer.kind === 'found') {
           const rows = suggestionsOf(answer.list.rows);
           setFound({ kind: 'found', text: text.trim(), suggestions: rows });

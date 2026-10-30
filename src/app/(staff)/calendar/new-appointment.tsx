@@ -203,6 +203,9 @@ export function BookingDrawer({
     providerId: choices.firstProviderId ?? '',
   });
   const [listOpen, setListOpen] = useState(false);
+  // While Book is on its way the drawer stays open on Escape, the overlay and Close, so a refusal
+  // shows above Book (E01-T06e, E01-T05a tester).
+  const [sending, setSending] = useState(false);
   const time = (minutes: number) =>
     format.dateTime(new Date(Date.UTC(2000, 0, 1, 0, minutes)), TIME_OF_DAY);
   const day = format.dateTime(new Date(choices.day), {
@@ -214,6 +217,7 @@ export function BookingDrawer({
   });
   return (
     <SheetContent
+      busy={sending}
       title={t('title')}
       description={t('when', {
         day,
@@ -236,6 +240,7 @@ export function BookingDrawer({
           listOpen={listOpen}
           onListOpen={setListOpen}
           onDone={onBooked}
+          onSendingChange={setSending}
         />
       </SheetBody>
     </SheetContent>
@@ -266,6 +271,7 @@ export function BookingForm({
   listOpen,
   onListOpen,
   onDone,
+  onSendingChange,
 }: {
   choices: BookingChoices;
   /** The day the calendar holds now. */
@@ -278,6 +284,8 @@ export function BookingForm({
   onListOpen: (open: boolean) => void;
   /** After the toast, with the booked appointment's provider. */
   onDone: (providerId: string) => void;
+  /** Told when Book is on its way and when it has answered: the drawer stays open meanwhile. */
+  onSendingChange?: (sending: boolean) => void;
 }) {
   const t = useTranslations('calendar.booking');
   const names = useTranslations('patients');
@@ -318,6 +326,7 @@ export function BookingForm({
           : t('bookWithoutProvider', { time: time(booking.start) })
       }
       pendingLabel={t('booking')}
+      onSendingChange={onSendingChange}
     >
       <input type="hidden" name="day" value={choices.day} />
       {anyway && <input type="hidden" name="anyway" value="true" />}

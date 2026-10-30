@@ -51,7 +51,9 @@ const DAYS: Record<
     | 'bookTwice'
     | 'closeTwice'
     | 'newPatient'
-    | 'newPatientEarly',
+    | 'newPatientEarly'
+    | 'bookHeld'
+    | 'enterStale',
     string
   >
 > = {
@@ -73,6 +75,8 @@ const DAYS: Record<
     closeTwice: '2031-06-05', // E01-T05c's tester
     newPatient: '2031-07-07', // E01-T05d's
     newPatientEarly: '2031-07-08', // E01-T05d's review
+    bookHeld: '2031-08-04', // E01-T06e's
+    enterStale: '2031-08-05',
   },
   firefox: {
     mouse: '2031-04-14',
@@ -92,6 +96,8 @@ const DAYS: Record<
     closeTwice: '2031-06-12',
     newPatient: '2031-07-14',
     newPatientEarly: '2031-07-15',
+    bookHeld: '2031-08-11',
+    enterStale: '2031-08-12',
   },
   webkit: {
     mouse: '2031-04-21',
@@ -111,6 +117,8 @@ const DAYS: Record<
     closeTwice: '2031-06-19',
     newPatient: '2031-07-21',
     newPatientEarly: '2031-07-22',
+    bookHeld: '2031-08-18',
+    enterStale: '2031-08-19',
   },
 };
 
@@ -1234,7 +1242,7 @@ test.describe('a click on an empty slot (E01-T05c, acceptance 1)', () => {
   // Tall enough for the whole grid, 08:00 to 18:00, to show without scrolling.
   test.use({ viewport: { width: 1280, height: 1100 } });
 
-  test("opens the drawer on the column's provider and the quarter hour under the pointer, the grid's first and last quarter too; a click on a visit or a break opens nothing", async ({
+  test("opens the drawer on the column's provider and the quarter hour under the pointer, the grid's first and last quarter too; a click on a break opens nothing, and a click on a visit opens the appointment drawer, never the booking one", async ({
     page,
   }, testInfo) => {
     const day = dayOf(testInfo, 'slot');
@@ -1808,6 +1816,116 @@ test.describe('a new patient booked in one go (E01-T05d, acceptance 1, 2, 3 and 
       await expect(open.getByLabel(messages.newPatient.firstName, { exact: true })).toHaveCount(0);
       await expect(patient).toHaveValue(typed);
       expect(await bookedOn(day)).toEqual([]);
+    } finally {
+      release();
+      await clear(day);
+    }
+  });
+});
+
+// E01-T06e: the arrow key's highlight does not outlive the search it was pressed in, and the drawer
+// stays open while Book is on its way.
+test.describe('the patient field after a search that was running (E01-T06e, acceptance 4)', () => {
+  test('an arrow key pressed while a search runs, then its answer: no row is highlighted and Enter takes none, not "Add … as new patient" either', async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'enterStale');
+    // The first search (for "Mimoza K") answers at once. The second, for a text no one has, is held
+    // until the key is pressed: its answer has fewer rows than the first, and its only option, "Add …",
+    // is where the old highlight points.
+    const second = 'Mimoza Kq';
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held = 0;
+    await page.route(`${APP}/calendar**`, async (route) => {
+      const request = route.request();
+      const search =
+        request.method() === 'POST' &&
+        request.headers()['next-action'] !== undefined &&
+        (request.postData() ?? '').includes(second);
+      if (!search) return route.fallback();
+      held++;
+      await released;
+      return route.continue();
+    });
+    try {
+      await openCalendar(page, day);
+      await newAppointment(page).click();
+      const open = drawer(page);
+      const patient = open.getByRole('combobox', { name: t.patient });
+      await expect(patient).toBeFocused();
+      await pressable(page);
+
+      await patient.fill('Mimoza K');
+      await expect(suggestions(open).first()).toContainText('Mimoza Kodra');
+      await patient.fill(second);
+      await expect.poll(() => held, { message: 'the second search is sent, and held' }).toBe(1);
+      // The old rows are still up: the arrow key highlights the first of them.
+      await page.keyboard.press('ArrowDown');
+      await expect(suggestions(open).first()).toHaveAttribute('aria-selected', 'true');
+
+      release();
+      await expect(suggestions(open), 'the answer: "Add …" alone').toHaveCount(1);
+      await expect(suggestions(open).first()).toHaveText(t.addNewPatient.replace('{text}', second));
+      await expect(suggestions(open).first()).toHaveAttribute('aria-selected', 'false');
+      await page.keyboard.press('Enter');
+      await expect(open.getByLabel(messages.newPatient.firstName, { exact: true })).toHaveCount(0);
+      await expect(patient).toHaveValue(second);
+      expect(await bookedOn(day)).toEqual([]);
+    } finally {
+      release();
+      await clear(day);
+    }
+  });
+});
+
+test.describe('the drawer while Book is on its way (E01-T06e, acceptance 3)', () => {
+  test('Escape, Close and a press on the overlay leave it open; the answer then books and closes it', async ({
+    page,
+  }, testInfo) => {
+    const day = dayOf(testInfo, 'bookHeld');
+    // The booking's call (a server action whose body names the treatment) is held until released.
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held = 0;
+    await page.route(`${APP}/calendar**`, async (route) => {
+      const request = route.request();
+      const booking =
+        request.method() === 'POST' &&
+        request.headers()['next-action'] !== undefined &&
+        (request.postData() ?? '').includes('treatmentTypeId');
+      if (!booking) return route.fallback();
+      held++;
+      await released;
+      return route.continue();
+    });
+    try {
+      await openCalendar(page, day);
+      await newAppointment(page).click();
+      const open = drawer(page);
+      await pressable(page);
+      await open.getByRole('combobox', { name: t.patient }).fill('Mimoza K');
+      await suggestions(open).filter({ hasText: 'Mimoza Kodra' }).click();
+      await open.getByRole('button', { name: 'Checkup', exact: true }).click();
+      await open.getByRole('button', { name: /^Book / }).click();
+      await expect.poll(() => held, { message: 'Book is sent, and held' }).toBe(1);
+
+      await page.keyboard.press('Escape');
+      await expect(open, 'Escape').toBeVisible();
+      await open.getByRole('button', { name: messages.drawer.close }).click();
+      await expect(open, 'Close').toBeVisible();
+      await page.mouse.click(100, 400);
+      await expect(open, 'the overlay').toBeVisible();
+      await page.waitForTimeout(300);
+      await expect(open).toBeVisible();
+
+      release();
+      await expect(open, 'the answer: booked, and the drawer closes').toBeHidden();
+      expect(await bookedOn(day)).toHaveLength(1);
     } finally {
       release();
       await clear(day);

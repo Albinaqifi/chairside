@@ -10,7 +10,7 @@ import type { AppointmentStatus, Provider, StatusAction } from '@/modules/schedu
 import { AppointmentDrawer } from './appointment-drawer';
 import { layoutDay, visitById, type AppointmentBlock, type Column } from './day';
 
-// E01-T06b: the appointment drawer as the server renders it, inside the staff frame, with next-intl's
+// E01-T06b, E01-T06e: the appointment drawer as the server renders it, inside the staff frame, with next-intl's
 // provider as the root layout gives it: the message file and the clinic's zone. The drawer opens in a
 // portal, which renders nothing on the server: here Radix's Portal renders in place, as in
 // new-appointment.test.ts. useActionState is replaced so a test can choose the forms' answer (every
@@ -130,6 +130,13 @@ function buttons(html: string): string[] {
   );
 }
 
+/** The buttons that open the cancel dialog (a dialog trigger, no submit), by their text. */
+function dialogTriggers(html: string): string[] {
+  return [...html.matchAll(/<button[^>]*aria-haspopup="dialog"[^>]*>([^<]*)<\/button>/g)].map(
+    ([, label = '']) => label,
+  );
+}
+
 /** The hidden `action` values, in the order they are drawn. */
 function hiddenActions(html: string): string[] {
   return [...html.matchAll(/<input[^>]*type="hidden"[^>]*name="action"[^>]*value="([^"]*)"/g)].map(
@@ -197,7 +204,7 @@ describe('Update status: a button for each action the visit has, in this order, 
     expect(text(html)).not.toContain('Nothing to change');
   });
 
-  it('shows no Cancel and no Restore, whatever the module allows (E01-T06e, E01-T06c)', () => {
+  it('shows Cancel last, as the one button that opens the cancel dialog, and no Restore, whatever the module allows (E01-T06e, E01-T06c)', () => {
     const all: StatusAction[] = [
       'confirm',
       'arrive',
@@ -209,10 +216,27 @@ describe('Update status: a button for each action the visit has, in this order, 
       'restore',
     ];
     const html = render(block('booked', all));
-    expect(buttons(html)).not.toContain('Cancel');
+    // The status forms, then the one button that is no form: it sends nothing, it opens the dialog.
+    expect(buttons(html)).toEqual([
+      'In the chair',
+      'Done',
+      'No-show',
+      'Confirm',
+      'Undo in the chair',
+      'Undo done',
+    ]);
+    expect(dialogTriggers(html)).toEqual(['Cancel']);
     expect(buttons(html)).not.toContain('Restore');
     expect(hiddenActions(html)).not.toContain('cancel');
     expect(hiddenActions(html)).not.toContain('restore');
+    expect(html.indexOf('>Confirm<')).toBeLessThan(html.indexOf('>Cancel<'));
+  });
+
+  it('the cancel dialog is closed until Cancel is pressed: no form of it is on the page, and Cancel is no submit button', () => {
+    const html = render(block('booked', ['arrive', 'cancel']));
+    expect(html.match(/<form\b/g)).toHaveLength(1);
+    expect(text(html)).not.toContain('Who cancelled');
+    expect(html).toMatch(/<button[^>]*type="button"[^>]*aria-expanded="false"[^>]*>Cancel</);
   });
 
   it('each button is a form of its own with the visit and the action hidden', () => {
@@ -228,7 +252,6 @@ describe('Update status: a button for each action the visit has, in this order, 
     ['completed', []],
     ['cancelled', ['restore']],
     ['no_show', ['restore']],
-    ['completed', ['cancel']],
   ])(
     'a %s visit that has no button for %j shows a muted line, no empty heading',
     (status, actions) => {
@@ -238,6 +261,16 @@ describe('Update status: a button for each action the visit has, in this order, 
       expect(text(html)).not.toContain('Update status');
     },
   );
+});
+
+describe('a visit with Cancel as its only button', () => {
+  it('still has the Update status heading and the one button', () => {
+    const html = render(block('booked', ['cancel']));
+    expect(text(html)).toContain('Update status');
+    expect(text(html)).not.toContain('Nothing to change');
+    expect(dialogTriggers(html)).toEqual(['Cancel']);
+    expect(buttons(html)).toEqual([]);
+  });
 });
 
 describe("the forms' answers (acceptance 5)", () => {

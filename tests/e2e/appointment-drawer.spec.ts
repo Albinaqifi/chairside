@@ -218,11 +218,12 @@ test.describe('the status changes from the drawer (acceptance 3 and 4)', () => {
       await expect(pill(open)).toHaveText(status.booked);
       await pressable(page);
 
-      // A visit that has not started: no No-show, and nothing to undo; no Cancel or Restore.
-      for (const name of ['In the chair', 'Done', 'Confirm']) {
+      // A visit that has not started: no No-show, and nothing to undo; no Restore. Cancel (E01-T06e)
+      // opens its dialog (appointment-cancel.spec.ts).
+      for (const name of ['In the chair', 'Done', 'Confirm', 'Cancel']) {
         await expect(action(open, name)).toBeVisible();
       }
-      for (const name of ['No-show', 'Undo in the chair', 'Undo done', 'Cancel', 'Restore']) {
+      for (const name of ['No-show', 'Undo in the chair', 'Undo done', 'Restore']) {
         await expect(action(open, name), `no ${name}`).toHaveCount(0);
       }
 

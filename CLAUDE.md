@@ -134,7 +134,10 @@ tests/e2e/            End-to-end journeys and checks in real browsers (Playwrigh
                       cancelled, and a double click on Save changes saves once (E01-T03b); the appointment drawer: a
                       block opens it, the six status changes, a refusal, a visit that leaves the day, a double click
                       whose second press lands on a status button, the keyboard and the focus back, the profile
-                      link's one `patient.viewed` row (E01-T06b).
+                      link's one `patient.viewed` row (E01-T06b); the cancel dialog over the drawer: who cancelled required, the
+                      row written once, the keyboard, a double click on Cancel, and a drawer or dialog that stays open
+                      while a request is on its way (E01-T06e); a dialog inside a form sends only its own form,
+                      on `/dev/components` (E01-T06e).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 Dockerfile            The one image staging and production run (D-007, D-103): the web by default,
@@ -201,7 +204,9 @@ task, unless product code on `main` would hit it today.
   It sends the clinic its frame names (the staff layout's `FrameClinic`), never one a page passes,
   and shows the answer one way: `invalid_input` at the fields, `forbidden`, `clinic_changed` with a
   reload, the general failure (a call that rejects too), a toast when done; its button is disabled
-  while it runs. A check the input alone settles is the schema's, shown at its field; one that needs
+  while it runs; `onSendingChange(sending)` tells a drawer or dialog holding it (`busy` on its
+  content, `src/ui/sheet.tsx`, `dialog.tsx`: Escape, the overlay and Close then leave it open; a form that
+  leaves the page tells false as it goes; E01-T06e). A check the input alone settles is the schema's, shown at its field; one that needs
   the clinic's settings or rows (a phone read with the clinic's country, a day already closed) is the
   handler's `refuse('code')`, shown above the button with a text (`refusals`) that names the field
   (D-098). `StaffForm`'s form is `autocomplete="off"`: it keeps nothing in the browser, so no reload or
