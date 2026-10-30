@@ -38,6 +38,15 @@ export {
   type StatusChangeRefusal,
   type StatusChangeResult,
 } from './status-change';
+// E01-T06c: moving a visit, and which statuses move.
+export {
+  moveAppointment,
+  type AppointmentMove,
+  type MovedField,
+  type MoveRefusal,
+  type MoveResult,
+} from './move';
+export { movable, MOVABLE_STATUSES, type MovableStatus } from './movable';
 export { breaksOnWeekday, listProviders, type Provider, type ProviderBreak } from './providers';
 // E01-T09b, E01-T09d, E01-T09c, E01-T09e: the providers as Settings keeps them.
 export {

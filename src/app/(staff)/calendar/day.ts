@@ -101,6 +101,8 @@ export interface AppointmentBlock extends Placed {
    * at the read (scheduling.appointmentsOnDay). The browser never works them out.
    */
   actions: StatusAction[];
+  /** Whether it can be moved (E01-T06c), as the module computed it at the read; no screen reads it yet. */
+  movable: boolean;
 }
 
 export interface BreakBlock extends Placed {
@@ -237,6 +239,7 @@ function columnOf(
       status: appointment.status,
       note: appointment.note,
       actions: appointment.actions,
+      movable: appointment.movable,
       ...spanOf(appointment),
       lane: 0,
       lanes: 1,

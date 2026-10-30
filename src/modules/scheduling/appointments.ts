@@ -1,6 +1,7 @@
 import { and, asc, gt, lt, sql, type Column } from 'drizzle-orm';
 import type { TenantTransaction } from '@/db/tenant';
 import type { CalendarDay } from '@/lib/calendar-day';
+import { movable } from './movable';
 import { appointments } from './schema';
 import { allowedActions, statusFactsOf, type StatusAction } from './status-machine';
 
@@ -39,6 +40,11 @@ export interface DayAppointment {
    * staff actor (allowedActions), from the same facts the change uses. The calendar's buttons.
    */
   actions: StatusAction[];
+  /**
+   * Whether the desk can move it (E01-T06c): from the one function the move itself checks
+   * (./movable.ts), so the drawer never works it out.
+   */
+  movable: boolean;
 }
 
 /**
@@ -87,7 +93,7 @@ export async function appointmentsOnDay(
       now,
       timeZone,
     );
-    return { ...row, status, actions: allowedActions(status, facts) };
+    return { ...row, status, actions: allowedActions(status, facts), movable: movable(status) };
   });
 }
 

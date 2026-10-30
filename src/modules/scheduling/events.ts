@@ -11,9 +11,15 @@ export interface AppointmentChanged {
   to: AppointmentStatus;
   /** The moment of the change: the `now` the caller passed. */
   at: Date;
+  /**
+   * True when the visit moved to another provider, day or start (E01-T06c); absent for a status
+   * change. A moved visit goes back to `booked`: a booked one moved has `from` and `to` both
+   * `booked`, so a reader of this event reads the row, which holds the new time (E02-T06).
+   */
+  moved?: boolean;
 }
 
-/** What `changeAppointmentStatus` calls once per successful change, in the change's transaction. */
+/** What `changeAppointmentStatus` and `moveAppointment` call once per successful change, in the change's transaction. */
 export type AppointmentChangedHook = (
   tx: TenantTransaction,
   event: AppointmentChanged,

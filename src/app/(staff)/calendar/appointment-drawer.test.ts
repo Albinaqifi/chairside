@@ -72,6 +72,7 @@ function block(
     status,
     note: '',
     actions,
+    movable: true,
     from: 9 * H,
     to: 9 * H + 30,
     lane: 0,
@@ -339,6 +340,7 @@ describe('visitById: the visit the drawer shows is the one the day holds now (ac
         startMinute: 9 * H,
         endMinute: 9 * H + 30,
         actions: ['arrive'],
+        movable: true,
         patient: { firstName: 'Ana', lastName: 'Brezovska' },
       })),
     });
