@@ -387,9 +387,19 @@ test.describe('a double click on a block: its second press lands on a status but
     const day = dayOf(testInfo, 'twice');
     const hygienist = SEEDED_PROVIDERS.harbourStreetHygienist;
     try {
-      // The column is full from 08:00 to 10:00, so a block is under the pointer wherever the button is.
+      // The column is full from 08:00 to 12:00, so a block is under the pointer wherever the button is:
+      // the move form (E01-T06f) sits above the buttons, which opens them lower.
       const ids: string[] = [];
-      for (const start of ['08:00', '08:30', '09:00', '09:30']) {
+      for (const start of [
+        '08:00',
+        '08:30',
+        '09:00',
+        '09:30',
+        '10:00',
+        '10:30',
+        '11:00',
+        '11:30',
+      ]) {
         ids.push(await visit(day, start, { provider: hygienist }));
       }
       await openCalendar(page, day);
