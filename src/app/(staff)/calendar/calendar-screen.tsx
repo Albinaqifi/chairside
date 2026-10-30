@@ -44,7 +44,8 @@ const readTimes = new WeakMap<CalendarDayView, number>();
  * - The appointment drawer (./appointment-drawer.tsx, E01-T06b): a click or Enter on a visit's block
  *   opens it. What is kept is the opened visit's id; the visit shown is looked up in the day held now,
  *   in every column (the filter hides columns, not visits), so a read on use or a change's answer
- *   updates it, and a visit the day no longer holds closes it.
+ *   updates it, and a visit the day no longer holds closes it. A move turns the column of the provider
+ *   the visit moved to on, as a booking does (E01-T06f).
  */
 export function CalendarScreen({
   initial,
@@ -155,8 +156,12 @@ export function CalendarScreen({
             key={opened.block.id}
             block={opened.block}
             column={opened.column}
+            view={view}
             year={view.day.slice(0, 4) !== view.today.slice(0, 4)}
             onClose={() => setOpenId(null)}
+            onMoved={(providerId) =>
+              setChoice((before) => showColumn(before, columnIds, providerId))
+            }
           />
         )
       }
