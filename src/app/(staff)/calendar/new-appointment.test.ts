@@ -466,6 +466,7 @@ function visitOf(
     endsAt: new Date(midnight + to * 60_000),
     startMinute: from,
     endMinute: to,
+    actions: [],
     patient: { firstName, lastName },
   };
 }

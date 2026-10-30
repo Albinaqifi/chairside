@@ -6,7 +6,8 @@ import { useFrameClinic } from '@/app/_lib/frame-clinic';
 import type { CalendarDay } from '@/lib/calendar-day';
 import { Button } from '@/ui/button';
 import { readCalendarDay } from './actions';
-import type { CalendarDayView, CalendarRead } from './day';
+import { AppointmentDrawer } from './appointment-drawer';
+import { visitById, type CalendarDayView, type CalendarRead } from './day';
 import { DayCalendar } from './day-calendar';
 import { firstChoice, showColumn, shownColumns, toggleColumn, type ColumnChoice } from './filter';
 import { NewAppointment, type NewAppointmentHandle } from './new-appointment';
@@ -40,6 +41,10 @@ const readTimes = new WeakMap<CalendarDayView, number>();
  * - New appointment and its drawer (./new-appointment.tsx, E01-T05a), with the treatment types the
  *   last read brought. After a booking, the provider's column is turned on if the filter had it off.
  *   A click on an empty slot of the grid opens the same drawer on that slot (E01-T05c).
+ * - The appointment drawer (./appointment-drawer.tsx, E01-T06b): a click or Enter on a visit's block
+ *   opens it. What is kept is the opened visit's id; the visit shown is looked up in the day held now,
+ *   in every column (the filter hides columns, not visits), so a read on use or a change's answer
+ *   updates it, and a visit the day no longer holds closes it.
  */
 export function CalendarScreen({
   initial,
@@ -65,6 +70,7 @@ export function CalendarScreen({
   const lastReadAt = useRef(0);
   const reading = useRef(false);
   const booking = useRef<NewAppointmentHandle>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   // The next read may come 30 seconds after the read of the day shown: a day the page rendered was
   // read when the browser first drew it, a day a read on use brought when that read started. A day
@@ -118,6 +124,11 @@ export function CalendarScreen({
       : nowLineMinute(new Date(minute), timeZone, view);
   const columnIds = view.columns.map((column) => column.providerId);
   const shown = shownColumns(choice, columnIds);
+  const opened = openId === null ? null : visitById(view, openId);
+  // A visit the day no longer holds (read again without it, or another day shown): the drawer is
+  // closed for good, so a visit that comes back is not opened again. State set while rendering, as
+  // React allows for state that follows what the render found.
+  if (openId !== null && opened === null) setOpenId(null);
 
   return (
     <DayCalendar
@@ -126,6 +137,7 @@ export function CalendarScreen({
       onToggle={(providerId) => setChoice((before) => toggleColumn(before, columnIds, providerId))}
       nowMinute={nowMinute}
       onSlot={(slot, at) => booking.current?.openAt(slot, at)}
+      onOpen={setOpenId}
       newAppointment={
         <NewAppointment
           ref={booking}
@@ -136,6 +148,17 @@ export function CalendarScreen({
             setChoice((before) => showColumn(before, columnIds, providerId))
           }
         />
+      }
+      appointmentDrawer={
+        opened && (
+          <AppointmentDrawer
+            key={opened.block.id}
+            block={opened.block}
+            column={opened.column}
+            year={view.day.slice(0, 4) !== view.today.slice(0, 4)}
+            onClose={() => setOpenId(null)}
+          />
+        )
       }
       notice={
         shownProblem === 'clinic_changed' ? (

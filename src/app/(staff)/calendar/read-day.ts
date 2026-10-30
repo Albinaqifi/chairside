@@ -26,7 +26,7 @@ export async function readDay(
   const [closedDay = null] = await closedDaysBetween(tx, day, day);
   const providers = await listProviders(tx);
   const breaks = await breaksOnWeekday(tx, weekday);
-  const appointments = await appointmentsOnDay(tx, day, timeZone);
+  const appointments = await appointmentsOnDay(tx, day, timeZone, now);
   const names = await patientNames(
     tx,
     appointments.map((appointment) => appointment.patientId),

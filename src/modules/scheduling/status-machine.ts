@@ -1,3 +1,4 @@
+import { dayInZone } from '@/lib/calendar-day';
 import type { AppointmentStatus } from './appointments';
 
 /**
@@ -97,4 +98,48 @@ export function nextAppointmentStatus(
         ? allowed('arrived')
         : refused;
   }
+}
+
+/** The columns of an appointment that the facts are made from. */
+export interface VisitMoments {
+  startsAt: Date;
+  confirmedAt: Date | null;
+  completedAt: Date | null;
+}
+
+/**
+ * The facts of a visit at `now` (E01-T06b): the one place they are made, so the change
+ * (changeAppointmentStatus) and the buttons the calendar shows (appointmentsOnDay's `actions`)
+ * cannot drift apart. `timeZone` is the clinic's: "the same day" of an undone completion is the
+ * clinic's calendar day, on a day of 23 or 25 hours too. `beforeCutoff` is only a patient's cancel's
+ * (E02); the desk's never reads it.
+ */
+export function statusFactsOf(
+  visit: VisitMoments,
+  now: Date,
+  timeZone: string,
+  beforeCutoff = false,
+): StatusFacts {
+  return {
+    started: visit.startsAt.getTime() <= now.getTime(),
+    confirmed: visit.confirmedAt !== null,
+    sameDay:
+      visit.completedAt !== null &&
+      dayInZone(visit.completedAt, timeZone) === dayInZone(now, timeZone),
+    // No aftercare exists before E06 (the visit wrap-up): E06 reads whether one was sent.
+    aftercareSent: false,
+    beforeCutoff,
+  };
+}
+
+/**
+ * The actions the desk may do to a visit of this status with these facts, in STATUS_ACTIONS' order:
+ * those nextAppointmentStatus accepts for a staff actor. `no_show` is in it once the visit has
+ * started, `undo_completion` on the clinic's day of the completion. `restore` is judged by the table
+ * alone: its chair re-check is the change's own (E01-T06c).
+ */
+export function allowedActions(status: AppointmentStatus, facts: StatusFacts): StatusAction[] {
+  return STATUS_ACTIONS.filter(
+    (action) => nextAppointmentStatus(status, action, 'staff', facts).ok,
+  );
 }

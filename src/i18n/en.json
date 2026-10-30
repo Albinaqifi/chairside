@@ -218,6 +218,45 @@
         "closedDay": "The clinic is closed that day: {label}.",
         "noHours": "The clinic is closed that day: no opening hours on {weekday}."
       }
+    },
+    "appointment": {
+      "when": "{day} · {from}–{to}",
+      "where": "{provider} · {chair}",
+      "update": "Update status",
+      "nothingToChange": "Nothing to change on this visit.",
+      "profile": "Patient profile",
+      "updating": "Updating…",
+      "actions": {
+        "arrive": {
+          "label": "In the chair",
+          "done": "Marked in the chair."
+        },
+        "complete": {
+          "label": "Done",
+          "done": "Marked done."
+        },
+        "no_show": {
+          "label": "No-show",
+          "done": "Marked no-show."
+        },
+        "confirm": {
+          "label": "Confirm",
+          "done": "Marked confirmed."
+        },
+        "undo_arrival": {
+          "label": "Undo in the chair",
+          "done": "Taken out of the chair."
+        },
+        "undo_completion": {
+          "label": "Undo done",
+          "done": "Done undone: back in the chair."
+        }
+      },
+      "refusals": {
+        "notAllowed": "This visit was changed meanwhile. Look at it again.",
+        "tooEarly": "A no-show can be marked once the visit has started.",
+        "notFound": "This visit is no longer there."
+      }
     }
   },
   "languages": {

@@ -1,14 +1,13 @@
 import { eq } from 'drizzle-orm';
 import type { TenantTransaction } from '@/db/tenant';
-import { dayInZone } from '@/lib/calendar-day';
 import { APPOINTMENT_STATUSES, type AppointmentStatus } from './appointments';
 import { chairClashes, sameVisitHoldsChair } from './chair';
 import { appointmentChanged, type AppointmentChangedHook } from './events';
 import { appointments, providers } from './schema';
 import {
   nextAppointmentStatus,
+  statusFactsOf,
   type StatusActor,
-  type StatusFacts,
   type StatusRefusal,
 } from './status-machine';
 
@@ -138,16 +137,7 @@ export async function changeAppointmentStatus(
   const from = APPOINTMENT_STATUSES.find((known) => known === row.status);
   if (!from) throw new Error('scheduling: a row holds a status the code does not know');
 
-  const facts: StatusFacts = {
-    started: row.startsAt.getTime() <= now.getTime(),
-    confirmed: row.confirmedAt !== null,
-    sameDay:
-      row.completedAt !== null &&
-      dayInZone(row.completedAt, change.timeZone) === dayInZone(now, change.timeZone),
-    // No aftercare exists before E06 (the visit wrap-up): E06 reads whether one was sent.
-    aftercareSent: false,
-    beforeCutoff: change.beforeCutoff ?? false,
-  };
+  const facts = statusFactsOf(row, now, change.timeZone, change.beforeCutoff ?? false);
   const next = nextAppointmentStatus(from, change.action, change.actor, facts);
   if (!next.ok) return next;
   const to = next.to;

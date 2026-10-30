@@ -1288,6 +1288,15 @@ test.describe('a click on an empty slot (E01-T05c, acceptance 1)', () => {
         await page.mouse.click(at.x, at.y);
         await page.waitForTimeout(700);
         await expect(drawer(page), block).toHaveCount(0);
+        if (block === 'li[data-status]') {
+          // E01-T06b: a visit's block opens the appointment drawer (never the booking one, which the
+          // line above still checks). It is closed before the next block is pointed at: an open
+          // drawer hides the grid's roles from the tree.
+          await expect(page.getByRole('dialog')).toHaveCount(1);
+          await page.keyboard.press('Escape');
+          await expect(page.getByRole('dialog')).toHaveCount(0);
+          await page.waitForTimeout(DOUBLE_CLICK_MS + 100);
+        }
       }
       expect(await bookedOn(day)).toHaveLength(1);
     } finally {

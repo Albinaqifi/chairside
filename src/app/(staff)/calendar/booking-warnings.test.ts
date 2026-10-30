@@ -50,6 +50,7 @@ function visit(
     endsAt: new Date(Date.UTC(2026, 9, 25, 23, to)),
     startMinute: from,
     endMinute: to,
+    actions: [],
     patient: { firstName: 'Ana', lastName: 'Brezovska' },
   };
 }
