@@ -12,7 +12,7 @@ import messages from '@/i18n/en.json' with { type: 'json' };
 import { DOUBLE_CLICK_MS } from '@/ui/double-click-guard';
 import { expectNoAxeViolations } from './axe.ts';
 import { e2eDatabase } from './e2e-database.ts';
-import { APP } from './servers.ts';
+import { APP, OWNER_SESSION } from './servers.ts';
 
 // E01-T06f in real browsers, on the production build, as the seeded front desk (the global setup's
 // session; no sign-in of its own): the appointment drawer's move form. Which visits have it; a move to
@@ -25,10 +25,10 @@ import { APP } from './servers.ts';
 // with a warning showing. Each check works on days of its own in a week of its browser's own, and
 // removes what it wrote. The visits are written as the migration role, as appointment-drawer.spec.ts
 // writes its rows. "Closed" is a weekend day (no opening hours): the closed days list belongs to
-// closed-days.spec.ts. A provider made inactive meanwhile is not tried here: the providers are the
-// clinic's, and every spec reads them (appointment-move.test.ts shows its text; E01-T06c's integration
-// tests refuse it). Names are the seed's invented ones; the assertions on the database name ids and
-// statuses only.
+// closed-days.spec.ts. A provider made inactive meanwhile is tried in the second seeded clinic, as the
+// seeded owner, on a provider the check writes itself and removes (the first clinic's providers are
+// the columns the other specs count, as provider-edit.spec.ts says). Names are the seed's invented
+// ones; the assertions on the database name ids and statuses only.
 
 const t = messages.calendar.appointment;
 const move = t.move;
@@ -50,6 +50,7 @@ const CHECKS = [
   'refusals',
   'double',
   'keys',
+  'inactive',
 ] as const;
 type Check = (typeof CHECKS)[number];
 
@@ -735,6 +736,102 @@ test.describe('the keyboard and the accessibility check (acceptance 6)', () => {
       await expect(block(page), 'the focus is back on the block').toBeFocused();
     } finally {
       await clear(main);
+    }
+  });
+});
+
+test.describe('a provider made inactive meanwhile (acceptance 4)', () => {
+  test.use({ storageState: OWNER_SESSION });
+
+  // The second seeded clinic, on a provider of the check's own (sort_order 100, after the seed's), so
+  // no other spec's column or choice changes, even for a moment.
+  const SONCOGLED = SEEDED_CLINICS.soncogled;
+  const SONCOGLED_NAME = 'Забна клиника Сончоглед';
+
+  test('the form is open on the visit, the provider is made inactive, Move is pressed: the refusal shows above the button and nothing is written', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    const { main } = daysOf(testInfo, 'inactive');
+    const providerName = `Move ${testInfo.project.name} Mira Testova`;
+    const removeOwn = async () => {
+      await db.query(
+        `delete from appointments where clinic_id = $1 and provider_id in
+           (select id from providers where clinic_id = $1 and name = $2)`,
+        [SONCOGLED, providerName],
+      );
+      await db.query(`delete from providers where clinic_id = $1 and name = $2`, [
+        SONCOGLED,
+        providerName,
+      ]);
+    };
+    await removeOwn();
+    try {
+      const { rows: made } = await db.query<{ id: string }>(
+        `insert into providers (id, clinic_id, name, short_name, kind, chair_label, color_hue, sort_order)
+         values (gen_random_uuid(), $1, $2, $3, 'dentist', 'Chair 8', 40, 100) returning id`,
+        [SONCOGLED, providerName, `M-${testInfo.project.name.slice(0, 3)}`],
+      );
+      const providerId = made[0]?.id;
+      const { rows: patients } = await db.query<{ name: string }>(
+        `select first_name || ' ' || last_name as name from patients
+          where clinic_id = $1 and status = 'active' order by id limit 1`,
+        [SONCOGLED],
+      );
+      const patient = patients[0]?.name;
+      if (!providerId || !patient) throw new Error('The second clinic has no patient to book.');
+      const { rows: booked } = await db.query<{ id: string }>(
+        `insert into appointments (id, clinic_id, patient_id, provider_id, title, starts_at, ends_at,
+                                   status, source, created_by)
+         select gen_random_uuid(), $1,
+                (select id from patients where clinic_id = $1 and status = 'active' order by id limit 1),
+                $2, 'Checkup', ($3::date + time '09:00') at time zone 'Europe/Skopje',
+                ($3::date + time '09:30') at time zone 'Europe/Skopje', 'booked', 'staff',
+                (select user_id from memberships where clinic_id = $1 order by user_id limit 1)
+         returning id`,
+        [SONCOGLED, providerId, main],
+      );
+      const id = booked[0]?.id;
+      if (!id) throw new Error('The visit was not written.');
+      const state = async () => {
+        const { rows } = await db.query<{ provider: string; at: string; status: string }>(
+          `select provider_id as provider,
+                  to_char(starts_at at time zone 'Europe/Skopje', 'YYYY-MM-DD HH24:MI') as at, status
+             from appointments where id = $1`,
+          [id],
+        );
+        return rows[0];
+      };
+      const movedAudits = async () => {
+        const { rows } = await db.query<{ n: string }>(
+          `select count(*) as n from audit_log
+            where clinic_id = $1 and action = 'appointment.moved' and entity_id = $2`,
+          [SONCOGLED, id],
+        );
+        return Number(rows[0]?.n);
+      };
+
+      await page.goto(`${APP}/choose-clinic`);
+      await page.getByRole('button', { name: SONCOGLED_NAME }).click();
+      await expect(page).toHaveURL(`${APP}/`);
+      await openCalendar(page, main, patient);
+      const open = await openDrawer(page, patient);
+      await expect(providerField(open)).toHaveValue(providerId);
+
+      // Another desk makes the provider inactive; this page does not know. Then a new time and Move.
+      await timeField(open).selectOption('10:00');
+      await db.query(`update providers set active = false where id = $1`, [providerId]);
+      await moveButton(open).click();
+      await expect(open.getByRole('alert')).toHaveText(move.refusals.providerNotBookable);
+      expect(await state()).toEqual({
+        provider: providerId,
+        at: `${main} 09:00`,
+        status: 'booked',
+      });
+      expect(await movedAudits()).toBe(0);
+      await expect(open).toBeVisible();
+    } finally {
+      await removeOwn();
     }
   });
 });

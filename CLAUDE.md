@@ -139,7 +139,7 @@ tests/e2e/            End-to-end journeys and checks in real browsers (Playwrigh
                       while a request is on its way (E01-T06e); a dialog inside a form sends only its own form,
                       on `/dev/components` (E01-T06e); the drawer's move form: which visits have it, a move to
                       another time, provider and day, the warnings on the shown day and on another
-                      (its read held or failed with `page.route`), the refusals, a double click on Move,
+                      (its read held or failed with `page.route`), the refusals (a provider made inactive meanwhile in the second clinic), a double click on Move,
                       the keyboard (E01-T06f).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
