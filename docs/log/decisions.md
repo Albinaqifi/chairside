@@ -2408,3 +2408,29 @@ architecture), `changed` (differs from the original files), `process`.
   650 lines of product code against the Definition of Ready's 400, and T05a showed the estimate is low.
 - **Revisit if:** T06b runs far over 450 lines (then the module's `actions` is its own task); the desk wants
   No-show offered before the start; the receptionist trial (Q-09) finds "no default" slow for a cancel.
+
+
+### D-124 · E01-T06e Done: E01-T06c split again, the move's module and action first, then the drawer's move form and Restore; the move re-checks the chair without counting itself
+- **Origin:** E01-T06e's Done pass and E01-T06c's Ready pass, 2026-10-30 (PR #98; `handoffs/E01-T06e.md`,
+  `handoffs/E01-T06c.md`). The owner had no question: the one item on the screen (the cancel dialog) was
+  tried, all fine, and every leftover was `none`. Process, planning.
+- **What:**
+  - **E01-T06c → E01-T06c and E01-T06f.** T06c: `scheduling.moveAppointment`, the action `moveAppointment`
+    and `movable` on the day's visits, no screen (as T06a). T06f: the drawer's move form with the warnings for
+    the day it moves to, and Restore. Order: T06c → T06f → T06d.
+  - **The move takes the chair checks without the moved visit** (`exceptId` in `chair.ts`): else a move of
+    09:00 to 09:15 with the same provider overlaps its own old place. The booking and the restore pass none.
+  - **Only an active patient's visit is moved** (`patient_not_bookable`, the patient's row `for share` first,
+    as the restore): a moved visit holds the chair at a new time, D-113.
+  - **The audit row** `appointment.moved` carries `{ fromStatus, toStatus, fields }`, not D-122's `from`
+    and `to`: the audit log refuses those names as personal fields (T06a found it).
+  - **The hook's event gets an optional `moved`** (true for a move), so E02-T06 can tell a booked visit moved
+    (`from` = `to` = `booked`) from no change; the status changes send none and their tests stand.
+  - **The move form reads the day it points at** (`readCalendarDay`, the last answer wins) for its
+    warnings; the server's check is the one that counts.
+- **Why:** T06c as D-122 wrote it (module, action, form, warnings for another day, Restore) came to about 600
+  lines of product code against 400, once the code was read and the target day's warnings were seen to need
+  a read of their own; T06a, T06b and T06e each ran 1.3 to 3 times their estimate.
+- **Revisit if:** T06f runs far over 500 lines (then Restore is its own task); the desk wants the move to
+  keep "confirmed" when only the provider changes (D-122's "Revisit if" stands); the reads of other days
+  make the form slow (receptionist trial, Q-09).

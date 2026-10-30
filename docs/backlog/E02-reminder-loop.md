@@ -164,7 +164,9 @@ Order: T01 → (T02, T03, T04, T05, T08 parallel-safe) → T06 → T07 → T09 �
   compute the time, insert the row with its key ("do nothing on conflict"), or record a skip.
 - React to the E01 event hooks: booked, moved, cancelled, restored, completed, no-show.
   The planning job is enqueued **in the same transaction** as the change.
-  Moved or cancelled → pending messages for the old time are cancelled.
+  Moved or cancelled → pending messages for the old time are cancelled. A move arrives as the
+  hook's event with `moved` true and the visit's statuses (a booked visit moved has `from` = `to`);
+  plan from the row on any event (E01-T06c, D-124).
 - Worker: a repeating job every 5 minutes that plans for every clinic (inside each clinic's
   tenant context) for appointments in the planning window.
 - Channel choice per D-055: one row for the first usable channel in the rule's order (enabled, contact present and valid, not refused, `whatsapp_status` not `unavailable`); `unreachable` skip plus task when none fits.

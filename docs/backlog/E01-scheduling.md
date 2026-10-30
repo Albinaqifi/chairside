@@ -7,7 +7,7 @@ provider, booking, moving, cancelling, arriving, completing. No messages yet.
 thing a receptionist judges (risk R-09), so it should be in front of a real one early.
 
 Order: T01a → T01b → T02a → T02b → T04a and T08a side by side (two checkouts, D-110) → T04b and T08b
-side by side (D-111) → T05a and T08c side by side (D-112, D-113) → T05b → T05c → T05d → T09a → T09b → T09d → T09c → T09e → T03a → T03b → T06a → T06b → T06e → T06c → T06d →
+side by side (D-111) → T05a and T08c side by side (D-112, D-113) → T05b → T05c → T05d → T09a → T09b → T09d → T09c → T09e → T03a → T03b → T06a → T06b → T06e → T06c → T06f → T06d →
 T07, T10 → T08d → T11 → T12 → T13. With E00 (D-087, D-090, D-091, D-093, D-096, D-108, D-110, D-111, D-112, D-113,
 D-114, D-115, D-118, D-119, D-120, D-121, D-122, D-123):
 E00-T05a → T01a → T01b → E00-T04c → E00-T04d → E00-T04e → T02a → T02b → E00-T06b → E00-T05b → E00-T07 →
@@ -34,7 +34,7 @@ estimate of 300: the providers' list and add (T09b); changing a provider and mak
 active again (T09d); T09c follows T09d. T09c is split in two (D-120): the providers' order (T09c) and their weekly breaks
 (T09e). T03 is split in two (D-121), as the profile and the edit with its lock came to about 900 lines of product
 code: the profile (T03a); editing a patient, the status and the lock (T03b). T12, after T11, is the audit
-log's id case (T03a's `data` leftover; owner, 2026-10-29: not now, before E07-T01). T13, after T12, refuses an edit saved from a form opened before another person's save (T03b's `message` leftover; owner, 2026-10-29: not now, before E02). T06 is split in four (D-122), as the state machine and its writes, the drawer, the guards of drawers and dialogs, the move and two corrections came to far more than one session: the state machine and the status changes, no screen (T06a); the drawer with its status buttons and the cancel dialog (T06b); moving a visit, the day too (owner), and restoring one (T06c); Book next visit and a visit under way on the profile and the list (owner: on both; T06d). T06b is split again (D-123), as its list came to about 650 lines of product code against 400 once the code was read: the drawer from a block with the status buttons the state machine allows, but Cancel (T06b); the cancel dialog, the two guards of drawers and dialogs and the booking drawer's Enter fix (T06e), after it and before the move, whose form sits in the same drawer.
+log's id case (T03a's `data` leftover; owner, 2026-10-29: not now, before E07-T01). T13, after T12, refuses an edit saved from a form opened before another person's save (T03b's `message` leftover; owner, 2026-10-29: not now, before E02). T06 is split in four (D-122), as the state machine and its writes, the drawer, the guards of drawers and dialogs, the move and two corrections came to far more than one session: the state machine and the status changes, no screen (T06a); the drawer with its status buttons and the cancel dialog (T06b); moving a visit, the day too (owner), the module and the action (T06c), and the drawer's move form and restoring one (T06f, D-124); Book next visit and a visit under way on the profile and the list (owner: on both; T06d). T06b is split again (D-123), as its list came to about 650 lines of product code against 400 once the code was read: the drawer from a block with the status buttons the state machine allows, but Cancel (T06b); the cancel dialog, the two guards of drawers and dialogs and the booking drawer's Enter fix (T06e), after it and before the move, whose form sits in the same drawer.
 
 ---
 
@@ -1026,10 +1026,11 @@ E01-T03). The language: the new-patient page's first, changed on the profile (E0
 ### E01-T06 · Appointment drawer: details, move, status changes
 
 **Split** (D-122): the task came to far more than one session (the state machine and its writes, the drawer,
-the guards of drawers and dialogs, the move, two corrections to the profile and the booking drawer). Four
+the guards of drawers and dialogs, the move, two corrections to the profile and the booking drawer). Five
 tasks, in this order: **E01-T06a** the state machine and the status changes (no screen) → **E01-T06b** the
 drawer with its status buttons → **E01-T06e** the cancel dialog and the guards of drawers and dialogs
-(T06b split again, D-123) → **E01-T06c** moving a visit and restoring one → **E01-T06d** "Book next visit"
+(T06b split again, D-123) → **E01-T06c** moving a visit, the module and the action → **E01-T06f** the drawer's
+move form and Restore (T06c split, D-124) → **E01-T06d** "Book next visit"
 and a visit under way on the profile and the list. The criteria of the old task are spread over them; each
 is in exactly one.
 
@@ -1149,46 +1150,64 @@ One pure function decides every change; nothing else may write `appointments.sta
 
 ---
 
-### E01-T06c · Moving a visit and restoring one
+### E01-T06c · Moving a visit: the module function and the action
 
-**Planned** (split from E01-T06, D-122; owner, 2026-10-29: the move changes the day too). Ready when E01-T06e is Done.
+**Ready** (split from E01-T06, D-122; split again, D-124: the drawer's move form and Restore are E01-T06f; refined by the architect when E01-T06e was Done, 2026-10-30, checked against `main` at `098da9c`). About 230 lines of product code (the module's move ~110, the start's moments shared with the booking ~25, the chair checks' `exceptId` ~10, the action ~75, `movable` ~10); no screen, as E01-T06a. E01-T06a came to 530 lines against 400: watch the count.
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T06e (the drawer, and the guards a form with a dialog inside it needs), E01-T05b (the warning box)
-- **Read:** `scope` (Appointment drawer; New appointment drawer's warnings) · `src/modules/scheduling/chair.ts`
-  and `booking.ts` (E01-T06a) · `src/app/(staff)/calendar/booking-warnings.ts` · D-020, D-114, D-122
+- **Role:** builder · **Risk:** normal (no area of `test-strategy.md`'s second-review table: no migration, policy, permission, wrapper, planner, link, consent or adapter change; E02's planner reads the hook later) · **Depends on:** E01-T06a (Done), E01-T05b (Done), E01-T06e (Done)
+- **Read:** `scope` (Appointment drawer) · `data-model` ("No double booking") · `handoffs/E01-T06a.md` (the architect's and the builder's sections) · `src/modules/scheduling/booking.ts`, `chair.ts`, `status-change.ts`, `events.ts`, `appointments.ts` · `src/app/(staff)/calendar/appointment-actions.ts`, `day.ts` · D-020, D-113, D-114, D-122, D-124
 
-**Why.** A visit that has to move keeps its place in the day's plan only if the move re-checks the chair as
-a booking does; a moved visit that kept "confirmed" would show a yes the patient gave for another time.
+**Why.** A visit that has to move keeps its place in the day's plan only if the move re-checks the chair as a booking does; a moved visit that kept "confirmed" would show a yes the patient gave for another time, and a reminder planned for the old time would go to a patient who was told another one.
 
 **Do.**
-- **`scheduling.moveAppointment(tx, move, now, emit)`:** a booked or confirmed visit (other statuses:
-  `not_movable`) to another provider, day and/or start; the length stays. Locks the appointment `for update`,
-  then the old and the new provider `for update` **in id order**. Refuses as the booking does, `provider_not_bookable`,
-  `start_skipped`, `already_booked`, `overlap` unless `anyway`, with `overlap_ok` set exactly over a real
-  clash; a move to the same provider and start is `nothing_changed`. A moved visit goes back to `booked` and
-  its confirmation is cleared (`confirmed_at`, `confirmed_via`): the patient confirmed the old time (D-122;
-  a moved visit shows as not yet confirmed, and E02 asks again). The hook fires once with the old and the new
-  status (E02 cancels the old reminder and plans one new).
-- **The action** `moveAppointment` (`calendar.manage`): input as the booking's day, `start`, `providerId`,
-  `anyway`; audit `appointment.moved`, metadata `{ from, to, fields }` (statuses and the names `provider`,
-  `day`, `start`, no values). Same refresh and revalidation as T06a.
-- **The drawer's move form:** date (a date field), time and provider (the booking drawer's own start and
-  provider choices), the same warning box (overlap with **Move anyway**, a break, hours outside, a closed day;
-  `booking-warnings.ts`, reused), Move under the fields. After a move the calendar stays on the shown day; a
-  move to another day leaves it, and the toast names the new day and time.
-- **Restore** for a cancelled or no-show visit, with its overlap warning and **Restore anyway** (T06a's
-  function); a refused patient (archived since) or provider shows above the button.
+- **The start's moments, once.** `createAppointment` makes its `starts_at` and `ends_at` in SQL from the day, the start in minutes and the zone, and refuses a local time the clocks skip (`start_skipped`). The move needs the same: pull those few lines into one function of the module (a new file, `local-time.ts`) that both call. The booking's behaviour and tests do not change (agent rule 8: none of its expectations moves).
+- **The chair checks leave one visit out.** `sameVisitHoldsChair` and `chairClashes` (`chair.ts`) find any visit that holds the chair, **the moved visit itself included**: moving 09:00 to 09:15 with the same provider would overlap its own old place and be refused `overlap`, or `already_booked` for its own patient. Both take an optional `exceptId`; the booking and the restore pass none, so their behaviour is as it is.
+- **`scheduling.moveAppointment(tx, move, now, emit)`** with `move` = `{ appointmentId, providerId, day, startMinute, timeZone, anyway, patientIsActive }`:
+  - A **booked or confirmed** visit moves; any other status is `not_movable` (an arrived visit is in the chair, a cancelled or no-show one is restored, T06f). One exported function says which statuses move (`movable(status)`), used here and by `appointmentsOnDay`, so the drawer never works it out (D-123).
+  - To another provider, day and/or start; the **length stays**, in real time (the new end is the new start plus the old end minus the old start).
+  - Locks, in the restore's order: the patient's row `for share` (the caller's `patientIsActive`: a moved visit holds the chair at a new time, so only an active patient's is moved, D-113; `patient_not_bookable`), then the appointment `for update` (read again under the lock, so two moves of one visit take turns and the second sees the first's time), then the old and the new provider's rows `for update` **in id order** (D-122; the same order for every writer). A provider that is not active, or not the clinic's, is `provider_not_bookable`.
+  - Refuses as the booking does, nothing written: `start_skipped`; `already_booked` (the patient has another visit with the new provider at that start that holds the chair); `overlap` without `anyway`; with `anyway`, `overlap_ok` is set **exactly** over a real clash as the row is written (a move that no longer clashes clears it; one that did clash and now does not, too). A move to the same provider and the same start is `nothing_changed` (checked after the lock, with the day and start turned into a moment in SQL, as the booking's are).
+  - Writes `provider_id`, `starts_at`, `ends_at`, `status` = `booked`, `confirmed_at` and `confirmed_via` = null (the patient confirmed the old time; D-122, "Revisit if" there), `overlap_ok`, `updated_at` = `now`; the title, the treatment and the patient stay.
+  - **The hook** (`events.ts`) fires once, after the write, in the same transaction, with the statuses before and after: `AppointmentChanged` gets an optional `moved?: boolean` (true for a move; absent for a status change, so T06a's tests are untouched). A booked visit moved has `from` = `to` = `booked`: E02-T06 (reacts to "moved", cancels what is planned for the old time and plans for the new one) reads the row on any event; its Do says so. A refusal calls nothing.
+  - `AppointmentOnDay` (`appointments.ts`) gets `movable: boolean`, from the same function, and the calendar's block (`day.ts`, the mapping that passes `actions` on) carries it. No screen reads it yet (T06f).
+- **The action** `moveAppointment`, in `appointment-actions.ts` (`calendar.manage`: every member): input `appointmentId` (lower-cased, as that file does), `providerId` (a uuid), `day` (`isShownDay`), `start` (`HH:MM`, read by `minutesOfStart`; a bad one is `invalid_input` at its field) and `anyway` (a hidden field, as the booking's). The handler reads the clinic's zone (`clinicPlace`) and passes `patients.patientStatus` as `patientIsActive` (as the restore does). Audit: `appointment.moved`, entity the appointment, metadata `{ fromStatus, toStatus, fields }` where `fields` are the names that changed (`provider`, `day`, `start`), no value (D-122 wrote `from` and `to`; the audit log refuses those two names as personal fields, `src/lib/personal-fields.ts`, as T06a found). It refreshes the day (`refresh()`) when done and when refused `overlap` or `already_booked` (the visit that blocks it is new to the caller, as the booking does), and revalidates `/patients` (a next visit changed). Answers `{ day, providerId }` (the new ones). Never `redirect()`.
+**Out of scope.** The drawer's move form, the warnings for another day, Restore in the drawer (E01-T06f). Book next visit (E01-T06d). A move of the length (the form has none). Dragging a block (not in v1). The planner's reaction to the hook (E02-T06).
 
-**Acceptance.** (to be completed when it is refined) Moving onto an occupied slot behaves like booking
-(warning, explicit override); restoring re-checks the overlap; a moved confirmed visit is `booked` with no
-confirmation; one audit row per move with the statuses; the hook once; the double click on Move moves once;
-every role and the other clinic's owner.
+**Acceptance.** Integration tests against PostgreSQL, the module and the action; no new e2e case (no screen), the existing ones stay green.
+- [ ] A booked and a confirmed visit move to another start, another provider, another day, and to a start that overlaps its own old place (09:00 to 09:15, same provider) with no `overlap` and no `already_booked`; the length is kept, also across a day the clocks change (Europe/Skopje and America/New_York, as `booking.test.ts` does).
+- [ ] A moved confirmed visit is `booked` with no `confirmed_at` and `confirmed_via`; a moved booked one is `booked` still; the title, treatment, patient and `created_by` are as before; `updated_at` is `now`.
+- [ ] A move onto another visit of the provider is `overlap`, nothing written; with `anyway` it moves with `overlap_ok` true; with `anyway` over no clash `overlap_ok` is false; moving a visit that was booked anyway to a free place clears it. Back to back is no overlap.
+- [ ] `not_found` (another clinic's visit, as another clinic's owner), `not_movable` for arrived, completed, cancelled and no-show, `provider_not_bookable` (inactive, other clinic's), `patient_not_bookable` (archived), `start_skipped`, `nothing_changed`, `already_booked` (the same patient, the new provider, that start): each writes nothing and calls no hook.
+- [ ] The hook once per move, with `moved` true and the statuses; the audit row once per move with `fromStatus`, `toStatus` and `fields` and no patient, time or provider id; none on a refusal (`audit` count).
+- [ ] Two moves of one visit at once: one moves, the other is judged against the first's result; two visits moved into one provider's slot at once: one moves, the other is `overlap`; a move and a booking of the same slot at once: one of them (integration, as `booking.test.ts` races two bookings).
+- [ ] Every action × every role in `src/app/action-permissions.test.ts`, as the others: all four members may, a signed-out caller and a stale clinic id are refused.
+- [ ] `appointmentsOnDay` gives `movable` true for booked and confirmed only, from the same function as the move (unit).
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
 
 ---
 
+### E01-T06f · The drawer's move form, and Restore
+
+**Planned** (split from E01-T06c, D-124). Ready when E01-T06c is Done. About 380 lines of product code with the texts (the move form ~170, the other day's read ~50, the warning box moved out of the booking drawer ~0 net, Restore ~90, texts ~70); T05a, T06b and T06e came to up to 1.5 or 3 times their estimate, so a builder who passes about 500 stops and writes it in the note.
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T06c (the action and `movable`), E01-T06e (Done: the drawer's guards), E01-T05b (Done: the warning box)
+- **Read:** `scope` (Appointment drawer; New appointment drawer's warnings) · `handoffs/E01-T06c.md` · `src/app/(staff)/calendar/new-appointment.tsx` (`BookingForm`, `BookingWarning`), `booking-warnings.ts`, `booking-choices.ts`, `appointment-drawer.tsx`, `calendar-screen.tsx`, `actions.ts` (`readCalendarDay`) · `src/app/(staff)/settings/closed-days.tsx` (a date field) · D-020, D-114, D-122, D-124
+
+**Do.**
+- **The move form in the drawer** for a visit with `movable`: a date (the browser's date field, as Settings' closed days), a time and a provider (the booking drawer's own start and provider choices, `booking-choices.ts`), starting on the visit's own, a **Move** button under the fields and the same warning box as the booking (overlap with **Move anyway**, a break, hours outside, a closed day; `booking-warnings.ts` and `BookingWarning`, moved out of `new-appointment.tsx` into a file of their own, their output unchanged). A `StaffForm` calling `moveAppointment` (T06c) with the visit and `anyway` as hidden fields; its refusals shown above the button (`overlap`, `already_booked`, `provider_not_bookable`, `patient_not_bookable`, `start_skipped`, `nothing_changed`, `not_movable`, `not_found`). Texts in `en.json`.
+- **The warnings for the day it moves to.** The calendar holds one day; a move can go to another (owner, D-122). The form takes the warnings from the day it points at: the day the calendar holds when it is that day, else that day read through `readCalendarDay` (it exists; its answer is the same view), asked when the date changes, the last answer only (a ticket, as the patient search does), the old warnings kept until the new answer comes. The server's check is the one that counts (an overlap is refused whatever the box showed), as for the booking. The own visit never warns against itself: `bookingWarnings` takes the visit's id to leave out (a move of 09:00 to 09:15 overlaps its own old block).
+- **After a move** the calendar stays on the day it shows. A move on the same day shows the visit in its new place, pill `booked`, and the drawer stays open on it; a move to another day takes the visit off the shown day, which closes the drawer as it does for any visit the day no longer holds (`calendar-screen.tsx`). The toast names the patient, the new day and time (24-hour clock, the clinic's zone, a date formatted as a date, D-098).
+- **Restore** for a visit with `restore` among its actions (cancelled or no-show): a button in the drawer's grid (`SHOWN` gets `restore`, so a visit that can only be restored no longer shows the muted line), a `StaffForm` as the status buttons. With another visit holding the chair at its time the shown day says so in the warning box (overlap only), and the button reads **Restore anyway** and sends `anyway`; without, it restores. A refusal (`patient_not_bookable` for a patient archived since, `provider_not_bookable`, `already_booked`, `overlap`, `not_allowed`, `not_found`) shows above the button. The one-second settle of T06b covers it.
+- **The guards of T06e hold:** the form tells `onSendingChange`, the drawer counts it; nothing in the form acts on the pointer's press but buttons and the browser's own fields (no Radix Select).
+
+**Out of scope.** Book next visit and a visit under way on the profile and the list (E01-T06d). A change to the module or the action (T06c). Dragging. Touch.
+
+**Acceptance.** (completed when it is refined, after E01-T06c: what the move form can choose is settled by what that task built.) A move to another start, provider and day through the form, each written once and the visit shown at once; the warning box for a break, hours, a closed day and an overlap on the shown day and on another day (the read held with `page.route`, the last answer wins); Move anyway only over an overlap; a double click on Move moves once; Restore of a cancelled and a no-show visit, Restore anyway over an overlap; every role; the keyboard; the accessibility check with the form open; three browsers.
+
+---
 ### E01-T06d · Book next visit, and a visit under way on the profile and the list
 
-**Planned** (split from E01-T06, D-122; owner, 2026-10-29: the visit under way shows on both). Its dependency E01-T06b is Done; its acceptance is completed when it is refined, after E01-T06c.
+**Planned** (split from E01-T06, D-122; owner, 2026-10-29: the visit under way shows on both). Its dependency E01-T06b is Done; its acceptance is completed when it is refined, after E01-T06f.
 
 - **Role:** builder · **Risk:** normal · **Depends on:** E01-T06b (the Arrived button), E01-T05d
 - **Read:** `scope` (Appointment drawer; Patients list and profile) · `handoffs/E01-T03a.md` (Discovered line,
@@ -1211,7 +1230,7 @@ chosen and books them once; the double click guard holds.
 
 ### E01-T06e · The cancel dialog, and the guards of drawers and dialogs
 
-**Ready** (split from E01-T06b, D-123; refined by the architect when E01-T06b was Done, 2026-10-30, checked against `main` at `788ef58`). About 290 lines of product code with the texts (the cancel dialog and its drawer wiring ~140, `onSendingChange` and `busy` ~60, the submit stop ~10, the Enter fix ~5, the demo of a dialog inside a form on `/dev/components` ~40, texts ~35); E01-T05a, E01-T06b and E01-T09a came to up to three times their estimate, so watch the count.
+**Done** (merged by the owner, PR #98, 2026-10-30; about 440 lines against 290, no fix round, no finding of the reviewer or the tester; split from E01-T06b, D-123; refined by the architect when E01-T06b was Done, checked against `main` at `788ef58`). The estimate was about 290 lines of product code with the texts (the cancel dialog and its drawer wiring ~140, `onSendingChange` and `busy` ~60, the submit stop ~10, the Enter fix ~5, the demo of a dialog inside a form on `/dev/components` ~40, texts ~35); E01-T05a, E01-T06b and E01-T09a came to up to three times their estimate, so watch the count.
 
 - **Role:** builder · **Risk:** normal (`StaffForm` and the drawer and dialog components are screen code, not an area of `test-strategy.md`'s second-review table; the action and its permission are E01-T06a's) · **Depends on:** E01-T06b (Done)
 - **Read:** `scope` (Appointment drawer) · `handoffs/E01-T06b.md` (the architect's and the builder's sections, and the tester's finding 1 with its fix) · `handoffs/E00-T04e.md` (the reviewer's suggestion 1) · `handoffs/E01-T05a.md` (the tester's Discovered line 1) · `handoffs/E01-T05d.md` (the review's and the delta review's suggestion 1) · `src/ui/sheet.tsx`, `dialog.tsx`, `double-click-guard.ts`, `src/app/_lib/staff-form.tsx`, `src/app/(staff)/calendar/appointment-drawer.tsx`, `appointment-actions.ts`, `patient-field.tsx` · D-113, D-114, D-118, D-122, D-123
