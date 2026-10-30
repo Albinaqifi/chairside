@@ -991,3 +991,156 @@ describe('the calendar’s read gives each visit movable (acceptance 8)', () => 
     }
   });
 });
+
+// Added by the tester (E01-T06c): cases the task's list does not name.
+describe('tester: the edges of a move', () => {
+  it.each(['confirmed', 'arrived', 'completed'])(
+    'a %s visit of another patient holds the chair: a move onto it is an overlap, and with anyway sets overlap_ok',
+    async (status) => {
+      const p = await provider(skopje);
+      const blocker = await visit(skopje, p, {
+        patientId: skopje.marko,
+        startsAt: '2031-03-03T13:00:00Z',
+        status,
+        confirmedAt: status === 'confirmed' ? NOON : null,
+        confirmedVia: status === 'confirmed' ? 'staff' : null,
+        completedAt: status === 'completed' ? NOON : null,
+      });
+      const id = await visit(skopje, p);
+      const before = await row(id);
+      const emit = hook();
+      expect(await move(skopje, id, { providerId: p, start: 14 * H }, emit)).toEqual({
+        ok: false,
+        code: 'overlap',
+      });
+      expect(await row(id)).toEqual(before);
+      expect(emit).not.toHaveBeenCalled();
+      expect((await move(skopje, id, { providerId: p, start: 14 * H, anyway: true })).ok).toBe(
+        true,
+      );
+      expect((await row(id)).overlap_ok).toBe(true);
+      expect((await row(blocker)).status).toBe(status);
+    },
+  );
+
+  it('a visit that overlaps another one booked anyway is an overlap too (the constraint ignores overlap_ok rows, the check does not)', async () => {
+    const p = await provider(skopje);
+    const already = await visit(skopje, p, {
+      patientId: skopje.marko,
+      startsAt: '2031-03-03T13:00:00Z',
+    });
+    await visit(skopje, p, {
+      patientId: skopje.archived,
+      startsAt: '2031-03-03T13:15:00Z',
+      overlapOk: true,
+    });
+    expect(already).toBeTruthy();
+    const id = await visit(skopje, p);
+    const before = await row(id);
+    expect(await move(skopje, id, { providerId: p, start: 14 * H + 20 })).toEqual({
+      ok: false,
+      code: 'overlap',
+    });
+    expect(await row(id)).toEqual(before);
+  });
+
+  it('across midnight: 23:45 for 30 minutes ends at 00:15 the next day; 00:00 starts at the local midnight', async () => {
+    const p = await provider(skopje);
+    const id = await visit(skopje, p);
+    expect((await move(skopje, id, { providerId: p, start: 23 * H + 45 })).ok).toBe(true);
+    let stored = await row(id);
+    expect(iso(stored.starts_at)).toBe('2031-03-03T22:45:00.000Z');
+    expect(iso(stored.ends_at)).toBe('2031-03-03T23:15:00.000Z');
+    expect((await move(skopje, id, { providerId: p, day: '2031-03-04', start: 0 })).ok).toBe(true);
+    stored = await row(id);
+    expect(iso(stored.starts_at)).toBe('2031-03-03T23:00:00.000Z');
+    expect(iso(stored.ends_at)).toBe('2031-03-03T23:30:00.000Z');
+  });
+
+  // 26 October 2031: 03:00 summer time goes back to 02:00, so 02:30 comes twice in Skopje
+  // (00:30Z summer, 01:30Z winter). PostgreSQL reads a typed 02:30 as the second.
+  it('the hour the clocks go back: from the first 02:30 to the typed 02:30 is a move of the start; from the second it is nothing_changed', async () => {
+    const p = await provider(skopje);
+    const first = await visit(skopje, p, { startsAt: '2031-10-26T00:30:00Z' });
+    expect(await move(skopje, first, { providerId: p, day: '2031-10-26', start: 150 })).toEqual({
+      ok: true,
+      from: 'booked',
+      fields: ['start'],
+    });
+    expect(iso((await row(first)).starts_at)).toBe('2031-10-26T01:30:00.000Z');
+    expect(await move(skopje, first, { providerId: p, day: '2031-10-26', start: 150 })).toEqual({
+      ok: false,
+      code: 'nothing_changed',
+    });
+    expect(await movedRows(first)).toBe(0); // the module writes no audit row, the action does
+  });
+
+  it('a visit of 90 minutes that spans the repeated hour keeps its real length when moved into it', async () => {
+    const p = await provider(skopje);
+    const id = await visit(skopje, p, { startsAt: '2031-10-27T08:00:00Z', minutes: 90 });
+    expect((await move(skopje, id, { providerId: p, day: '2031-10-26', start: 2 * H })).ok).toBe(
+      true,
+    );
+    const stored = await row(id);
+    const starts = Date.parse(String(iso(stored.starts_at)));
+    const ends = Date.parse(String(iso(stored.ends_at)));
+    expect((ends - starts) / 60_000).toBe(90);
+  });
+
+  it('a move of a visit away from an inactive provider to an active one is not refused', async () => {
+    const gone = await provider(skopje, false);
+    const q = await provider(skopje);
+    const id = await visit(skopje, gone);
+    expect((await move(skopje, id, { providerId: q, start: 12 * H })).ok).toBe(true);
+  });
+
+  it('a patient who became deceased after the booking: not movable, nothing written', async () => {
+    const p = await provider(skopje);
+    const id = await visit(skopje, p, { patientId: skopje.deceased });
+    const before = await row(id);
+    expect(await move(skopje, id, { providerId: p, start: 15 * H })).toEqual({
+      ok: false,
+      code: 'patient_not_bookable',
+    });
+    expect(await row(id)).toEqual(before);
+  });
+});
+
+describe('tester: a move against a status change of the same visit', () => {
+  it.each(['arrive', 'cancel'] as const)(
+    'a move and %s at once: the status the person set is the one that stays',
+    async (action) => {
+      for (let race = 0; race < 6; race += 1) {
+        const p = await provider(skopje);
+        const q = await provider(skopje);
+        const id = await visit(skopje, p);
+        const change = withTenant(skopje.clinic, (tx) =>
+          scheduling.changeAppointmentStatus(
+            tx,
+            action === 'cancel'
+              ? {
+                  appointmentId: id,
+                  action: 'cancel',
+                  actor: 'staff',
+                  timeZone: SKOPJE,
+                  cancelledBy: 'staff',
+                  reason: null,
+                }
+              : { appointmentId: id, action: 'arrive', actor: 'staff', timeZone: SKOPJE },
+            NOW,
+          ),
+        );
+        const [moved, changed] = await Promise.all([
+          move(skopje, id, { providerId: q, start: 15 * H }),
+          change,
+        ]);
+        const stored = await row(id);
+        expect(changed.ok, `race ${race}`).toBe(true);
+        expect(stored.status, `race ${race}`).toBe(action === 'cancel' ? 'cancelled' : 'arrived');
+        if (moved.ok) expect(stored.provider_id).toBe(q);
+        else expect(moved).toEqual({ ok: false, code: 'not_movable' });
+        if (!moved.ok) expect(stored.provider_id).toBe(p);
+      }
+    },
+  );
+});
