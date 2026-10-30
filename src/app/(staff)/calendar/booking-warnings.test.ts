@@ -236,3 +236,48 @@ describe('a break, the hours or a closed day (owner, D-114): each said, Book sti
     expect(warnings.outsideHours).toEqual({ from: 8 * H, to: 18 * H });
   });
 });
+
+describe("a visit left out (E01-T06f): the move form's own old place is no overlap", () => {
+  it('leaves out the visit being moved, and still names every other', () => {
+    const own = visit(DENTIST, 9 * H, 9 * H + 30);
+    const next = visit(DENTIST, 9 * H + 30, 10 * H);
+    const view = monday({ appointments: [own, next] });
+    const moved = { providerId: DENTIST, start: 9 * H + 15, length: 30 };
+    // Moving 09:00 to 09:15 overlaps its own old place and the visit after it.
+    expect(bookingWarnings(view, moved).overlaps.map((block) => block.id)).toEqual([
+      own.id,
+      next.id,
+    ]);
+    expect(bookingWarnings(view, moved, own.id).overlaps.map((block) => block.id)).toEqual([
+      next.id,
+    ]);
+  });
+
+  it('leaves out nothing by default and for an id the day does not hold', () => {
+    const own = visit(DENTIST, 9 * H, 9 * H + 30);
+    const view = monday({ appointments: [own] });
+    const booking = { providerId: DENTIST, start: 9 * H, length: 30 };
+    expect(bookingWarnings(view, booking).overlaps).toHaveLength(1);
+    expect(bookingWarnings(view, booking, null).overlaps).toHaveLength(1);
+    expect(bookingWarnings(view, booking, 'no-such-visit').overlaps).toHaveLength(1);
+  });
+
+  it('leaves out the visit only: its break, the hours and the closed day still warn', () => {
+    const own = visit(DENTIST, 12 * H, 12 * H + 30);
+    const view = monday({ appointments: [own], breaks: [lunch(DENTIST, 12 * H, 13 * H)] });
+    const warnings = bookingWarnings(
+      view,
+      { providerId: DENTIST, start: 12 * H, length: 30 },
+      own.id,
+    );
+    expect(warnings.overlaps).toEqual([]);
+    expect(warnings.breaks).toHaveLength(1);
+    const closed = monday({
+      closedDay: { date: '2026-10-26', label: 'Holiday' },
+      appointments: [own],
+    });
+    expect(
+      bookingWarnings(closed, { providerId: DENTIST, start: 9 * H, length: 30 }, own.id).closed,
+    ).toEqual({ why: 'closed_day', label: 'Holiday' });
+  });
+});

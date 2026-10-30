@@ -34,7 +34,11 @@ beforeEach(() => {
 });
 
 // The action is server code: the forms only hand it to StaffForm.
-vi.mock('./appointment-actions', () => ({ changeAppointmentStatus: vi.fn() }));
+vi.mock('./appointment-actions', () => ({
+  changeAppointmentStatus: vi.fn(),
+  moveAppointment: vi.fn(),
+}));
+vi.mock('./actions', () => ({ readCalendarDay: vi.fn() }));
 
 vi.mock('radix-ui', async (importOriginal) => {
   const actual = await importOriginal<typeof import('radix-ui')>();
@@ -72,7 +76,9 @@ function block(
     status,
     note: '',
     actions,
-    movable: true,
+    // The drawers of the status buttons are tested without the move form (E01-T06f's is in
+    // appointment-move.test.ts): a visit that cannot be moved shows none.
+    movable: false,
     from: 9 * H,
     to: 9 * H + 30,
     lane: 0,
@@ -93,6 +99,18 @@ const COLUMN: Column = {
   blocks: [],
 };
 
+/** The day the calendar holds: the dentist's column, open 08:00 to 18:00. */
+const VIEW = layoutDay({
+  day: '2026-10-26',
+  today: '2026-10-26',
+  weekday: 1,
+  hours: [{ weekday: 1, opens: 8 * H, closes: 18 * H }],
+  closedDay: null,
+  providers: [DENTIST],
+  breaks: [],
+  appointments: [],
+});
+
 function render(
   shown: AppointmentBlock,
   options: { answer?: FormAnswer<unknown>; timeZone?: string; year?: boolean } = {},
@@ -101,8 +119,10 @@ function render(
   const drawer = createElement(AppointmentDrawer, {
     block: shown,
     column: COLUMN,
+    view: VIEW,
     year: options.year ?? false,
     onClose: vi.fn(),
+    onMoved: vi.fn(),
   });
   const frame: ComponentProps<typeof FrameClinic> = { clinicId: CLINIC, children: drawer };
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
