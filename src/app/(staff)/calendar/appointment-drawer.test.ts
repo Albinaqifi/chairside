@@ -225,7 +225,7 @@ describe('Update status: a button for each action the visit has, in this order, 
     expect(text(html)).not.toContain('Nothing to change');
   });
 
-  it('shows Cancel last, as the one button that opens the cancel dialog, and no Restore, whatever the module allows (E01-T06e, E01-T06c)', () => {
+  it('shows Cancel as the one button that opens the cancel dialog, and Restore last as a form (E01-T06e, E01-T06g)', () => {
     const all: StatusAction[] = [
       'confirm',
       'arrive',
@@ -237,7 +237,8 @@ describe('Update status: a button for each action the visit has, in this order, 
       'restore',
     ];
     const html = render(block('booked', all));
-    // The status forms, then the one button that is no form: it sends nothing, it opens the dialog.
+    // The status forms, then the one button that is no form (it sends nothing, it opens the dialog),
+    // then Restore, a form of its own.
     expect(buttons(html)).toEqual([
       'In the chair',
       'Done',
@@ -245,12 +246,13 @@ describe('Update status: a button for each action the visit has, in this order, 
       'Confirm',
       'Undo in the chair',
       'Undo done',
+      'Restore',
     ]);
     expect(dialogTriggers(html)).toEqual(['Cancel']);
-    expect(buttons(html)).not.toContain('Restore');
     expect(hiddenActions(html)).not.toContain('cancel');
-    expect(hiddenActions(html)).not.toContain('restore');
+    expect(hiddenActions(html).at(-1)).toBe('restore');
     expect(html.indexOf('>Confirm<')).toBeLessThan(html.indexOf('>Cancel<'));
+    expect(html.indexOf('>Cancel<')).toBeLessThan(html.indexOf('>Restore<'));
   });
 
   it('the cancel dialog is closed until Cancel is pressed: no form of it is on the page, and Cancel is no submit button', () => {
@@ -269,17 +271,30 @@ describe('Update status: a button for each action the visit has, in this order, 
     expect(html.match(/autoComplete="off"|autocomplete="off"/gi)?.length).toBeGreaterThanOrEqual(2);
   });
 
-  it.each<[AppointmentStatus, StatusAction[]]>([
-    ['completed', []],
-    ['cancelled', ['restore']],
-    ['no_show', ['restore']],
-  ])(
-    'a %s visit that has no button for %j shows a muted line, no empty heading',
-    (status, actions) => {
-      const html = render(block(status, actions));
-      expect(buttons(html)).toEqual([]);
-      expect(text(html)).toContain('Nothing to change on this visit.');
-      expect(text(html)).not.toContain('Update status');
+  it('a completed visit with no button shows a muted line, no empty heading', () => {
+    const html = render(block('completed', []));
+    expect(buttons(html)).toEqual([]);
+    expect(text(html)).toContain('Nothing to change on this visit.');
+    expect(text(html)).not.toContain('Update status');
+  });
+
+  it.each<AppointmentStatus>(['cancelled', 'no_show'])(
+    'a %s visit has Restore alone, under the heading, and no muted line (E01-T06g)',
+    (status) => {
+      const html = render(block(status, ['restore']));
+      expect(buttons(html)).toEqual(['Restore']);
+      expect(hiddenActions(html)).toEqual(['restore']);
+      expect(text(html)).toContain('Update status');
+      expect(text(html)).not.toContain('Nothing to change');
+    },
+  );
+
+  it.each<AppointmentStatus>(['booked', 'confirmed', 'arrived', 'completed'])(
+    'a %s visit shows no Restore',
+    (status) => {
+      const html = render(block(status, ['cancel']));
+      expect(buttons(html)).not.toContain('Restore');
+      expect(hiddenActions(html)).not.toContain('restore');
     },
   );
 });

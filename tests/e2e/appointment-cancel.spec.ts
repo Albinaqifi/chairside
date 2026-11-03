@@ -303,9 +303,10 @@ test.describe('cancelling from the dialog over the drawer (acceptance 1 and 2)',
       const audit = await auditOf(patientVisit);
       expect(audit, 'one audit row').toHaveLength(1);
       expect(audit.join(), 'the reason in no audit row').not.toContain(reason);
-      // The cancel gone, the muted line stands; the focus is in the drawer, not lost on the page.
+      // The cancel gone, Restore stands in its place (E01-T06g); the focus is in the drawer, not lost
+      // on the page.
       await expect(button(open, t.actions.cancel.label)).toHaveCount(0);
-      await expect(open.getByText(t.nothingToChange)).toBeVisible();
+      await expect(button(open, t.restore.submit)).toBeVisible();
       await expect
         .poll(() => focusInDrawer(page), { message: 'the focus is in the drawer' })
         .toBe(true);

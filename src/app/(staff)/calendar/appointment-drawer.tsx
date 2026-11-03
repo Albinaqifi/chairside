@@ -12,6 +12,7 @@ import { Dialog, DialogTrigger } from '@/ui/dialog';
 import { Sheet, SheetBody, SheetContent, SheetFooter } from '@/ui/sheet';
 import { changeAppointmentStatus } from './appointment-actions';
 import { MoveForm } from './appointment-move';
+import { RestoreForm } from './appointment-restore';
 import { CancelDialogContent } from './cancel-dialog';
 import type { AppointmentBlock, CalendarDayView, Column } from './day';
 
@@ -26,9 +27,9 @@ const PILL: Record<AppointmentStatus, BadgeVariant> = {
 };
 
 /**
- * The buttons of "Update status", in the order the drawer shows them (E01-T06b, E01-T06e). Restore is
- * not here: it is E01-T06g's, so a visit that can only be restored shows the muted line. Cancel is the
- * one that is no StaffForm of its own: it opens the cancel dialog (./cancel-dialog.tsx).
+ * The buttons of "Update status", in the order the drawer shows them (E01-T06b, E01-T06e, E01-T06g).
+ * Cancel and Restore are the two that are no plain StatusButton: Cancel opens the cancel dialog
+ * (./cancel-dialog.tsx), Restore is a form of its own with the overlap box (./appointment-restore.tsx).
  */
 const SHOWN = [
   'arrive',
@@ -38,10 +39,11 @@ const SHOWN = [
   'undo_arrival',
   'undo_completion',
   'cancel',
+  'restore',
 ] as const satisfies readonly StatusAction[];
 type Shown = (typeof SHOWN)[number];
-/** The buttons that are a status form of their own. */
-type FormAction = Exclude<Shown, 'cancel'>;
+/** The buttons that are a status form of their own, with nothing but the visit and the action. */
+type FormAction = Exclude<Shown, 'cancel' | 'restore'>;
 
 /**
  * How long the status buttons take no click from a pointer once the buttons have changed (E01-T06b
@@ -93,7 +95,10 @@ function focusBlock(appointmentId: string) {
  * "Update status" (./appointment-move.tsx, E01-T06f), keyed by the visit's place so a move starts it
  * again. The settle covers the Move button too: the place changing starts it, as the buttons do.
  *
- * Not here yet: restoring (E01-T06g), Book next visit (E01-T06d), the visit's messages, the aftercare
+ * Restore (E01-T06g) is the one status button with a box above it: a cancelled or no-show visit has it
+ * alone, across both columns (./appointment-restore.tsx).
+ *
+ * Not here yet: Book next visit (E01-T06d), the visit's messages, the aftercare
  * box and the treatment plan (later milestones).
  */
 export function AppointmentDrawer({
@@ -213,6 +218,15 @@ export function AppointmentDrawer({
                           {t('calendar.appointment.actions.cancel.label')}
                         </Button>
                       </DialogTrigger>
+                    ) : action === 'restore' ? (
+                      <div key={`${block.id}-restore`} className="col-span-2">
+                        <RestoreForm
+                          block={block}
+                          column={column}
+                          held={view}
+                          onSendingChange={track}
+                        />
+                      </div>
                     ) : (
                       <StatusButton
                         key={`${block.id}-${action}`}

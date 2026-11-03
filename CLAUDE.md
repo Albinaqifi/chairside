@@ -140,7 +140,9 @@ tests/e2e/            End-to-end journeys and checks in real browsers (Playwrigh
                       on `/dev/components` (E01-T06e); the drawer's move form: which visits have it, a move to
                       another time, provider and day, the warnings on the shown day and on another
                       (its read held or failed with `page.route`), the refusals (a provider made inactive meanwhile in the second clinic), a double click on Move,
-                      the keyboard (E01-T06f).
+                      the keyboard (E01-T06f); Restore in the drawer: the box with its overlap line, Restore anyway,
+                      the refusals, a double click, the keyboard and where the focus goes, and the move form's
+                      `anyway` waiting for its day (E01-T06g).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 Dockerfile            The one image staging and production run (D-007, D-103): the web by default,

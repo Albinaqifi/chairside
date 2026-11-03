@@ -16,6 +16,7 @@ import { bookingWarnings, NO_WARNINGS } from './booking-warnings';
 import { isShownDay, type AppointmentBlock, type CalendarDayView, type Column } from './day';
 import {
   firstMoveProvider,
+  movesAnyway,
   placeOf,
   pointedDay,
   startChoicesWith,
@@ -38,7 +39,7 @@ import { readAgain } from './read-on-use';
  * counts: an overlap is refused whatever the box showed. That day's grid and active providers also
  * give the times and providers offered, and the time held is offered even when no grid has it, so a
  * change of day never moves the time under the person. An overlap turns Move into Move anyway and adds
- * the hidden `anyway`, sent only while it shows (D-020); a break, the hours or a closed day leave Move
+ * the hidden `anyway`, sent only while it shows an overlap of the day pointed at (D-020, ./move-choices.ts); a break, the hours or a closed day leave Move
  * as it is. The visit's own old place is no overlap.
  *
  * After a move the calendar keeps the day it shows: a move on that day shows the visit in its new
@@ -119,7 +120,7 @@ function MoveFields({
     state === 'ok'
       ? bookingWarnings(view, { providerId, start: move.start, length: place.length }, block.id)
       : NO_WARNINGS;
-  const anyway = warnings.overlaps.length > 0;
+  const anyway = movesAnyway(warnings.overlaps.length, view.day, pointed);
   const time = (minutes: number) =>
     format.dateTime(new Date(Date.UTC(2000, 0, 1, 0, minutes)), TIME_OF_DAY);
   const patient = names('fullName', {
@@ -238,7 +239,7 @@ function MoveFields({
             />
           </div>
           <BookingWarning
-            move
+            verb="move"
             warnings={warnings}
             day={view.day}
             providerName={provider?.shortName ?? ''}

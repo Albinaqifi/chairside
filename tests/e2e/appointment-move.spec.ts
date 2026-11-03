@@ -51,6 +51,7 @@ const CHECKS = [
   'double',
   'keys',
   'inactive',
+  'waits',
 ] as const;
 type Check = (typeof CHECKS)[number];
 
@@ -503,7 +504,9 @@ test.describe('the warning box on the day the calendar holds (acceptance 3)', ()
       await dayField(open).fill(saturday);
       await expect.poll(() => held, { message: "the Saturday's read is sent, and held" }).toBe(1);
       await expect(kept, 'the old warnings stay until the answer comes').toBeVisible();
-      await expect(moveButton(open, move.moveAnyway)).toBeVisible();
+      // The button waits for the day's answer (E01-T06g): it reads Move, not Move anyway, meanwhile.
+      await expect(moveButton(open)).toBeVisible();
+      await expect(moveButton(open, move.moveAnyway)).toHaveCount(0);
 
       // What is shown under the dialog from now on, whatever it is for a moment.
       await page.evaluate((saturdayText) => {
@@ -568,6 +571,91 @@ test.describe('the warning box on the day the calendar holds (acceptance 3)', ()
       expect(await stored(id)).toMatchObject({ at: `${saturday} 10:00` });
     } finally {
       await clear(main, saturday);
+    }
+  });
+
+  test('the anyway waits for its day (E01-T06g): while a changed day is read, the old warnings stay but the button reads Move and a press sends no anyway; once the day answers, the button follows it', async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    const { main, other, far } = daysOf(testInfo, 'waits');
+    // The reads of `other` and `far` are held, each until its own release. Next.js sends the page's
+    // server actions one after the other, so a Move pressed while a read is held is sent behind it,
+    // with the form as it was when it was pressed.
+    const holds = new Map<string, { released: Promise<void>; release: () => void; seen: number }>();
+    for (const day of [other, far]) {
+      const hold = { released: Promise.resolve(), release: () => {}, seen: 0 };
+      hold.released = new Promise<void>((resolve) => {
+        hold.release = resolve;
+      });
+      holds.set(day, hold);
+    }
+    await page.route(`${APP}/calendar**`, async (route) => {
+      for (const [day, hold] of holds) {
+        if (!readsOf(route.request(), day)) continue;
+        hold.seen++;
+        await hold.released;
+        return route.continue();
+      }
+      return route.fallback();
+    });
+    const seen = (day: string) => holds.get(day)?.seen ?? 0;
+    try {
+      const id = await visit(main, '09:00');
+      await visit(main, '10:00', { patient: ['Ana', 'Brezovska'] });
+      await visit(far, '10:00', { patient: ['Elena', 'Kodra'] });
+      await openCalendar(page, main);
+      const sent = movesSent(page);
+      const open = await openDrawer(page);
+      const anyway = open.locator('input[name="anyway"]');
+      const mainLine = open.getByText(overlapLine('Ana Brezovska', '10:00', '10:30'));
+      const farLine = open.getByText(overlapLine('Elena Kodra', '10:00', '10:30'));
+
+      // On its own day the overlap makes it Move anyway.
+      await timeField(open).selectOption('10:00');
+      await expect(mainLine).toBeVisible();
+      await expect(moveButton(open, move.moveAnyway)).toBeVisible();
+      await expect(anyway).toHaveCount(1);
+
+      // The date changes to a day that has an overlap of its own, and its read is held: the box keeps
+      // the old overlap (D-125), but the button reads Move and nothing is sent as "anyway".
+      await dayField(open).fill(far);
+      await expect.poll(() => seen(far), { message: "the far day's read is held" }).toBe(1);
+      await expect(mainLine, 'the old warnings stay').toBeVisible();
+      await expect(moveButton(open)).toBeVisible();
+      await expect(moveButton(open, move.moveAnyway)).toHaveCount(0);
+      await expect(anyway).toHaveCount(0);
+
+      // Move is pressed now: the request is built without anyway, and is sent behind the read.
+      await moveButton(open).click();
+      holds.get(far)?.release();
+      await expect(farLine, "the far day's own box comes").toBeVisible();
+      await expect(open.getByRole('alert')).toHaveText(move.refusals.overlap);
+      expect(sent, 'one move was sent').toHaveLength(1);
+      expect(sent[0], 'without anyway').not.toContain('anyway');
+      expect(await stored(id)).toMatchObject({ at: `${main} 09:00`, overlapOk: false });
+      expect(await movedRows(id)).toBe(0);
+
+      // Once the box is of the day pointed at, the button follows it.
+      await expect(mainLine).toHaveCount(0);
+      await expect(moveButton(open, move.moveAnyway)).toBeVisible();
+      await expect(anyway).toHaveCount(1);
+
+      // The date changes again, to a day with no overlap, held: the far day's overlap stays in the box
+      // and the button reads Move. The answer comes: the box is empty and the button stays Move.
+      await dayField(open).fill(other);
+      await expect.poll(() => seen(other), { message: "the other day's read is held" }).toBe(1);
+      await expect(farLine, 'the old warnings stay').toBeVisible();
+      await expect(moveButton(open)).toBeVisible();
+      await expect(moveButton(open, move.moveAnyway)).toHaveCount(0);
+      await expect(anyway).toHaveCount(0);
+      holds.get(other)?.release();
+      await expect(farLine).toHaveCount(0);
+      await expect(moveButton(open)).toBeVisible();
+      await expect(anyway).toHaveCount(0);
+    } finally {
+      for (const hold of holds.values()) hold.release();
+      await clear(main, other, far);
     }
   });
 });
