@@ -46,11 +46,13 @@ export const NO_WARNINGS: BookingWarnings = {
 /**
  * What a booking of `providerId` from `start` for `length` minutes is warned of on `day`: its
  * provider's column (one exists for a provider the filter has off too), the day's hours and why it is
- * closed. A provider without a column there (none chosen) has no visit or break to overlap.
+ * closed. A provider without a column there (none chosen) has no visit or break to overlap. `except`
+ * is a visit to leave out (E01-T06f): the visit being moved, whose own old place is no overlap.
  */
 export function bookingWarnings(
   day: Pick<CalendarDayView, 'columns' | 'open' | 'closed'>,
   booking: { providerId: string; start: number; length: number },
+  except: string | null = null,
 ): BookingWarnings {
   const time: Span = { from: booking.start, to: booking.start + booking.length };
   const blocks =
@@ -58,7 +60,10 @@ export function bookingWarnings(
   return {
     overlaps: blocks.filter(
       (block): block is AppointmentBlock =>
-        block.kind === 'appointment' && holdsTheChair(block.status) && overlap(block, time),
+        block.kind === 'appointment' &&
+        block.id !== except &&
+        holdsTheChair(block.status) &&
+        overlap(block, time),
     ),
     breaks: blocks.filter(
       (block): block is BreakBlock => block.kind === 'break' && overlap(block, time),

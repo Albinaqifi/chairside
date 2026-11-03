@@ -32,16 +32,11 @@ import {
   type BookingChoices,
   type Slot,
 } from './booking-choices';
-import { anyWarning, bookingWarnings, NO_WARNINGS, type BookingWarnings } from './booking-warnings';
+import { BookingWarning, TIME_OF_DAY } from './booking-warning';
+import { bookingWarnings, NO_WARNINGS } from './booking-warnings';
 import type { CalendarDayView } from './day';
 import { newPatientFrom, unreachable } from './new-patient';
 import { PatientField, type PickedPatient } from './patient-field';
-
-/** A time of the day the drawer shows, "10:30": no moment, so in UTC, as the grid's hours are. */
-const TIME_OF_DAY = { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' } as const;
-
-/** A visit's time, "09:00": a moment, so in the clinic's zone (next-intl's), as the grid shows it. */
-const VISIT_TIME = { hour: 'numeric', minute: '2-digit' } as const;
 
 /** A treatment's chip (demo line 1344), as the calendar's provider chips are drawn. */
 const CHIP =
@@ -450,84 +445,6 @@ export function BookingForm({
         />
       </div>
     </StaffForm>
-  );
-}
-
-/**
- * What the drawer warns of, above Book (E01-T05b), a line each: each visit the time overlaps, its
- * patient and its time, as the grid shows them (demo line 1350, logic line 2125), then that Book
- * anyway still books it; the provider's break; the day's opening hours, when the time runs outside
- * them; the day the clinic is closed (owner, D-114). A polite live region that is always there, as the
- * new patient's duplicate warning is, so a screen reader reads a warning when it appears; empty, it
- * takes no room.
- */
-function BookingWarning({
-  warnings,
-  day,
-  providerName,
-}: {
-  warnings: BookingWarnings;
-  /** The booking's day, for a weekday without hours. */
-  day: string;
-  providerName: string;
-}) {
-  const t = useTranslations('calendar.booking.warning');
-  const names = useTranslations('patients');
-  const format = useFormatter();
-  const time = (minutes: number) =>
-    format.dateTime(new Date(Date.UTC(2000, 0, 1, 0, minutes)), TIME_OF_DAY);
-  const lines: { key: string; text: string }[] = [
-    ...warnings.overlaps.map((visit) => ({
-      key: visit.id,
-      text: t('overlap', {
-        name: names('fullName', { first: visit.patient.firstName, last: visit.patient.lastName }),
-        from: format.dateTime(new Date(visit.startsAt), VISIT_TIME),
-        to: format.dateTime(new Date(visit.endsAt), VISIT_TIME),
-      }),
-    })),
-    ...warnings.breaks.map((found) => ({
-      key: found.id,
-      text: t('break', {
-        provider: providerName,
-        label: found.label,
-        from: time(found.from),
-        to: time(found.to),
-      }),
-    })),
-  ];
-  if (warnings.outsideHours) {
-    lines.push({
-      key: 'hours',
-      text: t('outsideHours', {
-        from: time(warnings.outsideHours.from),
-        to: time(warnings.outsideHours.to),
-      }),
-    });
-  }
-  if (warnings.closed) {
-    lines.push({
-      key: 'closed',
-      text:
-        warnings.closed.why === 'closed_day'
-          ? t('closedDay', { label: warnings.closed.label })
-          : t('noHours', {
-              weekday: format.dateTime(new Date(day), { weekday: 'long', timeZone: 'UTC' }),
-            }),
-    });
-  }
-  return (
-    <div role="status">
-      {anyWarning(warnings) && (
-        <div className="mt-4 grid gap-1 rounded-control border border-warn-border bg-warn-bg px-3 py-2">
-          <ul className="grid gap-1">
-            {lines.map((line) => (
-              <li key={line.key}>{line.text}</li>
-            ))}
-          </ul>
-          {warnings.overlaps.length > 0 && <p>{t('anyway')}</p>}
-        </div>
-      )}
-    </div>
   );
 }
 

@@ -11,8 +11,9 @@ import { cn } from '@/ui/cn';
 import { Dialog, DialogTrigger } from '@/ui/dialog';
 import { Sheet, SheetBody, SheetContent, SheetFooter } from '@/ui/sheet';
 import { changeAppointmentStatus } from './appointment-actions';
+import { MoveForm } from './appointment-move';
 import { CancelDialogContent } from './cancel-dialog';
-import type { AppointmentBlock, Column } from './day';
+import type { AppointmentBlock, CalendarDayView, Column } from './day';
 
 /** The pill's variant for each status: the Badge names the no-show's with a hyphen. */
 const PILL: Record<AppointmentStatus, BadgeVariant> = {
@@ -26,7 +27,7 @@ const PILL: Record<AppointmentStatus, BadgeVariant> = {
 
 /**
  * The buttons of "Update status", in the order the drawer shows them (E01-T06b, E01-T06e). Restore is
- * not here: it is E01-T06c's, so a visit that can only be restored shows the muted line. Cancel is the
+ * not here: it is E01-T06g's, so a visit that can only be restored shows the muted line. Cancel is the
  * one that is no StaffForm of its own: it opens the cancel dialog (./cancel-dialog.tsx).
  */
 const SHOWN = [
@@ -88,21 +89,31 @@ function focusBlock(appointmentId: string) {
  * request of any of the drawer's forms is on its way (the forms tell, `onSendingChange`), Escape, the
  * overlay and Close leave it open, so a refusal always shows above its button.
  *
- * Not here yet: moving and restoring (E01-T06c), Book next visit (E01-T06d), the visit's messages,
- * the aftercare box and the treatment plan (later milestones).
+ * A visit that can move (`block.movable`, from the module) has the move form between its details and
+ * "Update status" (./appointment-move.tsx, E01-T06f), keyed by the visit's place so a move starts it
+ * again. The settle covers the Move button too: the place changing starts it, as the buttons do.
+ *
+ * Not here yet: restoring (E01-T06g), Book next visit (E01-T06d), the visit's messages, the aftercare
+ * box and the treatment plan (later milestones).
  */
 export function AppointmentDrawer({
   block,
   column,
+  view,
   year,
   onClose,
+  onMoved,
 }: {
   block: AppointmentBlock;
   /** The provider's column the visit is in: its name and chair. */
   column: Column;
+  /** The day the calendar holds now: the move form's warnings and choices on that day. */
+  view: CalendarDayView;
   /** Whether the day's year is shown: it is when the day is not in the clinic's current year. */
   year: boolean;
   onClose: () => void;
+  /** A move is done, with the provider the visit moved to: the calendar turns that column on. */
+  onMoved: (providerId: string) => void;
 }) {
   const t = useTranslations();
   const format = useFormatter();
@@ -119,7 +130,9 @@ export function AppointmentDrawer({
   // The buttons as last rendered, compared while rendering: the commit that changes them is the one
   // that stops their clicks, so no frame shows them changed and taking a press. Only the pointer's:
   // a key, and assistive technology, act on the control they name, which no redraw changes under it.
-  const offered = actions.join();
+  // The visit's place counts too: a move redraws the move form from the new place, under a pointer
+  // that rests on its button (E01-T06f).
+  const offered = `${actions.join()}|${column.providerId}|${block.startsAt}|${block.endsAt}`;
   const [rendered, setRendered] = useState(offered);
   const [settling, setSettling] = useState(false);
   if (rendered !== offered) {
@@ -176,6 +189,17 @@ export function AppointmentDrawer({
             <p className="-mt-2 text-muted">
               {t('calendar.appointment.where', { provider: column.name, chair: column.chairLabel })}
             </p>
+            {block.movable && (
+              <MoveForm
+                key={`${block.id}-${column.providerId}-${block.startsAt}-${block.endsAt}`}
+                block={block}
+                column={column}
+                held={view}
+                settling={settling}
+                onSendingChange={track}
+                onMoved={onMoved}
+              />
+            )}
             {actions.length > 0 ? (
               <section aria-labelledby="appointment-update-status">
                 <h3 id="appointment-update-status" className="mb-2 text-small font-semibold">

@@ -137,7 +137,10 @@ tests/e2e/            End-to-end journeys and checks in real browsers (Playwrigh
                       link's one `patient.viewed` row (E01-T06b); the cancel dialog over the drawer: who cancelled required, the
                       row written once, the keyboard, a double click on Cancel, and a drawer or dialog that stays open
                       while a request is on its way (E01-T06e); a dialog inside a form sends only its own form,
-                      on `/dev/components` (E01-T06e).
+                      on `/dev/components` (E01-T06e); the drawer's move form: which visits have it, a move to
+                      another time, provider and day, the warnings on the shown day and on another
+                      (its read held or failed with `page.route`), the refusals (a provider made inactive meanwhile in the second clinic), a double click on Move,
+                      the keyboard (E01-T06f).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 Dockerfile            The one image staging and production run (D-007, D-103): the web by default,
