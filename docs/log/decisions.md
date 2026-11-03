@@ -2459,3 +2459,23 @@ architecture), `changed` (differs from the original files), `process`.
 - **Revisit if:** T06f runs far over 450 lines (then the other day's read is its own task); the desk wants
   the time and provider to stay as the person left them when the date changes to a closed day; the reads of
   other days make the form slow (receptionist trial, Q-09).
+
+### D-126 · E01-T06g Done: E01-T06d split, a visit under way first and Book next visit after it with a Day field in the booking drawer (owner)
+- **Origin:** E01-T06g's Done pass and E01-T06d's Ready pass, 2026-11-03 (PR #104; `handoffs/E01-T06g.md`,
+  `handoffs/E01-T06d.md`). **Owner, 2026-11-03:** tried Restore, all fine. Asked how "Book next visit" should
+  pick its day, the booking drawer booking only on the day the calendar shows: **a Day field in the drawer**.
+  The split and the rest are the architect's.
+- **What:**
+  - **E01-T06d → E01-T06d and E01-T06h.** T06d: "In the chair now" on the profile and the list (about 110
+    lines, Ready). T06h: "Book next visit" and the booking drawer's Day field (Planned, refined after T06d).
+  - **"In the chair now" is by status alone** (D-122): `scheduling` gives `inChair` beside `next`, never
+    instead of it. The list's cell shows the chair line only; the profile's card shows it first and the next
+    visit under it as "Then …".
+  - **The Day field** is the booking drawer's: a date with the warnings of that day, read as the move form
+    reads another day (D-125). Today the day is the calendar's, sent hidden. `scope-v1.md` says so.
+- **Why:** a "next visit" is weeks away, not later the same day; a button that only filled in the patient
+  would save the desk one search, while the Day field is the part that makes it a next visit. It is a second
+  outcome (a field, another day's read, a patient from outside), so a task of its own: the first splits
+  well apart and is small. The task before it ran up to three times its estimate.
+- **Revisit if:** the receptionist trial (Q-09) wants the field only on this button; a visit never completed
+  and read "In the chair now" for days confuses the desk (then an end to it, with E01-T10's Today screen).
