@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { firstMoveProvider, placeOf, pointedDay, startChoicesWith } from './move-choices';
+import {
+  firstMoveProvider,
+  movesAnyway,
+  placeOf,
+  pointedDay,
+  startChoicesWith,
+} from './move-choices';
 import { layoutDay, type CalendarDayView, type Column } from './day';
 
 // E01-T06f: what the appointment drawer's move form starts on and offers, without React. Each case that
@@ -155,5 +161,38 @@ describe("the day the form points at: the calendar's when it is that, else the l
       view: held,
       state: 'failed',
     });
+  });
+});
+
+describe('movesAnyway: the "anyway" waits for the day the box is of (E01-T06g)', () => {
+  it('is sent over an overlap of the day pointed at', () => {
+    expect(movesAnyway(1, '2026-10-26', '2026-10-26')).toBe(true);
+    expect(movesAnyway(2, '2026-10-28', '2026-10-28')).toBe(true);
+  });
+
+  it('is not sent with no overlap, on any day', () => {
+    expect(movesAnyway(0, '2026-10-26', '2026-10-26')).toBe(false);
+    expect(movesAnyway(0, '2026-10-26', '2026-10-28')).toBe(false);
+  });
+
+  it('is not sent while the box is of an older day than the one pointed at', () => {
+    // The date changed from a day with an overlap to a day whose read is on its way: the box keeps the
+    // old overlap (pointedDay), and the person has not seen what the new day warns of.
+    const held = day('2026-10-26');
+    const pointed = '2026-10-28';
+    const { view } = pointedDay(pointed, held, null, '2026-10-26');
+    expect(view.day).toBe('2026-10-26');
+    expect(movesAnyway(1, view.day, pointed)).toBe(false);
+    // The last answer was of a day before the one now pointed at.
+    const shown = pointedDay(
+      '2026-10-29',
+      held,
+      { day: '2026-10-28', view: day('2026-10-28') },
+      '2026-10-26',
+    );
+    expect(movesAnyway(1, shown.view.day, '2026-10-29')).toBe(false);
+    // Once the pointed day's own answer is in, it is.
+    const answered = pointedDay(pointed, held, { day: pointed, view: day(pointed) }, '2026-10-26');
+    expect(movesAnyway(1, answered.view.day, pointed)).toBe(true);
   });
 });

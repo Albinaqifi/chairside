@@ -6,6 +6,12 @@ import { anyWarning, type BookingWarnings } from './booking-warnings';
 /** A time of the day the drawers show, "10:30": no moment, so in UTC, as the grid's hours are. */
 export const TIME_OF_DAY = { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' } as const;
 
+/** What the drawer's button does, which names the "anyway" line under the overlaps. */
+export type WarningVerb = 'book' | 'move' | 'restore';
+
+/** The message under `calendar.booking.warning` that says what the "anyway" button does. */
+const ANYWAY = { book: 'anyway', move: 'moveAnyway', restore: 'restoreAnyway' } as const;
+
 /** A visit's time, "09:00": a moment, so in the clinic's zone (next-intl's), as the grid shows it. */
 const VISIT_TIME = { hour: 'numeric', minute: '2-digit' } as const;
 
@@ -13,7 +19,7 @@ const VISIT_TIME = { hour: 'numeric', minute: '2-digit' } as const;
  * What a drawer warns of, above its button (E01-T05b; moved out of ./new-appointment.tsx for the move
  * form, E01-T06f, and for Restore after it), a line each: each visit the time overlaps, its patient and
  * its time, as the grid shows them (demo line 1350, logic line 2125), then that the "anyway" button
- * still does it (`move`: Move anyway; else Book anyway); the provider's break; the day's opening
+ * still does it (`verb`: Book anyway, Move anyway or Restore anyway); the provider's break; the day's opening
  * hours, when the time runs outside them; the day the clinic is closed (owner, D-114). A polite live
  * region that is always there, as the new patient's duplicate warning is, so a screen reader reads a
  * warning when it appears; empty, it takes no room.
@@ -22,14 +28,14 @@ export function BookingWarning({
   warnings,
   day,
   providerName,
-  move = false,
+  verb = 'book',
 }: {
   warnings: BookingWarnings;
   /** The day the warnings are of, for a weekday without hours. */
   day: string;
   providerName: string;
-  /** The move form's box: its "anyway" line names Move anyway. */
-  move?: boolean;
+  /** The drawer the box is in: its "anyway" line names Book anyway, Move anyway or Restore anyway. */
+  verb?: WarningVerb;
 }) {
   const t = useTranslations('calendar.booking.warning');
   const names = useTranslations('patients');
@@ -84,7 +90,7 @@ export function BookingWarning({
               <li key={line.key}>{line.text}</li>
             ))}
           </ul>
-          {warnings.overlaps.length > 0 && <p>{t(move ? 'moveAnyway' : 'anyway')}</p>}
+          {warnings.overlaps.length > 0 && <p>{t(ANYWAY[verb])}</p>}
         </div>
       )}
     </div>

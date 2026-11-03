@@ -984,6 +984,52 @@ describe('the action, as every role (acceptance 3)', () => {
     expect(await statusRows(archived)).toBe(0);
   });
 
+  it('tester: the text a form sends, "true", restores over a clash with overlap_ok, over a free place without it; "false" is refused and writes nothing (E01-T06g)', async () => {
+    const providerId = await provider(skopje);
+    await visit(skopje, providerId, { patientId: skopje.marko, startsAt: '2031-03-03T11:10:00Z' });
+    const clashing = await visit(skopje, providerId, { status: 'cancelled' });
+    const free = await visit(skopje, await provider(skopje), {
+      status: 'no_show',
+      startsAt: EARLIER,
+    });
+    const asForm = (id: string, anyway?: string) => {
+      const data = new FormData();
+      data.append('appointmentId', id);
+      data.append('action', 'restore');
+      if (anyway !== undefined) data.append('anyway', anyway);
+      return data;
+    };
+
+    // A refused text writes nothing: the visit stays cancelled, no audit row.
+    expect(await call(skopje.clinic, asForm(clashing, 'false'))).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_input' },
+    });
+    expect((await row(clashing)).status).toBe('cancelled');
+    expect(await statusRows(clashing)).toBe(0);
+    // No text at all over a clash is the server's own refusal.
+    expect(await call(skopje.clinic, asForm(clashing))).toEqual({
+      ok: false,
+      error: { code: 'overlap' },
+    });
+    expect((await row(clashing)).status).toBe('cancelled');
+
+    expect(await call(skopje.clinic, asForm(clashing, 'true'))).toMatchObject({
+      ok: true,
+      value: { from: 'cancelled', to: 'booked' },
+    });
+    expect(await row(clashing)).toMatchObject({ status: 'booked', overlap_ok: true });
+    expect(await statusRows(clashing)).toBe(1);
+
+    // "anyway" over a place that is free is still not an overlap: the server writes what is true.
+    expect(await call(skopje.clinic, asForm(free, 'true'))).toMatchObject({
+      ok: true,
+      value: { from: 'no_show', to: 'booked' },
+    });
+    expect(await row(free)).toMatchObject({ status: 'booked', overlap_ok: false });
+    expect(await statusRows(free)).toBe(1);
+  });
+
   it('another clinic’s owner changing this clinic’s appointment: not_found, nothing written', async () => {
     request.cookie = strangerCookie;
     request.clinic = other.clinic;

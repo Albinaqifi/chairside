@@ -91,3 +91,14 @@ export function pointedDay(
   if (other.view === null) return { view: held, state: 'failed' };
   return { view: other.view, state: 'ok' };
 }
+
+/**
+ * Whether the form sends "anyway" and reads Move anyway (E01-T06g; D-020): only while the box shows
+ * an overlap of the day pointed at. The form keeps the last day's warnings until a changed day's read
+ * answers (D-125), so for that moment `shown` (the view's day) is not `pointed`, and the overlap the
+ * person sees is not the day Move would book on: an "anyway" then would write `overlap_ok` over a
+ * visit nobody showed. The server refuses a real overlap without it, and the refresh brings the box.
+ */
+export function movesAnyway(overlaps: number, shown: CalendarDay, pointed: CalendarDay): boolean {
+  return overlaps > 0 && shown === pointed;
+}

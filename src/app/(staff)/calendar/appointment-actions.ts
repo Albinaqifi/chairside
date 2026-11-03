@@ -44,8 +44,15 @@ const change = z.discriminatedUnion('action', [
   z.object({
     appointmentId,
     action: z.literal('restore'),
-    /** The person's "anyway" (D-020), sent only over the overlap the drawer showed. */
-    anyway: z.boolean().default(false),
+    /**
+     * The person's "anyway" (D-020), sent only over the overlap the drawer showed. A form sends the
+     * text "true" (the drawer's Restore anyway); the boolean is kept for a caller that sends one.
+     * Not sent: false. A transform that never throws.
+     */
+    anyway: z
+      .union([z.boolean(), z.literal('true')])
+      .optional()
+      .transform((sent) => sent === true || sent === 'true'),
   }),
 ]);
 

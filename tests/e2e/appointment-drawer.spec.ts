@@ -274,7 +274,7 @@ test.describe('the status changes from the drawer (acceptance 3 and 4)', () => {
     }
   });
 
-  test('a visit that has started offers No-show, which marks it; nothing is left to change after it', async ({
+  test('a visit that has started offers No-show, which marks it; only Restore is left after it', async ({
     page,
   }, testInfo) => {
     const day = dayOf(testInfo, 'noShow');
@@ -291,10 +291,11 @@ test.describe('the status changes from the drawer (acceptance 3 and 4)', () => {
       await action(open, 'No-show').click();
       await expect(pill(open)).toHaveText(status.no_show);
       await expect(page.locator('li[data-status]')).toHaveAttribute('data-status', 'no_show');
-      // Restore is the next task's: the drawer shows a muted line, no heading and no button.
-      await expect(open.getByText(t.nothingToChange)).toBeVisible();
-      await expect(open.getByText(t.update)).toHaveCount(0);
-      await expect(open.locator('form')).toHaveCount(0);
+      // Restore is all that is left (E01-T06g): its one form under the heading, no muted line.
+      await expect(action(open, t.restore.submit)).toBeVisible();
+      await expect(open.getByText(t.nothingToChange)).toHaveCount(0);
+      await expect(open.getByText(t.update)).toBeVisible();
+      await expect(open.locator('form')).toHaveCount(1);
       expect(await statusOf(id)).toBe('no_show');
       expect(await statusRows(id)).toBe(1);
     } finally {
