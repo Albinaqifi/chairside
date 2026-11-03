@@ -1030,8 +1030,8 @@ the guards of drawers and dialogs, the move, two corrections to the profile and 
 tasks, in this order: **E01-T06a** the state machine and the status changes (no screen) → **E01-T06b** the
 drawer with its status buttons → **E01-T06e** the cancel dialog and the guards of drawers and dialogs
 (T06b split again, D-123) → **E01-T06c** moving a visit, the module and the action → **E01-T06f** the drawer's
-move form (T06c split, D-124) → **E01-T06g** Restore in the drawer (T06f split, D-125) → **E01-T06d** "Book next visit"
-and a visit under way on the profile and the list. The criteria of the old task are spread over them; each
+move form (T06c split, D-124) → **E01-T06g** Restore in the drawer (T06f split, D-125) → **E01-T06d** a visit under
+way on the profile and the list → **E01-T06h** "Book next visit" with a Day field (T06d split, D-126). The criteria of the old task are spread over them; each
 is in exactly one.
 
 ---
@@ -1220,7 +1220,7 @@ One pure function decides every change; nothing else may write `appointments.sta
 
 ### E01-T06g · Restore in the drawer
 
-**Ready** (split from E01-T06f, D-125; refined by the architect when E01-T06f was Done, 2026-11-03, checked against `main` at `d03248c`). About 190 lines of product code with the texts (the restore form ~70, its overlap line ~20, `SHOWN` and the drawer's wiring ~25, the action's `anyway` ~8, the move form's `anyway` ~6, the warning box's prop ~8, texts ~30). E01-T06a, T06b, T06c, T06e and T06f came to 1.3 to 3 times their estimate, so a builder who passes about 280 stops and writes it in the note.
+**Done** (merged by the owner, PR #104, 2026-11-03; about 150 lines of product code against 190, no fix round, no finding of the reviewer or the tester, who added one integration case; the owner tried it, all fine; split from E01-T06f, D-125; refined by the architect when E01-T06f was Done, checked against `main` at `d03248c`). The estimate was about 190 lines of product code with the texts (the restore form ~70, its overlap line ~20, `SHOWN` and the drawer's wiring ~25, the action's `anyway` ~8, the move form's `anyway` ~6, the warning box's prop ~8, texts ~30). E01-T06a, T06b, T06c, T06e and T06f came to 1.3 to 3 times their estimate, so a builder who passes about 280 stops and writes it in the note.
 
 - **Role:** builder · **Risk:** normal (screen code over an action and a module that exist; the one change to the action is how its input reads a text; no migration, policy, permission, wrapper, planner, link or consent change, so no area of `test-strategy.md`'s second-review table) · **Depends on:** E01-T06f (Done: the warning box in `booking-warning.tsx`, the drawer's wiring), E01-T06e (Done), E01-T06a (Done: the restore and the action)
 - **Read:** `scope` (Appointment drawer: restore with the same overlap warning as booking) · `handoffs/E01-T06f.md` (the builder's section, and the review's `anyway` suggestion) · `handoffs/E01-T06a.md` (the restore's refusals) · `src/app/(staff)/calendar/appointment-drawer.tsx`, `appointment-move.tsx` (`MoveForm`: the pattern to copy), `booking-warning.tsx`, `booking-warnings.ts`, `appointment-actions.ts` (`changeAppointmentStatus`) · D-020, D-114, D-122, D-124, D-125
@@ -1249,26 +1249,49 @@ One pure function decides every change; nothing else may write `appointments.sta
 
 ---
 
-### E01-T06d · Book next visit, and a visit under way on the profile and the list
+### E01-T06d · A visit under way: "In the chair now" on the profile and the list
 
-**Planned** (split from E01-T06, D-122; owner, 2026-10-29: the visit under way shows on both). Its dependency E01-T06b is Done; its acceptance is completed when it is refined, after E01-T06g.
+**Ready** (split from E01-T06, D-122; Book next visit split off as E01-T06h, D-126; refined by the architect when E01-T06g was Done, 2026-11-03, checked against `main` at `c70dbeb`). About 110 lines of product code with the texts (the module's `inChair` ~35, the list's row and cell ~15, the profile's read and card ~35, texts ~10, the cache line ~5, a comment or two ~10). E01-T06a to T06g came to 0.8 to 3 times their estimate, so a builder who passes about 200 stops and writes it in the note.
 
-- **Role:** builder · **Risk:** normal · **Depends on:** E01-T06b (the Arrived button), E01-T05d
-- **Read:** `scope` (Appointment drawer; Patients list and profile) · `handoffs/E01-T03a.md` (Discovered line,
-  `speed`) · `src/modules/scheduling/visits.ts` · D-122
+- **Role:** builder · **Risk:** normal (a read in `scheduling` and the text of two screens; no migration, policy, permission, wrapper, planner, link or consent change, so no area of `test-strategy.md`'s second-review table) · **Depends on:** E01-T06b (Done: the desk marks a visit *arrived* from the drawer), E01-T03a (Done: the profile), E01-T02a (Done: the list)
+- **Read:** `scope` (Patients list and profile: the "In the chair now" line) · `handoffs/E01-T03a.md` (its next-visit card) · `src/modules/scheduling/visits.ts` · `src/modules/patients/list.ts` · `src/app/(staff)/patients/patient-list.tsx`, `src/app/(staff)/patients/[id]/actions.ts`, `patient-profile.tsx` · D-122
+
+**Why.** The desk marks a patient in the chair, then looks for them on the list or the profile: it reads "—" and "No appointment ahead", and the desk, thinking the visit is lost, books another. A patient sitting in the chair must read as one (`speed`; owner, 2026-10-29: on both).
 
 **Do.**
-- **A visit under way** (E01-T03a, `speed`; owner: on both): a patient whose visit is `arrived` shows
-  **"In the chair now"** in the profile's next-visit card and in the list's next-visit column, instead of
-  "No appointment ahead". One change in `scheduling` (`upcoming` and what reads it), for both together,
-  never one; the arrived visit counts by its status alone (the desk completes it). Texts in `en.json`.
-- **Book next visit** in the drawer: opens the booking drawer for the same patient and provider (the demo's
-  button). The booking drawer takes a patient from outside; the profile's own Book button stays "not now"
-  (D-121).
+- **The module (`visits.ts`), one definition for both screens.** An `arrived(…)` SQL fragment beside `upcoming`: the visit's status is `arrived`, **by status alone** (the desk completes it; no end check, so a patient who stays past the slot still reads as in the chair; D-122). `upcoming` is not changed: an arrived visit is still not `next`.
+  - `lastAndNextVisits`: `PatientVisits` gets `inChair: boolean`, in the same query (`coalesce(bool_or(status = 'arrived'), false)`); a patient with no visit at all still has no entry in the map (the list reads `visit?.inChair ?? false`).
+  - `patientVisits`: `PatientVisitsOf` gets `inChair: PatientVisit | null`, the arrived visit (the earliest start, then id, when there are several), read like `next` with the provider's and the treatment type's names.
+- **The list.** `PatientRow` (`patients/list.ts`) gets `inChair: boolean`; `nextVisit` is unchanged. The next-visit cell reads **"In the chair now"** when `inChair`, else the date or "—" as now. (A patient who is in the chair and has a later visit booked shows the chair line only: one cell.) The booking drawer's patient search uses `PatientRow` too and shows neither field: its test fixtures gain `inChair: false`, nothing else there changes.
+- **The profile.** `ProfileRead` (`[id]/actions.ts`) gets `inChair: ProfileVisit | null`. The next-visit card (`patient-profile.tsx`) keeps its heading and, with `inChair`, shows **"In the chair now"** as its big line and the visit's "{what} with {provider}" under it; when the patient also has a `next`, a muted line under that, "Then {when}" (the date as the card writes `next` now). With no `inChair` the card is as it is.
+- **Texts** in `en.json`: `patients.inChairNow`, `patientProfile.inChairNow` and `patientProfile.then`.
+- **The cache.** A status change already calls `revalidatePath('/patients')` (`appointment-actions.ts`). Check, with the e2e below, that Back to a profile or the list visited before shows the new state; if the profile does not, add `revalidatePath('/patients/[id]', 'page')` to that one place, nothing else.
 
-**Acceptance.** (to be completed when it is refined) The list and the profile agree for a patient with an
-arrived visit, a booked one and neither; Book next visit opens the drawer with the patient and provider
-chosen and books them once; the double click guard holds.
+**Out of scope.** Book next visit and the booking drawer's Day field (E01-T06h). An end to "in the chair now": a visit marked arrived and never completed reads as in the chair until the desk completes or undoes it (D-122; E01-T10's Today screen is where a forgotten one shows; the seed's arrived patients read so in a development database for ever). The profile's Book button (D-121). The list's filters. A change to the state machine, the drawer or the action.
+
+**Acceptance.** Integration tests on the real database (as `patients-list.test.ts` and `patient-profile.test.ts` do), rendered tests for the two screens (the list's cell and the card, in the zones those tests already name), and one e2e spec, `tests/e2e/patient-in-chair.spec.ts`, on the production build in all three browsers, on a day of its browser's own **in 2039** (no other spec uses it; years in use: 2026 and 2032 to 2038), its visit written as the migration role.
+- [ ] A patient with an arrived visit: the list row has `inChair` true and the profile read has `inChair` set to that visit (its provider, its treatment name); with only booked or confirmed visits (as before: `next`), only completed, cancelled or no-show visits, or none: `inChair` false and null, `next` as it was. An arrived visit counts whatever its end (one that ended an hour ago still does).
+- [ ] Both together: arrived and a later booked visit: the list's `inChair` is true and its `nextVisit` the booked visit's start, and the profile has `inChair` and `next` both. A patient of the other clinic with an arrived visit shows to nobody of this one (the list and profile tests' tenant cases stand).
+- [ ] The list and the profile agree: for a patient who is in the chair, one who is booked and one with neither, the list's cell and the profile's card read "In the chair now" and the profile's "Then …" only with a later visit; "—" and "No appointment ahead." for neither. Rendered, in a zone behind UTC for the date as before.
+- [ ] e2e: mark a visit "In the chair" from the calendar's drawer: the list (`/patients`) and the profile read "In the chair now"; "Done" in the drawer, and both read as they did before (the completed visit is history; no appointment ahead). Reached by Back as well as by a fresh load.
+- [ ] No existing expectation moves (a field is added to the fixtures, nothing is loosened).
+- [ ] `pnpm check`, `pnpm build`, `pnpm test:e2e` (all three browsers) and `pnpm audit --prod` pass.
+
+---
+
+### E01-T06h · Book next visit, with a Day field in the booking drawer
+
+**Planned** (split from E01-T06d, D-126; owner, 2026-11-03: the booking drawer gets a Day field, so "Book next visit" can book weeks ahead). Its dependencies E01-T06g and E01-T05d are Done; it is refined when E01-T06d is Done, with this outline:
+
+- **Role:** builder · **Risk:** normal · **Depends on:** E01-T06g (Done: the drawer), E01-T05b and E01-T05d (Done: the booking drawer and its warnings), E01-T06f (Done: the read of another day), E01-T06d
+- **Read:** `scope` (Appointment drawer: Book next visit; New appointment drawer) · demo lines 1254–1255 and 1955 · `src/app/(staff)/calendar/new-appointment.tsx`, `booking-choices.ts`, `booking-warnings.ts`, `appointment-move.tsx`, `read-day.ts`, `move-choices.ts` (the pattern for another day's read) · D-114, D-118, D-121, D-125, D-126
+
+**Do (outline).**
+- A **Day** field in the booking drawer (a date; today the day is the calendar's, sent hidden), with the warnings of the day chosen, read as the move form reads another day (the last answer wins; a failed read empties the box and says the day could not be checked; the server still decides). Whether the field shows for every booking or only for this one is for the refinement; recommendation: for every booking, so the drawer never books on a day it does not show.
+- **Book next visit** in the appointment drawer's foot, beside Patient profile: opens the booking drawer for the **same patient and provider** (the patient picked, not locked), the day the visit's own and the desk changes it; no treatment is chosen (as every booking). The booking drawer takes a patient from outside; the profile's own Book button stays "not now" (D-121).
+- The double click guards, the drawer's `busy` flag and the booking's one-per-click hold, as in the booking drawer now.
+
+**Acceptance.** (to be completed when it is refined) The drawer's Book next visit opens with the patient and provider chosen and books them once on the day chosen, a day weeks ahead included; the warnings follow the day; the double click guard holds; the existing booking checks stand.
 
 ---
 

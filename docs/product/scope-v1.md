@@ -89,6 +89,8 @@ Legend: ✅ in v1 as designed · ✏️ in v1 but changed · ⏳ later · ❌ no
   architect, D-122)
 - ✅ "Messages for this visit" timeline, from real message rows and events.
 - ✅ "Book next visit", "Patient profile", start the visit wrap-up.
+- ✏️ "Book next visit" opens the booking drawer for the same patient and provider; the booking drawer has a
+  Day field, so the next visit can be weeks ahead, with that day's warnings. (owner, D-126; E01-T06h)
 - ✏️ Status changes follow the state machine in `data-model.md`. Cancel asks who cancelled
   and optionally why.
 - ✏️ Aftercare box appears in M6. Treatment plan list appears in M6.
