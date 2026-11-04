@@ -151,6 +151,54 @@ describe('the list (acceptance 1 and 2)', () => {
   });
 });
 
+describe('the visit leaves the chair (tester, E01-T06d)', () => {
+  it('backed out (booked again) or completed: both reads go back to what they were', async () => {
+    const providerId = (
+      await admin.query<{ id: string }>('select id from providers where clinic_id = $1 limit 1', [
+        clinicA,
+      ])
+    ).rows[0]?.id;
+    if (!providerId) throw new Error('A provider of the clinic was written.');
+    const id = await patient(clinicA, 'Flip', 'Dardha');
+    // Starts tomorrow, so once it is booked again it is the next visit: the chair line must go,
+    // and the date come back, with nothing left over from the arrived state.
+    const visitId = await visit(clinicA, providerId, id, at(9, 8), 'arrived');
+    const row = async () => (await rowsOf(clinicA))[id];
+    expect(await row()).toMatchObject({ inChair: true, nextVisit: null });
+    expect((await visitsOf(clinicA, id)).inChair?.id).toBe(visitId);
+
+    await admin.query("update appointments set status = 'booked' where id = $1", [visitId]);
+    expect(await row()).toMatchObject({
+      inChair: false,
+      nextVisit: new Date(at(9, 8)).toISOString(),
+    });
+    const booked = await visitsOf(clinicA, id);
+    expect(booked.inChair).toBeNull();
+    expect(booked.next?.id).toBe(visitId);
+
+    await admin.query("update appointments set status = 'arrived' where id = $1", [visitId]);
+    await admin.query("update appointments set status = 'completed' where id = $1", [visitId]);
+    expect(await row()).toMatchObject({ inChair: false, nextVisit: null });
+    const done = await visitsOf(clinicA, id);
+    expect(done.inChair).toBeNull();
+    expect(done.next).toBeNull();
+    expect(done.history.map((entry) => entry.id)).toEqual([visitId]);
+  });
+
+  it('two arrived visits that start together: the lower id, every time', async () => {
+    // One chair each, so the two visits can share their start (a provider cannot be booked twice).
+    const chairOne = await insertProvider(admin, clinicA);
+    const chairTwo = await insertProvider(admin, clinicA);
+    const id = await patient(clinicA, 'Tie', 'Dardha');
+    const first = await visit(clinicA, chairOne, id, at(9, 2), 'arrived');
+    const second = await visit(clinicA, chairTwo, id, at(9, 2), 'arrived');
+    const expected = [first, second].sort()[0];
+    for (let n = 0; n < 3; n += 1) {
+      expect((await visitsOf(clinicA, id)).inChair?.id).toBe(expected);
+    }
+  });
+});
+
 describe('the profile read (acceptance 1 and 2)', () => {
   it('inChair is the arrived visit with its provider and label', async () => {
     const { inChair, next, history } = await visitsOf(clinicA, a.arrived);
