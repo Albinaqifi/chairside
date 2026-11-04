@@ -19,6 +19,7 @@ function list(total: number, ids: string[]): PatientList {
       phone: null,
       lastVisit: null,
       nextVisit: null,
+      inChair: false,
     })),
   };
 }

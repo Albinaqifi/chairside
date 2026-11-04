@@ -28,6 +28,7 @@ function row(fields: Partial<PatientRow> = {}): PatientRow {
     phone: '070 001 234',
     lastVisit: null,
     nextVisit: null,
+    inChair: false,
     ...fields,
   };
 }
@@ -155,6 +156,33 @@ describe('the rows', () => {
   it('a dash where there is no visit', () => {
     const shown = text(render(createElement(PatientTable, { query: '', rows: [row()] })));
     expect(shown).toContain(' 070 001 234 — — ');
+  });
+
+  it('In the chair now in the next-visit cell, over any later visit; a dash or the date otherwise (E01-T06d)', () => {
+    const chair = text(
+      render(createElement(PatientTable, { query: '', rows: [row({ inChair: true })] })),
+    );
+    expect(chair).toContain(' 070 001 234 — In the chair now ');
+    const both = text(
+      render(
+        createElement(PatientTable, {
+          query: '',
+          rows: [row({ inChair: true, nextVisit: '2026-10-09T08:00:00.000Z' })],
+        }),
+      ),
+    );
+    expect(both).toContain('In the chair now');
+    expect(both).not.toContain('Oct 9');
+    const booked = text(
+      render(
+        createElement(PatientTable, {
+          query: '',
+          rows: [row({ nextVisit: '2026-10-09T08:00:00.000Z' })],
+        }),
+      ),
+    );
+    expect(booked).toContain(' — Fri, Oct 9, 10:00 ');
+    expect(booked).not.toContain('In the chair now');
   });
 
   it('an empty state when nothing matches, and when the clinic has no patients yet', () => {

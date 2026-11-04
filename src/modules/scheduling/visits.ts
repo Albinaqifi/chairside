@@ -14,12 +14,24 @@ function upcoming(now: Date): SQL {
   return sql`${appointments.status} in ('booked', 'confirmed') and ${appointments.endsAt} > ${now}`;
 }
 
+/**
+ * A visit under way: marked arrived. By status alone (D-122, owner): the desk completes it, so a
+ * patient who stays past the slot still reads as in the chair, and a visit marked arrived and never
+ * completed reads so until the desk completes or undoes it. One rule for the patient list and the
+ * profile (E01-T06d). It takes no `now`; `upcoming` is not changed, so an arrived visit is no `next`.
+ */
+function arrived(): SQL {
+  return sql`${appointments.status} = 'arrived'`;
+}
+
 /** A patient's last and next visit: the start of each, or null when there is none. */
 export interface PatientVisits {
   /** The last completed appointment. */
   last: Date | null;
   /** The first booked or confirmed appointment that has not ended at `now`. */
   next: Date | null;
+  /** True when the patient has an arrived visit (in the chair now), whatever its end. */
+  inChair: boolean;
 }
 
 /**
@@ -42,11 +54,14 @@ export async function lastAndNextVisits(
       next: sql<Date | null>`min(${appointments.startsAt}) filter (where ${upcoming(now)})`.mapWith(
         appointments.startsAt,
       ),
+      inChair: sql<boolean>`coalesce(bool_or(${arrived()}), false)`,
     })
     .from(appointments)
     .where(inArray(appointments.patientId, [...patientIds]))
     .groupBy(appointments.patientId);
-  return new Map(rows.map(({ patientId, last, next }) => [patientId, { last, next }]));
+  return new Map(
+    rows.map(({ patientId, last, next, inChair }) => [patientId, { last, next, inChair }]),
+  );
 }
 
 /** One visit of a patient as the profile shows it. */
@@ -65,6 +80,8 @@ export interface PatientVisit {
 export interface PatientVisitsOf {
   /** The first booked or confirmed visit that has not ended at `now`, or null. */
   next: PatientVisit | null;
+  /** The arrived visit (the earliest start, then id, when there are several), or null (E01-T06d). */
+  inChair: PatientVisit | null;
   /** Completed visits, newest first, at most HISTORY_LIMIT. Cancelled visits and no-shows are not. */
   history: PatientVisit[];
 }
@@ -96,12 +113,13 @@ export async function patientVisits(
       .orderBy(order, asc(appointments.id))
       .limit(limit);
   const [next] = await read(upcoming(now), asc(appointments.startsAt), 1);
+  const [inChair] = await read(arrived(), asc(appointments.startsAt), 1);
   const history = await read(
     sql`${appointments.status} = 'completed'`,
     desc(appointments.startsAt),
     HISTORY_LIMIT,
   );
-  return { next: next ?? null, history };
+  return { next: next ?? null, inChair: inChair ?? null, history };
 }
 
 /** The most visits ahead a patient's list holds (E01-T03b). */

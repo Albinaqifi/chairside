@@ -243,9 +243,11 @@ export function PatientTable({ query, rows }: { query: string; rows: readonly Pa
                     : format.dateTime(new Date(row.lastVisit), LAST_VISIT)}
                 </td>
                 <td className={cell}>
-                  {row.nextVisit === null
-                    ? t('none')
-                    : format.dateTime(new Date(row.nextVisit), NEXT_VISIT)}
+                  {row.inChair
+                    ? t('inChairNow')
+                    : row.nextVisit === null
+                      ? t('none')
+                      : format.dateTime(new Date(row.nextVisit), NEXT_VISIT)}
                 </td>
               </tr>
             );

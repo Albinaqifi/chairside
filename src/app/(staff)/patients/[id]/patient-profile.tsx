@@ -39,7 +39,7 @@ export function PatientProfileView({ read, canEdit }: { read: ProfileRead; canEd
   const tPatients = useTranslations('patients');
   const format = useFormatter();
   const locale = useLocale();
-  const { profile, next, history } = read;
+  const { profile, next, inChair, history } = read;
   return (
     <div className="max-w-310">
       <Link
@@ -121,7 +121,19 @@ export function PatientProfileView({ read, canEdit }: { read: ProfileRead; canEd
             <h2 id="profile-next" className="text-small text-muted">
               {t('next')}
             </h2>
-            {next === null ? (
+            {inChair !== null ? (
+              <>
+                <p className="mt-0.5 text-section font-semibold">{t('inChairNow')}</p>
+                <p className="text-small text-muted">
+                  {t('visitWith', { what: inChair.what, provider: inChair.providerName })}
+                </p>
+                {next !== null && (
+                  <p className="mt-1 text-small text-muted">
+                    {t('then', { when: format.dateTime(new Date(next.startsAt), VISIT_WHEN) })}
+                  </p>
+                )}
+              </>
+            ) : next === null ? (
               <p className="mt-0.5 text-muted">{t('noNext')}</p>
             ) : (
               <>

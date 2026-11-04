@@ -18,6 +18,8 @@ export interface ProfileRead {
   profile: patients.PatientProfile;
   /** The next booked or confirmed visit that has not ended, or null. */
   next: ProfileVisit | null;
+  /** The visit marked arrived, in the chair now, or null (E01-T06d). */
+  inChair: ProfileVisit | null;
   /** Completed visits, newest first, at most scheduling.HISTORY_LIMIT. */
   history: ProfileVisit[];
 }
@@ -53,6 +55,11 @@ export const readPatient = staffRead(
       what: visit.treatmentName ?? visit.title,
       providerName: visit.providerName,
     });
-    return { profile, next: visits.next && shown(visits.next), history: visits.history.map(shown) };
+    return {
+      profile,
+      next: visits.next && shown(visits.next),
+      inChair: visits.inChair && shown(visits.inChair),
+      history: visits.history.map(shown),
+    };
   },
 );

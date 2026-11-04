@@ -242,7 +242,11 @@ describe("a user of the second clinic finds none of the first clinic's patients 
       new Map([
         [
           a.anaKodra,
-          { last: new Date('2026-09-15T08:00:00Z'), next: new Date('2026-10-10T08:00:00Z') },
+          {
+            last: new Date('2026-09-15T08:00:00Z'),
+            next: new Date('2026-10-10T08:00:00Z'),
+            inChair: false,
+          },
         ],
       ]),
     );

@@ -376,10 +376,10 @@ describe('the next visit and the history (acceptance 4)', () => {
     const mine = await patient(clinicA, { first_name: 'Shpëtim', last_name: 'Lumi' });
     const other = await patient(clinicA, { first_name: 'Mimoza', last_name: 'Kodra' });
     await visit(other, at(1), 'booked');
-    expect(await visitsOf(mine)).toEqual({ next: null, history: [] });
+    expect(await visitsOf(mine)).toEqual({ next: null, inChair: null, history: [] });
     // Clinic B's transaction sees none of clinic A's visits, whatever patient id it asks for.
     const fromB = await withTenant(clinicB, (tx) => patientVisits(tx, other, NOW));
-    expect(fromB).toEqual({ next: null, history: [] });
+    expect(fromB).toEqual({ next: null, inChair: null, history: [] });
   });
 
   it('the page shows the next visit and the history of the patient it opens', async () => {
@@ -391,5 +391,20 @@ describe('the next visit and the history (acceptance 4)', () => {
     expect(read.next?.id).toBe(ahead);
     expect(read.history.map((entry) => entry.id)).toEqual([done]);
     expect(read.history[0]).toMatchObject({ what: 'Filling', providerName: 'Elena Planinska' });
+  });
+
+  it('the page names the arrived visit as in the chair, beside a later one (E01-T06d)', async () => {
+    request.cookie = await signInCookie(logins.front_desk, PASSWORD, freshAddress());
+    const id = await patient(clinicA, { first_name: 'Ardit', last_name: 'Lumi' });
+    const now = Date.now();
+    const chair = await visit(id, new Date(now - 3 * 60 * MINUTE).toISOString(), 'arrived');
+    const ahead = await visit(id, new Date(now + 3 * DAY).toISOString(), 'booked');
+    const { read } = await open(id);
+    expect(read.inChair).toMatchObject({
+      id: chair,
+      what: 'Filling',
+      providerName: 'Elena Planinska',
+    });
+    expect(read.next?.id).toBe(ahead);
   });
 });
