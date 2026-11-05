@@ -79,6 +79,9 @@ Legend: ✅ in v1 as designed · ✏️ in v1 but changed · ⏳ later · ❌ no
   contact detail is allowed but flagged.
 - ✅ "Text the patient a booking confirmation now" (D-045).
 - ✏️ The dropdown the demo labels "Chair" is "Provider". (D-019)
+- ✏️ A **Day** field (a date) above start, length and provider, in every booking: any day, weeks ahead or
+  already past, with that day's starts, providers and warnings. The demo books on the day the calendar
+  shows. (owner, D-126; E01-T06h)
 
 ## Appointment drawer
 
