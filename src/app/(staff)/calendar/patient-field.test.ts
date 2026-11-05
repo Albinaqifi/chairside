@@ -37,6 +37,7 @@ function row(
     phone,
     lastVisit: null,
     nextVisit: null,
+    inChair: false,
   };
 }
 

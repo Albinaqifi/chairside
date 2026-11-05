@@ -142,7 +142,8 @@ tests/e2e/            End-to-end journeys and checks in real browsers (Playwrigh
                       (its read held or failed with `page.route`), the refusals (a provider made inactive meanwhile in the second clinic), a double click on Move,
                       the keyboard (E01-T06f); Restore in the drawer: the box with its overlap line, Restore anyway,
                       the refusals, a double click, the keyboard and where the focus goes, and the move form's
-                      `anyway` waiting for its day (E01-T06g).
+                      `anyway` waiting for its day (E01-T06g); a patient marked In the chair reads "In the chair now" on
+                      the list and the profile, by Back and a fresh load, and as before once Done (E01-T06d).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 Dockerfile            The one image staging and production run (D-007, D-103): the web by default,

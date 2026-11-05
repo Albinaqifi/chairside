@@ -36,6 +36,13 @@ const VISIT_NEXT = {
   what: 'Filling',
   providerName: 'Elena Planinska',
 };
+// A visit under way: arrived (E01-T06d), its time long past in the cases below.
+const VISIT_ARRIVED = {
+  id: '01970000-0000-7000-8000-0000000000b3',
+  startsAt: '2026-10-09T07:00:00.000Z',
+  what: 'Root canal',
+  providerName: 'Arben Kodra',
+};
 const VISIT_DONE = {
   id: '01970000-0000-7000-8000-0000000000b2',
   startsAt: '2026-03-12T09:00:00.000Z',
@@ -51,6 +58,7 @@ function render(
   const shown: ProfileRead = {
     profile: { ...ANA, ...read.profile },
     next: read.next === undefined ? null : read.next,
+    inChair: read.inChair === undefined ? null : read.inChair,
     history: read.history ?? [],
   };
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
@@ -221,4 +229,42 @@ describe('the Edit link (E01-T03b)', () => {
     expect(html).not.toContain('/edit"');
     expect(text(html)).not.toContain(t.edit);
   });
+});
+
+describe('a visit under way: In the chair now (E01-T06d)', () => {
+  it('reads as in the chair, with the visit, and no "Then" without a later visit', () => {
+    const page = text(render({ inChair: VISIT_ARRIVED }));
+    expect(page).toContain(t.inChairNow);
+    expect(page).toContain('Root canal with Arben Kodra');
+    expect(page).not.toContain(t.noNext);
+    expect(page).not.toContain('Then ');
+  });
+
+  it('with a later visit as well: the chair line first, then "Then …" with its day', () => {
+    const page = text(render({ inChair: VISIT_ARRIVED, next: VISIT_NEXT }));
+    expect(page).toContain(t.inChairNow);
+    expect(page.indexOf(t.inChairNow)).toBeLessThan(page.indexOf('Then Fri, Oct 9, 10:05'));
+    expect(page).not.toContain(t.noNext);
+  });
+
+  it('a booked patient and one with neither read as before, and say nothing of the chair', () => {
+    const booked = text(render({ next: VISIT_NEXT }));
+    expect(booked).toContain('Fri, Oct 9, 10:05');
+    expect(booked).toContain('Filling with Elena Planinska');
+    expect(booked).not.toContain(t.inChairNow);
+    expect(booked).not.toContain('Then ');
+    const neither = text(render({}));
+    expect(neither).toContain(t.noNext);
+    expect(neither).not.toContain(t.inChairNow);
+  });
+
+  it.each(['America/Los_Angeles', 'Pacific/Auckland'])(
+    'the later visit is in the clinic zone %s, whatever the computer zone',
+    (zone) => {
+      const page = text(render({ inChair: VISIT_ARRIVED, next: VISIT_NEXT }, zone));
+      expect(page).toContain(
+        zone === 'Pacific/Auckland' ? 'Then Fri, Oct 9, 21:05' : 'Then Fri, Oct 9, 01:05',
+      );
+    },
+  );
 });

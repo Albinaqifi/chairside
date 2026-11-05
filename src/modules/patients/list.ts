@@ -26,6 +26,8 @@ export interface PatientRow {
   lastVisit: string | null;
   /** When the next booked or confirmed visit starts; null without one. */
   nextVisit: string | null;
+  /** True when the patient has an arrived visit: in the chair now (E01-T06d). */
+  inChair: boolean;
 }
 
 export interface PatientList {
@@ -90,6 +92,7 @@ export async function listPatients(
         phone: patient.phoneE164 === null ? null : phoneAsWritten(patient.phoneE164, place.country),
         lastVisit: visit?.last?.toISOString() ?? null,
         nextVisit: visit?.next?.toISOString() ?? null,
+        inChair: visit?.inChair ?? false,
       };
     }),
   };

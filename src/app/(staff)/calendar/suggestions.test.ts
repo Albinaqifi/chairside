@@ -17,6 +17,7 @@ function row(firstName: string, lastName: string, status: PatientStatus = 'activ
     phone: null,
     lastVisit: null,
     nextVisit: null,
+    inChair: false,
   };
 }
 
