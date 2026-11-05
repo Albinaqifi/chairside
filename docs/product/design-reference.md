@@ -58,7 +58,7 @@ The markup uses a small template language: `{{ name }}` is a value, `<sc-for>` i
 | Patient page: aligner progress | 1169–1190 | 2020–2023 | v1.1 |
 | Drawer: appointment details | 1197–1258 | 1937–1957, 1720–1727 | E01-T06b (details, status), E01-T06e (the cancel dialog), E01-T06f (the move form), E01-T06g (restore), E01-T06h (Book next visit), E02-T12 |
 | Drawer: aftercare review | 1259–1322 | 1975–1994 | E06-T08 |
-| Drawer: new appointment | 1323–1362 | 1619–1621, 1958–1964, 2116–2135 | E01-T05a; the overlap warning E01-T05b, a click on a slot E01-T05c, the quick new patient E01-T05d (D-113, D-114) |
+| Drawer: new appointment | 1323–1362 | 1619–1621, 1958–1964, 2116–2135 | E01-T05a; the overlap warning E01-T05b, a click on a slot E01-T05c, the quick new patient E01-T05d, a Day field E01-T06h (D-113, D-114, D-126) |
 | Toast | 1364–1366 | 1615 (`flash`) | E00-T04c |
 
 Useful data in the logic section:
