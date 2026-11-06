@@ -81,6 +81,8 @@ const FIRST: Booking = {
   newPatient: null,
   searchText: '',
   treatmentId: null,
+  day: CHOICES.day,
+  pointed: CHOICES.day,
   start: 9 * H,
   length: 30,
   providerId: DENTIST,
@@ -230,9 +232,11 @@ describe('the fields the booking sends, and nothing typed kept in the browser (a
     }
   });
 
-  it('the day the calendar shows is sent hidden', () => {
+  // E01-T06h: the day was a hidden input; it is a field now, with the same value (the one expectation
+  // of this file that moves).
+  it('the day the calendar shows is the Day field, a date, starting on it', () => {
     const [day] = tags(render(), 'input').filter((input) => input.get('name') === 'day');
-    expect(day?.get('type')).toBe('hidden');
+    expect(day?.get('type')).toBe('date');
     expect(day?.get('value')).toBe('2026-10-26');
   });
 });

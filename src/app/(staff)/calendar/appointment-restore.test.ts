@@ -324,6 +324,7 @@ describe('inside the appointment drawer', () => {
         year: false,
         onClose: vi.fn(),
         onMoved: vi.fn(),
+        onBookNext: vi.fn(),
       }),
     );
   }

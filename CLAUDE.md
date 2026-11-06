@@ -143,7 +143,9 @@ tests/e2e/            End-to-end journeys and checks in real browsers (Playwrigh
                       the keyboard (E01-T06f); Restore in the drawer: the box with its overlap line, Restore anyway,
                       the refusals, a double click, the keyboard and where the focus goes, and the move form's
                       `anyway` waiting for its day (E01-T06g); a patient marked In the chair reads "In the chair now" on
-                      the list and the profile, by Back and a fresh load, and as before once Done (E01-T06d).
+                      the list and the profile, by Back and a fresh load, and as before once Done (E01-T06d); the booking drawer's Day field (a day weeks ahead and one past, what the day typed decides, a changed
+                      day's read held, crossing or failed, a blank day, a provider made inactive between two reads)
+                      and Book next visit (the drawer on the patient, one booking, a double click, the keyboard; E01-T06h).
 eslint-rules/         Our lint rules (module boundaries, server actions, database access, forms) and
                       the tests of all architecture rules.
 Dockerfile            The one image staging and production run (D-007, D-103): the web by default,

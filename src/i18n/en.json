@@ -201,6 +201,9 @@
       "bookWithoutProvider": "Book {time}",
       "booking": "Booking…",
       "booked": "Booked {name}, {time}.",
+      "bookedOn": "Booked {name} on {day}, {time}.",
+      "day": "Day",
+      "couldNotCheck": "That day could not be checked. Book still checks it.",
       "overlap": "This time overlaps another visit of this provider. Choose another time, or another provider.",
       "alreadyBooked": "This patient is already booked with this provider at this time, so it was not booked again.",
       "patientNotBookable": "This patient cannot be booked: only an active patient can. Choose the patient again.",
@@ -229,6 +232,7 @@
       "where": "{provider} · {chair}",
       "update": "Update status",
       "nothingToChange": "Nothing to change on this visit.",
+      "bookNext": "Book next visit",
       "profile": "Patient profile",
       "updating": "Updating…",
       "actions": {

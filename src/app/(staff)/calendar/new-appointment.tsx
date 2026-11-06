@@ -12,6 +12,7 @@ import {
   type Ref,
 } from 'react';
 import { StaffField, StaffForm } from '@/app/_lib/staff-form';
+import type { CalendarDay } from '@/lib/calendar-day';
 import { newId } from '@/lib/ids';
 import type { TreatmentType } from '@/modules/scheduling';
 import { Button } from '@/ui/button';
@@ -32,11 +33,14 @@ import {
   type BookingChoices,
   type Slot,
 } from './booking-choices';
+import { offeredOn } from './booking-day';
 import { BookingWarning, TIME_OF_DAY } from './booking-warning';
 import { bookingWarnings, NO_WARNINGS } from './booking-warnings';
-import type { CalendarDayView } from './day';
+import { isShownDay, type CalendarDayView } from './day';
+import { movesAnyway } from './move-choices';
 import { newPatientFrom, unreachable } from './new-patient';
 import { PatientField, type PickedPatient } from './patient-field';
+import { usePointedDay } from './pointed-day';
 
 /** A treatment's chip (demo line 1344), as the calendar's provider chips are drawn. */
 const CHIP =
@@ -78,7 +82,11 @@ export function NewAppointment({
   const t = useTranslations('calendar.booking');
   const timeZone = useTimeZone();
   const [open, setOpen] = useState(false);
-  const [opening, setOpening] = useState<{ count: number; choices: BookingChoices } | null>(null);
+  const [opening, setOpening] = useState<{
+    count: number;
+    choices: BookingChoices;
+    patient: PickedPatient | null;
+  } | null>(null);
 
   // When the drawer last went from the page: only from then does a click land on the grid under it.
   // Taken as the render removes it, since a booking's answer closes it with no event of its own; on
@@ -90,12 +98,16 @@ export function NewAppointment({
     wasOpen.current = open;
   }, [open]);
 
-  function openOn(slot: Slot | null) {
+  function openOn(
+    slot: Slot | null,
+    patient: PickedPatient | null = null,
+    first: readonly string[] = shown,
+  ) {
     // The browser's clock, in the clinic's zone, as the "now" line reads it. Every request names
     // the clinic's zone (src/i18n/request.ts); without one, the day's opening.
     const now = timeZone === undefined ? null : clinicNow(new Date(), timeZone);
-    const choices = bookingChoices(view, treatmentTypes, shown, now, slot);
-    setOpening((before) => ({ count: (before?.count ?? 0) + 1, choices }));
+    const choices = bookingChoices(view, treatmentTypes, first, now, slot);
+    setOpening((before) => ({ count: (before?.count ?? 0) + 1, choices, patient }));
     setOpen(true);
   }
 
@@ -109,6 +121,11 @@ export function NewAppointment({
       if (open || withinDoubleClick(closedAt.current, at)) return;
       openOn(slot);
     },
+    openFor({ patient, providerId }) {
+      if (open) return;
+      // The provider is "the column shown first": chosen when active, else the first active one.
+      openOn(null, patient, [providerId]);
+    },
   }));
 
   return (
@@ -120,6 +137,7 @@ export function NewAppointment({
         <BookingDrawer
           key={opening.count}
           choices={opening.choices}
+          patient={opening.patient}
           view={view}
           onBooked={(providerId) => {
             setOpen(false);
@@ -138,6 +156,12 @@ export interface NewAppointmentHandle {
    * already, or the click comes within a double click of the drawer closing.
    */
   openAt: (slot: Slot, at: number) => void;
+  /**
+   * Opens the drawer for a patient (E01-T06h, Book next visit): on the day the calendar shows and its
+   * first start, no treatment chosen, the patient picked and their visit's provider chosen when that
+   * provider is active, else the first one. Not when it is open already.
+   */
+  openFor: (next: { patient: PickedPatient; providerId: string }) => void;
 }
 
 /**
@@ -161,6 +185,10 @@ export interface Booking {
   searchText: string;
   /** None until one is picked: no booking takes a treatment by default (scope-v1.md). */
   treatmentId: string | null;
+  /** The Day field as typed: a date, or '' while the browser holds one half typed (E01-T06h). */
+  day: string;
+  /** The last complete day typed: the day the drawer's line, warnings and choices are of. */
+  pointed: CalendarDay;
   /** Minutes from the day's local midnight. */
   start: number;
   /** In minutes. */
@@ -175,10 +203,13 @@ export interface Booking {
  */
 export function BookingDrawer({
   choices,
+  patient = null,
   view,
   onBooked,
 }: {
   choices: BookingChoices;
+  /** The patient the drawer opens with picked (Book next visit); none for New appointment. */
+  patient?: PickedPatient | null;
   /** The day the calendar holds now: each read on use and each booking's answer change it. */
   view: CalendarDayView;
   onBooked: (providerId: string) => void;
@@ -189,10 +220,12 @@ export function BookingDrawer({
   // patient, so the same booking sent twice adds them once (E01-T05d, test-strategy.md Duplicates).
   const [newPatientId] = useState(newId);
   const [booking, setBooking] = useState<Booking>({
-    patient: null,
+    patient,
     newPatient: null,
     searchText: '',
     treatmentId: null,
+    day: choices.day,
+    pointed: choices.day,
     start: choices.firstStart,
     length: FIRST_LENGTH,
     providerId: choices.firstProviderId ?? '',
@@ -203,11 +236,11 @@ export function BookingDrawer({
   const [sending, setSending] = useState(false);
   const time = (minutes: number) =>
     format.dateTime(new Date(Date.UTC(2000, 0, 1, 0, minutes)), TIME_OF_DAY);
-  const day = format.dateTime(new Date(choices.day), {
+  const day = format.dateTime(new Date(booking.pointed), {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-    year: choices.day.slice(0, 4) === choices.today.slice(0, 4) ? undefined : 'numeric',
+    year: booking.pointed.slice(0, 4) === choices.today.slice(0, 4) ? undefined : 'numeric',
     timeZone: 'UTC',
   });
   return (
@@ -247,15 +280,23 @@ export function BookingDrawer({
  * keeps nothing in the browser (D-093, D-095): no field sets an `autocomplete` of its own. The
  * patient, picked from the search, or a new one's fields in its place (E01-T05d); the treatment's
  * chips, none pressed until one is picked, each setting the length to its own; the start, the length and the provider, each the browser's own
- * select; the day the calendar shows, hidden. Book names the time and the provider (demo logic
- * line 2127). A problem of the input shows at its field; the clinic's refusals above Book (D-098).
+ * select; the Day (E01-T06h), above them, a date that starts on the day the drawer opened on and
+ * takes any date. Book names the time and the provider (demo logic line 2127). A problem of the input
+ * shows at its field, a blank or half-typed day too; the clinic's refusals above Book (D-098).
  *
- * Above Book, what the time is warned of on the day the calendar holds now (./booking-warnings.ts,
- * E01-T05b), following start, length and provider as they change: an overlap turns Book into Book
- * anyway and adds the hidden `anyway`, sent only while the overlap shows (D-020); a break, the hours
- * or a closed day leave Book as it is. Past midnight a page on the clinic's today reads the next day,
- * whose visits are not this booking's: then nothing is warned of, and the server's check still
- * refuses an overlap.
+ * Above Book, what the time is warned of on the day typed (./booking-warnings.ts, E01-T05b), following
+ * day, start, length and provider as they change: an overlap turns Book into Book anyway and adds the
+ * hidden `anyway`, sent only while the overlap shown is of the day typed (D-020); a break, the hours
+ * or a closed day leave Book as it is. The day is the calendar's when that is the day, else read
+ * through the calendar's read (./pointed-day.ts, as the move form's): only the last answer counts, a
+ * read that did not work empties the box and a line says the day could not be checked, and the
+ * server's check still refuses an overlap. Past midnight a page on the clinic's today reads the next
+ * day, whose visits are not this booking's: the day is then read, and until it is nothing is warned
+ * of. What the day offers (./booking-day.ts) is its own grid's starts and active providers, the start
+ * held kept among them.
+ *
+ * After a booking on another day than the calendar shows, the toast names the day and the calendar
+ * keeps its own, as after a move.
  */
 export function BookingForm({
   choices,
@@ -289,18 +330,42 @@ export function BookingForm({
   const time = (minutes: number) =>
     format.dateTime(new Date(Date.UTC(2000, 0, 1, 0, minutes)), TIME_OF_DAY);
   const treatment = choices.treatmentTypes.find((type) => type.id === booking.treatmentId) ?? null;
-  const provider = choices.providers.find((found) => found.id === booking.providerId) ?? null;
+  // The day typed decides what is offered and warned of (E01-T06h): the opening day's choices, or
+  // another day's, once read, with the start held always among them and the provider kept while the
+  // day offers them. The read of another day is the move form's (./pointed-day.ts).
+  const pointed = usePointedDay(booking.pointed, view, choices.day);
+  const offered = offeredOn(choices, booking.pointed, pointed, booking.start, booking.providerId);
+  const provider = offered.providers.find((found) => found.id === offered.providerId) ?? null;
+  // A date is no moment, so it is formatted in UTC (D-098).
+  const bookedDay = isShownDay(booking.day)
+    ? format.dateTime(new Date(booking.day), {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: booking.day.slice(0, 4) === choices.today.slice(0, 4) ? undefined : 'numeric',
+        timeZone: 'UTC',
+      })
+    : '';
   // The toast names the patient: the one picked, or the new one by the names typed.
   const named = booking.newPatient ?? booking.patient;
   const patientName = named
     ? names('fullName', { first: named.firstName.trim(), last: named.lastName.trim() })
     : '';
-  const warnings = view.day === choices.day ? bookingWarnings(view, booking) : NO_WARNINGS;
-  const anyway = warnings.overlaps.length > 0;
+  const warnings =
+    pointed.state === 'ok'
+      ? bookingWarnings(pointed.view, { ...booking, providerId: offered.providerId })
+      : NO_WARNINGS;
+  // Only while the box shows an overlap of the day pointed at: the old box stays until a changed
+  // day's read answers, and Book anyway then would go over a visit nobody showed (D-020).
+  const anyway = movesAnyway(warnings.overlaps.length, pointed.view.day, booking.pointed);
   return (
     <StaffForm
       action={bookAppointment}
-      doneMessage={t('booked', { name: patientName, time: time(booking.start) })}
+      doneMessage={
+        booking.day === view.day
+          ? t('booked', { name: patientName, time: time(booking.start) })
+          : t('bookedOn', { name: patientName, day: bookedDay, time: time(booking.start) })
+      }
       onDone={(value) => onDone(value.providerId)}
       refusals={{
         overlap: t('overlap'),
@@ -321,9 +386,11 @@ export function BookingForm({
           : t('bookWithoutProvider', { time: time(booking.start) })
       }
       pendingLabel={t('booking')}
-      onSendingChange={onSendingChange}
+      onSendingChange={(sending) => {
+        onSendingChange?.(sending);
+        if (!sending) pointed.readAgainAfterSend();
+      }}
     >
-      <input type="hidden" name="day" value={choices.day} />
       {anyway && <input type="hidden" name="anyway" value="true" />}
       {booking.newPatient ? (
         <NewPatientFields
@@ -373,6 +440,22 @@ export function BookingForm({
         The form's last child: StaffForm puts its refusal's message and Book right under it. The
         warning shares it with the selects, so its live region, empty, adds no gap above Book.
       */}
+      <StaffField
+        name="day"
+        label={t('day')}
+        render={(field) => (
+          <Input
+            {...field}
+            type="date"
+            value={booking.day}
+            onChange={(event) => {
+              // The browser gives '' while a date is half typed: only a complete day is pointed at.
+              const day = event.currentTarget.value;
+              onChange(isShownDay(day) ? { day, pointed: day } : { day });
+            }}
+          />
+        )}
+      />
       <div>
         {/* The provider's short name is the longest of the three: its select is the widest. */}
         <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-2.5">
@@ -388,7 +471,7 @@ export function BookingForm({
                   if (start !== null) onChange({ start });
                 }}
               >
-                {choices.starts.map((minutes) => (
+                {offered.starts.map((minutes) => (
                   <NativeSelectOption key={minutes} value={startValue(minutes)}>
                     {time(minutes)}
                   </NativeSelectOption>
@@ -417,7 +500,7 @@ export function BookingForm({
             name="providerId"
             label={t('provider')}
             render={(field) =>
-              choices.providers.length === 0 ? (
+              offered.providers.length === 0 ? (
                 // Disabled, so nothing is sent: Book then says the field needs a provider.
                 <NativeSelect {...field} disabled defaultValue="">
                   <NativeSelectOption value="">{t('noProviders')}</NativeSelectOption>
@@ -425,10 +508,10 @@ export function BookingForm({
               ) : (
                 <NativeSelect
                   {...field}
-                  value={booking.providerId}
+                  value={offered.providerId}
                   onChange={(event) => onChange({ providerId: event.currentTarget.value })}
                 >
-                  {choices.providers.map((option) => (
+                  {offered.providers.map((option) => (
                     <NativeSelectOption key={option.id} value={option.id}>
                       {option.shortName}
                     </NativeSelectOption>
@@ -438,9 +521,16 @@ export function BookingForm({
             }
           />
         </div>
+        {/*
+          A live region, always there, empty while the day could be checked: it adds no gap. Before the
+          warning's, which is the last one above Book.
+        */}
+        <div role="status">
+          {pointed.state === 'failed' && <p className="mt-3 text-muted">{t('couldNotCheck')}</p>}
+        </div>
         <BookingWarning
           warnings={warnings}
-          day={choices.day}
+          day={pointed.view.day}
           providerName={provider?.shortName ?? ''}
         />
       </div>

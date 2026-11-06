@@ -1,28 +1,19 @@
 'use client';
 
 import { useFormatter, useTimeZone, useTranslations } from 'next-intl';
-import { startTransition, useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { StaffField, StaffForm } from '@/app/_lib/staff-form';
-import { useFrameClinic } from '@/app/_lib/frame-clinic';
 import type { CalendarDay } from '@/lib/calendar-day';
 import { cn } from '@/ui/cn';
 import { Input } from '@/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/ui/native-select';
-import { readCalendarDay } from './actions';
 import { moveAppointment } from './appointment-actions';
 import { bookableProviders, minutesOfStart, startValue } from './booking-choices';
 import { BookingWarning, TIME_OF_DAY } from './booking-warning';
 import { bookingWarnings, NO_WARNINGS } from './booking-warnings';
 import { isShownDay, type AppointmentBlock, type CalendarDayView, type Column } from './day';
-import {
-  firstMoveProvider,
-  movesAnyway,
-  placeOf,
-  pointedDay,
-  startChoicesWith,
-  type OtherDay,
-} from './move-choices';
-import { readAgain } from './read-on-use';
+import { firstMoveProvider, movesAnyway, placeOf, startChoicesWith } from './move-choices';
+import { usePointedDay } from './pointed-day';
 
 /**
  * The appointment drawer's move form (E01-T06f; the action is E01-T06c's): a date, a time and a
@@ -78,7 +69,6 @@ function MoveFields({
   const booking = useTranslations('calendar.booking');
   const names = useTranslations('patients');
   const format = useFormatter();
-  const clinicId = useFrameClinic();
   const heading = useId();
   const [place] = useState(() => placeOf(block.startsAt, block.endsAt, timeZone));
   const [move, setMove] = useState({
@@ -88,29 +78,7 @@ function MoveFields({
   });
   // The last complete day typed: the day the warnings and choices are of while a date is half typed.
   const [pointed, setPointed] = useState<CalendarDay>(place.day);
-  const [other, setOther] = useState<OtherDay | null>(null);
-  // Bumped when a send is over, so another day's warnings are read again: a refusal such as an overlap
-  // says another desk booked the slot, and the calendar's own refresh brings only the day it holds.
-  const [again, setAgain] = useState(0);
-
-  // Another day's read, for the day pointed at. Each run is a ticket: a change of day, a later send
-  // or the form leaving the page makes the answer of an earlier one drop, so the last answer wins.
-  const latest = useRef(0);
-  useEffect(() => {
-    if (pointed === held.day) return;
-    const ticket = ++latest.current;
-    // In a transition, so Next.js's redirect after an ended session reaches its boundary.
-    startTransition(async () => {
-      const answer = await readAgain(readCalendarDay, clinicId, pointed);
-      if (ticket !== latest.current) return;
-      setOther({ day: pointed, view: answer.kind === 'read' ? answer.read.view : null });
-    });
-    return () => {
-      latest.current += 1;
-    };
-  }, [pointed, held.day, clinicId, again]);
-
-  const { view, state } = pointedDay(pointed, held, other, place.day);
+  const { view, state, readAgainAfterSend } = usePointedDay(pointed, held, place.day);
   const providers = bookableProviders(view.columns);
   const providerId = providers.some((found) => found.id === move.providerId)
     ? move.providerId
@@ -161,7 +129,7 @@ function MoveFields({
         pendingLabel={t('moving')}
         onSendingChange={(sending) => {
           onSendingChange(sending);
-          if (!sending) setAgain((count) => count + 1);
+          if (!sending) readAgainAfterSend();
         }}
         className={cn(settling && '[&_button]:pointer-events-none')}
       >

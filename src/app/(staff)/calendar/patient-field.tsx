@@ -85,7 +85,13 @@ export function PatientField({
   const box = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const sent = useRef(0);
-  const [typed, setTyped] = useState(initialText);
+  // A patient picked before the field shows (Book next visit, E01-T06h) is named in the box, as one
+  // picked from the list is; typing then replaces them.
+  const [typed, setTyped] = useState(() =>
+    initialText !== '' || picked === null
+      ? initialText
+      : names('fullName', { first: picked.firstName, last: picked.lastName }),
+  );
   const [found, setFound] = useState<Found | null>(null);
   const [active, setActive] = useState(-1);
   const suggestions = found?.kind === 'found' ? found.suggestions : [];

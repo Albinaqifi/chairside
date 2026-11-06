@@ -45,7 +45,8 @@ const readTimes = new WeakMap<CalendarDayView, number>();
  *   opens it. What is kept is the opened visit's id; the visit shown is looked up in the day held now,
  *   in every column (the filter hides columns, not visits), so a read on use or a change's answer
  *   updates it, and a visit the day no longer holds closes it. A move turns the column of the provider
- *   the visit moved to on, as a booking does (E01-T06f).
+ *   the visit moved to on, as a booking does (E01-T06f). Its Book next visit hands the patient and the
+ *   visit's provider to New appointment's drawer, which opens as the appointment drawer closes (E01-T06h).
  */
 export function CalendarScreen({
   initial,
@@ -162,6 +163,18 @@ export function CalendarScreen({
             onMoved={(providerId) =>
               setChoice((before) => showColumn(before, columnIds, providerId))
             }
+            onBookNext={() => {
+              const { block, column } = opened;
+              setOpenId(null);
+              booking.current?.openFor({
+                patient: {
+                  id: block.patientId,
+                  firstName: block.patient.firstName,
+                  lastName: block.patient.lastName,
+                },
+                providerId: column.providerId,
+              });
+            }}
           />
         )
       }

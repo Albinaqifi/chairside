@@ -98,8 +98,12 @@ function focusBlock(appointmentId: string) {
  * Restore (E01-T06g) is the one status button with a box above it: a cancelled or no-show visit has it
  * alone, across both columns (./appointment-restore.tsx).
  *
- * Not here yet: Book next visit (E01-T06d), the visit's messages, the aftercare
- * box and the treatment plan (later milestones).
+ * Book next visit (E01-T06h), in the foot beside the profile link, for every visit whatever its status:
+ * one press closes this drawer and opens the booking drawer from the calendar's state (never a
+ * navigation) on the patient, with the visit's provider. The focus then stays in the booking drawer,
+ * not back on the block.
+ *
+ * Not here yet: the visit's messages, the aftercare box and the treatment plan (later milestones).
  */
 export function AppointmentDrawer({
   block,
@@ -108,6 +112,7 @@ export function AppointmentDrawer({
   year,
   onClose,
   onMoved,
+  onBookNext,
 }: {
   block: AppointmentBlock;
   /** The provider's column the visit is in: its name and chair. */
@@ -119,6 +124,8 @@ export function AppointmentDrawer({
   onClose: () => void;
   /** A move is done, with the provider the visit moved to: the calendar turns that column on. */
   onMoved: (providerId: string) => void;
+  /** Book next visit: the calendar closes this drawer and opens the booking drawer on the patient. */
+  onBookNext: () => void;
 }) {
   const t = useTranslations();
   const format = useFormatter();
@@ -131,6 +138,7 @@ export function AppointmentDrawer({
   const content = useRef<HTMLDivElement>(null);
   const cancelButton = useRef<HTMLButtonElement>(null);
   const cancelled = useRef(false);
+  const leavingForBooking = useRef(false);
   const actions = SHOWN.filter((action: Shown) => block.actions.includes(action));
   // The buttons as last rendered, compared while rendering: the commit that changes them is the one
   // that stops their clicks, so no frame shows them changed and taking a press. Only the pointer's:
@@ -170,7 +178,8 @@ export function AppointmentDrawer({
         description={block.title}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          focusBlock(block.id);
+          // Not after Book next visit: the focus is in the booking drawer that opened as this one left.
+          if (!leavingForBooking.current) focusBlock(block.id);
         }}
       >
         <SheetBody>
@@ -256,6 +265,17 @@ export function AppointmentDrawer({
           </Dialog>
         </SheetBody>
         <SheetFooter>
+          {/* Outside the drawer's forms: a plain button, never a submit. */}
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={() => {
+              leavingForBooking.current = true;
+              onBookNext();
+            }}
+          >
+            {t('calendar.appointment.bookNext')}
+          </Button>
           <Button asChild variant="secondary" className="flex-1">
             <Link href={`/patients/${block.patientId}`} prefetch={false}>
               {t('calendar.appointment.profile')}

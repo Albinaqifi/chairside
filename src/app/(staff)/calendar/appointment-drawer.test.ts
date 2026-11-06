@@ -123,6 +123,7 @@ function render(
     year: options.year ?? false,
     onClose: vi.fn(),
     onMoved: vi.fn(),
+    onBookNext: vi.fn(),
   });
   const frame: ComponentProps<typeof FrameClinic> = { clinicId: CLINIC, children: drawer };
   const provider: ComponentProps<typeof NextIntlClientProvider> = {
@@ -391,5 +392,22 @@ describe('visitById: the visit the drawer shows is the one the day holds now (ac
     expect(visitById(day(['a']), 'b')).toBeNull();
     expect(visitById(day([]), 'a')).toBeNull();
     expect(visitById(day(['a']), 'lunch')).toBeNull();
+  });
+});
+
+describe('Book next visit, in the foot beside the profile link (E01-T06h)', () => {
+  /** The foot's HTML: it holds a button and a link, no other div. */
+  const foot = (html: string) =>
+    /data-slot="sheet-footer"[^>]*>([\s\S]*?)<\/div>/.exec(html)?.[1] ?? '';
+
+  it.each<[AppointmentStatus, StatusAction[]]>([
+    ['booked', ['arrive', 'cancel']],
+    ['completed', ['undo_completion']],
+    ['cancelled', ['restore']],
+  ])('a %s visit has it, a plain button, left of the profile link', (status, actions) => {
+    const inFoot = foot(render(block(status, actions)));
+    const button = /<button\b([^>]*)>Book next visit<\/button>/.exec(inFoot);
+    expect(button?.[1]).toMatch(/type="button"/);
+    expect(inFoot.indexOf('Book next visit')).toBeLessThan(inFoot.indexOf('Patient profile'));
   });
 });
